@@ -8,11 +8,9 @@ git pull
 echo "→ Installing PHP dependencies…"
 composer install --no-dev --optimize-autoloader
 
-if [ -f package.json ]; then
-  echo "→ Building front-end assets…"
-  npm install --no-audit --no-fund
-  npm run build
-fi
+# NOTE: front-end assets (public/build) are committed to the repo, so there is
+# NO npm build step here. If you change CSS/JS, run `npm run build` on your PC
+# and commit public/build, then `git push` and re-run this script.
 
 echo "→ Running database migrations…"
 php artisan migrate --force

@@ -54,6 +54,51 @@ class ImageOptimizer
         }
     }
 
+    /**
+     * Download a remote image and store it as optimized WebP.
+     * Returns the stored relative path, or the original URL if the download fails
+     * (ProductImage::url() serves http(s) paths as-is, so nothing breaks).
+     */
+    public function storeWebpFromUrl(string $url, string $dir = 'products', int $maxWidth = 1600, int $quality = 82): string
+    {
+        try {
+            $binary = @file_get_contents($url);
+            if ($binary === false || $binary === '') {
+                return $url;
+            }
+
+            if (! $this->canConvert()) {
+                $ext = pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION) ?: 'jpg';
+                $path = $dir.'/'.Str::uuid()->toString().'.'.$ext;
+                Storage::disk('public')->put($path, $binary);
+                return $path;
+            }
+
+            $src = @imagecreatefromstring($binary);
+            if ($src === false) {
+                return $url;
+            }
+
+            $src = $this->downscale($src, $maxWidth);
+            imagepalettetotruecolor($src);
+            imagealphablending($src, true);
+            imagesavealpha($src, true);
+
+            $path = $dir.'/'.Str::uuid()->toString().'.webp';
+            ob_start();
+            imagewebp($src, null, $quality);
+            $out = ob_get_clean();
+            imagedestroy($src);
+
+            Storage::disk('public')->put($path, $out);
+
+            return $path;
+        } catch (\Throwable $e) {
+            Log::warning('Remote image import failed; keeping URL', ['url' => $url, 'error' => $e->getMessage()]);
+            return $url;
+        }
+    }
+
     protected function canConvert(): bool
     {
         return function_exists('imagewebp') && function_exists('imagecreatefromstring');
