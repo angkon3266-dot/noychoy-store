@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+    /* Noychoy jewelry palette — warm gold on soft charcoal/cream */
+    --color-gold-50: #fbf8f1;
+    --color-gold-100: #f5edda;
+    --color-gold-200: #ead7b0;
+    --color-gold-300: #ddbd82;
+    --color-gold-400: #cfa055;
+    --color-gold-500: #b6863a;
+    --color-gold-600: #9a6c2e;
+    --color-gold-700: #7a5326;
+    --color-gold-800: #5f4222;
+    --color-gold-900: #50381f;
+
+    --color-ink-50: #f6f6f7;
+    --color-ink-100: #e7e7e9;
+    --color-ink-700: #36363b;
+    --color-ink-800: #232327;
+    --color-ink-900: #161618;
+}
+
+@layer base {
+    body {
+        @apply bg-gold-50 text-ink-800 antialiased;
+    }
+    h1, h2, h3, .font-display {
+        font-family: var(--font-serif);
+    }
+}
+
+@layer components {
+    .btn, .btn-primary, .btn-dark, .btn-outline {
+        @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-gold-400/50 disabled:opacity-50;
+    }
+    .btn-primary {
+        @apply bg-gold-600 text-white hover:bg-gold-700;
+    }
+    .btn-dark {
+        @apply bg-ink-900 text-white hover:bg-ink-800;
+    }
+    .btn-outline {
+        @apply border border-gold-300 text-gold-800 hover:bg-gold-100;
+    }
+    .input {
+        @apply w-full rounded-md border border-ink-100 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 focus:outline-none;
+    }
+    .label {
+        @apply mb-1 block text-sm font-medium text-ink-700;
+    }
+    .card {
+        @apply rounded-xl border border-ink-100 bg-white shadow-sm;
+    }
+    .badge {
+        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    }
+}

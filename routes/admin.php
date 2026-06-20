@@ -1,0 +1,89 @@
+<?php
+
+use App\Http\Controllers\Admin\AppearanceController;
+use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\CouponController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\IntegrationController;
+use App\Http\Controllers\Admin\MenuController;
+use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SmsController;
+use Illuminate\Support\Facades\Route;
+
+// Auth (no admin middleware)
+Route::get('login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('login', [AuthController::class, 'login'])->name('login.post');
+Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+
+// Protected admin area
+Route::middleware('admin')->group(function () {
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Products
+    Route::get('products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
+    Route::post('products', [ProductController::class, 'store'])->name('products.store');
+    Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+    Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
+    Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate');
+    Route::patch('products/{product}/quick', [ProductController::class, 'quickUpdate'])->name('products.quick');
+    Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
+    Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    Route::delete('product-images/{image}', [ProductController::class, 'deleteImage'])->name('products.images.delete');
+    Route::post('product-images/{image}/primary', [ProductController::class, 'setPrimaryImage'])->name('products.images.primary');
+
+    // Categories
+    Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
+    Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+    Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+
+    // Orders
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
+    Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
+    Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
+    Route::post('orders/{order}/sms', [OrderController::class, 'sendSms'])->name('orders.sms');
+
+    // Reviews (moderation)
+    Route::get('reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');
+    Route::patch('reviews/{review}/status', [\App\Http\Controllers\Admin\ReviewController::class, 'updateStatus'])->name('reviews.status');
+    Route::delete('reviews/{review}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+    // Abandoned carts (lead follow-up)
+    Route::get('abandoned-carts', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'index'])->name('abandoned.index');
+    Route::patch('abandoned-carts/{cart}/contacted', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'markContacted'])->name('abandoned.contacted');
+    Route::delete('abandoned-carts/{cart}', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'destroy'])->name('abandoned.destroy');
+
+    // Coupons
+    Route::get('coupons', [CouponController::class, 'index'])->name('coupons.index');
+    Route::post('coupons', [CouponController::class, 'store'])->name('coupons.store');
+    Route::put('coupons/{coupon}', [CouponController::class, 'update'])->name('coupons.update');
+    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('coupons.destroy');
+
+    // SMS
+    Route::get('sms', [SmsController::class, 'index'])->name('sms.index');
+    Route::post('sms/send', [SmsController::class, 'send'])->name('sms.send');
+    Route::post('sms/broadcast', [SmsController::class, 'broadcast'])->name('sms.broadcast');
+
+    // Appearance / theme
+    Route::get('appearance', [AppearanceController::class, 'index'])->name('appearance');
+    Route::post('appearance', [AppearanceController::class, 'update'])->name('appearance.update');
+
+    // Navigation menu builder
+    Route::get('menu', [MenuController::class, 'index'])->name('menu');
+    Route::post('menu', [MenuController::class, 'update'])->name('menu.update');
+
+    // Integrations (Steadfast, SMS) + templates
+    Route::get('integrations', [IntegrationController::class, 'index'])->name('integrations');
+    Route::post('integrations', [IntegrationController::class, 'update'])->name('integrations.update');
+    Route::post('integrations/test-sms', [IntegrationController::class, 'testSms'])->name('integrations.test-sms');
+
+    // Settings
+    Route::get('settings', [SettingController::class, 'index'])->name('settings');
+    Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
+});

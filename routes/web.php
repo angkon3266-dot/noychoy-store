@@ -1,0 +1,60 @@
+<?php
+
+use App\Http\Controllers\Customer\AccountController;
+use App\Http\Controllers\Customer\AuthController as CustomerAuthController;
+use App\Http\Controllers\Shop\CartController;
+use App\Http\Controllers\Shop\CatalogController;
+use App\Http\Controllers\Shop\CheckoutController;
+use App\Http\Controllers\Shop\HomeController;
+use App\Http\Controllers\SteadfastWebhookController;
+use Illuminate\Support\Facades\Route;
+
+// Steadfast delivery-status webhook (register at steadfast.com.bd/user/webhook/add)
+Route::post('/webhooks/steadfast', [SteadfastWebhookController::class, 'handle'])->name('steadfast.webhook');
+
+// ── Storefront ──────────────────────────────────────────────────────────────
+Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/shop', [CatalogController::class, 'index'])->name('shop');
+Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
+Route::get('/track', [CheckoutController::class, 'track'])->name('track');
+
+// Cart
+Route::controller(CartController::class)->group(function () {
+    Route::get('/cart', 'index')->name('cart');
+    Route::get('/cart/mini', 'mini')->name('cart.mini');
+    Route::post('/cart/add/{product:slug}', 'add')->name('cart.add');
+    Route::post('/cart/add-many', 'addMany')->name('cart.add-many');
+    Route::post('/cart/buy-now/{product:slug}', 'buyNow')->name('cart.buynow');
+    Route::patch('/cart/update', 'update')->name('cart.update');
+    Route::delete('/cart/remove', 'remove')->name('cart.remove');
+    Route::post('/cart/coupon', 'applyCoupon')->name('cart.coupon');
+    Route::delete('/cart/coupon', 'removeCoupon')->name('cart.coupon.remove');
+});
+
+// Checkout
+Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+Route::post('/checkout/lead', [\App\Http\Controllers\Shop\LeadController::class, 'capture'])->name('checkout.lead');
+
+// Product reviews
+Route::post('/product/{product:slug}/review', [\App\Http\Controllers\Shop\ReviewController::class, 'store'])->name('review.store');
+Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'confirmation'])->name('order.confirmation');
+
+// ── Customer accounts (optional) ─────────────────────────────────────────────
+Route::middleware('guest:customer')->group(function () {
+    Route::get('/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login');
+    Route::post('/login', [CustomerAuthController::class, 'login'])->name('customer.login.post');
+    Route::get('/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register');
+    Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.post');
+});
+Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
+
+Route::middleware('auth:customer')->group(function () {
+    Route::get('/account', [AccountController::class, 'index'])->name('account');
+    Route::get('/account/orders', [AccountController::class, 'orders'])->name('account.orders');
+    Route::get('/account/orders/{orderNumber}', [AccountController::class, 'order'])->name('account.order');
+});
+
+// Catalog (slug routes last so they don't shadow the above)
+Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');
+Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->name('product.show');
