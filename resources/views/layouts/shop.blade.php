@@ -139,34 +139,22 @@
         </div>
     @endif
 
-    <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ open: false }">
+    <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ open: false, msearch: false }">
         <div class="mx-auto max-w-7xl px-4">
-            <div class="flex h-16 items-center gap-3">
-                {{-- Logo (left on all screens) --}}
+            <div class="flex h-16 items-center gap-2">
+                {{-- Hamburger (mobile, far left) --}}
+                <button @click="open = !open" class="md:hidden p-2 -ml-1" aria-label="Menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+                </button>
+
+                {{-- Logo --}}
                 <a href="{{ route('home') }}" class="shrink-0">
                     @if($logo = theme_asset(theme('logo')))
                         <img src="{{ $logo }}" alt="{{ config('store.name') }}" class="h-9 w-auto">
                     @else
-                        <span class="font-display text-xl sm:text-2xl font-bold tracking-wide text-gold-700">{{ config('store.name') }}</span>
+                        <span class="font-display text-xl sm:text-2xl font-bold tracking-wide text-gold-700">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
                     @endif
                 </a>
-
-                {{-- Mobile search (middle) --}}
-                @if(theme('menu_show_search', true))
-                <div class="flex-1 md:hidden relative" x-data="searchBox()" @click.outside="open=false">
-                    <form action="{{ route('shop') }}" method="GET">
-                        <input name="q" x-model="q" @input="onInput()" placeholder="Search jewelry…" class="input py-2 w-full" autocomplete="off">
-                    </form>
-                    <div x-show="open && results.length" x-cloak class="absolute left-0 right-0 mt-1 max-h-80 overflow-y-auto rounded-xl border border-ink-100 bg-white shadow-xl z-50 p-2">
-                        <template x-for="r in results" :key="r.url">
-                            <a :href="r.url" class="flex items-center gap-3 rounded-lg p-2 hover:bg-gold-50">
-                                <span class="w-9 h-9 rounded bg-gold-100 overflow-hidden shrink-0"><template x-if="r.thumb"><img :src="r.thumb" class="w-full h-full object-cover" alt=""></template></span>
-                                <span class="min-w-0 flex-1"><span class="block text-sm truncate" x-text="r.name"></span><span class="block text-xs text-gold-700" x-text="r.price"></span></span>
-                            </a>
-                        </template>
-                    </div>
-                </div>
-                @endif
 
                 @php $menuTrigger = theme('menu_desktop_trigger', 'hover'); @endphp
                 <nav class="hidden md:flex items-center gap-6 text-sm font-medium">
@@ -226,6 +214,12 @@
                 </nav>
 
                 <div class="flex items-center gap-1 ml-auto">
+                    {{-- Mobile search icon (toggles the bar below) --}}
+                    @if(theme('menu_show_search', true))
+                        <button type="button" @click="msearch = !msearch" class="md:hidden p-2 hover:text-gold-700" aria-label="Search">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+                        </button>
+                    @endif
                     @if(theme('menu_show_search', true))
                     <div class="hidden lg:block relative" x-data="searchBox()" @click.outside="open=false">
                         <form action="{{ route('shop') }}" method="GET">
@@ -262,12 +256,25 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
                         <span x-show="$store.cart.count > 0" x-cloak class="absolute -top-0.5 -right-0.5 badge bg-gold-600 text-white px-1.5 min-w-5 justify-center" x-text="$store.cart.count">{{ $cartCount ?? '' }}</span>
                     </a>
-                    {{-- Hamburger (mobile, right) --}}
-                    <button @click="open = !open" class="md:hidden p-2 -mr-2" aria-label="Menu">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
-                    </button>
                 </div>
             </div>
+
+            {{-- Mobile collapsible search bar --}}
+            @if(theme('menu_show_search', true))
+            <div x-show="msearch" x-cloak class="md:hidden pb-3" x-data="searchBox()" @click.outside="msearch=false">
+                <form action="{{ route('shop') }}" method="GET">
+                    <input name="q" x-model="q" @input="onInput()" placeholder="Search jewelry…" class="input py-2 w-full" autocomplete="off" x-ref="msearchInput">
+                </form>
+                <div x-show="open && results.length" x-cloak class="mt-1 max-h-80 overflow-y-auto rounded-xl border border-ink-100 bg-white shadow-xl p-2">
+                    <template x-for="r in results" :key="r.url">
+                        <a :href="r.url" class="flex items-center gap-3 rounded-lg p-2 hover:bg-gold-50">
+                            <span class="w-9 h-9 rounded bg-gold-100 overflow-hidden shrink-0"><template x-if="r.thumb"><img :src="r.thumb" class="w-full h-full object-cover" alt=""></template></span>
+                            <span class="min-w-0 flex-1"><span class="block text-sm truncate" x-text="r.name"></span><span class="block text-xs text-gold-700" x-text="r.price"></span></span>
+                        </a>
+                    </template>
+                </div>
+            </div>
+            @endif
 
             <div x-show="open" x-cloak class="md:hidden pb-4 space-y-1">
                 @foreach($siteMenu ?? [] as $item)
@@ -366,7 +373,7 @@
     <footer class="mt-16 bg-ink-900 text-gold-100">
         <div class="mx-auto max-w-7xl px-4 py-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-                <div class="font-display text-xl font-bold text-gold-300">{{ config('store.name') }}</div>
+                <div class="font-display text-xl font-bold text-gold-300">{{ theme('footer_brand') ?: \App\Models\Setting::get('store_name', config('store.name')) }}</div>
                 <p class="mt-3 text-sm text-gold-100/70">{{ theme('footer_about') ?: 'Handpicked jewelry, delivered across Bangladesh. Cash on delivery available.' }}</p>
                 @php($fbUrl = theme('footer_facebook'))
                 @php($igUrl = theme('footer_instagram'))

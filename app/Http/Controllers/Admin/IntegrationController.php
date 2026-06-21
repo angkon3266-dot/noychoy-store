@@ -85,6 +85,10 @@ class IntegrationController extends Controller
         $data = $request->validate(['phone' => ['required', 'string', 'max:20']]);
         $ok = $sms->send($data['phone'], 'Test SMS from '.config('store.name').' — your SMS gateway is working.');
 
-        return back()->with($ok ? 'success' : 'error', $ok ? 'Test SMS sent.' : 'Test SMS failed (check credentials/logs).');
+        // Surface the exact gateway response so problems can be diagnosed.
+        $raw = $sms->lastResponse ? ' — gateway response: '.json_encode($sms->lastResponse) : '';
+
+        return back()->with($ok ? 'success' : 'error',
+            ($ok ? 'Test SMS sent.' : 'Test SMS failed.').$raw);
     }
 }

@@ -64,6 +64,7 @@ return [
         'menu_cta_link' => null,             // optional highlighted nav button link
 
         // Footer (editable in Appearance → Footer)
+        'footer_brand' => null,              // footer heading text; defaults to store name
         'footer_about' => 'Handpicked jewelry, delivered across Bangladesh. Cash on delivery available.',
         'footer_facebook' => null,
         'footer_instagram' => null,

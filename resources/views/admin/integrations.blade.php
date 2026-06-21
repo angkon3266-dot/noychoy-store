@@ -39,8 +39,8 @@
                 </div>
                 <div><label class="label">API Key</label><input name="sms_api_key" value="{{ $int['sms_api_key'] ?? '' }}" class="input" autocomplete="off"></div>
                 <div><label class="label">Secret Key</label><input name="sms_secret_key" value="{{ $int['sms_secret_key'] ?? '' }}" class="input" autocomplete="off"></div>
-                <div><label class="label">Masking / Sender ID (callerID)</label><input name="sms_caller_id" value="{{ $int['sms_caller_id'] ?? '' }}" class="input" placeholder="Leave empty for non-masking">
-                    <p class="text-xs text-ink-700/50 mt-1">Leave empty to send <strong>non-masking</strong> (SMS shows from a number, no brand name).</p>
+                <div><label class="label">Sender ID (callerID) — required</label><input name="sms_caller_id" value="{{ $int['sms_caller_id'] ?? '' }}" class="input" placeholder="Noychoy_Com">
+                    <p class="text-xs text-ink-700/50 mt-1">KhudeBarta <strong>requires a sender ID</strong>. Use your masking name (e.g. <code>Noychoy_Com</code>) or, for non-masking, the numeric sender ID KhudeBarta assigned you. It cannot be blank.</p>
                 </div>
                 @if($smsOk)<div class="flex items-end text-sm text-ink-700/60">Balance: <strong class="ml-1">{{ $smsBalance['statusInfo']['availablebalance'] ?? ($smsBalance['availablebalance'] ?? 'n/a') }}</strong></div>@endif
             </div>

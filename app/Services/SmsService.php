@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Log;
  */
 class SmsService
 {
+    /** Raw provider response from the most recent send() — for diagnostics. */
+    public ?array $lastResponse = null;
+
     protected function cfg(string $key, $default = null)
     {
         $int = Setting::get('integrations', []);
@@ -64,19 +67,20 @@ class SmsService
         }
 
         try {
+            // callerID (sender ID) is REQUIRED by KhudeBarta — masking name OR a
+            // non-masking sender ID. Always send it.
             $params = [
                 'apikey' => $this->apiKey(),
                 'secretkey' => $this->secretKey(),
+                'callerID' => $this->callerId() ?? '',
                 'toUser' => $to,
                 'messageContent' => $message,
             ];
-            // Only send a masking sender if one is configured; otherwise non-masking.
-            if (filled($this->callerId())) {
-                $params['callerID'] = $this->callerId();
-            }
 
             $response = Http::timeout(config('sms.timeout', 20))
                 ->get($this->baseUrl().'/sendtext', $params);
+
+            $this->lastResponse = $response->json() ?? ['raw' => $response->body()];
 
             $data = $response->json() ?? [];
             $providerStatus = (string) ($data['Status'] ?? '');

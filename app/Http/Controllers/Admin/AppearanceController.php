@@ -32,6 +32,7 @@ class AppearanceController extends Controller
             'font_body_src' => ['nullable', 'in:google,custom'],
             'font_heading_file' => ['nullable', 'file', 'mimes:woff,woff2,ttf,otf', 'max:4096'],
             'font_body_file' => ['nullable', 'file', 'mimes:woff,woff2,ttf,otf', 'max:4096'],
+            'footer_brand' => ['nullable', 'string', 'max:60'],
             'footer_about' => ['nullable', 'string', 'max:300'],
             'footer_facebook' => ['nullable', 'string', 'max:200'],
             'footer_instagram' => ['nullable', 'string', 'max:200'],
@@ -118,7 +119,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'low_stock_threshold', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'low_stock_threshold', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

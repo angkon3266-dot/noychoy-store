@@ -239,6 +239,11 @@
         <p class="text-xs text-ink-700/60 mb-4">The Shop / Help / Contact columns fill automatically from your categories &amp; store details. Customise the rest here.</p>
         <div class="space-y-4">
             <div>
+                <label class="label">Footer brand text</label>
+                <input name="footer_brand" value="{{ $theme['footer_brand'] ?? '' }}" class="input" placeholder="{{ \App\Models\Setting::get('store_name', config('store.name')) }}">
+                <p class="text-xs text-ink-700/50 mt-1">The big heading in the footer. Leave empty to use your store name (set in <a href="{{ route('admin.settings') }}" class="text-gold-700 underline">Settings</a>).</p>
+            </div>
+            <div>
                 <label class="label">About text</label>
                 <textarea name="footer_about" rows="2" class="input" placeholder="Handpicked jewelry, delivered across Bangladesh…">{{ $theme['footer_about'] ?? '' }}</textarea>
             </div>
