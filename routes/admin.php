@@ -49,6 +49,12 @@ Route::middleware('admin')->group(function () {
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
     Route::post('orders/{order}/sms', [OrderController::class, 'sendSms'])->name('orders.sms');
 
+    // Offers & promotions (auto-apply + PDP display)
+    Route::get('offers', [\App\Http\Controllers\Admin\OfferController::class, 'index'])->name('offers.index');
+    Route::post('offers', [\App\Http\Controllers\Admin\OfferController::class, 'store'])->name('offers.store');
+    Route::put('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'update'])->name('offers.update');
+    Route::delete('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'destroy'])->name('offers.destroy');
+
     // Reviews (moderation)
     Route::get('reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');
     Route::patch('reviews/{review}/status', [\App\Http\Controllers\Admin\ReviewController::class, 'updateStatus'])->name('reviews.status');

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Coupon;
+use App\Models\Offer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Support\Collection;
@@ -119,6 +120,52 @@ class CartService
         return (float) $this->items()->sum(fn ($i) => $this->lineOfferSaving($i));
     }
 
+    // ── Automatic offers (Admin → Offers) ──────────────────────────────────
+
+    protected ?Collection $offerCache = null;
+
+    protected function isMember(): bool
+    {
+        return auth('customer')->check();
+    }
+
+    /** Base that order-level offers apply to: subtotal after per-product offers. */
+    protected function promoBase(): float
+    {
+        return max(0, $this->subtotal() - $this->offerDiscount());
+    }
+
+    /** All active offers whose conditions the current cart meets. */
+    public function matchingOffers(): Collection
+    {
+        $this->offerCache ??= Offer::active()->get();
+        $sub = $this->promoBase();
+        $qty = $this->count();
+        $member = $this->isMember();
+
+        return $this->offerCache->filter(fn (Offer $o) => $o->matches($sub, $qty, $member))->values();
+    }
+
+    /** Combined percentage from auto offers (best non-member + member, capped). */
+    public function promoPercent(): float
+    {
+        $offers = $this->matchingOffers()->where('type', 'order_percent');
+        $base = (float) ($offers->where('members_only', false)->max('percent') ?: 0);
+        $member = (float) ($offers->where('members_only', true)->max('percent') ?: 0);
+
+        return min(90, $base + $member);
+    }
+
+    public function promoDiscount(): float
+    {
+        return round($this->promoBase() * $this->promoPercent() / 100, 2);
+    }
+
+    public function hasFreeShippingOffer(): bool
+    {
+        return $this->matchingOffers()->contains(fn (Offer $o) => $o->type === 'free_shipping');
+    }
+
     // ── Coupons ───────────────────────────────────────────────────────────
     public function applyCoupon(Coupon $coupon): void
     {
@@ -130,10 +177,10 @@ class CartService
         session()->forget($this->couponKey);
     }
 
-    /** Base the coupon is calculated against: subtotal after quantity offers. */
+    /** Base the coupon is calculated against: subtotal after product + auto offers. */
     protected function couponBase(): float
     {
-        return max(0, $this->subtotal() - $this->offerDiscount());
+        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount());
     }
 
     public function coupon(): ?Coupon
@@ -153,16 +200,16 @@ class CartService
         return $coupon ? $coupon->discountFor($this->couponBase(), $this) : 0.0;
     }
 
-    /** Total discount = quantity offers + coupon. */
+    /** Total discount = quantity offers + auto promo offers + coupon. */
     public function discount(): float
     {
-        return round($this->offerDiscount() + $this->couponDiscount(), 2);
+        return round($this->offerDiscount() + $this->promoDiscount() + $this->couponDiscount(), 2);
     }
 
     public function shipping(bool $insideDhaka = false): float
     {
-        // Free-shipping coupon overrides everything.
-        if ($this->coupon()?->free_shipping) {
+        // Free shipping from a coupon or an active offer overrides everything.
+        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer()) {
             return 0.0;
         }
         $threshold = config('store.shipping.free_threshold');

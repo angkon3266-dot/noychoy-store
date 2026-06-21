@@ -52,6 +52,28 @@
         </div>
     @endif
 
+    {{-- Active offers (auto-applied at checkout) --}}
+    @php
+        $pdpOffers = \App\Models\Offer::active()->where('show_on_pdp', true)->get();
+    @endphp
+    @if($pdpOffers->isNotEmpty())
+        <div class="mt-5 rounded-xl border border-green-200 bg-green-50/70 p-4">
+            <p class="text-sm font-semibold text-green-800 flex items-center gap-1.5">🎉 Offers on this order</p>
+            <ul class="mt-2 space-y-1.5">
+                @foreach($pdpOffers as $o)
+                    <li class="flex items-start gap-2 text-sm text-ink-800">
+                        <span class="text-green-600 mt-0.5">✓</span>
+                        <span>
+                            @if($o->badge_label)<span class="badge bg-green-600 text-white text-[10px] mr-1">{{ $o->badge_label }}</span>@endif
+                            <strong>{{ $o->title }}</strong>@if($o->description) — <span class="text-ink-700/70">{{ $o->description }}</span>@endif
+                            @if($o->members_only) @guest('customer') · <a href="{{ route('customer.register') }}" class="text-gold-700 underline">Register to unlock</a>@endguest @endif
+                        </span>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     {{-- Delivery estimate --}}
     @if(theme('show_delivery_estimate'))
         @php

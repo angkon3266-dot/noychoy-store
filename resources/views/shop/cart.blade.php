@@ -11,9 +11,9 @@
             <a href="{{ route('shop') }}" class="btn-primary mt-4">Start shopping</a>
         </div>
     @else
-        @php($freeThreshold = config('store.shipping.free_threshold'))
+        @php $freeThreshold = config('store.shipping.free_threshold'); @endphp
         @if(theme('free_shipping_bar') && $freeThreshold)
-            @php($remaining = max(0, $freeThreshold - $cart->subtotal()))
+            @php $remaining = max(0, $freeThreshold - $cart->subtotal()); @endphp
             <div class="card p-4 mb-6">
                 @if($remaining > 0)
                     <p class="text-sm text-center mb-2">Add <strong>{{ money($remaining) }}</strong> more to unlock <strong>free delivery!</strong></p>
@@ -25,6 +25,35 @@
                 </div>
             </div>
         @endif
+        {{-- Offers: applied + how to unlock more --}}
+        @php
+            $allOffers = \App\Models\Offer::active()->get();
+            $matched = $cart->matchingOffers();
+            $matchedIds = $matched->pluck('id')->all();
+            $sub = $cart->subtotal() - $cart->offerDiscount();
+            $nearly = $allOffers->reject(fn($o) => in_array($o->id, $matchedIds))
+                ->filter(fn($o) => $o->min_subtotal && $o->remainingToUnlock($sub) > 0 && (!$o->members_only || auth('customer')->check()))
+                ->sortBy(fn($o) => $o->remainingToUnlock($sub));
+        @endphp
+        @if($matched->isNotEmpty() || $nearly->isNotEmpty())
+            <div class="card p-4 mb-6 space-y-2">
+                @foreach($matched as $o)
+                    <p class="text-sm text-green-700 flex items-center gap-2">✓ <strong>{{ $o->title }}</strong> applied</p>
+                @endforeach
+                @foreach($nearly->take(1) as $o)
+                    <p class="text-sm">Add <strong>{{ money($o->remainingToUnlock($sub)) }}</strong> more to unlock <strong>{{ $o->title }}</strong></p>
+                    <div class="h-2 rounded-full bg-gold-100 overflow-hidden">
+                        <div class="h-full bg-gold-500 transition-all" style="width: {{ min(100, (int) ($sub / max(1,(float)$o->min_subtotal) * 100)) }}%"></div>
+                    </div>
+                @endforeach
+                @guest('customer')
+                    @if($allOffers->where('members_only', true)->where('is_active', true)->isNotEmpty())
+                        <p class="text-sm text-ink-700/70">💡 <a href="{{ route('customer.register') }}" class="text-gold-700 underline">Register</a> to unlock members-only savings.</p>
+                    @endif
+                @endguest
+            </div>
+        @endif
+
         <div class="grid lg:grid-cols-3 gap-8">
             <div class="lg:col-span-2 space-y-4">
                 @foreach($cart->items() as $item)
@@ -81,6 +110,12 @@
                     @if($cart->offerDiscount() > 0)
                         <div class="flex justify-between text-green-700"><dt>Bundle offers</dt><dd>−{{ money($cart->offerDiscount()) }}</dd></div>
                     @endif
+                    @if($cart->promoDiscount() > 0)
+                        <div class="flex justify-between text-green-700"><dt>Offers ({{ rtrim(rtrim(number_format($cart->promoPercent(),2),'0'),'.') }}%)</dt><dd>−{{ money($cart->promoDiscount()) }}</dd></div>
+                    @endif
+                    @if($cart->hasFreeShippingOffer())
+                        <div class="flex justify-between text-green-700"><dt>Free delivery offer</dt><dd>unlocked 🎉</dd></div>
+                    @endif
                     @if($cart->couponDiscount() > 0)
                         <div class="flex justify-between text-green-700"><dt>Coupon</dt><dd>−{{ money($cart->couponDiscount()) }}</dd></div>
                     @endif
@@ -94,6 +129,21 @@
                 <a href="{{ route('shop') }}" class="block text-center text-sm text-gold-700 hover:underline mt-3">Continue shopping</a>
             </div>
         </div>
+
+        {{-- You may also like --}}
+        @php
+            $inCart = $cart->items()->pluck('product_id')->all();
+            $suggestions = \App\Models\Product::published()->whereNotIn('id', $inCart)
+                ->with('images', 'approvedReviews')->inRandomOrder()->take(4)->get();
+        @endphp
+        @if($suggestions->isNotEmpty())
+            <section class="mt-14">
+                <h2 class="font-display text-2xl font-semibold mb-6">You may also like</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+                    @foreach($suggestions as $p)<x-product-card :product="$p" />@endforeach
+                </div>
+            </section>
+        @endif
     @endif
 </div>
 @endsection
