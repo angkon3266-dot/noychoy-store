@@ -60,7 +60,8 @@ class CatalogController extends Controller
         $ids = $category->children()->pluck('id')->push($category->id);
 
         $products = Product::published()
-            ->whereIn('category_id', $ids)
+            ->where(fn ($q) => $q->whereIn('category_id', $ids)
+                ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)))
             ->with('images', 'approvedReviews', 'category')
             ->when($request->query('sort'), function ($query, $sort) {
                 match ($sort) {

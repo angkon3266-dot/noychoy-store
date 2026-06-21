@@ -29,14 +29,35 @@
                 <div class="grid sm:grid-cols-2 gap-4">
                     <div><label class="label">SKU</label><input name="sku" value="{{ old('sku', $product->sku) }}" class="input"></div>
                     <div>
-                        <label class="label">Category</label>
+                        <label class="label">Primary category</label>
                         <select name="category_id" class="input">
                             <option value="">— None —</option>
                             @foreach($categories as $cat)
                                 <option value="{{ $cat->id }}" @selected(old('category_id', $product->category_id)==$cat->id)>{{ $cat->name }}</option>
                             @endforeach
                         </select>
+                        <p class="text-xs text-ink-700/50 mt-1">Used for the breadcrumb &amp; page template.</p>
                     </div>
+                </div>
+
+                {{-- Multiple categories (for browsing + Meta catalog ad sets) --}}
+                @php
+                    $existingCats = $product->exists ? $product->categories->pluck('id')->all() : [];
+                    $selectedCats = collect(old('category_ids', $existingCats))->map(fn ($i) => (int) $i)->all();
+                @endphp
+                <div x-data="{ q: '' }">
+                    <label class="label">Categories (a product can be in several)</label>
+                    <input x-model="q" placeholder="Filter categories…" class="input py-1.5 mb-2">
+                    <div class="max-h-44 overflow-y-auto rounded-lg border border-ink-100 p-2 grid sm:grid-cols-2 gap-1">
+                        @foreach($categories as $cat)
+                            <label class="flex items-center gap-2 text-sm py-1 px-1 rounded hover:bg-ink-50"
+                                   x-show="q==='' || '{{ Str::lower($cat->name) }}'.includes(q.toLowerCase())">
+                                <input type="checkbox" name="category_ids[]" value="{{ $cat->id }}" @checked(in_array($cat->id, $selectedCats))>
+                                <span>{{ $cat->parent_id ? '— ' : '' }}{{ $cat->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="text-xs text-ink-700/50 mt-1">Tick every category this piece belongs to — this powers category-based Meta catalog ads later.</p>
                 </div>
                 <div>
                     <label class="label">Short description</label>
@@ -129,29 +150,69 @@
             </div>
 
             <!-- Upsell / cross-sell -->
+            @php
+                $allProductsJs = $allProducts->map(fn($p)=>['id'=>$p->id,'name'=>$p->name])->values();
+                $selUp = collect(old('upsell_ids', $product->upsell_ids ?? []))->map(fn($i)=>(int)$i)->values();
+                $selCross = collect(old('cross_sell_ids', $product->cross_sell_ids ?? []))->map(fn($i)=>(int)$i)->values();
+            @endphp
             <div class="card p-6 space-y-4">
-                <div><h2 class="font-semibold">Related products</h2><p class="text-xs text-ink-700/60">Drive bigger orders with manual recommendations. Ctrl/Cmd-click to select several.</p></div>
-                @php
-                    $selUp = old('upsell_ids', $product->upsell_ids ?? []);
-                    $selCross = old('cross_sell_ids', $product->cross_sell_ids ?? []);
-                @endphp
-                <div class="grid sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="label">“You may also like” (upsells)</label>
-                        <select name="upsell_ids[]" multiple size="6" class="input">
-                            @foreach($allProducts as $p)
-                                <option value="{{ $p->id }}" @selected(in_array($p->id, (array) $selUp))>{{ $p->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="label">“Frequently bought together” (cross-sells)</label>
-                        <select name="cross_sell_ids[]" multiple size="6" class="input">
-                            @foreach($allProducts as $p)
-                                <option value="{{ $p->id }}" @selected(in_array($p->id, (array) $selCross))>{{ $p->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div><h2 class="font-semibold">Related products</h2><p class="text-xs text-ink-700/60">Search and add products to recommend. Drives bigger orders.</p></div>
+                <div class="grid sm:grid-cols-2 gap-6">
+                    @foreach([['upsell_ids','“You may also like” (upsells)',$selUp],['cross_sell_ids','“Frequently bought together” (cross-sells)',$selCross]] as [$field,$label,$sel])
+                        <div x-data="relatedPicker({{ Js::from($allProductsJs) }}, {{ Js::from($sel) }}, '{{ $field }}')" @click.outside="open=false">
+                            <label class="label">{{ $label }}</label>
+                            <div class="relative">
+                                <input x-model="q" @focus="open=true" @input="open=true" placeholder="Search products…" class="input py-2" autocomplete="off">
+                                <div x-show="open && results.length" x-cloak class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-ink-100 bg-white shadow-lg">
+                                    <template x-for="p in results" :key="p.id">
+                                        <button type="button" @click="add(p.id)" class="block w-full text-left px-3 py-2 text-sm hover:bg-gold-50" x-text="p.name"></button>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <template x-for="p in chosen" :key="p.id">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-gold-100 text-gold-800 text-xs px-2 py-1">
+                                        <span x-text="p.name"></span>
+                                        <button type="button" @click="remove(p.id)" class="text-gold-700 hover:text-red-600">×</button>
+                                        <input type="hidden" :name="field + '[]'" :value="p.id">
+                                    </span>
+                                </template>
+                                <template x-if="!chosen.length"><span class="text-xs text-ink-700/40">None selected.</span></template>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- SEO -->
+            <div class="card p-6 space-y-4"
+                 x-data="{
+                    mt: '{{ addslashes(old('meta_title', $product->meta_title)) }}',
+                    md: '{{ addslashes(old('meta_description', $product->meta_description)) }}',
+                    slug: '{{ addslashes(old('slug', $product->slug)) }}',
+                    name: @js(old('name', $product->name)),
+                    get title(){ return this.mt || this.name || 'Product title'; }
+                 }">
+                <div><h2 class="font-semibold">SEO (Google &amp; search)</h2><p class="text-xs text-ink-700/60">Control how this product appears in Google search results.</p></div>
+
+                {{-- Google preview --}}
+                <div class="rounded-lg border border-ink-100 p-3 bg-white">
+                    <p class="text-[#1a0dab] text-base leading-tight truncate" x-text="title"></p>
+                    <p class="text-[#006621] text-xs">{{ config('app.url') }}/product/<span x-text="slug || 'product-name'"></span></p>
+                    <p class="text-ink-700/70 text-sm line-clamp-2" x-text="md || '{{ addslashes(Str::limit(strip_tags($product->short_description ?? ''),150)) }}' || 'Your meta description preview appears here.'"></p>
+                </div>
+
+                <div>
+                    <label class="label">URL slug</label>
+                    <input name="slug" x-model="slug" class="input" placeholder="auto-generated from name">
+                </div>
+                <div>
+                    <label class="label flex justify-between">Meta title <span class="text-xs text-ink-700/40" x-text="mt.length + '/60'"></span></label>
+                    <input name="meta_title" x-model="mt" maxlength="60" class="input" placeholder="Defaults to product name">
+                </div>
+                <div>
+                    <label class="label flex justify-between">Meta description <span class="text-xs text-ink-700/40" x-text="md.length + '/160'"></span></label>
+                    <textarea name="meta_description" x-model="md" maxlength="160" rows="2" class="input" placeholder="A short, enticing summary for search results"></textarea>
                 </div>
             </div>
         </div>

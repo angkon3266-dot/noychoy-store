@@ -69,6 +69,27 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: searchable related-product picker (upsell / cross-sell) ───────
+    window.Alpine.data('relatedPicker', (all, selected, field) => ({
+        all: all || [],
+        selected: (selected || []).map(Number),
+        field,
+        q: '',
+        open: false,
+        get results() {
+            const term = this.q.trim().toLowerCase();
+            return this.all
+                .filter(p => !this.selected.includes(p.id))
+                .filter(p => term === '' || p.name.toLowerCase().includes(term))
+                .slice(0, 8);
+        },
+        get chosen() {
+            return this.selected.map(id => this.all.find(p => p.id === id)).filter(Boolean);
+        },
+        add(id) { if (!this.selected.includes(id)) this.selected.push(id); this.q = ''; this.open = false; },
+        remove(id) { this.selected = this.selected.filter(x => x !== id); },
+    }));
+
     window.Alpine.data('productPage', (config) => ({
         img: config.image || '',
         qty: 1,

@@ -42,9 +42,10 @@
             </thead>
             <tbody class="divide-y divide-ink-100">
                 @forelse($categories as $cat)
-                    <tr x-data="{ edit: false }">
+                    <tr x-data="{ edit: false }" class="{{ $cat->parent_id ? 'bg-ink-50/40' : '' }}">
                         <td class="px-4 py-3">
-                            <span x-show="!edit" class="font-medium">{{ $cat->name }}
+                            <span x-show="!edit" class="{{ $cat->parent_id ? 'pl-6 text-ink-700/90' : 'font-medium' }}">
+                                @if($cat->parent_id)<span class="text-ink-300 mr-1">└</span>@endif{{ $cat->name }}
                                 @if($cat->product_template)<span class="badge bg-gold-100 text-gold-700 ml-1">{{ config('theme.product_templates.'.$cat->product_template.'.name', $cat->product_template) }}</span>@endif
                             </span>
                             <form x-show="edit" x-cloak action="{{ route('admin.categories.update', $cat) }}" method="POST" class="flex flex-wrap gap-1 items-center">
@@ -75,5 +76,4 @@
         </table>
     </div>
 </div>
-<div class="mt-6">{{ $categories->links() }}</div>
 @endsection

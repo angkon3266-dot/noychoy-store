@@ -11,8 +11,23 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::with('parent')->orderBy('position')->orderBy('name')->paginate(50);
-        $parents = Category::whereNull('parent_id')->orderBy('name')->get();
+        // Build a parent → children tree so the list reads logically.
+        $top = Category::with(['children' => fn ($q) => $q->orderBy('position')->orderBy('name')])
+            ->whereNull('parent_id')->orderBy('position')->orderBy('name')->get();
+
+        $categories = collect();
+        foreach ($top as $parent) {
+            $categories->push($parent);
+            foreach ($parent->children as $child) {
+                $categories->push($child);
+            }
+        }
+        // Safety net: include any category not captured above (e.g. orphaned child).
+        $captured = $categories->pluck('id')->all();
+        Category::with('parent')->whereNotIn('id', $captured)->orderBy('name')->get()
+            ->each(fn ($c) => $categories->push($c));
+
+        $parents = $top;
 
         return view('admin.categories.index', compact('categories', 'parents'));
     }

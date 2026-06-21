@@ -39,6 +39,7 @@ class ProductController extends Controller
         $data = $this->validateData($request);
         $product = Product::create($data);
 
+        $this->syncCategories($data, $product);
         $this->syncImages($request, $product);
         $this->syncVariants($request, $product);
 
@@ -48,7 +49,7 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        $product->load('images', 'variants');
+        $product->load('images', 'variants', 'categories');
 
         return view('admin.products.form', [
             'product' => $product,
@@ -62,6 +63,7 @@ class ProductController extends Controller
         $data = $this->validateData($request, $product);
         $product->update($data);
 
+        $this->syncCategories($data, $product);
         $this->syncImages($request, $product);
         $this->applyImageOrder($request, $product);
         $this->syncVariants($request, $product);
@@ -181,8 +183,11 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:200'],
+            'slug' => ['nullable', 'string', 'max:200', 'alpha_dash'],
             'sku' => ['nullable', 'string', 'max:80'],
             'category_id' => ['nullable', 'exists:categories,id'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:categories,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
@@ -223,7 +228,29 @@ class ProductController extends Controller
         $validated['upsell_ids'] = array_values(array_unique(array_map('intval', $validated['upsell_ids'] ?? [])));
         $validated['cross_sell_ids'] = array_values(array_unique(array_map('intval', $validated['cross_sell_ids'] ?? [])));
 
+        // Primary category = the chosen primary, else the first ticked category.
+        $catIds = array_values(array_unique(array_map('intval', $validated['category_ids'] ?? [])));
+        if (empty($validated['category_id']) && ! empty($catIds)) {
+            $validated['category_id'] = $catIds[0];
+        }
+        // Make sure the primary is part of the set.
+        if (! empty($validated['category_id']) && ! in_array((int) $validated['category_id'], $catIds, true)) {
+            $catIds[] = (int) $validated['category_id'];
+        }
+        $validated['_category_ids'] = $catIds;          // consumed by syncCategories
+        unset($validated['category_ids']);
+
+        if (blank($validated['slug'] ?? null)) {
+            unset($validated['slug']);                  // let the model auto-generate
+        }
+
         return $validated;
+    }
+
+    /** Sync the many-to-many categories pivot from validated data. */
+    protected function syncCategories(array $data, Product $product): void
+    {
+        $product->categories()->sync($data['_category_ids'] ?? []);
     }
 
     /** Apply a drag-reordered image sequence (posted as image_order[] of ids). */
