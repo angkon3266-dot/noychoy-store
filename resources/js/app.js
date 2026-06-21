@@ -1,5 +1,18 @@
 // Shared Alpine component for product pages: gallery, variant selection,
 // quantity, and Meta Pixel AddToCart firing. Used by every product template.
+// Prevent double-submits: disable the submit button once a form starts submitting
+// (covers Buy now, Place order, Add to cart fallbacks). Add data-no-lock to opt out.
+document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.noLock !== undefined) return;
+    const btn = form.querySelector('button[type="submit"], button:not([type])');
+    if (btn && !btn.disabled) {
+        // Let the submit proceed, then lock to block a second click.
+        setTimeout(() => { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); }, 0);
+        setTimeout(() => { btn.disabled = false; btn.classList.remove('opacity-60', 'cursor-wait'); }, 5000);
+    }
+}, true);
+
 document.addEventListener('alpine:init', () => {
     // ── Global cart store: optimistic add, toast, slide-over drawer ──────────
     window.Alpine.store('cart', {
@@ -10,7 +23,10 @@ document.addEventListener('alpine:init', () => {
         toastMsg: '',
         toastShow: false,
 
+        _adding: false,
         async add(form) {
+            if (this._adding) return;            // ignore rapid double-clicks → one item
+            this._adding = true;
             try {
                 const res = await fetch(form.action, {
                     method: 'POST',
@@ -26,6 +42,8 @@ document.addEventListener('alpine:init', () => {
                 this.drawer = true;
             } catch (e) {
                 form.submit();
+            } finally {
+                setTimeout(() => { this._adding = false; }, 800);
             }
         },
         async refresh() {

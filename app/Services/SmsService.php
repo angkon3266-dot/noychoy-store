@@ -39,7 +39,8 @@ class SmsService
 
     protected function apiKey(): ?string { return $this->cfg('sms_api_key', config('sms.api_key')); }
     protected function secretKey(): ?string { return $this->cfg('sms_secret_key', config('sms.secret_key')); }
-    protected function callerId(): ?string { return $this->cfg('sms_caller_id', config('sms.caller_id')) ?: 'Noychoy_Com'; }
+    /** Masking sender ID. Empty/blank ⇒ non-masking (SMS shows from a number). */
+    protected function callerId(): ?string { return $this->cfg('sms_caller_id', config('sms.caller_id')) ?: null; }
 
     public function isEnabled(): bool
     {
@@ -63,14 +64,19 @@ class SmsService
         }
 
         try {
+            $params = [
+                'apikey' => $this->apiKey(),
+                'secretkey' => $this->secretKey(),
+                'toUser' => $to,
+                'messageContent' => $message,
+            ];
+            // Only send a masking sender if one is configured; otherwise non-masking.
+            if (filled($this->callerId())) {
+                $params['callerID'] = $this->callerId();
+            }
+
             $response = Http::timeout(config('sms.timeout', 20))
-                ->get($this->baseUrl().'/sendtext', [
-                    'apikey' => $this->apiKey(),
-                    'secretkey' => $this->secretKey(),
-                    'callerID' => $this->callerId(),
-                    'toUser' => $to,
-                    'messageContent' => $message,
-                ]);
+                ->get($this->baseUrl().'/sendtext', $params);
 
             $data = $response->json() ?? [];
             $providerStatus = (string) ($data['Status'] ?? '');
