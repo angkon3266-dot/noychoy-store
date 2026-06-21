@@ -6,6 +6,15 @@
     </section>
 @endif
 
+@if($product->custom_show && $product->custom_label && $product->custom_value)
+    <section class="mt-6 max-w-3xl">
+        <div class="inline-flex items-center gap-2 rounded-lg bg-gold-50 border border-gold-100 px-4 py-2 text-sm">
+            <span class="text-ink-700/60">{{ $product->custom_label }}:</span>
+            <span class="font-medium">{{ $product->custom_value }}</span>
+        </div>
+    </section>
+@endif
+
 {{-- ── Customer reviews ─────────────────────────────────────────────── --}}
 @php
     $reviews = $product->approvedReviews;

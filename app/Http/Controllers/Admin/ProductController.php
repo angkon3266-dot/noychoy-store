@@ -21,6 +21,7 @@ class ProductController extends Controller
             ->when($request->query('type') === 'simple', fn ($q) => $q->where('has_variants', false))
             ->when($request->query('type') === 'variable', fn ($q) => $q->where('has_variants', true))
             ->when($request->query('tag'), fn ($q, $tag) => $q->where('tags', 'like', "%{$tag}%"))
+            ->when($request->query('custom'), fn ($q, $c) => $q->where('custom_value', 'like', "%{$c}%"))
             ->latest()
             ->paginate(20)
             ->withQueryString();
@@ -32,6 +33,79 @@ class ProductController extends Controller
         $bulkCategories = Category::orderBy('name')->get(['id', 'name']);
 
         return view('admin.products.index', compact('products', 'allTags', 'bulkCategories'));
+    }
+
+    public function importForm()
+    {
+        return view('admin.products.import');
+    }
+
+    /**
+     * Bulk-create products from an uploaded CSV.
+     * Header row expected: name, price, sku, category, short_description, description, stock, status, tags
+     */
+    public function import(Request $request)
+    {
+        $request->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:5120']]);
+
+        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        if (! $handle) {
+            return back()->with('error', 'Could not read the file.');
+        }
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            return back()->with('error', 'The file appears to be empty.');
+        }
+        $cols = array_map(fn ($h) => strtolower(trim((string) $h)), $header);
+
+        $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
+        $created = 0;
+        $skipped = 0;
+        $row = 1;
+
+        while (($line = fgetcsv($handle)) !== false) {
+            $row++;
+            $data = array_combine($cols, array_pad($line, count($cols), null));
+            $name = trim((string) ($data['name'] ?? ''));
+            if ($name === '') {
+                $skipped++;
+                continue;
+            }
+
+            $categoryId = null;
+            if (! empty($data['category'])) {
+                $key = strtolower(trim($data['category']));
+                $categoryId = $categories->get($key)?->id;
+                if (! $categoryId) {
+                    $cat = Category::create(['name' => trim($data['category']), 'is_active' => true]);
+                    $categories->put($key, $cat);
+                    $categoryId = $cat->id;
+                }
+            }
+
+            $product = Product::create([
+                'name' => $name,
+                'sku' => $data['sku'] ?? null,
+                'category_id' => $categoryId,
+                'short_description' => $data['short_description'] ?? null,
+                'description' => $data['description'] ?? null,
+                'price' => is_numeric($data['price'] ?? null) ? (float) $data['price'] : 0,
+                'manage_stock' => isset($data['stock']) && $data['stock'] !== '',
+                'stock_quantity' => (int) ($data['stock'] ?? 0),
+                'in_stock' => true,
+                'status' => in_array(strtolower($data['status'] ?? 'published'), ['draft', 'published']) ? strtolower($data['status'] ?? 'published') : 'published',
+                'tags' => $data['tags'] ?? null,
+            ]);
+            if ($categoryId) {
+                $product->categories()->sync([$categoryId]);
+            }
+            $created++;
+        }
+        fclose($handle);
+
+        return redirect()->route('admin.products.index')
+            ->with('success', "Imported {$created} product(s)".($skipped ? ", skipped {$skipped} row(s) with no name." : '.'));
     }
 
     public function create()
@@ -228,6 +302,9 @@ class ProductController extends Controller
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', 'in:draft,published'],
             'tags' => ['nullable', 'string', 'max:255'],
+            'custom_label' => ['nullable', 'string', 'max:60'],
+            'custom_value' => ['nullable', 'string', 'max:255'],
+            'custom_show' => ['nullable', 'boolean'],
             'is_featured' => ['nullable', 'boolean'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
@@ -243,6 +320,7 @@ class ProductController extends Controller
         $validated['manage_stock'] = $request->boolean('manage_stock');
         $validated['is_featured'] = $request->boolean('is_featured');
         $validated['is_preorder'] = $request->boolean('is_preorder');
+        $validated['custom_show'] = $request->boolean('custom_show');
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
 
         // ── Product type: simple vs variable ────────────────────────────────

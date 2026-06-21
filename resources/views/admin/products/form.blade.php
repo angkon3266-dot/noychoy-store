@@ -286,6 +286,15 @@
                     <input name="tags" value="{{ old('tags', $product->tags) }}" class="input" placeholder="bestseller, new-arrival, eid">
                     <p class="text-xs text-ink-700/50 mt-1">Comma-separated. Used to filter products in the admin list &amp; on the shop.</p>
                 </div>
+                <div class="border-t border-ink-100 pt-4">
+                    <label class="label">Custom field (any purpose)</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input name="custom_label" value="{{ old('custom_label', $product->custom_label) }}" class="input" placeholder="Label (e.g. Material)">
+                        <input name="custom_value" value="{{ old('custom_value', $product->custom_value) }}" class="input" placeholder="Value (e.g. 22k Gold)">
+                    </div>
+                    <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" name="custom_show" value="1" @checked(old('custom_show', $product->custom_show))> Show on product page</label>
+                    <p class="text-xs text-ink-700/50 mt-1">Use for anything (material, purity, weight…). Filterable in the admin list.</p>
+                </div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured))> Featured on homepage</label>
                 <button class="btn-primary w-full">{{ $product->exists ? 'Save changes' : 'Create product' }}</button>
             </div>

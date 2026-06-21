@@ -22,6 +22,7 @@ class Product extends Model
         'views', 'meta_title', 'meta_description', 'woo_id',
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
         'is_preorder', 'preorder_release_date', 'preorder_note', 'tags',
+        'custom_label', 'custom_value', 'custom_show',
     ];
 
     protected $casts = [
@@ -41,6 +42,7 @@ class Product extends Model
         'cross_sell_ids' => 'array',
         'is_preorder' => 'boolean',
         'preorder_release_date' => 'date',
+        'custom_show' => 'boolean',
     ];
 
     protected static function booted(): void

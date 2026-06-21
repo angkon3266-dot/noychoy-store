@@ -22,9 +22,13 @@
                 <option value="{{ $tag }}" @selected(request('tag')==$tag)>{{ $tag }}</option>
             @endforeach
         </select>
+        <input name="custom" value="{{ request('custom') }}" placeholder="Custom field value…" class="input py-2 w-40">
         <button class="btn-outline">Filter</button>
     </form>
-    <a href="{{ route('admin.products.create') }}" class="btn-primary">+ Add product</a>
+    <div class="flex gap-2">
+        <a href="{{ route('admin.products.import') }}" class="btn-outline">Import CSV</a>
+        <a href="{{ route('admin.products.create') }}" class="btn-primary">+ Add product</a>
+    </div>
 </div>
 
 @php($pageIds = $products->pluck('id')->values())
