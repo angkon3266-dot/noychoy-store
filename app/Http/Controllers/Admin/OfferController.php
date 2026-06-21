@@ -13,6 +13,9 @@ class OfferController extends Controller
         return view('admin.offers.index', [
             'offers' => Offer::orderBy('sort')->orderByDesc('id')->get(),
             'types' => Offer::TYPES,
+            'scopes' => Offer::SCOPES,
+            'categories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
+            'products' => \App\Models\Product::orderBy('name')->get(['id', 'name']),
             'editing' => $request->filled('edit') ? Offer::find($request->query('edit')) : null,
         ]);
     }
@@ -44,6 +47,11 @@ class OfferController extends Controller
             'title' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:'.implode(',', array_keys(Offer::TYPES))],
+            'applies_to' => ['required', 'in:'.implode(',', array_keys(Offer::SCOPES))],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:categories,id'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
             'percent' => ['nullable', 'numeric', 'min:0.1', 'max:90', 'required_if:type,order_percent'],
             'min_subtotal' => ['nullable', 'numeric', 'min:0'],
             'min_qty' => ['nullable', 'integer', 'min:1'],
@@ -58,6 +66,9 @@ class OfferController extends Controller
         if ($data['type'] === 'free_shipping') {
             $data['percent'] = null;
         }
+        // Only keep the relevant scope list.
+        $data['category_ids'] = $data['applies_to'] === 'categories' ? array_values($data['category_ids'] ?? []) : null;
+        $data['product_ids'] = $data['applies_to'] === 'products' ? array_values($data['product_ids'] ?? []) : null;
 
         return $data;
     }

@@ -40,13 +40,13 @@
                     <div><label class="label">SKU</label><input name="sku" value="{{ old('sku', $product->sku) }}" class="input"></div>
                     <div>
                         <label class="label">Primary category</label>
-                        <select name="category_id" class="input">
+                        <select name="category_id" class="input" onchange="primaryCatChanged(this.value)">
                             <option value="">— None —</option>
                             @foreach($categories as $cat)
                                 <option value="{{ $cat->id }}" @selected(old('category_id', $product->category_id)==$cat->id)>{{ $cat->name }}</option>
                             @endforeach
                         </select>
-                        <p class="text-xs text-ink-700/50 mt-1">Used for the breadcrumb &amp; page template.</p>
+                        <p class="text-xs text-ink-700/50 mt-1">Used for the breadcrumb &amp; page template. Selecting it auto-ticks its sub-categories below.</p>
                     </div>
                 </div>
 
@@ -69,6 +69,17 @@
                     </div>
                     <p class="text-xs text-ink-700/50 mt-1">Tick every category this piece belongs to — this powers category-based Meta catalog ads later.</p>
                 </div>
+                <script>
+                    window.__catChildren = @json($categories->groupBy('parent_id')->map(fn($g) => $g->pluck('id'))->all());
+                    function primaryCatChanged(id) {
+                        if (!id) return;
+                        const ids = [parseInt(id, 10), ...((window.__catChildren[id] || []))];
+                        ids.forEach(cid => {
+                            const cb = document.querySelector(`input[name='category_ids[]'][value='${cid}']`);
+                            if (cb) cb.checked = true;
+                        });
+                    }
+                </script>
                 <div>
                     <label class="label">Short description</label>
                     <textarea name="short_description" rows="2" class="input">{{ old('short_description', $product->short_description) }}</textarea>

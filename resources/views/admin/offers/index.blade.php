@@ -13,7 +13,7 @@
 
 <div class="grid lg:grid-cols-3 gap-6">
     {{-- Form --}}
-    <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}' }">
+    <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}', applies: '{{ old('applies_to', $editing->applies_to ?? 'all') }}', catQ: '' }">
         <h2 class="font-semibold mb-4">{{ $editing ? 'Edit offer' : 'New offer' }}</h2>
         @if($errors->any())<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $errors->first() }}</div>@endif
         <form action="{{ $editing ? route('admin.offers.update', $editing) : route('admin.offers.store') }}" method="POST" class="space-y-3">
@@ -30,6 +30,32 @@
             <div x-show="type==='order_percent'">
                 <label class="label">Discount %</label>
                 <input name="percent" type="number" step="0.01" min="0.1" max="90" value="{{ old('percent', $editing->percent ?? '') }}" class="input" placeholder="5">
+            </div>
+
+            {{-- Scope --}}
+            @php($selOffCats = collect(old('category_ids', $editing->category_ids ?? []))->map(fn($i)=>(int)$i)->all())
+            @php($selOffProds = collect(old('product_ids', $editing->product_ids ?? []))->map(fn($i)=>(int)$i)->all())
+            <div>
+                <label class="label">Applies to *</label>
+                <select name="applies_to" x-model="applies" class="input">
+                    @foreach($scopes as $key => $label)<option value="{{ $key }}" @selected(old('applies_to', $editing->applies_to ?? 'all')==$key)>{{ $label }}</option>@endforeach
+                </select>
+            </div>
+            <div x-show="applies==='categories'" x-cloak>
+                <input x-model="catQ" placeholder="Filter categories…" class="input py-1.5 mb-2">
+                <div class="max-h-40 overflow-y-auto rounded-lg border border-ink-100 p-2 space-y-1">
+                    @foreach($categories as $cat)
+                        <label class="flex items-center gap-2 text-sm" x-show="catQ==='' || '{{ Str::lower($cat->name) }}'.includes(catQ.toLowerCase())">
+                            <input type="checkbox" name="category_ids[]" value="{{ $cat->id }}" @checked(in_array($cat->id, $selOffCats))> {{ $cat->name }}
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+            <div x-show="applies==='products'" x-cloak>
+                <select name="product_ids[]" multiple size="6" class="input">
+                    @foreach($products as $p)<option value="{{ $p->id }}" @selected(in_array($p->id, $selOffProds))>{{ $p->name }}</option>@endforeach
+                </select>
+                <p class="text-xs text-ink-700/50 mt-1">Ctrl/Cmd-click to select several.</p>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div><label class="label">Min. cart value ৳</label><input name="min_subtotal" type="number" step="0.01" value="{{ old('min_subtotal', $editing->min_subtotal ?? '') }}" class="input" placeholder="any"></div>

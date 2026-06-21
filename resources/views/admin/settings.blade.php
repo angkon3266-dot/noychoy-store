@@ -13,7 +13,7 @@
                 <div><label class="label">Store phone</label><input name="store_phone" value="{{ $general['store_phone'] }}" class="input"></div>
             </div>
             <div><label class="label">Store email</label><input name="store_email" type="email" value="{{ $general['store_email'] }}" class="input"></div>
-            <div><label class="label">Announcement bar (top of site)</label><input name="announcement" value="{{ $general['announcement'] }}" class="input" placeholder="e.g. Free delivery this Eid!"></div>
+            <p class="text-xs text-ink-700/50">The scrolling announcement bar is managed in <a href="{{ route('admin.appearance') }}" class="text-gold-700 underline">Appearance → Announcement top bar</a>.</p>
             <div class="grid sm:grid-cols-2 gap-4">
                 <div><label class="label">Shipping inside Dhaka (৳)</label><input name="shipping_inside" type="number" value="{{ $general['shipping_inside'] }}" class="input"></div>
                 <div><label class="label">Shipping outside Dhaka (৳)</label><input name="shipping_outside" type="number" value="{{ $general['shipping_outside'] }}" class="input"></div>

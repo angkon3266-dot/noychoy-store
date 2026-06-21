@@ -139,26 +139,30 @@ class CartService
     public function matchingOffers(): Collection
     {
         $this->offerCache ??= Offer::active()->get();
-        $sub = $this->promoBase();
-        $qty = $this->count();
         $member = $this->isMember();
 
-        return $this->offerCache->filter(fn (Offer $o) => $o->matches($sub, $qty, $member))->values();
+        return $this->offerCache->filter(fn (Offer $o) => $o->matches($this, $member))->values();
     }
 
-    /** Combined percentage from auto offers (best non-member + member, capped). */
-    public function promoPercent(): float
-    {
-        $offers = $this->matchingOffers()->where('type', 'order_percent');
-        $base = (float) ($offers->where('members_only', false)->max('percent') ?: 0);
-        $member = (float) ($offers->where('members_only', true)->max('percent') ?: 0);
-
-        return min(90, $base + $member);
-    }
-
+    /**
+     * Auto-offer discount: best non-member percentage offer (on its eligible items)
+     * plus the best members-only offer (stacks). Scoped offers only discount their items.
+     */
     public function promoDiscount(): float
     {
-        return round($this->promoBase() * $this->promoPercent() / 100, 2);
+        $offers = $this->matchingOffers()->where('type', 'order_percent');
+        $best = (float) $offers->where('members_only', false)->max(fn (Offer $o) => $o->discountAmount($this));
+        $member = (float) $offers->where('members_only', true)->max(fn (Offer $o) => $o->discountAmount($this));
+
+        return round(min($this->promoBase(), $best + $member), 2);
+    }
+
+    /** Effective discount percentage (for display only). */
+    public function promoPercent(): float
+    {
+        $base = $this->promoBase();
+
+        return $base > 0 ? round($this->promoDiscount() / $base * 100, 1) : 0;
     }
 
     public function hasFreeShippingOffer(): bool

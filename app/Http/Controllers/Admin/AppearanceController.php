@@ -102,7 +102,7 @@ class AppearanceController extends Controller
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent'] as $bool) {
+        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent'] as $bool) {
             $current[$bool] = $request->boolean($bool);
         }
 

@@ -17,7 +17,6 @@ class SettingController extends Controller
                 'store_name' => Setting::get('store_name', config('store.name')),
                 'store_phone' => Setting::get('store_phone', config('store.phone')),
                 'store_email' => Setting::get('store_email', config('store.email')),
-                'announcement' => Setting::get('announcement'),
                 'shipping_inside' => Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
                 'shipping_outside' => Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
             ],
@@ -34,7 +33,6 @@ class SettingController extends Controller
             'store_name' => ['nullable', 'string', 'max:120'],
             'store_phone' => ['nullable', 'string', 'max:40'],
             'store_email' => ['nullable', 'email', 'max:160'],
-            'announcement' => ['nullable', 'string', 'max:200'],
             'shipping_inside' => ['nullable', 'numeric', 'min:0'],
             'shipping_outside' => ['nullable', 'numeric', 'min:0'],
         ]);

@@ -218,6 +218,7 @@
                 'urgency_low_stock' => 'Low-stock urgency badges',
                 'show_reviews' => 'Product reviews & ratings',
                 'show_recently_viewed' => 'Recently viewed products',
+                'show_frequently_bought' => 'Frequently bought together',
                 'exit_intent' => 'Exit-intent discount popup',
             ]; @endphp
             @foreach($toggles as $key => $label)
