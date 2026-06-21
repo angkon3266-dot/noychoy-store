@@ -11,24 +11,38 @@ class CatalogController extends Controller
 {
     public function index(Request $request)
     {
-        $products = Product::published()
+        $query = Product::published()
             ->with('images', 'approvedReviews', 'category')
-            ->search($request->query('q'))
-            ->when($request->query('sort'), function ($query, $sort) {
-                match ($sort) {
-                    'price_asc' => $query->orderBy('price'),
-                    'price_desc' => $query->orderByDesc('price'),
-                    'name' => $query->orderBy('name'),
-                    default => $query->latest(),
-                };
-            }, fn ($query) => $query->latest())
-            ->paginate(24)
-            ->withQueryString();
+            ->search($request->query('q'));
+
+        $this->applyFilters($query, $request);
+
+        $products = $query->paginate(24)->withQueryString();
 
         return view('shop.catalog', [
             'products' => $products,
             'title' => $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry',
         ]);
+    }
+
+    /** Shared storefront filters + sort (price range, availability, sale, tag). */
+    protected function applyFilters($query, Request $request): void
+    {
+        $query
+            ->when($request->filled('price_min'), fn ($q) => $q->where('price', '>=', (float) $request->query('price_min')))
+            ->when($request->filled('price_max'), fn ($q) => $q->where('price', '<=', (float) $request->query('price_max')))
+            ->when($request->boolean('in_stock'), fn ($q) => $q->where('in_stock', true))
+            ->when($request->boolean('on_sale'), fn ($q) => $q->whereNotNull('compare_at_price')->whereColumn('compare_at_price', '>', 'price'))
+            ->when($request->query('tag'), fn ($q, $tag) => $q->where('tags', 'like', "%{$tag}%"))
+            ->when($request->query('sort'), function ($q, $sort) {
+                match ($sort) {
+                    'price_asc' => $q->orderBy('price'),
+                    'price_desc' => $q->orderByDesc('price'),
+                    'name' => $q->orderBy('name'),
+                    'popular' => $q->orderByDesc('views'),
+                    default => $q->latest(),
+                };
+            }, fn ($q) => $q->latest());
     }
 
     /** JSON type-ahead suggestions for the header search box. */
@@ -59,20 +73,14 @@ class CatalogController extends Controller
 
         $ids = $category->children()->pluck('id')->push($category->id);
 
-        $products = Product::published()
+        $query = Product::published()
             ->where(fn ($q) => $q->whereIn('category_id', $ids)
                 ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)))
-            ->with('images', 'approvedReviews', 'category')
-            ->when($request->query('sort'), function ($query, $sort) {
-                match ($sort) {
-                    'price_asc' => $query->orderBy('price'),
-                    'price_desc' => $query->orderByDesc('price'),
-                    'name' => $query->orderBy('name'),
-                    default => $query->latest(),
-                };
-            }, fn ($query) => $query->latest())
-            ->paginate(24)
-            ->withQueryString();
+            ->with('images', 'approvedReviews', 'category');
+
+        $this->applyFilters($query, $request);
+
+        $products = $query->paginate(24)->withQueryString();
 
         return view('shop.catalog', [
             'products' => $products,

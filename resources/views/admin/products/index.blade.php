@@ -4,12 +4,23 @@
 
 @section('content')
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-    <form method="GET" class="flex gap-2">
-        <input name="q" value="{{ request('q') }}" placeholder="Search products…" class="input py-2 w-56">
+    <form method="GET" class="flex flex-wrap gap-2">
+        <input name="q" value="{{ request('q') }}" placeholder="Search products…" class="input py-2 w-48">
         <select name="status" onchange="this.form.submit()" class="input py-2">
             <option value="">All status</option>
             <option value="published" @selected(request('status')=='published')>Published</option>
             <option value="draft" @selected(request('status')=='draft')>Draft</option>
+        </select>
+        <select name="type" onchange="this.form.submit()" class="input py-2">
+            <option value="">All types</option>
+            <option value="simple" @selected(request('type')=='simple')>Simple</option>
+            <option value="variable" @selected(request('type')=='variable')>Variable</option>
+        </select>
+        <select name="tag" onchange="this.form.submit()" class="input py-2">
+            <option value="">All tags</option>
+            @foreach($allTags as $tag)
+                <option value="{{ $tag }}" @selected(request('tag')==$tag)>{{ $tag }}</option>
+            @endforeach
         </select>
         <button class="btn-outline">Filter</button>
     </form>
@@ -71,7 +82,11 @@
                                 </div>
                                 <div>
                                     <div class="font-medium">{{ $product->name }} @if($product->is_featured)<span class="badge bg-gold-100 text-gold-700 text-[10px]">★</span>@endif</div>
-                                    <div class="text-xs text-ink-700/50">{{ $product->sku }}</div>
+                                    <div class="text-xs text-ink-700/50 flex items-center gap-1.5 flex-wrap">
+                                        <span class="badge {{ $product->has_variants ? 'bg-violet-100 text-violet-700' : 'bg-ink-100 text-ink-600' }} text-[10px]">{{ $product->type_label }}</span>
+                                        @if($product->sku)<span>{{ $product->sku }}</span>@endif
+                                        @foreach($product->tag_list as $t)<span class="badge bg-gold-50 text-gold-700 text-[10px]">{{ $t }}</span>@endforeach
+                                    </div>
                                 </div>
                             </div>
                         </td>

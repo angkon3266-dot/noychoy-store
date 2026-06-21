@@ -41,14 +41,63 @@ class OrderController extends Controller
         ]);
     }
 
-    public function show(Order $order, CustomerInsight $insight)
+    public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast)
     {
         $order->load('items', 'history', 'shipment', 'customer');
+
+        // Best-effort live Steadfast status refresh for this order's consignment.
+        if ($order->shipment?->consignment_id && $steadfast->isConfigured()) {
+            try {
+                $status = $steadfast->statusByConsignmentId($order->shipment->consignment_id);
+                if (! empty($status['delivery_status'])) {
+                    $order->shipment->update(['status' => $status['delivery_status'], 'response' => $status]);
+                    $order->setRelation('shipment', $order->shipment->fresh());
+                }
+            } catch (\Throwable $e) {
+                // keep last known status
+            }
+        }
+
+        // Courier track record for this customer (from their shipments).
+        $courier = ['total' => 0, 'delivered' => 0, 'partial' => 0, 'cancelled' => 0, 'returned' => 0, 'pending' => 0];
+        Order::where('customer_phone', $order->customer_phone)->with('shipment')->get()->each(function ($o) use (&$courier) {
+            if (! $o->shipment) {
+                return;
+            }
+            $courier['total']++;
+            $s = strtolower((string) $o->shipment->status);
+            if (str_contains($s, 'partial')) {
+                $courier['partial']++;
+            } elseif (str_contains($s, 'deliver')) {
+                $courier['delivered']++;
+            } elseif (str_contains($s, 'cancel')) {
+                $courier['cancelled']++;
+            } elseif (str_contains($s, 'return')) {
+                $courier['returned']++;
+            } else {
+                $courier['pending']++;
+            }
+        });
+        $settled = $courier['delivered'] + $courier['partial'] + $courier['cancelled'] + $courier['returned'];
+        $courier['success_rate'] = $settled > 0 ? round(($courier['delivered'] + $courier['partial']) / $settled * 100) : null;
+
+        // Steadfast balance (best-effort).
+        $balance = null;
+        if ($steadfast->isConfigured()) {
+            try {
+                $b = $steadfast->getBalance();
+                $balance = $b['current_balance'] ?? ($b['balance'] ?? null);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
 
         return view('admin.orders.show', [
             'order' => $order,
             'statuses' => Order::STATUSES,
             'insight' => $insight->forPhone($order->customer_phone, $order->id),
+            'courier' => $courier,
+            'balance' => $balance,
         ]);
     }
 

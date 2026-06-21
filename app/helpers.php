@@ -97,55 +97,80 @@ if (! function_exists('site_menu')) {
     {
         $stored = Setting::get('menu', null);
 
-        // Category lookup once (id => model) for URL resolution.
-        $cats = \App\Models\Category::query()->get()->keyBy('id');
-
-        $resolve = function (array $item) use (&$resolve, $cats) {
-            $type = $item['type'] ?? 'link';
-            $label = trim((string) ($item['label'] ?? ''));
-            $url = null;
-
-            if ($type === 'category') {
-                $cat = $cats->get((int) ($item['value'] ?? 0));
-                if (! $cat || ! $cat->is_active) {
-                    return null;
-                }
-                $label = $label !== '' ? $label : $cat->name;
-                $url = route('category.show', $cat->slug);
-            } else { // link
-                $url = (string) ($item['value'] ?? '#');
-            }
-
-            if ($label === '') {
-                return null;
-            }
-
-            $children = [];
-            foreach ($item['children'] ?? [] as $child) {
-                $resolved = $resolve($child);
-                if ($resolved) {
-                    $resolved['children'] = []; // only two levels
-                    $children[] = $resolved;
-                }
-            }
-
-            return ['label' => $label, 'url' => $url, 'new_tab' => (bool) ($item['new_tab'] ?? false), 'children' => $children];
-        };
-
         if (is_array($stored) && ! empty($stored)) {
-            return collect($stored)->map($resolve)->filter()->values()->all();
+            return collect($stored)->map(fn ($i) => normalize_menu_item($i))->filter()->values()->all();
         }
 
-        // Default: "Shop All" + active top-level categories with their children.
-        $menu = [['label' => 'Shop All', 'url' => route('shop'), 'new_tab' => false, 'children' => []]];
-        foreach ($cats->whereNull('parent_id')->where('is_active', true)->sortBy('position') as $cat) {
-            $children = $cats->where('parent_id', $cat->id)->where('is_active', true)->sortBy('position')
-                ->map(fn ($c) => ['label' => $c->name, 'url' => route('category.show', $c->slug), 'new_tab' => false, 'children' => []])
+        // Default: "Shop All" + active top-level categories as dropdowns.
+        $cats = \App\Models\Category::query()->where('is_active', true)->get();
+        $menu = [[
+            'label' => 'Shop All', 'type' => 'link', 'url' => route('shop'),
+            'new_tab' => false, 'badge' => null, 'view_all_mobile' => false, 'children' => [], 'columns' => [],
+        ]];
+        foreach ($cats->whereNull('parent_id')->sortBy('position') as $cat) {
+            $children = $cats->where('parent_id', $cat->id)->sortBy('position')
+                ->map(fn ($c) => ['label' => $c->name, 'url' => route('category.show', $c->slug), 'new_tab' => false])
                 ->values()->all();
-            $menu[] = ['label' => $cat->name, 'url' => route('category.show', $cat->slug), 'new_tab' => false, 'children' => $children];
+            $menu[] = [
+                'label' => $cat->name,
+                'type' => $children ? 'dropdown' : 'link',
+                'url' => route('category.show', $cat->slug),
+                'new_tab' => false, 'badge' => null, 'view_all_mobile' => true,
+                'children' => $children, 'columns' => [],
+            ];
         }
 
         return $menu;
+    }
+}
+
+if (! function_exists('normalize_menu_item')) {
+    /** Normalise one stored menu item to the full render shape (handles legacy data). */
+    function normalize_menu_item(array $item): ?array
+    {
+        $label = trim((string) ($item['label'] ?? ''));
+        if ($label === '') {
+            return null;
+        }
+
+        // Legacy support: type 'category' + value (id) → resolve to a URL.
+        $url = (string) ($item['url'] ?? '');
+        if ($url === '' && ($item['type'] ?? '') === 'category') {
+            $cat = \App\Models\Category::find((int) ($item['value'] ?? 0));
+            $url = $cat ? route('category.show', $cat->slug) : '#';
+        } elseif ($url === '') {
+            $url = (string) ($item['value'] ?? '#');
+        }
+
+        $type = in_array($item['type'] ?? '', ['link', 'dropdown', 'mega'], true)
+            ? $item['type']
+            : (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link'));
+
+        $children = collect($item['children'] ?? [])->map(function ($c) {
+            $cl = trim((string) ($c['label'] ?? ''));
+            $cu = (string) ($c['url'] ?? $c['value'] ?? '#');
+            return $cl === '' ? null : ['label' => $cl, 'url' => $cu, 'new_tab' => (bool) ($c['new_tab'] ?? false)];
+        })->filter()->values()->all();
+
+        $columns = collect($item['columns'] ?? [])->map(function ($col) {
+            $links = collect($col['links'] ?? [])->map(function ($l) {
+                $ll = trim((string) ($l['label'] ?? ''));
+                return $ll === '' ? null : ['label' => $ll, 'url' => (string) ($l['url'] ?? '#'), 'new_tab' => (bool) ($l['new_tab'] ?? false)];
+            })->filter()->values()->all();
+            return empty($links) && trim((string) ($col['heading'] ?? '')) === '' ? null
+                : ['heading' => trim((string) ($col['heading'] ?? '')), 'links' => $links];
+        })->filter()->values()->all();
+
+        return [
+            'label' => $label,
+            'type' => $type,
+            'url' => $url ?: '#',
+            'new_tab' => (bool) ($item['new_tab'] ?? false),
+            'badge' => ($item['badge'] ?? null) ?: null,
+            'view_all_mobile' => (bool) ($item['view_all_mobile'] ?? false),
+            'children' => $children,
+            'columns' => $columns,
+        ];
     }
 }
 

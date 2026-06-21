@@ -18,11 +18,18 @@ class ProductController extends Controller
             ->with('primaryImage', 'category')
             ->search($request->query('q'))
             ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
+            ->when($request->query('type') === 'simple', fn ($q) => $q->where('has_variants', false))
+            ->when($request->query('type') === 'variable', fn ($q) => $q->where('has_variants', true))
+            ->when($request->query('tag'), fn ($q, $tag) => $q->where('tags', 'like', "%{$tag}%"))
             ->latest()
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.products.index', compact('products'));
+        // Tag suggestions for the filter dropdown.
+        $allTags = Product::whereNotNull('tags')->where('tags', '!=', '')->pluck('tags')
+            ->flatMap(fn ($t) => array_map('trim', explode(',', $t)))->filter()->unique()->sort()->values();
+
+        return view('admin.products.index', compact('products', 'allTags'));
     }
 
     public function create()
@@ -209,6 +216,7 @@ class ProductController extends Controller
             'manage_stock' => ['nullable', 'boolean'],
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', 'in:draft,published'],
+            'tags' => ['nullable', 'string', 'max:255'],
             'is_featured' => ['nullable', 'boolean'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],

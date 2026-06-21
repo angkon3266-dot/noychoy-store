@@ -112,7 +112,7 @@
         <!-- Profitability (internal) -->
         <div class="card p-5 text-sm">
             <h2 class="font-semibold mb-3">Profitability <span class="text-xs font-normal text-ink-700/50">(internal)</span></h2>
-            @php($cogs = $order->cost_of_goods)
+            @php $cogs = $order->cost_of_goods; @endphp
             <dl class="space-y-1.5">
                 <div class="flex justify-between"><dt class="text-ink-700/70">Revenue (after discount)</dt><dd>{{ money($order->subtotal - $order->discount) }}</dd></div>
                 <div class="flex justify-between"><dt class="text-ink-700/70">Cost of goods + transport</dt><dd>−{{ money($cogs) }}</dd></div>
@@ -145,17 +145,44 @@
 
         <!-- Steadfast -->
         <div class="card p-5">
-            <h2 class="font-semibold mb-3">Courier (Steadfast)</h2>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold">Courier (Steadfast)</h2>
+                @if($balance !== null)<span class="text-xs text-ink-700/50">Balance: <strong>৳{{ number_format((float) $balance, 0) }}</strong></span>@endif
+            </div>
             @if($order->shipment?->consignment_id)
-                <div class="text-sm space-y-1">
-                    <p>Consignment: <strong>{{ $order->shipment->consignment_id }}</strong></p>
-                    <p>Tracking: <strong>{{ $order->shipment->tracking_code }}</strong></p>
-                    <p>Status: <span class="badge bg-gold-100 text-gold-800">{{ $order->shipment->status }}</span></p>
+                @php
+                    $cs = strtolower((string) $order->shipment->status);
+                    $deliveryBadge = str_contains($cs, 'partial') ? 'bg-amber-100 text-amber-700'
+                        : (str_contains($cs, 'deliver') ? 'bg-green-100 text-green-700'
+                        : (str_contains($cs, 'cancel') || str_contains($cs, 'return') ? 'bg-red-100 text-red-700'
+                        : 'bg-gold-100 text-gold-800'));
+                    $resp = (array) ($order->shipment->response ?? []);
+                @endphp
+                <div class="text-sm space-y-1.5">
+                    <p>Delivery status: <span class="badge {{ $deliveryBadge }} capitalize">{{ str_replace('_', ' ', $order->shipment->status) }}</span></p>
+                    <p class="text-ink-700/70">Consignment: <strong>{{ $order->shipment->consignment_id }}</strong></p>
+                    <p class="text-ink-700/70">Tracking: <strong>{{ $order->shipment->tracking_code }}</strong></p>
+                    @if(!empty($resp['note']) || !empty($resp['delivery_note']))<p class="text-xs text-ink-700/60">Courier note: {{ $resp['note'] ?? $resp['delivery_note'] }}</p>@endif
                 </div>
                 <form action="{{ route('admin.orders.steadfast.refresh', $order) }}" method="POST" class="mt-3">@csrf<button class="btn-outline w-full">Refresh status</button></form>
             @else
                 <p class="text-sm text-ink-700/60 mb-3">Create a courier consignment for COD ৳{{ number_format($order->total,0) }}.</p>
                 <form action="{{ route('admin.orders.steadfast', $order) }}" method="POST">@csrf<button class="btn-primary w-full">Send to Steadfast</button></form>
+            @endif
+
+            {{-- Courier-confirmed track record for this customer --}}
+            @if(($courier['total'] ?? 0) > 0)
+                <div class="mt-4 pt-3 border-t border-ink-100">
+                    <p class="text-xs text-ink-700/60 mb-1.5">Courier outcomes across {{ $courier['total'] }} shipment(s):</p>
+                    <div class="flex flex-wrap gap-1.5 text-[11px]">
+                        <span class="badge bg-green-100 text-green-700">{{ $courier['delivered'] }} delivered</span>
+                        @if($courier['partial'])<span class="badge bg-amber-100 text-amber-700">{{ $courier['partial'] }} partial</span>@endif
+                        @if($courier['cancelled'])<span class="badge bg-red-100 text-red-700">{{ $courier['cancelled'] }} cancelled</span>@endif
+                        @if($courier['returned'])<span class="badge bg-red-100 text-red-700">{{ $courier['returned'] }} returned</span>@endif
+                        @if($courier['pending'])<span class="badge bg-ink-100 text-ink-600">{{ $courier['pending'] }} in transit</span>@endif
+                    </div>
+                    @if($courier['success_rate'] !== null)<p class="mt-1.5 text-xs text-ink-700/60">Courier success rate: <strong>{{ $courier['success_rate'] }}%</strong></p>@endif
+                </div>
             @endif
         </div>
 

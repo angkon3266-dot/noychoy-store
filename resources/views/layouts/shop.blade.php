@@ -107,10 +107,12 @@
     @include('partials.meta-pixel')
 </head>
 <body class="min-h-screen flex flex-col">
-    @php($announce = theme())
-    @php($announceMsgs = array_values(array_filter((array) ($announce['announcement_messages'] ?? []))))
+    @php
+        $announce = theme();
+        $announceMsgs = array_values(array_filter((array) ($announce['announcement_messages'] ?? [])));
+    @endphp
     @if($announce['announcement_enabled'] && !empty($announceMsgs))
-        @php($announceSpeed = max(10, count($announceMsgs) * (int) ($announce['announcement_speed'] ?? 6)))
+        @php $announceSpeed = max(10, count($announceMsgs) * (int) ($announce['announcement_speed'] ?? 6)); @endphp
         <div x-data="{ show: true }" x-show="show"
              class="announce-bar relative text-xs"
              style="background: {{ $announce['announcement_bg'] }}; color: {{ $announce['announcement_color'] }}">
@@ -166,27 +168,55 @@
                 </div>
                 @endif
 
-                @php($menuTrigger = theme('menu_desktop_trigger', 'hover'))
+                @php $menuTrigger = theme('menu_desktop_trigger', 'hover'); @endphp
                 <nav class="hidden md:flex items-center gap-6 text-sm font-medium">
                     @foreach($siteMenu ?? [] as $item)
-                        @if(empty($item['children']))
-                            <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="hover:text-gold-700">{{ $item['label'] }}</a>
+                        @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
+                        @if($mtype === 'link')
+                            <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="hover:text-gold-700 flex items-center gap-1">
+                                {{ $item['label'] }}
+                                @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
+                            </a>
                         @else
-                            <div class="relative" x-data="{ o: false }"
+                            <div class="{{ $mtype === 'mega' ? 'static' : 'relative' }}" x-data="{ o: false }"
                                  @if($menuTrigger === 'hover') @mouseenter="o=true" @mouseleave="o=false" @endif>
                                 <button type="button" @if($menuTrigger === 'click') @click="o=!o" @endif class="flex items-center gap-1 hover:text-gold-700">
                                     {{ $item['label'] }}
+                                    @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
                                     <svg class="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="o" x-cloak @click.outside="o=false" x-transition.opacity
-                                     class="absolute left-0 top-full pt-3 z-50 min-w-48">
-                                    <div class="rounded-lg border border-gold-100 bg-white shadow-lg py-2">
-                                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block px-4 py-2 hover:bg-gold-50 font-medium">All {{ $item['label'] }}</a>
-                                        @foreach($item['children'] as $child)
-                                            <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block px-4 py-2 hover:bg-gold-50 text-ink-700/80">{{ $child['label'] }}</a>
-                                        @endforeach
+                                @if($mtype === 'mega')
+                                    {{-- Full-width mega panel --}}
+                                    <div x-show="o" x-cloak @click.outside="o=false" x-transition.opacity
+                                         class="absolute left-0 right-0 top-full pt-3 z-50">
+                                        <div class="mx-auto max-w-7xl rounded-xl border border-gold-100 bg-white shadow-xl p-6 grid gap-6"
+                                             style="grid-template-columns: repeat({{ min(5, max(1, count($item['columns'] ?? []))) }}, minmax(0,1fr));">
+                                            @forelse($item['columns'] ?? [] as $col)
+                                                <div>
+                                                    @if($col['heading'])<p class="font-display font-semibold text-gold-700 mb-2">{{ $col['heading'] }}</p>@endif
+                                                    <ul class="space-y-1.5">
+                                                        @foreach($col['links'] as $l)
+                                                            <li><a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="text-sm text-ink-700/80 hover:text-gold-700">{{ $l['label'] }}</a></li>
+                                                        @endforeach
+                                                    </ul>
+                                                </div>
+                                            @empty
+                                                <a href="{{ $item['url'] }}" class="text-sm text-gold-700">View {{ $item['label'] }}</a>
+                                            @endforelse
+                                        </div>
                                     </div>
-                                </div>
+                                @else
+                                    {{-- Simple dropdown --}}
+                                    <div x-show="o" x-cloak @click.outside="o=false" x-transition.opacity
+                                         class="absolute left-0 top-full pt-3 z-50 min-w-48">
+                                        <div class="rounded-lg border border-gold-100 bg-white shadow-lg py-2">
+                                            <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block px-4 py-2 hover:bg-gold-50 font-medium">All {{ $item['label'] }}</a>
+                                            @foreach($item['children'] ?? [] as $child)
+                                                <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block px-4 py-2 hover:bg-gold-50 text-ink-700/80">{{ $child['label'] }}</a>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     @endforeach
@@ -241,30 +271,41 @@
 
             <div x-show="open" x-cloak class="md:hidden pb-4 space-y-1">
                 @foreach($siteMenu ?? [] as $item)
-                    @if(empty($item['children']))
-                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block py-2 border-b border-gold-100">{{ $item['label'] }}</a>
+                    @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
+                    @if($mtype === 'link')
+                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-2 border-b border-gold-100">
+                            {{ $item['label'] }}
+                            @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
+                        </a>
                     @else
+                        {{-- Parent is an accordion toggle (no navigation), per spec --}}
                         <div x-data="{ sub: false }" class="border-b border-gold-100">
                             <button type="button" @click="sub=!sub" class="w-full flex items-center justify-between py-2 text-left">
-                                <span>{{ $item['label'] }}</span>
+                                <span class="flex items-center gap-2">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</span>
                                 <svg class="w-4 h-4 transition" :class="sub && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
                             </button>
                             <div x-show="sub" x-cloak class="pb-2 pl-3 space-y-1">
-                                <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">All {{ $item['label'] }}</a>
-                                @foreach($item['children'] as $child)
-                                    <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $child['label'] }}</a>
-                                @endforeach
+                                @if($mtype === 'mega')
+                                    @foreach($item['columns'] ?? [] as $col)
+                                        @if($col['heading'])<p class="pt-1.5 text-xs font-semibold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
+                                        @foreach($col['links'] as $l)
+                                            <a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $l['label'] }}</a>
+                                        @endforeach
+                                    @endforeach
+                                @else
+                                    @foreach($item['children'] ?? [] as $child)
+                                        <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $child['label'] }}</a>
+                                    @endforeach
+                                @endif
+                                @if($item['view_all_mobile'] ?? false)
+                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm font-medium text-gold-700">View all {{ $item['label'] }} →</a>
+                                @endif
                             </div>
                         </div>
                     @endif
                 @endforeach
                 @if($ctaLabel = theme('menu_cta_label'))
                     <a href="{{ theme('menu_cta_link') ?: route('shop') }}" class="block py-2 mt-1 text-gold-700 font-medium">{{ $ctaLabel }}</a>
-                @endif
-                @if(theme('menu_show_search', true))
-                <form action="{{ route('shop') }}" method="GET" class="pt-3">
-                    <input name="q" value="{{ request('q') }}" placeholder="Search jewelry…" class="input">
-                </form>
                 @endif
             </div>
         </div>

@@ -21,7 +21,7 @@ class Product extends Model
         'in_stock', 'weight', 'has_variants', 'options', 'status', 'is_featured',
         'views', 'meta_title', 'meta_description', 'woo_id',
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
-        'is_preorder', 'preorder_release_date', 'preorder_note',
+        'is_preorder', 'preorder_release_date', 'preorder_note', 'tags',
     ];
 
     protected $casts = [
@@ -179,6 +179,18 @@ class Product extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /** Tags as a clean array. */
+    public function getTagListAttribute(): array
+    {
+        return collect(explode(',', (string) $this->tags))->map(fn ($t) => trim($t))->filter()->values()->all();
+    }
+
+    /** Human product type. */
+    public function getTypeLabelAttribute(): string
+    {
+        return $this->has_variants ? 'Variable' : 'Simple';
     }
 
     // ── Margin / profitability ──────────────────────────────────────────────

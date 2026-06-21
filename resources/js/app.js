@@ -134,6 +134,24 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: mega-menu builder ─────────────────────────────────────────────
+    window.Alpine.data('menuBuilder', (initial) => ({
+        items: initial || [],
+        open: null,
+        blank() { return { label: 'New item', type: 'link', url: '#', new_tab: false, badge: '', view_all_mobile: true, children: [], columns: [] }; },
+        add() { this.items.push(this.blank()); this.open = this.items.length - 1; },
+        remove(i) { this.items.splice(i, 1); this.open = null; },
+        move(i, d) { const j = i + d; if (j < 0 || j >= this.items.length) return; [this.items[i], this.items[j]] = [this.items[j], this.items[i]]; this.open = j; },
+        toggle(i) { this.open = this.open === i ? null : i; },
+        addChild(it) { it.children.push({ label: '', url: '#', new_tab: false }); },
+        removeChild(it, j) { it.children.splice(j, 1); },
+        addColumn(it) { it.columns.push({ heading: 'New column', links: [{ label: '', url: '#', new_tab: false }] }); },
+        removeColumn(it, k) { it.columns.splice(k, 1); },
+        addLink(col) { col.links.push({ label: '', url: '#', new_tab: false }); },
+        removeLink(col, l) { col.links.splice(l, 1); },
+        get json() { return JSON.stringify(this.items); },
+    }));
+
     // ── Admin: searchable related-product picker (upsell / cross-sell) ───────
     window.Alpine.data('relatedPicker', (all, selected, field) => ({
         all: all || [],

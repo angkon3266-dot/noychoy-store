@@ -270,6 +270,11 @@
                         <option value="draft" @selected(old('status', $product->status)=='draft')>Draft</option>
                     </select>
                 </div>
+                <div>
+                    <label class="label">Tags</label>
+                    <input name="tags" value="{{ old('tags', $product->tags) }}" class="input" placeholder="bestseller, new-arrival, eid">
+                    <p class="text-xs text-ink-700/50 mt-1">Comma-separated. Used to filter products in the admin list &amp; on the shop.</p>
+                </div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured))> Featured on homepage</label>
                 <button class="btn-primary w-full">{{ $product->exists ? 'Save changes' : 'Create product' }}</button>
             </div>
