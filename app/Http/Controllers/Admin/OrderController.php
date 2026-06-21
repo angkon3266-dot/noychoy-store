@@ -101,6 +101,21 @@ class OrderController extends Controller
         ]);
     }
 
+    /** Print-ready shipping labels (A4, 14 per page) for orders with a consignment. */
+    public function labels(Request $request)
+    {
+        $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
+
+        $orders = Order::with('items', 'shipment')
+            ->whereHas('shipment', fn ($s) => $s->whereNotNull('consignment_id'))
+            ->when($ids, fn ($q) => $q->whereIn('id', $ids))
+            ->latest()
+            ->take(200)
+            ->get();
+
+        return view('admin.orders.labels', compact('orders'));
+    }
+
     public function updateStatus(Request $request, Order $order, SmsService $sms)
     {
         $data = $request->validate([

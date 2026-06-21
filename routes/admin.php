@@ -43,6 +43,7 @@ Route::middleware('admin')->group(function () {
 
     // Orders
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/labels', [OrderController::class, 'labels'])->name('orders.labels');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');

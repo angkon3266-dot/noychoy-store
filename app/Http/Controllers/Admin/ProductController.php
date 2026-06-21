@@ -29,7 +29,9 @@ class ProductController extends Controller
         $allTags = Product::whereNotNull('tags')->where('tags', '!=', '')->pluck('tags')
             ->flatMap(fn ($t) => array_map('trim', explode(',', $t)))->filter()->unique()->sort()->values();
 
-        return view('admin.products.index', compact('products', 'allTags'));
+        $bulkCategories = Category::orderBy('name')->get(['id', 'name']);
+
+        return view('admin.products.index', compact('products', 'allTags', 'bulkCategories'));
     }
 
     public function create()
@@ -147,9 +149,10 @@ class ProductController extends Controller
     public function bulk(Request $request)
     {
         $data = $request->validate([
-            'action' => ['required', 'in:publish,draft,feature,unfeature,delete'],
+            'action' => ['required', 'in:publish,draft,feature,unfeature,delete,category'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
+            'category_id' => ['nullable', 'exists:categories,id', 'required_if:action,category'],
         ]);
 
         $query = Product::whereIn('id', $data['ids']);
@@ -161,9 +164,17 @@ class ProductController extends Controller
             'feature' => $query->update(['is_featured' => true]),
             'unfeature' => $query->update(['is_featured' => false]),
             'delete' => $query->get()->each->delete(),
+            'category' => $query->get()->each(function ($p) use ($data) {
+                $p->update(['category_id' => $data['category_id']]);   // set primary
+                $p->categories()->syncWithoutDetaching([$data['category_id']]); // add to pivot
+            }),
         };
 
-        return back()->with('success', "$count product(s) updated.");
+        $msg = $data['action'] === 'category'
+            ? "$count product(s) moved to the selected category."
+            : "$count product(s) updated.";
+
+        return back()->with('success', $msg);
     }
 
     public function deleteImage(ProductImage $image)

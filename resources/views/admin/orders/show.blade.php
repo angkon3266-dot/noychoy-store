@@ -164,7 +164,10 @@
                     <p class="text-ink-700/70">Tracking: <strong>{{ $order->shipment->tracking_code }}</strong></p>
                     @if(!empty($resp['note']) || !empty($resp['delivery_note']))<p class="text-xs text-ink-700/60">Courier note: {{ $resp['note'] ?? $resp['delivery_note'] }}</p>@endif
                 </div>
-                <form action="{{ route('admin.orders.steadfast.refresh', $order) }}" method="POST" class="mt-3">@csrf<button class="btn-outline w-full">Refresh status</button></form>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <form action="{{ route('admin.orders.steadfast.refresh', $order) }}" method="POST">@csrf<button class="btn-outline w-full">Refresh status</button></form>
+                    <a href="{{ route('admin.orders.labels', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">🖨 Print label</a>
+                </div>
             @else
                 <p class="text-sm text-ink-700/60 mb-3">Create a courier consignment for COD ৳{{ number_format($order->total,0) }}.</p>
                 <form action="{{ route('admin.orders.steadfast', $order) }}" method="POST">@csrf<button class="btn-primary w-full">Send to Steadfast</button></form>

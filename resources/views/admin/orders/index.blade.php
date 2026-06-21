@@ -12,6 +12,7 @@
         @endforeach
     </select>
     <button class="btn-outline">Search</button>
+    <a href="{{ route('admin.orders.labels') }}" target="_blank" class="btn-outline whitespace-nowrap ml-auto">🖨 Print labels</a>
 </form>
 
 <div class="card overflow-hidden">

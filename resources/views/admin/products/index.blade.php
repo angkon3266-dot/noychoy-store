@@ -30,11 +30,13 @@
 @php($pageIds = $products->pluck('id')->values())
 <div x-data="{
         sel: [],
+        catId: '',
         allIds: {{ Js::from($pageIds) }},
         toggleAll(e) { this.sel = e.target.checked ? [...this.allIds] : []; },
         run(action) {
             if (!this.sel.length) return;
             if (action === 'delete' && !confirm('Delete ' + this.sel.length + ' product(s)? This cannot be undone.')) return;
+            if (action === 'category' && !this.catId) { alert('Pick a category first.'); return; }
             this.$refs.act.value = action;
             this.$refs.bulk.submit();
         }
@@ -48,6 +50,12 @@
         <button type="button" @click="run('draft')" class="text-gold-700 hover:underline">Set draft</button>
         <button type="button" @click="run('feature')" class="text-gold-700 hover:underline">Feature</button>
         <button type="button" @click="run('unfeature')" class="text-gold-700 hover:underline">Unfeature</button>
+        <span class="text-ink-300">|</span>
+        <select x-model="catId" class="input py-1 text-xs w-40">
+            <option value="">Move to category…</option>
+            @foreach($bulkCategories as $cat)<option value="{{ $cat->id }}">{{ $cat->name }}</option>@endforeach
+        </select>
+        <button type="button" @click="run('category')" class="text-gold-700 hover:underline">Apply</button>
         <button type="button" @click="run('delete')" class="text-red-600 hover:underline ml-auto">Delete</button>
     </div>
 
@@ -55,6 +63,7 @@
     <form x-ref="bulk" action="{{ route('admin.products.bulk') }}" method="POST" class="hidden">
         @csrf
         <input type="hidden" name="action" x-ref="act">
+        <input type="hidden" name="category_id" :value="catId">
         <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
     </form>
 
