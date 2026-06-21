@@ -83,6 +83,7 @@ return [
 
     // Homepage templates (brand-inspired presets). Each maps to a Blade view.
     'homepage_templates' => [
+        'couture' => ['name' => 'Couture — Modern Luxury', 'inspiration' => 'Mejuri / Tiffany editorial', 'view' => 'shop.templates.home.couture'],
         'aurelia' => ['name' => 'Aurelia — Classic Elegance', 'inspiration' => 'Tiffany & Co.', 'view' => 'shop.templates.home.aurelia'],
         'lumiere' => ['name' => 'Lumière — Editorial', 'inspiration' => 'Mejuri', 'view' => 'shop.templates.home.lumiere'],
         'maison' => ['name' => 'Maison — Luxe Dark', 'inspiration' => 'Cartier / Bvlgari', 'view' => 'shop.templates.home.maison'],
