@@ -92,6 +92,16 @@ Route::middleware('admin')->group(function () {
     Route::post('integrations', [IntegrationController::class, 'update'])->name('integrations.update');
     Route::post('integrations/test-sms', [IntegrationController::class, 'testSms'])->name('integrations.test-sms');
 
+    // Staff accounts & roles (admin only)
+    Route::get('users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
+    Route::post('users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');
+    Route::put('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'update'])->name('users.update');
+    Route::delete('users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
+
+    // My profile (any admin user — change own name/email/password)
+    Route::get('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'edit'])->name('profile');
+    Route::put('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'update'])->name('profile.update');
+
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');

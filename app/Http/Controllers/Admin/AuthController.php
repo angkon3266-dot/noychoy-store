@@ -29,7 +29,7 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => 'These credentials do not match our records.']);
         }
 
-        if (! in_array(Auth::user()->role, ['admin', 'manager'], true)) {
+        if (! in_array(Auth::user()->role, ['admin', 'manager', 'staff'], true)) {
             Auth::logout();
             throw ValidationException::withMessages(['email' => 'This account cannot access the admin area.']);
         }
