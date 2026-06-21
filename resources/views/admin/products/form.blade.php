@@ -305,11 +305,12 @@
                             <div class="img-card relative group cursor-move" draggable="true" data-img-id="{{ $image->id }}">
                                 <img src="{{ $image->url }}" class="aspect-square w-full object-cover rounded-lg pointer-events-none {{ $image->is_primary ? 'ring-2 ring-gold-500' : '' }}" alt="">
                                 @if($image->is_primary)<span class="absolute top-1 left-1 text-xs bg-gold-500 text-white rounded px-1">★</span>@endif
+                                {{-- Buttons target standalone forms (below) via form="" so they are NOT nested in the product form --}}
                                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 rounded-lg">
                                     @unless($image->is_primary)
-                                        <form action="{{ route('admin.products.images.primary', $image) }}" method="POST">@csrf<button class="text-[10px] bg-white rounded px-1.5 py-0.5">Primary</button></form>
+                                        <button type="submit" form="img-primary-{{ $image->id }}" class="text-[10px] bg-white rounded px-1.5 py-0.5">Primary</button>
                                     @endunless
-                                    <form action="{{ route('admin.products.images.delete', $image) }}" method="POST">@csrf @method('DELETE')<button class="text-[10px] bg-red-600 text-white rounded px-1.5 py-0.5">Del</button></form>
+                                    <button type="submit" form="img-del-{{ $image->id }}" class="text-[10px] bg-red-600 text-white rounded px-1.5 py-0.5">Del</button>
                                 </div>
                             </div>
                         @endforeach
@@ -322,6 +323,16 @@
         </div>
     </div>
 </form>
+
+{{-- Standalone image-action forms (kept OUTSIDE the product form to avoid nested-form bugs) --}}
+@if($product->exists && $product->images->isNotEmpty())
+    @foreach($product->images as $image)
+        @unless($image->is_primary)
+            <form id="img-primary-{{ $image->id }}" action="{{ route('admin.products.images.primary', $image) }}" method="POST" class="hidden">@csrf</form>
+        @endunless
+        <form id="img-del-{{ $image->id }}" action="{{ route('admin.products.images.delete', $image) }}" method="POST" class="hidden" onsubmit="return confirm('Delete this image?')">@csrf @method('DELETE')</form>
+    @endforeach
+@endif
 
 <script>
 (function () {

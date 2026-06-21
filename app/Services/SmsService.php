@@ -139,11 +139,18 @@ class SmsService
         if (! $this->isEnabled()) {
             return [];
         }
-        return Http::timeout(config('sms.timeout', 20))
-            ->post($this->baseUrl().'/api/v3/balance', [
-                'apikey' => $this->apiKey(),
-                'secretkey' => $this->secretKey(),
-            ])->json() ?? [];
+
+        // Never let a gateway timeout/connection error 500 the admin page.
+        try {
+            return Http::timeout(8)
+                ->post($this->baseUrl().'/api/v3/balance', [
+                    'apikey' => $this->apiKey(),
+                    'secretkey' => $this->secretKey(),
+                ])->json() ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('SMS balance check failed', ['error' => $e->getMessage()]);
+            return [];
+        }
     }
 
     protected function normalize(string $phone): string
