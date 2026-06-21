@@ -21,7 +21,7 @@
                     <p class="text-sm text-center mb-2 text-green-700 font-medium">🎉 You've unlocked free delivery!</p>
                 @endif
                 <div class="h-2 rounded-full bg-gold-100 overflow-hidden">
-                    <div class="h-full bg-gold-500 transition-all" style="width: {{ min(100, (int) ($cart->subtotal() / $freeThreshold * 100)) }}%"></div>
+                    <div class="h-full bg-accent transition-all" style="width: {{ min(100, (int) ($cart->subtotal() / $freeThreshold * 100)) }}%"></div>
                 </div>
             </div>
         @endif
@@ -43,7 +43,7 @@
                 @foreach($nearly->take(1) as $o)
                     <p class="text-sm">Add <strong>{{ money($o->remainingToUnlock($sub)) }}</strong> more to unlock <strong>{{ $o->title }}</strong></p>
                     <div class="h-2 rounded-full bg-gold-100 overflow-hidden">
-                        <div class="h-full bg-gold-500 transition-all" style="width: {{ min(100, (int) ($sub / max(1,(float)$o->min_subtotal) * 100)) }}%"></div>
+                        <div class="h-full bg-accent transition-all" style="width: {{ min(100, (int) ($sub / max(1,(float)$o->min_subtotal) * 100)) }}%"></div>
                     </div>
                 @endforeach
                 @guest('customer')

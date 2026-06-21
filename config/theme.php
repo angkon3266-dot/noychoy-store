@@ -1,23 +1,36 @@
 <?php
 
 return [
-    // One-click brand palettes (primary = highlights/buttons, accent = dark/text).
+    // One-click 4-colour brand palettes.
+    // primary = buttons/links · accent = secondary highlights · background = page tone · text = ink/headings
     'palettes' => [
-        'gold' => ['label' => 'Classic Gold', 'primary' => '#9a6c2e', 'accent' => '#161618'],
-        'rose' => ['label' => 'Rose Gold', 'primary' => '#b76e79', 'accent' => '#2b2024'],
-        'emerald' => ['label' => 'Emerald', 'primary' => '#0f766e', 'accent' => '#14201e'],
-        'royal' => ['label' => 'Royal Blue', 'primary' => '#1d4ed8', 'accent' => '#0f1729'],
-        'blush' => ['label' => 'Blush Pink', 'primary' => '#db2777', 'accent' => '#2a1620'],
-        'plum' => ['label' => 'Plum', 'primary' => '#7e22ce', 'accent' => '#1f1430'],
-        'mono' => ['label' => 'Monochrome', 'primary' => '#0a0a0a', 'accent' => '#0a0a0a'],
+        'gold' => ['label' => 'Classic Gold', 'primary' => '#9a6c2e', 'accent' => '#b6863a', 'background' => '#fbf8f1', 'text' => '#161618'],
+        'rose' => ['label' => 'Rose Gold', 'primary' => '#b76e79', 'accent' => '#cf9aa3', 'background' => '#fcf6f6', 'text' => '#2b2024'],
+        'emerald' => ['label' => 'Emerald', 'primary' => '#0f766e', 'accent' => '#2dd4bf', 'background' => '#f2faf8', 'text' => '#14201e'],
+        'royal' => ['label' => 'Royal Blue', 'primary' => '#1d4ed8', 'accent' => '#60a5fa', 'background' => '#f4f7fe', 'text' => '#0f1729'],
+        'blush' => ['label' => 'Blush Pink', 'primary' => '#db2777', 'accent' => '#f9a8d4', 'background' => '#fdf5f9', 'text' => '#2a1620'],
+        'plum' => ['label' => 'Plum', 'primary' => '#7e22ce', 'accent' => '#c084fc', 'background' => '#faf6fe', 'text' => '#1f1430'],
+        'noir' => ['label' => 'Noir', 'primary' => '#1f2937', 'accent' => '#9ca3af', 'background' => '#f7f7f8', 'text' => '#0a0a0a'],
     ],
+
+    // Curated fonts (Google) the admin can pick, plus "custom" for uploaded files.
+    'fonts' => ['Poppins', 'Inter', 'Montserrat', 'Lato', 'Raleway', 'Jost', 'Playfair Display', 'Cormorant Garamond', 'Marcellus', 'Instrument Sans'],
 
     // Default appearance — overridable from Admin → Appearance (stored in settings table).
     'defaults' => [
         'logo' => null,
         'favicon' => null,
-        'primary' => '#9a6c2e',   // gold-600
-        'accent' => '#161618',    // ink-900
+        'primary' => '#9a6c2e',     // buttons/links
+        'accent' => '#b6863a',      // secondary highlights
+        'background' => '#fbf8f1',  // page background
+        'text' => '#161618',        // ink / headings
+        // Fonts: source = google | custom (uploaded file)
+        'font_heading' => 'Playfair Display',
+        'font_heading_src' => 'google',
+        'font_heading_file' => null,
+        'font_body' => 'Instrument Sans',
+        'font_body_src' => 'google',
+        'font_body_file' => null,
         'homepage_template' => 'aurelia',
         'product_template' => 'showcase',
 

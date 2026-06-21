@@ -24,6 +24,14 @@ class AppearanceController extends Controller
         $data = $request->validate([
             'primary' => ['nullable', 'string', 'max:9'],
             'accent' => ['nullable', 'string', 'max:9'],
+            'background' => ['nullable', 'string', 'max:9'],
+            'text' => ['nullable', 'string', 'max:9'],
+            'font_heading' => ['nullable', 'string', 'max:60'],
+            'font_heading_src' => ['nullable', 'in:google,custom'],
+            'font_body' => ['nullable', 'string', 'max:60'],
+            'font_body_src' => ['nullable', 'in:google,custom'],
+            'font_heading_file' => ['nullable', 'file', 'mimes:woff,woff2,ttf,otf', 'max:4096'],
+            'font_body_file' => ['nullable', 'file', 'mimes:woff,woff2,ttf,otf', 'max:4096'],
             'homepage_template' => ['required', 'string', 'in:'.implode(',', array_keys(config('theme.homepage_templates')))],
             'product_template' => ['required', 'string', 'in:'.implode(',', array_keys(config('theme.product_templates')))],
             'announcement_enabled' => ['nullable', 'boolean'],
@@ -51,13 +59,23 @@ class AppearanceController extends Controller
 
         $current = theme();
 
-        // Files
+        // Files (images)
         foreach (['logo', 'favicon'] as $file) {
             if ($request->hasFile($file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
                 }
                 $current[$file] = $request->file($file)->store('branding', 'public');
+            }
+        }
+
+        // Custom font uploads (Blore etc.) → stored on public disk.
+        foreach (['font_heading_file', 'font_body_file'] as $fontFile) {
+            if ($request->hasFile($fontFile)) {
+                if (! empty($current[$fontFile])) {
+                    Storage::disk('public')->delete($current[$fontFile]);
+                }
+                $current[$fontFile] = $request->file($fontFile)->store('fonts', 'public');
             }
         }
 
@@ -96,7 +114,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'low_stock_threshold'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'low_stock_threshold'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

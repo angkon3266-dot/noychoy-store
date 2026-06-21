@@ -23,40 +23,79 @@
                 @if($fav = theme_asset($theme['favicon']))<img src="{{ $fav }}" class="h-8 mb-2" alt="favicon">@endif
                 <input type="file" name="favicon" accept="image/*" class="input text-sm">
             </div>
-            <div x-data="{ primary: '{{ $theme['primary'] }}', accent: '{{ $theme['accent'] }}' }">
-                <label class="label">Primary colour</label>
-                <div class="flex items-center gap-2">
-                    <input type="color" name="primary" x-model="primary" class="h-10 w-14 rounded border border-ink-100">
-                    <input type="text" x-model="primary" class="input py-1.5 w-28 font-mono text-xs uppercase">
+            @php
+                $colorRoles = [
+                    'primary' => ['Primary', 'Buttons, links, prices'],
+                    'accent' => ['Accent', 'Secondary highlights & progress bars'],
+                    'background' => ['Background', 'Page background & light surfaces'],
+                    'text' => ['Text / Ink', 'Headings & body text'],
+                ];
+            @endphp
+            @foreach($colorRoles as $key => [$label, $hint])
+                <div x-data="{ c: '{{ $theme[$key] ?? '#000000' }}' }">
+                    <label class="label">{{ $label }} colour</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" name="{{ $key }}" x-model="c" class="h-10 w-14 rounded border border-ink-100">
+                        <input type="text" x-model="c" class="input py-1.5 w-28 font-mono text-xs uppercase">
+                    </div>
+                    <p class="text-xs text-ink-700/50 mt-1">{{ $hint }}</p>
                 </div>
-                <p class="text-xs text-ink-700/50 mt-1">Buttons, links, prices &amp; highlights. The full light/dark scale is generated automatically.</p>
-            </div>
-            <div x-data="{ accent: '{{ $theme['accent'] }}' }">
-                <label class="label">Accent colour (dark / text)</label>
-                <div class="flex items-center gap-2">
-                    <input type="color" name="accent" x-model="accent" class="h-10 w-14 rounded border border-ink-100">
-                    <input type="text" x-model="accent" class="input py-1.5 w-28 font-mono text-xs uppercase">
-                </div>
-            </div>
+            @endforeach
         </div>
 
-        {{-- One-click preset palettes --}}
+        {{-- One-click 4-colour preset palettes --}}
         <div class="mt-6">
             <label class="label">Quick palettes</label>
-            <p class="text-xs text-ink-700/50 mb-3">Click one to set both colours, then Save. You can fine-tune above afterwards.</p>
+            <p class="text-xs text-ink-700/50 mb-3">Click one to set all four colours, then Save. Fine-tune above afterwards.</p>
             <div class="flex flex-wrap gap-3">
                 @foreach(config('theme.palettes', []) as $key => $pal)
                     <button type="button"
-                        onclick="document.querySelectorAll('[name=primary]').forEach(e=>{e.value='{{ $pal['primary'] }}';e.dispatchEvent(new Event('input'))});document.querySelectorAll('[name=accent]').forEach(e=>{e.value='{{ $pal['accent'] }}';e.dispatchEvent(new Event('input'))});"
+                        onclick="['primary','accent','background','text'].forEach(k=>{const v={primary:'{{ $pal['primary'] }}',accent:'{{ $pal['accent'] }}',background:'{{ $pal['background'] }}',text:'{{ $pal['text'] }}'}[k];document.querySelectorAll('[name='+k+']').forEach(e=>{e.value=v;e.dispatchEvent(new Event('input'))})});"
                         class="group flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2 hover:border-gold-400 hover:shadow-sm transition">
                         <span class="flex -space-x-1">
                             <span class="h-6 w-6 rounded-full border-2 border-white shadow" style="background: {{ $pal['primary'] }}"></span>
                             <span class="h-6 w-6 rounded-full border-2 border-white shadow" style="background: {{ $pal['accent'] }}"></span>
+                            <span class="h-6 w-6 rounded-full border-2 border-white shadow" style="background: {{ $pal['background'] }}"></span>
+                            <span class="h-6 w-6 rounded-full border-2 border-white shadow" style="background: {{ $pal['text'] }}"></span>
                         </span>
                         <span class="text-sm">{{ $pal['label'] }}</span>
                     </button>
                 @endforeach
             </div>
+        </div>
+    </div>
+
+    {{-- Fonts --}}
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Fonts</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Pick a Google font, or upload your own brand font file (.woff2/.woff/.ttf/.otf) — e.g. <strong>Blore</strong> for headings.</p>
+        <div class="grid sm:grid-cols-2 gap-6">
+            @foreach(['heading' => 'Heading font', 'body' => 'Body font'] as $slot => $slotLabel)
+                @php
+                    $curName = $theme['font_'.$slot] ?? '';
+                    $curSrc = $theme['font_'.$slot.'_src'] ?? 'google';
+                    $curFile = $theme['font_'.$slot.'_file'] ?? null;
+                @endphp
+                <div x-data="{ src: '{{ $curSrc }}' }">
+                    <label class="label">{{ $slotLabel }}</label>
+                    <div class="flex gap-2 mb-2">
+                        <label class="flex items-center gap-1.5 text-sm"><input type="radio" name="font_{{ $slot }}_src" value="google" x-model="src"> Google font</label>
+                        <label class="flex items-center gap-1.5 text-sm"><input type="radio" name="font_{{ $slot }}_src" value="custom" x-model="src"> Upload</label>
+                    </div>
+                    <div x-show="src==='google'">
+                        <select name="font_{{ $slot }}" class="input" :disabled="src!=='google'">
+                            @foreach(config('theme.fonts', []) as $f)
+                                <option value="{{ $f }}" @selected($curName===$f)>{{ $f }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div x-show="src==='custom'" x-cloak class="space-y-2">
+                        <input name="font_{{ $slot }}" :disabled="src!=='custom'" value="{{ $curSrc==='custom' ? $curName : '' }}" class="input" placeholder="Font name (e.g. Blore)">
+                        <input type="file" name="font_{{ $slot }}_file" accept=".woff,.woff2,.ttf,.otf" class="input text-sm">
+                        @if($curFile)<p class="text-xs text-green-700">Current: {{ basename($curFile) }}</p>@endif
+                    </div>
+                </div>
+            @endforeach
         </div>
     </div>
 

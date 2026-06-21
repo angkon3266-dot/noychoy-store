@@ -8,7 +8,7 @@
     @hasSection('meta')@yield('meta')@endif
     @isset($product)
         @if($product instanceof \App\Models\Product)
-            @php($ogImg = $product->thumbnail)
+            @php $ogImg = $product->thumbnail; @endphp
             <meta property="og:type" content="product">
             <meta property="og:title" content="{{ $product->meta_title ?: $product->name }}">
             <meta property="og:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($product->meta_description ?: $product->short_description ?: $product->description), 200) }}">
@@ -25,26 +25,63 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    {{-- Brand fonts (Google and/or uploaded custom) --}}
+    @php
+        $fHeading = theme('font_heading', 'Playfair Display');
+        $fHeadingSrc = theme('font_heading_src', 'google');
+        $fHeadingFile = theme('font_heading_file');
+        $fBody = theme('font_body', 'Instrument Sans');
+        $fBodySrc = theme('font_body_src', 'google');
+        $fBodyFile = theme('font_body_file');
+        $googleFonts = collect();
+        if ($fHeadingSrc === 'google' && $fHeading) $googleFonts->push($fHeading);
+        if ($fBodySrc === 'google' && $fBody) $googleFonts->push($fBody);
+        $googleFonts = $googleFonts->filter()->unique()->values();
+    @endphp
+    @if($googleFonts->isNotEmpty())
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?{{ $googleFonts->map(fn($f) => 'family='.str_replace(' ', '+', $f).':wght@400;500;600;700')->implode('&') }}&display=swap" rel="stylesheet">
+    @endif
     <style>
+        @if($fHeadingSrc === 'custom' && $fHeadingFile)
+        @font-face{ font-family:'{{ $fHeading }}'; src:url('{{ asset('storage/'.$fHeadingFile) }}'); font-weight:400 700; font-display:swap; }
+        @endif
+        @if($fBodySrc === 'custom' && $fBodyFile)
+        @font-face{ font-family:'{{ $fBody }}'; src:url('{{ asset('storage/'.$fBodyFile) }}'); font-weight:400 700; font-display:swap; }
+        @endif
         :root{
+            /* 4-colour brand palette */
             --brand: {{ theme('primary') }};
-            --brand-ink: {{ theme('accent') }};
-            /* Full gold scale derived from the primary colour */
-            --color-gold-50:  color-mix(in srgb, var(--brand) 8%,  white);
-            --color-gold-100: color-mix(in srgb, var(--brand) 16%, white);
-            --color-gold-200: color-mix(in srgb, var(--brand) 30%, white);
-            --color-gold-300: color-mix(in srgb, var(--brand) 48%, white);
-            --color-gold-400: color-mix(in srgb, var(--brand) 70%, white);
-            --color-gold-500: color-mix(in srgb, var(--brand) 88%, white);
+            --accent: {{ theme('accent') }};
+            --bg: {{ theme('background', '#fbf8f1') }};
+            --ink: {{ theme('text', theme('accent')) }};
+
+            /* Surfaces follow Background, accents/buttons follow Primary */
+            --color-gold-50:  var(--bg);
+            --color-gold-100: color-mix(in srgb, var(--bg) 80%, var(--brand));
+            --color-gold-200: color-mix(in srgb, var(--brand) 28%, white);
+            --color-gold-300: color-mix(in srgb, var(--brand) 46%, white);
+            --color-gold-400: color-mix(in srgb, var(--brand) 68%, white);
+            --color-gold-500: color-mix(in srgb, var(--brand) 86%, white);
             --color-gold-600: var(--brand);
             --color-gold-700: color-mix(in srgb, var(--brand) 82%, black);
             --color-gold-800: color-mix(in srgb, var(--brand) 64%, black);
             --color-gold-900: color-mix(in srgb, var(--brand) 52%, black);
-            /* Accent / text scale derived from the accent colour */
-            --color-ink-900: var(--brand-ink);
-            --color-ink-800: color-mix(in srgb, var(--brand-ink) 90%, white);
-            --color-ink-700: color-mix(in srgb, var(--brand-ink) 78%, white);
+            /* Text / ink follows Text colour */
+            --color-ink-900: var(--ink);
+            --color-ink-800: color-mix(in srgb, var(--ink) 90%, white);
+            --color-ink-700: color-mix(in srgb, var(--ink) 78%, white);
+            /* Secondary accent */
+            --color-accent: var(--accent);
+
+            --font-sans: '{{ $fBody }}', ui-sans-serif, system-ui, sans-serif;
+            --font-serif: '{{ $fHeading }}', Georgia, 'Times New Roman', serif;
         }
+        .bg-accent{ background-color: var(--color-accent) !important; }
+        .text-accent{ color: var(--color-accent) !important; }
+        .border-accent{ border-color: var(--color-accent) !important; }
         [x-cloak]{display:none!important}
 
         /* Moving announcement bar */
