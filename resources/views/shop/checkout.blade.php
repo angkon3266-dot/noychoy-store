@@ -46,22 +46,12 @@
                 </div>
             </div>
             <div>
-                <label class="label">Email (optional)</label>
-                <input name="email" x-ref="cemail" value="{{ old('email', $customer->email ?? '') }}" type="email" class="input">
-            </div>
-            <div>
                 <label class="label">Full address *</label>
                 <textarea name="address" rows="2" class="input" required>{{ old('address', $address->address ?? '') }}</textarea>
             </div>
-            <div class="grid sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="label">Area / Thana</label>
-                    <input name="area" value="{{ old('area', $address->area ?? '') }}" class="input">
-                </div>
-                <div>
-                    <label class="label">District</label>
-                    <input name="district" value="{{ old('district', $address->district ?? '') }}" class="input">
-                </div>
+            <div>
+                <label class="label">Area / Thana</label>
+                <input name="area" value="{{ old('area', $address->area ?? '') }}" class="input">
             </div>
 
             <div>
