@@ -49,6 +49,12 @@ Route::middleware('guest:customer')->group(function () {
     Route::post('/login', [CustomerAuthController::class, 'login'])->name('customer.login.post');
     Route::get('/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register');
     Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.post');
+
+    // Forgot password via SMS OTP
+    Route::get('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showForgot'])->name('customer.password.forgot');
+    Route::post('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendOtp'])->name('customer.password.send');
+    Route::get('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showReset'])->name('customer.password.reset');
+    Route::post('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'reset'])->name('customer.password.update');
 });
 Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 

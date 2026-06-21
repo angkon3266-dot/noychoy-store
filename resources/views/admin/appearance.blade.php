@@ -233,6 +233,26 @@
         </div>
     </div>
 
+    {{-- Footer --}}
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Footer</h2>
+        <p class="text-xs text-ink-700/60 mb-4">The Shop / Help / Contact columns fill automatically from your categories &amp; store details. Customise the rest here.</p>
+        <div class="space-y-4">
+            <div>
+                <label class="label">About text</label>
+                <textarea name="footer_about" rows="2" class="input" placeholder="Handpicked jewelry, delivered across Bangladesh…">{{ $theme['footer_about'] ?? '' }}</textarea>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="label">Facebook page URL</label><input name="footer_facebook" value="{{ $theme['footer_facebook'] ?? '' }}" class="input" placeholder="https://facebook.com/yourpage"></div>
+                <div><label class="label">Instagram URL</label><input name="footer_instagram" value="{{ $theme['footer_instagram'] ?? '' }}" class="input" placeholder="https://instagram.com/yourpage"></div>
+            </div>
+            <div>
+                <label class="label">Copyright line</label>
+                <input name="footer_copyright" value="{{ $theme['footer_copyright'] ?? '' }}" class="input" placeholder="© {{ date('Y') }} {{ config('store.name') }}. All rights reserved.">
+            </div>
+        </div>
+    </div>
+
     <div class="flex justify-end">
         <button class="btn-primary">Save appearance</button>
     </div>

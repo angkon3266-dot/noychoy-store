@@ -15,7 +15,10 @@
             @csrf
             <div><label class="label">Mobile number</label><input name="phone" value="{{ old('phone') }}" class="input" required></div>
             <div><label class="label">Password</label><input type="password" name="password" class="input" required></div>
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remember"> Remember me</label>
+            <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remember"> Remember me</label>
+                <a href="{{ route('customer.password.forgot') }}" class="text-sm text-gold-700 hover:underline">Forgot password?</a>
+            </div>
             <button class="btn-primary w-full">Log in</button>
         </form>
         <p class="text-center text-sm mt-4">No account? <a href="{{ route('customer.register') }}" class="text-gold-700 hover:underline">Register</a></p>
