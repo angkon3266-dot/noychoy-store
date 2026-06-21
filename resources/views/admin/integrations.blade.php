@@ -70,5 +70,13 @@
             <button class="btn-outline whitespace-nowrap">Send test</button>
         </form>
     </div>
+
+    {{-- Meta product catalog feed --}}
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Meta product catalog feed</h2>
+        <p class="text-xs text-ink-700/60 mb-3">In <strong>Meta Commerce Manager → Catalog → Data sources → Add items → Scheduled feed</strong>, paste this URL and set it to refresh daily. Use <code>custom_label_0</code> (your category) to build product sets for category ad campaigns.</p>
+        <code class="block break-all rounded bg-white border border-ink-100 px-3 py-2 text-xs">{{ route('feed.meta') }}</code>
+        <p class="text-xs text-ink-700/50 mt-2">Per-category feed: append <code>?category=slug</code> (e.g. <code>{{ route('feed.meta') }}?category=rings</code>).</p>
+    </div>
 </div>
 @endsection

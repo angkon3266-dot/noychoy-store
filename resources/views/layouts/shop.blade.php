@@ -6,6 +6,21 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', config('store.name')) — {{ config('store.name') }}</title>
     @hasSection('meta')@yield('meta')@endif
+    @isset($product)
+        @if($product instanceof \App\Models\Product)
+            @php($ogImg = $product->thumbnail)
+            <meta property="og:type" content="product">
+            <meta property="og:title" content="{{ $product->meta_title ?: $product->name }}">
+            <meta property="og:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($product->meta_description ?: $product->short_description ?: $product->description), 200) }}">
+            <meta property="og:url" content="{{ route('product.show', $product) }}">
+            @if($ogImg)<meta property="og:image" content="{{ \Illuminate\Support\Str::startsWith($ogImg, 'http') ? $ogImg : rtrim(config('app.url'),'/').'/'.ltrim($ogImg,'/') }}">@endif
+            <meta property="product:brand" content="{{ config('store.name') }}">
+            <meta property="product:availability" content="{{ ($product->isAvailable() || $product->isPreorder()) ? 'in stock' : 'out of stock' }}">
+            <meta property="product:condition" content="new">
+            <meta property="product:price:amount" content="{{ number_format((float) $product->price, 2, '.', '') }}">
+            <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
+        @endif
+    @endisset
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>

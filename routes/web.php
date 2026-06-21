@@ -16,6 +16,9 @@ Route::post('/webhooks/steadfast', [SteadfastWebhookController::class, 'handle']
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/shop', [CatalogController::class, 'index'])->name('shop');
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
+
+// Meta (Facebook/Instagram) product catalog feed for Commerce Manager
+Route::get('/feed/meta.csv', [\App\Http\Controllers\Shop\ProductFeedController::class, 'meta'])->name('feed.meta');
 Route::get('/track', [CheckoutController::class, 'track'])->name('track');
 
 // Cart
