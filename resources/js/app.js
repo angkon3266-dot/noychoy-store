@@ -87,6 +87,53 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: product editor (simple/variable + multi-attribute variants) ───
+    window.Alpine.data('productForm', (config) => ({
+        type: config.type || 'simple',
+        attributes: config.attributes || [],   // [{ name, values }] (values = comma string)
+        variants: config.variants || [],       // [{ attrs:{Size:'7'}, price, stock, sku }]
+        offers: config.offers || [],
+        price: Number(config.price) || 0,
+        cost: Number(config.cost) || 0,
+        transport: Number(config.transport) || 0,
+
+        get profit() { return this.price - this.cost - this.transport; },
+        get margin() { return this.price > 0 ? (this.profit / this.price * 100) : 0; },
+        fmt(n) { return '৳' + Number(n).toLocaleString('en-BD', { maximumFractionDigits: 2 }); },
+
+        addOffer() { this.offers.push({ min_qty: '', percent: '' }); },
+        addAttribute() { this.attributes.push({ name: '', values: '' }); },
+        removeAttribute(i) { this.attributes.splice(i, 1); this.generate(); },
+
+        keyOf(attrs) { return Object.keys(attrs).sort().map(k => k + ':' + attrs[k]).join('|'); },
+        label(attrs) { return Object.entries(attrs).map(([k, v]) => k + ': ' + v).join(' · '); },
+        attrNames(v) { return Object.keys(v.attrs); },
+
+        /** Rebuild the variant matrix as the cartesian product of attribute values. */
+        generate() {
+            const defs = this.attributes
+                .map(a => ({ name: (a.name || '').trim(), vals: (a.values || '').split(',').map(s => s.trim()).filter(Boolean) }))
+                .filter(a => a.name && a.vals.length);
+            if (!defs.length) { this.variants = []; return; }
+
+            let combos = [[]];
+            for (const d of defs) {
+                const next = [];
+                for (const c of combos) for (const v of d.vals) next.push([...c, [d.name, v]]);
+                combos = next;
+            }
+            const prev = {};
+            for (const v of this.variants) prev[this.keyOf(v.attrs)] = v;
+
+            this.variants = combos.map(combo => {
+                const attrs = {};
+                combo.forEach(([n, v]) => { attrs[n] = v; });
+                const old = prev[this.keyOf(attrs)];
+                return { attrs, price: old ? old.price : '', stock: old ? old.stock : 0, sku: old ? old.sku : '' };
+            });
+        },
+    }));
+
     // ── Admin: searchable related-product picker (upsell / cross-sell) ───────
     window.Alpine.data('relatedPicker', (all, selected, field) => ({
         all: all || [],
@@ -112,21 +159,43 @@ document.addEventListener('alpine:init', () => {
         img: config.image || '',
         qty: 1,
         hasVariants: !!config.hasVariants,
-        variant: config.hasVariants ? null : 'none',
-        variants: config.variants || {},
+        attributes: config.attributes || [],     // [{name, values:[]}]
+        variantList: config.variants || [],       // [{id, attrs:{}, price, stock}]
+        selected: {},                              // {Size:'7', Color:'Gold'}
         basePrice: config.price || 0,
         contentId: String(config.id || ''),
         name: config.name || '',
         offers: (config.offers || []).map(o => ({ min_qty: Number(o.min_qty), percent: Number(o.percent) })),
 
-        // Unit price for the currently-selected variant, before any quantity offer.
-        get unitPrice() {
-            if (this.variant && this.variant !== 'none' && this.variants[this.variant]) {
-                return this.variants[this.variant].price;
+        init() {
+            // Pre-select any attribute that has only one value.
+            for (const a of this.attributes) {
+                if ((a.values || []).length === 1) this.selected[a.name] = a.values[0];
             }
+        },
+
+        // The variant matching every selected attribute (null until all chosen).
+        get matched() {
+            if (!this.hasVariants) return null;
+            if (this.attributes.some(a => !this.selected[a.name])) return null;
+            return this.variantList.find(v =>
+                this.attributes.every(a => String(v.attrs[a.name]) === String(this.selected[a.name]))) || null;
+        },
+        // variant_id posted to the cart: id when matched, '' when variable-unmatched, 'none' when simple.
+        get variant() { return this.hasVariants ? (this.matched ? String(this.matched.id) : '') : 'none'; },
+        get variantStock() { return this.matched ? this.matched.stock : null; },
+
+        selectAttr(name, val) { this.selected[name] = val; },
+        isSelected(name, val) { return String(this.selected[name]) === String(val); },
+        // Disable a value if no variant with it is in stock.
+        valueInStock(name, val) {
+            return this.variantList.some(v => String(v.attrs[name]) === String(val) && v.stock > 0);
+        },
+
+        get unitPrice() {
+            if (this.hasVariants) return this.matched ? this.matched.price : this.basePrice;
             return this.basePrice;
         },
-        // Best offer percent that applies at the current quantity (0 if none).
         get offerPercent() {
             let best = 0;
             for (const o of this.offers) {
@@ -134,7 +203,6 @@ document.addEventListener('alpine:init', () => {
             }
             return best;
         },
-        // Discounted unit price after applying the best applicable offer.
         get price() {
             return this.offerPercent > 0
                 ? Math.round(this.unitPrice * (1 - this.offerPercent / 100) * 100) / 100
@@ -143,13 +211,17 @@ document.addEventListener('alpine:init', () => {
         get lineTotal() { return this.price * this.qty; },
         get savings() { return Math.round((this.unitPrice - this.price) * this.qty * 100) / 100; },
         get canBuy() {
-            return !this.hasVariants || (this.variant && this.variant !== 'none');
+            if (!this.hasVariants) return true;
+            return !!this.matched && this.matched.stock > 0;
         },
         fmt(n) { return '৳' + Number(n).toLocaleString(); },
         priceText() {
+            if (this.hasVariants && !this.matched) {
+                const prices = this.variantList.map(v => v.price).filter(p => p > 0);
+                return prices.length ? 'From ' + this.fmt(Math.min(...prices)) : this.fmt(this.basePrice);
+            }
             return this.fmt(this.price);
         },
-        selectVariant(id) { this.variant = String(id); },
         inc() { this.qty++; },
         dec() { this.qty = Math.max(1, this.qty - 1); },
 

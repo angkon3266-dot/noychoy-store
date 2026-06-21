@@ -190,8 +190,17 @@ class ProductController extends Controller
             'category_ids.*' => ['integer', 'exists:categories,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
+            'product_type' => ['nullable', 'in:simple,variable'],
+            'price' => ['nullable', 'numeric', 'min:0', 'required_if:product_type,simple'],
             'compare_at_price' => ['nullable', 'numeric', 'min:0'],
+            'attributes' => ['nullable', 'array'],
+            'attributes.*.name' => ['nullable', 'string', 'max:60'],
+            'attributes.*.values' => ['nullable', 'string', 'max:300'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.attrs' => ['nullable', 'array'],
+            'variants.*.price' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.stock' => ['nullable', 'integer', 'min:0'],
+            'variants.*.sku' => ['nullable', 'string', 'max:80'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'transport_cost' => ['nullable', 'numeric', 'min:0'],
             'is_preorder' => ['nullable', 'boolean'],
@@ -216,8 +225,32 @@ class ProductController extends Controller
         $validated['is_featured'] = $request->boolean('is_featured');
         $validated['is_preorder'] = $request->boolean('is_preorder');
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
-        $validated['in_stock'] = ! $validated['manage_stock'] || $validated['stock_quantity'] > 0;
-        $validated['has_variants'] = filled($request->input('variants'));
+
+        // ── Product type: simple vs variable ────────────────────────────────
+        $isVariable = ($request->input('product_type') === 'variable');
+        $validated['has_variants'] = $isVariable;
+
+        if ($isVariable) {
+            // Attribute definitions → options json: [{name, values:[]}]
+            $validated['options'] = collect($request->input('attributes', []))
+                ->map(fn ($a) => [
+                    'name' => trim((string) ($a['name'] ?? '')),
+                    'values' => collect(explode(',', (string) ($a['values'] ?? '')))->map(fn ($v) => trim($v))->filter()->values()->all(),
+                ])
+                ->filter(fn ($a) => $a['name'] !== '' && ! empty($a['values']))
+                ->values()->all();
+
+            // Price = lowest variation price (for cards, sorting, "from" display).
+            $prices = collect($request->input('variants', []))
+                ->map(fn ($v) => (float) ($v['price'] ?? 0))->filter(fn ($p) => $p > 0);
+            $validated['price'] = $prices->min() ?? 0;
+            $validated['manage_stock'] = true;
+            $validated['stock_quantity'] = collect($request->input('variants', []))->sum(fn ($v) => (int) ($v['stock'] ?? 0));
+            $validated['in_stock'] = $validated['stock_quantity'] > 0;
+        } else {
+            $validated['options'] = null;
+            $validated['in_stock'] = ! $validated['manage_stock'] || $validated['stock_quantity'] > 0;
+        }
 
         // Normalise quantity offers: keep only complete rows, sorted by min_qty.
         $validated['quantity_offers'] = collect($validated['quantity_offers'] ?? [])
@@ -298,27 +331,30 @@ class ProductController extends Controller
      */
     protected function syncVariants(Request $request, Product $product): void
     {
-        $rows = collect($request->input('variants', []))
-            ->filter(fn ($row) => filled($row['label'] ?? null));
-
-        if ($rows->isEmpty()) {
+        // Simple product → no variants.
+        if ($request->input('product_type') !== 'variable') {
             $product->variants()->delete();
-            $product->update(['has_variants' => false]);
             return;
         }
 
+        $rows = collect($request->input('variants', []))
+            ->filter(fn ($row) => ! empty($row['attrs']) && is_array($row['attrs']));
+
+        // Rebuild fresh each save (small catalog, keeps it predictable).
         $product->variants()->delete();
 
         foreach ($rows as $row) {
+            $attrs = collect($row['attrs'])->map(fn ($v) => (string) $v)->filter(fn ($v) => $v !== '')->all();
+            if (empty($attrs)) {
+                continue;
+            }
             $product->variants()->create([
-                'attributes' => ['Option' => $row['label']],
+                'attributes' => $attrs,                                   // {"Size":"7","Color":"Gold"}
                 'sku' => $row['sku'] ?? null,
-                'price' => ($row['price'] ?? null) !== null && $row['price'] !== '' ? $row['price'] : null,
+                'price' => filled($row['price'] ?? null) ? (float) $row['price'] : null,
                 'stock_quantity' => (int) ($row['stock'] ?? 0),
                 'is_active' => true,
             ]);
         }
-
-        $product->update(['has_variants' => true]);
     }
 }

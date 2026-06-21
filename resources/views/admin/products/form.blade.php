@@ -9,12 +9,22 @@
     </div>
 @endif
 
+@php
+    $vType = old('product_type', $product->has_variants ? 'variable' : 'simple');
+    $vAttributes = collect(old('attributes', collect($product->options ?? [])->map(fn ($o) => ['name' => $o['name'] ?? '', 'values' => implode(', ', $o['values'] ?? [])])->all()))->values();
+    $vVariants = collect(old('variants', $product->variants->map(fn ($v) => ['attrs' => $v->attributes ?? [], 'price' => $v->price, 'stock' => $v->stock_quantity, 'sku' => $v->sku])->all()))->values();
+    $formConfig = [
+        'type' => $vType,
+        'attributes' => $vAttributes,
+        'variants' => $vVariants,
+        'offers' => collect(old('quantity_offers', $product->quantity_offers ?? []))->map(fn ($t) => ['min_qty' => $t['min_qty'] ?? '', 'percent' => $t['percent'] ?? ''])->values(),
+        'price' => (float) old('price', $product->price ?: 0),
+        'cost' => (float) old('cost_price', $product->cost_price ?: 0),
+        'transport' => (float) old('transport_cost', $product->transport_cost ?: 0),
+    ];
+@endphp
 <form action="{{ $product->exists ? route('admin.products.update', $product) : route('admin.products.store') }}"
-      method="POST" enctype="multipart/form-data"
-      x-data="{
-          variants: {{ Js::from($product->variants->map(fn($v)=>['label'=>$v->attributes['Option']??'','sku'=>$v->sku,'price'=>$v->price,'stock'=>$v->stock_quantity])->values()) }},
-          offers: {{ Js::from(collect(old('quantity_offers', $product->quantity_offers ?? []))->map(fn($t)=>['min_qty'=>$t['min_qty']??'','percent'=>$t['percent']??''])->values()) }}
-      }">
+      method="POST" enctype="multipart/form-data" x-data="productForm(@js($formConfig))">
     @csrf
     @if($product->exists) @method('PUT') @endif
 
@@ -70,21 +80,33 @@
             </div>
 
             <!-- Pricing -->
-            <div class="card p-6 space-y-4"
-                 x-data="{
-                    price: {{ (float) old('price', $product->price ?: 0) }},
-                    cost: {{ (float) old('cost_price', $product->cost_price ?: 0) }},
-                    transport: {{ (float) old('transport_cost', $product->transport_cost ?: 0) }},
-                    get profit() { return this.price - this.cost - this.transport; },
-                    get margin() { return this.price > 0 ? (this.profit / this.price * 100) : 0; },
-                    fmt(n) { return '৳' + Number(n).toLocaleString('en-BD', {maximumFractionDigits: 2}); }
-                 }">
+            <div class="card p-6 space-y-4">
                 <h2 class="font-semibold">Pricing &amp; stock</h2>
-                <div class="grid sm:grid-cols-2 gap-4">
-                    <div><label class="label">Price (৳) *</label><input name="price" type="number" step="0.01" x-model.number="price" value="{{ old('price', $product->price) }}" class="input" required></div>
+
+                {{-- Product type --}}
+                <div>
+                    <span class="label">Product type</span>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm" :class="type==='simple' ? 'border-gold-500 bg-gold-50' : 'border-ink-100'">
+                            <input type="radio" name="product_type" value="simple" x-model="type" class="mr-1"> Simple product
+                            <span class="block text-xs text-ink-700/50 mt-0.5">One price, one SKU.</span>
+                        </label>
+                        <label class="flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm" :class="type==='variable' ? 'border-gold-500 bg-gold-50' : 'border-ink-100'">
+                            <input type="radio" name="product_type" value="variable" x-model="type" class="mr-1"> Variable product
+                            <span class="block text-xs text-ink-700/50 mt-0.5">Options (size, colour) each with its own price &amp; stock.</span>
+                        </label>
+                    </div>
+                </div>
+
+                {{-- Simple-only price (hidden for variable; price comes from variations) --}}
+                <div class="grid sm:grid-cols-2 gap-4" x-show="type==='simple'">
+                    <div><label class="label">Price (৳) *</label><input name="price" type="number" step="0.01" x-model.number="price" :required="type==='simple'" class="input"></div>
                     <div><label class="label">Compare-at (৳)</label><input name="compare_at_price" type="number" step="0.01" value="{{ old('compare_at_price', $product->compare_at_price) }}" class="input"></div>
-                    <div><label class="label">Product cost (৳)</label><input name="cost_price" type="number" step="0.01" x-model.number="cost" value="{{ old('cost_price', $product->cost_price) }}" class="input" placeholder="What you pay supplier"></div>
-                    <div><label class="label">Transport / packaging (৳)</label><input name="transport_cost" type="number" step="0.01" x-model.number="transport" value="{{ old('transport_cost', $product->transport_cost) }}" class="input" placeholder="Inbound + packing per unit"></div>
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div><label class="label">Product cost (৳)</label><input name="cost_price" type="number" step="0.01" x-model.number="cost" class="input" placeholder="What you pay supplier"></div>
+                    <div><label class="label">Transport / packaging (৳)</label><input name="transport_cost" type="number" step="0.01" x-model.number="transport" class="input" placeholder="Inbound + packing per unit"></div>
                 </div>
 
                 {{-- Live margin readout --}}
@@ -93,36 +115,57 @@
                     <span class="text-ink-700/60">Landed cost: <strong x-text="fmt(cost + transport)"></strong></span>
                     <span class="text-ink-700/60">Profit / unit: <strong x-text="fmt(profit)" :class="profit < 0 ? 'text-red-700' : 'text-green-700'"></strong></span>
                     <span class="text-ink-700/60">Margin: <strong x-text="margin.toFixed(1) + '%'" :class="profit < 0 ? 'text-red-700' : 'text-green-700'"></strong></span>
-                    <span x-show="cost === 0 && transport === 0" class="text-ink-700/40 text-xs">Enter cost to see margin</span>
+                    <span x-show="type==='variable'" class="text-ink-700/40 text-xs">Margin uses the simple price; per-variation prices set below.</span>
                 </div>
 
-                <div class="flex flex-wrap items-end gap-4">
+                <div class="flex flex-wrap items-end gap-4" x-show="type==='simple'">
                     <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="manage_stock" value="1" @checked(old('manage_stock', $product->manage_stock))> Track stock</label>
                     <div><label class="label">Stock quantity</label><input name="stock_quantity" type="number" value="{{ old('stock_quantity', $product->stock_quantity) }}" class="input w-32"></div>
                 </div>
             </div>
 
-            <!-- Variants -->
-            <div class="card p-6">
-                <div class="flex items-center justify-between mb-3">
-                    <div><h2 class="font-semibold">Variants</h2><p class="text-xs text-ink-700/60">Optional — e.g. ring sizes or colors. Leave empty for a simple product.</p></div>
-                    <button type="button" @click="variants.push({label:'',sku:'',price:'',stock:0})" class="btn-outline py-1.5">+ Add variant</button>
+            <!-- Variations (variable products only) -->
+            <div class="card p-6" x-show="type==='variable'" x-cloak>
+                <h2 class="font-semibold mb-1">Variations</h2>
+                <p class="text-xs text-ink-700/60 mb-4">Define options like <strong>Size</strong> and <strong>Colour</strong>, then set a price &amp; stock for each combination.</p>
+
+                {{-- Attributes --}}
+                <div class="space-y-2 mb-4">
+                    <template x-for="(a, i) in attributes" :key="i">
+                        <div class="grid grid-cols-12 gap-2 items-center">
+                            <input :name="`attributes[${i}][name]`" x-model="a.name" @change="generate()" class="input py-2 col-span-4" placeholder="Option name (e.g. Size)">
+                            <input :name="`attributes[${i}][values]`" x-model="a.values" @change="generate()" @blur="generate()" class="input py-2 col-span-7" placeholder="Comma-separated values (e.g. 6, 7, 8)">
+                            <button type="button" @click="removeAttribute(i)" class="col-span-1 text-red-600 text-lg">×</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="addAttribute()" class="btn-outline py-1.5">+ Add option (Size, Colour…)</button>
                 </div>
+
+                {{-- Generated variation matrix --}}
                 <template x-if="variants.length">
                     <div class="space-y-2">
-                        <div class="grid grid-cols-12 gap-2 text-xs text-ink-700/60 px-1">
-                            <span class="col-span-5">Option (e.g. Size 6 / Gold)</span><span class="col-span-3">SKU</span><span class="col-span-2">Price ৳</span><span class="col-span-1">Stock</span>
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm font-medium"><span x-text="variants.length"></span> variation(s)</p>
+                            <button type="button" @click="generate()" class="text-xs text-gold-700 hover:underline">↻ Regenerate</button>
                         </div>
-                        <template x-for="(v, i) in variants" :key="i">
+                        <div class="grid grid-cols-12 gap-2 text-xs text-ink-700/60 px-1">
+                            <span class="col-span-5">Variation</span><span class="col-span-3">Price ৳</span><span class="col-span-2">Stock</span><span class="col-span-2">SKU</span>
+                        </div>
+                        <template x-for="(v, i) in variants" :key="keyOf(v.attrs)">
                             <div class="grid grid-cols-12 gap-2 items-center">
-                                <input :name="`variants[${i}][label]`" x-model="v.label" class="input py-2 col-span-5" placeholder="Size 6 / Gold">
-                                <input :name="`variants[${i}][sku]`" x-model="v.sku" class="input py-2 col-span-3">
-                                <input :name="`variants[${i}][price]`" x-model="v.price" type="number" step="0.01" class="input py-2 col-span-2" placeholder="base">
-                                <input :name="`variants[${i}][stock]`" x-model="v.stock" type="number" class="input py-2 col-span-1">
-                                <button type="button" @click="variants.splice(i,1)" class="col-span-1 text-red-600 text-lg">×</button>
+                                <span class="col-span-5 text-sm" x-text="label(v.attrs)"></span>
+                                <input :name="`variants[${i}][price]`" x-model="v.price" type="number" step="0.01" class="input py-2 col-span-3" placeholder="0.00">
+                                <input :name="`variants[${i}][stock]`" x-model="v.stock" type="number" class="input py-2 col-span-2" placeholder="0">
+                                <input :name="`variants[${i}][sku]`" x-model="v.sku" class="input py-2 col-span-2" placeholder="SKU">
+                                <template x-for="(val, name) in v.attrs" :key="name">
+                                    <input type="hidden" :name="`variants[${i}][attrs][${name}]`" :value="val">
+                                </template>
                             </div>
                         </template>
                     </div>
+                </template>
+                <template x-if="!variants.length">
+                    <p class="text-sm text-ink-700/50">Add at least one option with values to generate variations.</p>
                 </template>
             </div>
 

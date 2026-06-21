@@ -95,20 +95,29 @@
         </div>
     @endif
 
-    {{-- Variant picker --}}
+    {{-- Variant picker (one selector per attribute, e.g. Size, Colour) --}}
     @if($product->has_variants)
-        <div class="mt-6">
-            <span class="label">Option</span>
-            <div class="flex flex-wrap gap-2">
-                @foreach($product->variants as $v)
-                    <button type="button" @click="selectVariant('{{ $v->id }}')"
-                        class="rounded-md border px-4 py-2 text-sm"
-                        :class="variant==='{{ $v->id }}' ? 'border-gold-500 bg-gold-100 text-gold-800' : 'border-ink-100 hover:border-gold-300'"
-                        @disabled($v->stock_quantity <= 0)>
-                        {{ $v->attributes['Option'] ?? $v->label }}
-                    </button>
-                @endforeach
-            </div>
+        <div class="mt-6 space-y-4">
+            @foreach($product->options ?? [] as $attr)
+                <div>
+                    <span class="label">{{ $attr['name'] }}: <span class="text-ink-700/60 font-normal" x-text="selected[@js($attr['name'])] || 'Choose'"></span></span>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($attr['values'] as $val)
+                            <button type="button" @click="selectAttr(@js($attr['name']), @js($val))"
+                                class="rounded-md border px-4 py-2 text-sm transition"
+                                :disabled="!valueInStock(@js($attr['name']), @js($val))"
+                                :class="[
+                                    isSelected(@js($attr['name']), @js($val)) ? 'border-gold-500 bg-gold-100 text-gold-800' : 'border-ink-100 hover:border-gold-300',
+                                    !valueInStock(@js($attr['name']), @js($val)) ? 'opacity-40 line-through cursor-not-allowed' : ''
+                                ]">
+                                {{ $val }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+            <p x-show="!matched" class="text-xs text-ink-700/50">Select options to see price &amp; availability.</p>
+            <p x-show="matched && variantStock <= 0" x-cloak class="text-xs text-red-600 font-medium">This combination is sold out.</p>
         </div>
     @endif
 

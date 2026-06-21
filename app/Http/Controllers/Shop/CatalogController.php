@@ -108,6 +108,23 @@ class CatalogController extends Controller
             ->take(8)->values()->all();
         session(['recently_viewed' => $recent]);
 
+        // Shared Alpine config for the product page (built once, used by every template).
+        $pp = [
+            'id' => $product->id,
+            'name' => $product->name,
+            'price' => (float) $product->price,
+            'hasVariants' => (bool) $product->has_variants,
+            'image' => $product->images->first()?->url ?? '',
+            'attributes' => $product->options ?? [],   // [{name, values:[]}]
+            'variants' => $product->variants->map(fn ($v) => [
+                'id' => $v->id,
+                'attrs' => $v->attributes ?? [],
+                'price' => (float) ($v->price ?? $product->price),
+                'stock' => (int) $v->stock_quantity,
+            ])->values(),
+            'offers' => $product->offerTiers(),
+        ];
+
         // Resolve template: category override → theme default → fallback.
         $key = $product->category?->product_template ?: theme('product_template');
         $view = config('theme.product_templates.'.$key.'.view');
@@ -115,6 +132,6 @@ class CatalogController extends Controller
             $view = 'shop.templates.product.showcase';
         }
 
-        return view($view, compact('product', 'related', 'crossSells'));
+        return view($view, compact('product', 'related', 'crossSells', 'pp'));
     }
 }

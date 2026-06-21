@@ -3,14 +3,6 @@
 @section('meta')<meta name="description" content="{{ $product->meta_description ?: \Illuminate\Support\Str::limit(strip_tags($product->short_description), 150) }}">@endsection
 
 @section('content')
-@php
-$pp = [
-    'id' => $product->id, 'name' => $product->name, 'price' => (float) $product->price,
-    'hasVariants' => (bool) $product->has_variants, 'image' => $product->images->first()?->url ?? '',
-    'variants' => $product->variants->mapWithKeys(fn($v) => [$v->id => ['label' => $v->attributes['Option'] ?? $v->label, 'price' => $v->effective_price, 'stock' => $v->stock_quantity]]),
-    'offers' => $product->offerTiers(),
-];
-@endphp
 {{-- Traditional centered layout with framed gallery --}}
 <div class="mx-auto max-w-5xl px-4 py-10" x-data="productPage(@js($pp))">
     <nav class="text-sm text-ink-700/60 mb-6 text-center">
