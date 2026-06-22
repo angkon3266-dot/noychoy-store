@@ -77,14 +77,18 @@ class SmsService
                 'messageContent' => $message,
             ];
 
-            $response = Http::timeout(config('sms.timeout', 20))
-                ->get($this->baseUrl().'/sendtext', $params);
+            $endpoint = $this->baseUrl().'/sendtext';
+            $response = Http::timeout(config('sms.timeout', 20))->get($endpoint, $params);
 
             $this->lastResponse = $response->json() ?? ['raw' => $response->body()];
+            // Surface the endpoint + HTTP code (no secrets) to aid diagnosis.
+            $this->lastResponse['_endpoint'] = $endpoint;
+            $this->lastResponse['_http'] = $response->status();
 
             $data = $response->json() ?? [];
+            // KhudeBarta success = Status "0". Accept string or int just in case.
             $providerStatus = (string) ($data['Status'] ?? '');
-            $accepted = $providerStatus === '0';
+            $accepted = in_array($providerStatus, ['0', '00'], true);
 
             $this->log($to, $message, $orderId,
                 status: $data['Text'] ?? ($accepted ? 'ACCEPTD' : 'REJECTD'),
