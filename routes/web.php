@@ -66,10 +66,10 @@ Route::middleware('guest:customer')->group(function () {
     Route::post('/password/email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendEmailLink'])->name('customer.password.email');
     Route::get('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showEmailReset'])->name('customer.password.email.form');
     Route::post('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'resetViaEmail'])->name('customer.password.email.update');
-}
+});
 
 // Google OAuth callback (outside guest group so it works mid-session)
-Route::get('/auth/google/callback', [\App\Http\Controllers\Customer\GoogleController::class, 'callback'])->name('customer.google.callback'););
+Route::get('/auth/google/callback', [\App\Http\Controllers\Customer\GoogleController::class, 'callback'])->name('customer.google.callback');
 Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
 Route::middleware('auth:customer')->group(function () {

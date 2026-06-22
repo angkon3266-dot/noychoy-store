@@ -92,7 +92,7 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function show(Product $product)
+    public function show(Request $request, Product $product)
     {
         abort_unless($product->status === 'published', 404);
 
