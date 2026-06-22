@@ -19,9 +19,25 @@ document.addEventListener('alpine:init', () => {
         count: Number(window.__cartCount || 0),
         items: [],
         subtotalText: '',
+        discountLines: [],
+        discountText: '',
+        discount: 0,
+        hints: [],
+        freeShipping: false,
         drawer: false,
         toastMsg: '',
         toastShow: false,
+
+        _apply(data) {
+            this.count = data.count;
+            this.items = data.items || [];
+            this.subtotalText = data.subtotal_text || '';
+            this.discountLines = data.discount_lines || [];
+            this.discountText = data.discount_text || '';
+            this.discount = data.discount || 0;
+            this.hints = data.hints || [];
+            this.freeShipping = !!data.free_shipping;
+        },
 
         _adding: false,
         async add(form) {
@@ -35,9 +51,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 if (!res.ok) { form.submit(); return; } // fall back to normal post
                 const data = await res.json();
-                this.count = data.count;
-                this.items = data.items || [];
-                this.subtotalText = data.subtotal_text || '';
+                this._apply(data);
                 this.showToast((data.added ? data.added : 'Item') + ' added to cart ✓');
                 this.drawer = true;
             } catch (e) {
@@ -50,9 +64,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 const res = await fetch('/cart/mini', { headers: { 'Accept': 'application/json' } });
                 const data = await res.json();
-                this.count = data.count;
-                this.items = data.items || [];
-                this.subtotalText = data.subtotal_text || '';
+                this._apply(data);
             } catch (e) { /* ignore */ }
         },
         openDrawer() { this.refresh(); this.drawer = true; },

@@ -46,11 +46,21 @@ Route::middleware('admin')->group(function () {
     // Orders
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('orders/labels', [OrderController::class, 'labels'])->name('orders.labels');
+    Route::post('orders/bulk-steadfast', [OrderController::class, 'bulkSteadfast'])->name('orders.bulk-steadfast');
+    Route::post('orders/merge', [OrderController::class, 'merge'])->name('orders.merge');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
     Route::post('orders/{order}/sms', [OrderController::class, 'sendSms'])->name('orders.sms');
+
+    // Customers (CRM, analytics, SMS, import)
+    Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
+    Route::get('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'importForm'])->name('customers.import');
+    Route::post('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'import'])->name('customers.import.store');
+    Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');
+    Route::put('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'update'])->name('customers.update');
+    Route::post('customers/{customer}/sms', [\App\Http\Controllers\Admin\CustomerController::class, 'sendSms'])->name('customers.sms');
 
     // Offers & promotions (auto-apply + PDP display)
     Route::get('offers', [\App\Http\Controllers\Admin\OfferController::class, 'index'])->name('offers.index');

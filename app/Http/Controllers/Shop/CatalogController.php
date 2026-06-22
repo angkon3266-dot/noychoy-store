@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductLove;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CatalogController extends Controller
 {
@@ -96,9 +99,17 @@ class CatalogController extends Controller
         $product->load(['images', 'variants' => fn ($q) => $q->where('is_active', true), 'category', 'approvedReviews']);
         $product->increment('views');
 
-        // Manual cross-sells ("frequently bought together") and upsells.
-        $crossSells = $product->crossSells();
+        // "Frequently bought together": real co-purchase pairs from past orders,
+        // falling back to manual cross-sells, then same-category products.
+        $crossSells = $this->frequentlyBoughtTogether($product);
         $upsells = $product->upsells();
+
+        // Love reaction state for this visitor.
+        $lovesCount = (int) $product->loves_count;
+        $loved = false;
+        if ($token = $request->cookie('visitor_token')) {
+            $loved = ProductLove::where('product_id', $product->id)->where('visitor_token', $token)->exists();
+        }
 
         // "You may also like" prefers manual upsells, falls back to same-category.
         $related = $upsells->isNotEmpty()
@@ -140,6 +151,45 @@ class CatalogController extends Controller
             $view = 'shop.templates.product.showcase';
         }
 
-        return view($view, compact('product', 'related', 'crossSells', 'pp'));
+        return view($view, compact('product', 'related', 'crossSells', 'pp', 'lovesCount', 'loved'));
+    }
+
+    /**
+     * Products most often purchased in the same orders as $product.
+     * Falls back to the admin's manual cross-sells, then same-category items.
+     */
+    protected function frequentlyBoughtTogether(Product $product, int $limit = 4): \Illuminate\Support\Collection
+    {
+        $orderIds = OrderItem::where('product_id', $product->id)->pluck('order_id');
+
+        $ids = $orderIds->isEmpty() ? collect() : OrderItem::whereIn('order_id', $orderIds)
+            ->where('product_id', '!=', $product->id)
+            ->whereNotNull('product_id')
+            ->select('product_id', DB::raw('COUNT(*) as c'))
+            ->groupBy('product_id')
+            ->orderByDesc('c')
+            ->limit($limit)
+            ->pluck('product_id');
+
+        if ($ids->isNotEmpty()) {
+            $found = Product::published()->whereIn('id', $ids)->with('images', 'approvedReviews', 'category')->get()
+                ->sortBy(fn ($p) => $ids->search($p->id))->values();
+            if ($found->isNotEmpty()) {
+                return $found;
+            }
+        }
+
+        // Fallback 1: manual cross-sells set on the product.
+        $manual = $product->crossSells();
+        if ($manual->isNotEmpty()) {
+            return $manual;
+        }
+
+        // Fallback 2: other products from the same category.
+        return Product::published()
+            ->where('category_id', $product->category_id)
+            ->where('id', '!=', $product->id)
+            ->with('images', 'approvedReviews', 'category')
+            ->take($limit)->get();
     }
 }

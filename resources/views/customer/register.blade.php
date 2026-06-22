@@ -12,11 +12,17 @@
             </div>
         @endif
 
-        <form action="{{ route('customer.register.post') }}" method="POST" class="mt-6 space-y-4">
+        <x-google-button>Sign up with Google</x-google-button>
+
+        <div class="flex items-center gap-3 my-5 text-xs text-ink-700/40">
+            <span class="h-px flex-1 bg-ink-100"></span>OR<span class="h-px flex-1 bg-ink-100"></span>
+        </div>
+
+        <form action="{{ route('customer.register.post') }}" method="POST" class="space-y-4">
             @csrf
             <div><label class="label">Full name</label><input name="name" value="{{ old('name') }}" class="input" required></div>
-            <div><label class="label">Mobile number</label><input name="phone" value="{{ old('phone') }}" placeholder="01XXXXXXXXX" class="input" required></div>
-            <div><label class="label">Email (optional)</label><input type="email" name="email" value="{{ old('email') }}" class="input"></div>
+            <div><label class="label">Mobile number *</label><input name="phone" value="{{ old('phone') }}" placeholder="01XXXXXXXXX" class="input" required></div>
+            <div><label class="label">Email *</label><input type="email" name="email" value="{{ old('email') }}" class="input" required></div>
             <div><label class="label">Password</label><input type="password" name="password" class="input" required></div>
             <div><label class="label">Confirm password</label><input type="password" name="password_confirmation" class="input" required></div>
             <button class="btn-primary w-full">Register</button>

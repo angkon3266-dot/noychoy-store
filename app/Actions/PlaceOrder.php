@@ -63,7 +63,7 @@ class PlaceOrder
                 'total' => max(0, $subtotal - $discount + $shipping),
                 'payment_method' => 'cod',
                 'payment_status' => 'unpaid',
-                'status' => 'pending',
+                'status' => 'processing',
                 'coupon_code' => $coupon?->code,
                 'notes' => $data['notes'] ?? null,
                 'source' => 'web',
@@ -93,7 +93,7 @@ class PlaceOrder
                 $this->decrementStock($item['product_id'], $item['variant_id'], $item['qty']);
             }
 
-            $order->history()->create(['status' => 'pending', 'note' => 'Order placed by customer']);
+            $order->history()->create(['status' => 'processing', 'note' => 'Order placed by customer']);
 
             if ($coupon) {
                 $coupon->increment('used_count');
@@ -116,6 +116,16 @@ class PlaceOrder
 
         // Fire-and-forget SMS confirmation (logged either way).
         $this->sms->sendTemplate('order_placed', $order);
+
+        // Email the invoice if the customer left an email address.
+        if (filled($order->customer_email)) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($order->customer_email)
+                    ->send(new \App\Mail\OrderInvoiceMail($order));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         // Server-side Purchase (deduplicated with the browser Pixel via order_number).
         $this->capi->purchase($order, $order->order_number);

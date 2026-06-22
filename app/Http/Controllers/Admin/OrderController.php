@@ -22,6 +22,7 @@ class OrderController extends Controller
                     ->orWhere('customer_name', 'like', "%{$term}%"));
             })
             ->withCount('items')
+            ->with('shipment')
             ->latest()
             ->paginate(20)
             ->withQueryString();
@@ -106,7 +107,7 @@ class OrderController extends Controller
     {
         $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
 
-        $orders = Order::with('items', 'shipment')
+        $orders = Order::with('items.product.images', 'shipment')
             ->whereHas('shipment', fn ($s) => $s->whereNotNull('consignment_id'))
             ->when($ids, fn ($q) => $q->whereIn('id', $ids))
             ->latest()
@@ -114,6 +115,122 @@ class OrderController extends Controller
             ->get();
 
         return view('admin.orders.labels', compact('orders'));
+    }
+
+    /** Create Steadfast consignments for several orders at once (skips already-sent). */
+    public function bulkSteadfast(Request $request, SteadfastService $steadfast)
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        if (! $steadfast->isConfigured()) {
+            return back()->with('error', 'Steadfast API keys are not configured (Settings → Integrations).');
+        }
+
+        $orders = Order::with('items', 'shipment')->whereIn('id', $ids)->get();
+        $created = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        foreach ($orders as $order) {
+            if ($order->shipment && $order->shipment->consignment_id) {
+                $skipped++;
+                continue;
+            }
+            $shipment = $steadfast->createForOrder($order);
+            if (! $shipment) {
+                $failed++;
+                continue;
+            }
+            if (in_array($order->status, ['pending', 'confirmed', 'processing'], true)) {
+                $order->update(['status' => 'shipped']);
+                $order->history()->create(['status' => 'booked', 'note' => 'Consignment created at Steadfast', 'created_by' => auth()->user()->name]);
+            }
+            $created++;
+        }
+
+        $msg = "Sent {$created} order(s) to Steadfast"
+            .($skipped ? ", {$skipped} already booked" : '')
+            .($failed ? ", {$failed} failed (check logs)" : '').'.';
+
+        return back()->with($failed ? 'error' : 'success', $msg);
+    }
+
+    /** Merge several orders from the same customer into one (the earliest). */
+    public function merge(Request $request)
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:2'],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        $orders = Order::with('items')->whereIn('id', $ids)->get();
+
+        if ($orders->count() < 2) {
+            return back()->with('error', 'Select at least two orders to merge.');
+        }
+        if ($orders->pluck('customer_phone')->unique()->count() > 1) {
+            return back()->with('error', 'Only orders from the same customer (phone) can be merged.');
+        }
+        if ($orders->contains(fn ($o) => in_array($o->status, ['shipped', 'delivered', 'returned', 'cancelled'], true))) {
+            return back()->with('error', 'Orders already shipped, delivered, returned or cancelled cannot be merged.');
+        }
+
+        $target = $orders->sortBy('id')->first();
+        $sources = $orders->where('id', '!=', $target->id);
+        $mergedNumbers = $sources->pluck('order_number')->implode(', ');
+
+        DB::transaction(function () use ($target, $sources, $mergedNumbers) {
+            foreach ($sources as $src) {
+                $src->items()->update(['order_id' => $target->id]);
+            }
+
+            // Combine duplicate lines (same product + variant) into one.
+            $target->load('items');
+            foreach ($target->items->groupBy(fn ($i) => $i->product_id.':'.($i->variant_id ?? 0)) as $group) {
+                if ($group->count() < 2) {
+                    continue;
+                }
+                $keep = $group->first();
+                $keep->update([
+                    'quantity' => $group->sum('quantity'),
+                    'subtotal' => $group->sum('subtotal'),
+                ]);
+                foreach ($group->slice(1) as $dup) {
+                    $dup->delete();
+                }
+            }
+
+            $target->load('items');
+            $subtotal = (float) $target->items->sum('subtotal');
+            $target->update([
+                'subtotal' => $subtotal,
+                'total' => max(0, $subtotal - (float) $target->discount + (float) $target->shipping_cost),
+                'status' => 'processing',
+            ]);
+            $target->history()->create([
+                'status' => 'processing',
+                'note' => "Merged order(s) {$mergedNumbers} into this order",
+                'created_by' => auth()->user()->name,
+            ]);
+
+            foreach ($sources as $src) {
+                $src->history()->delete();
+                $src->delete();
+            }
+
+            // Recompute the customer's rollups from what's left.
+            if ($customer = $target->customer) {
+                $customer->update([
+                    'total_orders' => $customer->orders()->count(),
+                    'total_spent' => $customer->orders()->sum('total'),
+                ]);
+            }
+        });
+
+        return back()->with('success', "Merged into order {$target->order_number} (now Processing).");
     }
 
     public function updateStatus(Request $request, Order $order, SmsService $sms)
@@ -163,9 +280,9 @@ class OrderController extends Controller
             return back()->with('error', 'Steadfast rejected the request. Check the logs.');
         }
 
-        if ($order->status === 'pending' || $order->status === 'confirmed') {
+        if (in_array($order->status, ['pending', 'confirmed', 'processing'], true)) {
             $order->update(['status' => 'shipped']);
-            $order->history()->create(['status' => 'shipped', 'note' => 'Consignment created at Steadfast', 'created_by' => auth()->user()->name]);
+            $order->history()->create(['status' => 'booked', 'note' => 'Consignment created at Steadfast', 'created_by' => auth()->user()->name]);
         }
 
         return back()->with('success', "Consignment created. Tracking: {$shipment->tracking_code}");

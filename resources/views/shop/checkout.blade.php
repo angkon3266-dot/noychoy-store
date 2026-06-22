@@ -86,19 +86,23 @@
             </div>
             <dl class="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
                 <div class="flex justify-between"><dt class="text-ink-700/70">Subtotal</dt><dd>{{ money($cart->subtotal()) }}</dd></div>
-                @if($cart->discount() > 0)<div class="flex justify-between text-green-700"><dt>Discount</dt><dd>−{{ money($cart->discount()) }}</dd></div>@endif
+                @forelse($cart->discountLines() as $line)
+                    <div class="flex justify-between text-green-700"><dt>{{ $line['label'] }}</dt><dd>−{{ money($line['amount']) }}</dd></div>
+                @empty
+                    @if($cart->discount() > 0)<div class="flex justify-between text-green-700"><dt>Discount</dt><dd>−{{ money($cart->discount()) }}</dd></div>@endif
+                @endforelse
                 <div class="flex justify-between"><dt class="text-ink-700/70">Shipping</dt><dd>৳<span x-text="ship"></span></dd></div>
                 <div class="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>৳<span x-text="total.toLocaleString()"></span></dd></div>
             </dl>
+            @foreach($cart->offerHints() as $hint)
+                <div class="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {{ $hint }}</div>
+            @endforeach
+
             <div class="mt-4 rounded-md bg-gold-100/60 p-3 text-sm">💵 <strong>Cash on Delivery</strong> — pay when you receive your order.</div>
             <button type="submit" class="btn-primary w-full mt-6">Place order</button>
 
-            {{-- Trust strip --}}
-            <div class="mt-4 grid grid-cols-3 gap-2 text-center text-[11px] text-ink-700/70">
-                <div class="rounded-lg bg-ink-50 p-2.5">🔒<br>Secure &amp; private</div>
-                <div class="rounded-lg bg-ink-50 p-2.5">🚚<br>Nationwide delivery</div>
-                <div class="rounded-lg bg-ink-50 p-2.5">↩️<br>Easy exchange</div>
-            </div>
+            {{-- Trust strip (editable in Admin → Appearance → Trust badges) --}}
+            <x-trust-strip class="mt-4" />
             <p class="mt-3 text-center text-xs text-ink-700/50">No advance payment needed · We call to confirm every order</p>
         </div>
     </form>

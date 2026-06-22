@@ -107,23 +107,21 @@
 
                 <dl class="space-y-2 text-sm border-t border-ink-100 pt-4">
                     <div class="flex justify-between"><dt class="text-ink-700/70">Subtotal</dt><dd>{{ money($cart->subtotal()) }}</dd></div>
-                    @if($cart->offerDiscount() > 0)
-                        <div class="flex justify-between text-green-700"><dt>Bundle offers</dt><dd>−{{ money($cart->offerDiscount()) }}</dd></div>
-                    @endif
-                    @if($cart->promoDiscount() > 0)
-                        <div class="flex justify-between text-green-700"><dt>Offers ({{ rtrim(rtrim(number_format($cart->promoPercent(),2),'0'),'.') }}%)</dt><dd>−{{ money($cart->promoDiscount()) }}</dd></div>
-                    @endif
+                    @foreach($cart->discountLines() as $line)
+                        <div class="flex justify-between text-green-700"><dt>{{ $line['label'] }}</dt><dd>−{{ money($line['amount']) }}</dd></div>
+                    @endforeach
                     @if($cart->hasFreeShippingOffer())
                         <div class="flex justify-between text-green-700"><dt>Free delivery offer</dt><dd>unlocked 🎉</dd></div>
-                    @endif
-                    @if($cart->couponDiscount() > 0)
-                        <div class="flex justify-between text-green-700"><dt>Coupon</dt><dd>−{{ money($cart->couponDiscount()) }}</dd></div>
                     @endif
                     <div class="flex justify-between"><dt class="text-ink-700/70">Shipping</dt><dd class="text-ink-700/60">calculated at checkout</dd></div>
                     <div class="flex justify-between font-semibold text-base border-t border-ink-100 pt-3">
                         <dt>Estimated total</dt><dd>{{ money($cart->subtotal() - $cart->discount()) }}</dd>
                     </div>
                 </dl>
+
+                @foreach($cart->offerHints() as $hint)
+                    <div class="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {{ $hint }}</div>
+                @endforeach
 
                 <a href="{{ route('checkout') }}" class="btn-primary w-full mt-6">Proceed to checkout</a>
                 <a href="{{ route('shop') }}" class="block text-center text-sm text-gold-700 hover:underline mt-3">Continue shopping</a>

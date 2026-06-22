@@ -118,11 +118,14 @@ class Order extends Model
 
     public static function generateNumber(): string
     {
-        // NOY-YYMMDD-XXXX  (sequential per day)
-        $prefix = 'NOY-'.now()->format('ymd').'-';
-        $last = static::where('order_number', 'like', $prefix.'%')
-            ->orderByDesc('order_number')->value('order_number');
-        $seq = $last ? ((int) substr($last, -4)) + 1 : 1;
-        return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+        // Plain 5-digit sequential order number (e.g. 10001, 10002…).
+        // We ignore any legacy "NOY-…" numbers by only looking at numeric ones.
+        $last = static::where('order_number', 'not like', '%-%')
+            ->orderByDesc('id')->value('order_number');
+        $next = is_numeric($last) ? ((int) $last) + 1 : 10001;
+        if ($next < 10001) {
+            $next = 10001;
+        }
+        return str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 }

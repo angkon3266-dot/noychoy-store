@@ -56,6 +56,11 @@ class AppearanceController extends Controller
             'exit_intent' => ['nullable', 'boolean'],
             'logo' => ['nullable', 'image', 'max:2048'],
             'favicon' => ['nullable', 'image', 'max:512'],
+            // Editable trust strip
+            'trust_badges' => ['nullable', 'array'],
+            'trust_badges.*.icon' => ['nullable', 'string', 'max:8'],
+            'trust_badges.*.title' => ['nullable', 'string', 'max:40'],
+            'trust_badges.*.text' => ['nullable', 'string', 'max:60'],
             // Editable homepage content
             'home' => ['nullable', 'array'],
             'home.*' => ['nullable', 'string', 'max:500'],
@@ -109,6 +114,18 @@ class AppearanceController extends Controller
         // Booleans (checkboxes)
         foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent'] as $bool) {
             $current[$bool] = $request->boolean($bool);
+        }
+
+        // Trust strip badges: keep only rows with a title.
+        if (array_key_exists('trust_badges', $data)) {
+            $current['trust_badges'] = collect($data['trust_badges'] ?? [])
+                ->map(fn ($b) => [
+                    'icon' => trim((string) ($b['icon'] ?? '')),
+                    'title' => trim((string) ($b['title'] ?? '')),
+                    'text' => trim((string) ($b['text'] ?? '')),
+                ])
+                ->filter(fn ($b) => $b['title'] !== '')
+                ->values()->all();
         }
 
         // Announcement messages: one per line -> array

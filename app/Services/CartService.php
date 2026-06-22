@@ -6,6 +6,7 @@ use App\Models\Coupon;
 use App\Models\Offer;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Setting;
 use Illuminate\Support\Collection;
 
 /**
@@ -210,6 +211,80 @@ class CartService
         return round($this->offerDiscount() + $this->promoDiscount() + $this->couponDiscount(), 2);
     }
 
+    /**
+     * Human-readable breakdown of why a discount was applied, so customers
+     * understand each saving. Each entry: ['label' => string, 'amount' => float].
+     *
+     * @return array<int, array{label:string, amount:float}>
+     */
+    public function discountLines(): array
+    {
+        $lines = [];
+        $offers = $this->matchingOffers()->where('type', 'order_percent');
+
+        $bestNon = $offers->where('members_only', false)->sortByDesc(fn (Offer $o) => $o->discountAmount($this))->first();
+        if ($bestNon && $bestNon->discountAmount($this) > 0) {
+            $lines[] = ['label' => $bestNon->title ?: (rtrim(rtrim((string) $bestNon->percent, '0'), '.').'% off'), 'amount' => round($bestNon->discountAmount($this), 2)];
+        }
+
+        $bestMember = $offers->where('members_only', true)->sortByDesc(fn (Offer $o) => $o->discountAmount($this))->first();
+        if ($bestMember && $bestMember->discountAmount($this) > 0) {
+            $lines[] = ['label' => ($bestMember->title ?: 'Member discount').' · members', 'amount' => round($bestMember->discountAmount($this), 2)];
+        }
+
+        if ($this->offerDiscount() > 0) {
+            $lines[] = ['label' => 'Quantity / bundle offer', 'amount' => round($this->offerDiscount(), 2)];
+        }
+
+        if (($coupon = $this->coupon()) && $this->couponDiscount() > 0) {
+            $lines[] = ['label' => 'Coupon '.$coupon->code, 'amount' => round($this->couponDiscount(), 2)];
+        }
+
+        return $lines;
+    }
+
+    /** True if free delivery is currently unlocked (coupon, offer or threshold). */
+    public function hasFreeShipping(): bool
+    {
+        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer()) {
+            return true;
+        }
+        $threshold = config('store.shipping.free_threshold');
+
+        return $threshold !== null && $this->subtotal() >= $threshold;
+    }
+
+    /**
+     * Almost-unlocked offers to nudge the customer ("Add ৳X more to get …").
+     *
+     * @return array<int, string>
+     */
+    public function offerHints(): array
+    {
+        $hints = [];
+        $member = $this->isMember();
+        $subtotal = $this->subtotal();
+
+        foreach (Offer::active()->get() as $offer) {
+            if ($offer->members_only && ! $member) {
+                continue;
+            }
+            if ($offer->matches($this, $member)) {
+                continue; // already applied
+            }
+            if ($offer->min_subtotal !== null) {
+                $base = $offer->applies_to === 'all' ? $subtotal : $offer->eligibleSubtotal($this);
+                $remaining = $offer->remainingToUnlock($base);
+                if ($remaining > 0 && $remaining <= max(1500, (float) $offer->min_subtotal)) {
+                    $reward = $offer->type === 'free_shipping' ? 'free delivery' : ($offer->title ?: 'a discount');
+                    $hints[] = 'Add '.money($remaining).' more to unlock '.$reward.'.';
+                }
+            }
+        }
+
+        return array_slice($hints, 0, 2);
+    }
+
     public function shipping(bool $insideDhaka = false): float
     {
         // Free shipping from a coupon or an active offer overrides everything.
@@ -220,9 +295,11 @@ class CartService
         if ($threshold !== null && $this->subtotal() >= $threshold) {
             return 0.0;
         }
-        return $insideDhaka
-            ? config('store.shipping.inside_dhaka')
-            : config('store.shipping.outside_dhaka');
+        // Rates come from Admin → Settings (so they always match what the
+        // checkout page shows), with config/.env as the fallback default.
+        return (float) ($insideDhaka
+            ? Setting::get('shipping_inside', config('store.shipping.inside_dhaka'))
+            : Setting::get('shipping_outside', config('store.shipping.outside_dhaka')));
     }
 
     public function total(bool $insideDhaka = false): float

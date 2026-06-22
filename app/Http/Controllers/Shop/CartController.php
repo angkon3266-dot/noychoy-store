@@ -54,6 +54,12 @@ class CartController extends Controller
             'count' => $this->cart->count(),
             'subtotal' => $this->cart->subtotal(),
             'subtotal_text' => money($this->cart->subtotal()),
+            'discount' => $this->cart->discount(),
+            'discount_text' => money($this->cart->discount()),
+            'discount_lines' => collect($this->cart->discountLines())
+                ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
+            'hints' => $this->cart->offerHints(),
+            'free_shipping' => $this->cart->hasFreeShipping(),
             'items' => $this->cart->items()->map(fn ($i) => [
                 'key' => $i['key'],
                 'name' => $i['name'],

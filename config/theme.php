@@ -79,6 +79,13 @@ return [
 
         // Marketing
         'meta_pixel_id' => null,
+
+        // Trust strip (editable in Appearance → Trust badges). Each: icon, title, text.
+        'trust_badges' => [
+            ['icon' => '💵', 'title' => 'Cash on delivery', 'text' => 'Pay when you receive'],
+            ['icon' => '🚚', 'title' => 'Fast nationwide', 'text' => 'Delivered everywhere'],
+            ['icon' => '✨', 'title' => 'Quality assured', 'text' => 'Hand-checked pieces'],
+        ],
     ],
 
     // Homepage templates (brand-inspired presets). Each maps to a Blade view.

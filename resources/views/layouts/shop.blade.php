@@ -346,7 +346,21 @@
                 </template>
             </div>
             <div class="border-t border-ink-100 p-5 space-y-3" x-show="$store.cart.items.length">
-                <div class="flex justify-between font-semibold"><span>Subtotal</span><span x-text="$store.cart.subtotalText"></span></div>
+                <div class="flex justify-between text-sm"><span class="text-ink-700/70">Subtotal</span><span x-text="$store.cart.subtotalText"></span></div>
+
+                {{-- Why you're saving --}}
+                <template x-for="d in $store.cart.discountLines" :key="d.label">
+                    <div class="flex justify-between text-sm text-green-700"><span x-text="d.label"></span><span x-text="'−' + d.amount_text"></span></div>
+                </template>
+                <div class="flex justify-between text-sm text-green-700" x-show="$store.cart.freeShipping">
+                    <span>Free delivery</span><span>✓</span>
+                </div>
+
+                {{-- Almost-there nudges --}}
+                <template x-for="h in $store.cart.hints" :key="h">
+                    <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs" x-text="'🎁 ' + h"></div>
+                </template>
+
                 <a href="{{ route('cart') }}" class="btn-outline w-full block text-center">View cart</a>
                 <a href="{{ route('checkout') }}" class="btn-primary w-full block text-center">Checkout</a>
             </div>

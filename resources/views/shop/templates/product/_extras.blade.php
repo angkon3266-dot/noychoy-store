@@ -6,11 +6,17 @@
     </section>
 @endif
 
-@if($product->custom_show && $product->custom_label && $product->custom_value)
+@php $specs = collect($product->customFieldList())->where('show', true)->values(); @endphp
+@if($specs->isNotEmpty())
     <section class="mt-6 max-w-3xl">
-        <div class="inline-flex items-center gap-2 rounded-lg bg-gold-50 border border-gold-100 px-4 py-2 text-sm">
-            <span class="text-ink-700/60">{{ $product->custom_label }}:</span>
-            <span class="font-medium">{{ $product->custom_value }}</span>
+        <h2 class="font-display text-lg font-semibold mb-2">Specifications</h2>
+        <div class="flex flex-wrap gap-2">
+            @foreach($specs as $spec)
+                <div class="inline-flex items-center gap-2 rounded-lg bg-gold-50 border border-gold-100 px-4 py-2 text-sm">
+                    <span class="text-ink-700/60">{{ $spec['label'] }}:</span>
+                    <span class="font-medium">{{ $spec['value'] }}</span>
+                </div>
+            @endforeach
         </div>
     </section>
 @endif

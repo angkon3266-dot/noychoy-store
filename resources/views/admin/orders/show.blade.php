@@ -41,7 +41,7 @@
             <ol class="space-y-3 border-l-2 border-gold-200 pl-4">
                 @foreach($order->history as $h)
                     <li>
-                        <div class="font-medium capitalize text-sm">{{ $h->status }} @if($h->created_by)<span class="text-xs text-ink-700/50 font-normal">by {{ $h->created_by }}</span>@endif</div>
+                        <div class="font-medium text-sm">{{ $h->label }} @if($h->created_by)<span class="text-xs text-ink-700/50 font-normal">by {{ $h->created_by }}</span>@endif</div>
                         @if($h->note)<div class="text-sm text-ink-700/60">{{ $h->note }}</div>@endif
                         <div class="text-xs text-ink-700/40">{{ $h->created_at->format('d M Y, g:i a') }}</div>
                     </li>

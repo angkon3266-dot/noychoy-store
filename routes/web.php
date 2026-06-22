@@ -41,6 +41,9 @@ Route::post('/checkout/lead', [\App\Http\Controllers\Shop\LeadController::class,
 
 // Product reviews
 Route::post('/product/{product:slug}/review', [\App\Http\Controllers\Shop\ReviewController::class, 'store'])->name('review.store');
+
+// Love / heart reaction (anonymous, per-browser cookie)
+Route::post('/product/{product:slug}/love', [\App\Http\Controllers\Shop\LoveController::class, 'toggle'])->name('product.love');
 Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'confirmation'])->name('order.confirmation');
 
 // ── Customer accounts (optional) ─────────────────────────────────────────────
@@ -50,12 +53,23 @@ Route::middleware('guest:customer')->group(function () {
     Route::get('/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register');
     Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.post');
 
+    // Continue with Google (OAuth2, no Socialite)
+    Route::get('/auth/google', [\App\Http\Controllers\Customer\GoogleController::class, 'redirect'])->name('customer.google');
+
     // Forgot password via SMS OTP
     Route::get('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showForgot'])->name('customer.password.forgot');
     Route::post('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendOtp'])->name('customer.password.send');
     Route::get('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showReset'])->name('customer.password.reset');
     Route::post('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'reset'])->name('customer.password.update');
-});
+
+    // Forgot password via email link
+    Route::post('/password/email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendEmailLink'])->name('customer.password.email');
+    Route::get('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showEmailReset'])->name('customer.password.email.form');
+    Route::post('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'resetViaEmail'])->name('customer.password.email.update');
+}
+
+// Google OAuth callback (outside guest group so it works mid-session)
+Route::get('/auth/google/callback', [\App\Http\Controllers\Customer\GoogleController::class, 'callback'])->name('customer.google.callback'););
 Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
 Route::middleware('auth:customer')->group(function () {

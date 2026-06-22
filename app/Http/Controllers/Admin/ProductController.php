@@ -21,7 +21,10 @@ class ProductController extends Controller
             ->when($request->query('type') === 'simple', fn ($q) => $q->where('has_variants', false))
             ->when($request->query('type') === 'variable', fn ($q) => $q->where('has_variants', true))
             ->when($request->query('tag'), fn ($q, $tag) => $q->where('tags', 'like', "%{$tag}%"))
-            ->when($request->query('custom'), fn ($q, $c) => $q->where('custom_value', 'like', "%{$c}%"))
+            ->when($request->query('custom'), fn ($q, $c) => $q->where(fn ($w) => $w
+                ->where('custom_value', 'like', "%{$c}%")
+                ->orWhere('custom_label', 'like', "%{$c}%")
+                ->orWhere('custom_fields', 'like', "%{$c}%")))
             ->latest()
             ->paginate(20)
             ->withQueryString();
@@ -305,6 +308,10 @@ class ProductController extends Controller
             'custom_label' => ['nullable', 'string', 'max:60'],
             'custom_value' => ['nullable', 'string', 'max:255'],
             'custom_show' => ['nullable', 'boolean'],
+            'custom_fields' => ['nullable', 'array'],
+            'custom_fields.*.label' => ['nullable', 'string', 'max:60'],
+            'custom_fields.*.value' => ['nullable', 'string', 'max:255'],
+            'custom_fields.*.show' => ['nullable'],
             'is_featured' => ['nullable', 'boolean'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
@@ -322,6 +329,16 @@ class ProductController extends Controller
         $validated['is_preorder'] = $request->boolean('is_preorder');
         $validated['custom_show'] = $request->boolean('custom_show');
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
+
+        // Normalise the repeatable custom fields: keep only complete rows.
+        $validated['custom_fields'] = collect($validated['custom_fields'] ?? [])
+            ->map(fn ($f) => [
+                'label' => trim((string) ($f['label'] ?? '')),
+                'value' => trim((string) ($f['value'] ?? '')),
+                'show' => filled($f['show'] ?? null),
+            ])
+            ->filter(fn ($f) => $f['label'] !== '' && $f['value'] !== '')
+            ->values()->all();
 
         // ── Product type: simple vs variable ────────────────────────────────
         $isVariable = ($request->input('product_type') === 'variable');

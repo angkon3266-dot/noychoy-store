@@ -20,6 +20,9 @@
         <span class="text-ink-700/50 group-hover:text-gold-700">{{ $reviewCount ? $avgRating.' · '.$reviewCount.' review'.($reviewCount > 1 ? 's' : '') : 'No reviews yet — be the first' }}</span>
     </a>
 
+    {{-- Love / heart reaction --}}
+    <x-love-button :product="$product" :loved="$loved ?? false" :count="$lovesCount ?? $product->loves_count" />
+
     <div class="mt-4 flex items-baseline gap-3 flex-wrap">
         <span class="text-2xl font-semibold text-gold-700" x-text="priceText()"></span>
         @if($product->is_on_sale)
@@ -177,12 +180,8 @@
         </a>
     @endif
 
-    {{-- Trust badges --}}
-    <div class="mt-6 grid grid-cols-3 gap-2 text-center text-xs text-ink-700/70">
-        <div class="rounded-lg bg-gold-100/60 p-3">💵<br>Cash on delivery</div>
-        <div class="rounded-lg bg-gold-100/60 p-3">🚚<br>Fast nationwide</div>
-        <div class="rounded-lg bg-gold-100/60 p-3">✨<br>Quality assured</div>
-    </div>
+    {{-- Trust badges (editable in Admin → Appearance → Trust badges) --}}
+    <x-trust-strip class="mt-6" />
 </div>
 
 @push('meta-events')

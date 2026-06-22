@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CustomerPasswordResetMail;
 use App\Models\Customer;
 use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * Password reset for customers via a one-time code (OTP) sent over SMS.
@@ -78,6 +81,65 @@ class PasswordResetController extends Controller
 
         $customer->update(['password' => $data['password']]); // hashed cast
         Cache::forget($key);
+        auth('customer')->login($customer);
+
+        return redirect()->route('account')->with('success', 'Password updated — you are now logged in.');
+    }
+
+    // ── Email link reset ────────────────────────────────────────────────────
+
+    /** Email a one-time reset link (token held in cache for 60 min). */
+    public function sendEmailLink(Request $request)
+    {
+        $data = $request->validate(['email' => ['required', 'email']]);
+
+        $customer = Customer::where('email', $data['email'])->first();
+
+        // Anti-enumeration: always respond the same.
+        if ($customer) {
+            $token = Str::random(64);
+            Cache::put('pwreset:'.hash('sha256', $token), $customer->email, now()->addMinutes(60));
+            $url = route('customer.password.email.form', ['token' => $token, 'email' => $customer->email]);
+            try {
+                Mail::to($customer->email)->send(new CustomerPasswordResetMail($customer, $url));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return back()->with('success', 'If that email has an account, we sent a password reset link. Please check your inbox.');
+    }
+
+    public function showEmailReset(Request $request)
+    {
+        return view('customer.reset-password-email', [
+            'token' => $request->query('token', ''),
+            'email' => $request->query('email', ''),
+        ]);
+    }
+
+    public function resetViaEmail(Request $request)
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        $cacheKey = 'pwreset:'.hash('sha256', $data['token']);
+        $email = Cache::get($cacheKey);
+
+        if (! $email || $email !== $data['email']) {
+            return back()->withInput()->with('error', 'This reset link is invalid or has expired. Please request a new one.');
+        }
+
+        $customer = Customer::where('email', $email)->first();
+        if (! $customer) {
+            return back()->with('error', 'Account not found.');
+        }
+
+        $customer->update(['password' => $data['password']]);
+        Cache::forget($cacheKey);
         auth('customer')->login($customer);
 
         return redirect()->route('account')->with('success', 'Password updated — you are now logged in.');

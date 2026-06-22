@@ -22,7 +22,7 @@ class Product extends Model
         'views', 'meta_title', 'meta_description', 'woo_id',
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
         'is_preorder', 'preorder_release_date', 'preorder_note', 'tags',
-        'custom_label', 'custom_value', 'custom_show',
+        'custom_label', 'custom_value', 'custom_show', 'custom_fields', 'loves_count',
     ];
 
     protected $casts = [
@@ -43,7 +43,33 @@ class Product extends Model
         'is_preorder' => 'boolean',
         'preorder_release_date' => 'date',
         'custom_show' => 'boolean',
+        'custom_fields' => 'array',
+        'loves_count' => 'integer',
     ];
+
+    /** Custom fields as a clean list: [{label, value, show}]. Includes the
+     *  legacy single custom_label/value/show as the first entry for back-compat. */
+    public function customFieldList(): array
+    {
+        $list = collect($this->custom_fields ?? [])
+            ->map(fn ($f) => [
+                'label' => trim((string) ($f['label'] ?? '')),
+                'value' => trim((string) ($f['value'] ?? '')),
+                'show' => (bool) ($f['show'] ?? false),
+            ])
+            ->filter(fn ($f) => $f['label'] !== '' && $f['value'] !== '')
+            ->values();
+
+        if (trim((string) $this->custom_label) !== '' && trim((string) $this->custom_value) !== '') {
+            $list->prepend([
+                'label' => trim((string) $this->custom_label),
+                'value' => trim((string) $this->custom_value),
+                'show' => (bool) $this->custom_show,
+            ]);
+        }
+
+        return $list->all();
+    }
 
     protected static function booted(): void
     {

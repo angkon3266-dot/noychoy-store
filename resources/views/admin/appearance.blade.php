@@ -258,6 +258,24 @@
         </div>
     </div>
 
+    {{-- Trust badges --}}
+    <div class="card p-6" x-data="{ badges: @js(array_values($theme['trust_badges'] ?? config('theme.defaults.trust_badges', []))) }">
+        <h2 class="font-semibold mb-1">Trust badges</h2>
+        <p class="text-xs text-ink-700/60 mb-4">The reassurance strip shown on product &amp; checkout pages. Add, remove or reorder freely — each badge has an icon (emoji), a title and an optional line of text.</p>
+        <div class="space-y-3">
+            <template x-for="(b, i) in badges" :key="i">
+                <div class="flex gap-2 items-start">
+                    <input :name="`trust_badges[${i}][icon]`" x-model="b.icon" class="input w-16 text-center" placeholder="💵" maxlength="4">
+                    <input :name="`trust_badges[${i}][title]`" x-model="b.title" class="input flex-1" placeholder="Title (e.g. Cash on delivery)">
+                    <input :name="`trust_badges[${i}][text]`" x-model="b.text" class="input flex-1" placeholder="Subtext (optional)">
+                    <button type="button" @click="badges.splice(i, 1)" class="text-red-500 px-2 text-xl leading-none" title="Remove">&times;</button>
+                </div>
+            </template>
+        </div>
+        <button type="button" @click="badges.push({icon:'✓', title:'', text:''})" class="btn-outline mt-3 text-sm">+ Add badge</button>
+        <p class="text-xs text-ink-700/50 mt-2">Tip: 3–4 badges look best. Use emojis for icons (🔒 🚚 ↩️ ⭐ 💎 ✨).</p>
+    </div>
+
     <div class="flex justify-end">
         <button class="btn-primary">Save appearance</button>
     </div>
