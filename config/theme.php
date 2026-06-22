@@ -20,6 +20,8 @@ return [
     'defaults' => [
         'logo' => null,
         'favicon' => null,
+        'logo_height_desktop' => 40,   // px — logo height on desktop
+        'logo_height_mobile' => 32,    // px — logo height on mobile (centered)
         'primary' => '#9a6c2e',     // buttons/links
         'accent' => '#b6863a',      // secondary highlights
         'background' => '#fbf8f1',  // page background
@@ -31,7 +33,7 @@ return [
         'font_body' => 'Instrument Sans',
         'font_body_src' => 'google',
         'font_body_file' => null,
-        'homepage_template' => 'aurelia',
+        'homepage_template' => 'storefront',
         'product_template' => 'showcase',
 
         // Announcement bar
@@ -48,6 +50,10 @@ return [
 
         // Conversion toggles
         'whatsapp_number' => null,            // e.g. 8801XXXXXXXXX
+        'messenger_url' => null,              // e.g. https://m.me/yourpage
+        'show_call_button' => true,           // floating "Call now" (uses store phone)
+        'show_whatsapp_button' => true,
+        'show_messenger_button' => false,
         'free_shipping_bar' => true,
         'show_recently_viewed' => true,
         'show_reviews' => true,
@@ -90,6 +96,7 @@ return [
 
     // Homepage templates (brand-inspired presets). Each maps to a Blade view.
     'homepage_templates' => [
+        'storefront' => ['name' => 'Storefront — Slider + carousels', 'inspiration' => 'Manfare / modern retail', 'view' => 'shop.templates.home.storefront'],
         'couture' => ['name' => 'Couture — Modern Luxury', 'inspiration' => 'Mejuri / Tiffany editorial', 'view' => 'shop.templates.home.couture'],
         'aurelia' => ['name' => 'Aurelia — Classic Elegance', 'inspiration' => 'Tiffany & Co.', 'view' => 'shop.templates.home.aurelia'],
         'lumiere' => ['name' => 'Lumière — Editorial', 'inspiration' => 'Mejuri', 'view' => 'shop.templates.home.lumiere'],

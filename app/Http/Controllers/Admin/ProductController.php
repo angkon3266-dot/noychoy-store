@@ -127,6 +127,7 @@ class ProductController extends Controller
 
         $this->syncCategories($data, $product);
         $this->syncImages($request, $product);
+        $this->syncVideos($request, $product);
         $this->syncVariants($request, $product);
 
         return redirect()->route('admin.products.edit', $product)
@@ -152,6 +153,7 @@ class ProductController extends Controller
         $this->syncCategories($data, $product);
         $this->syncImages($request, $product);
         $this->applyImageOrder($request, $product);
+        $this->syncVideos($request, $product);
         $this->syncVariants($request, $product);
 
         return redirect()->route('admin.products.edit', $product)
@@ -313,6 +315,11 @@ class ProductController extends Controller
             'custom_fields.*.value' => ['nullable', 'string', 'max:255'],
             'custom_fields.*.show' => ['nullable'],
             'is_featured' => ['nullable', 'boolean'],
+            'is_bestseller' => ['nullable', 'boolean'],
+            'video_urls' => ['nullable', 'array'],
+            'video_urls.*' => ['nullable', 'string', 'max:255'],
+            'video_files' => ['nullable', 'array'],
+            'video_files.*' => ['nullable', 'file', 'mimetypes:video/mp4,video/webm,video/quicktime', 'max:30720'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
             'quantity_offers' => ['nullable', 'array'],
@@ -326,9 +333,15 @@ class ProductController extends Controller
 
         $validated['manage_stock'] = $request->boolean('manage_stock');
         $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_bestseller'] = $request->boolean('is_bestseller');
         $validated['is_preorder'] = $request->boolean('is_preorder');
         $validated['custom_show'] = $request->boolean('custom_show');
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
+
+        // Gallery video references (YouTube/Vimeo URLs + previously-stored file paths).
+        $validated['video_urls'] = collect($validated['video_urls'] ?? [])
+            ->map(fn ($u) => trim((string) $u))->filter()->values()->all();
+        unset($validated['video_files']); // handled separately (uploads)
 
         // Normalise the repeatable custom fields: keep only complete rows.
         $validated['custom_fields'] = collect($validated['custom_fields'] ?? [])
@@ -415,6 +428,22 @@ class ProductController extends Controller
                 ProductImage::where('id', $id)->update(['position' => $position++]);
             }
         }
+    }
+
+    /** Store uploaded MP4/WebM gallery videos and append their paths to video_urls. */
+    protected function syncVideos(Request $request, Product $product): void
+    {
+        if (! $request->hasFile('video_files')) {
+            return;
+        }
+
+        $urls = collect($product->video_urls ?? []);
+        foreach ($request->file('video_files') as $file) {
+            if ($file && $file->isValid()) {
+                $urls->push($file->store('product-videos', 'public'));
+            }
+        }
+        $product->update(['video_urls' => $urls->filter()->values()->all()]);
     }
 
     protected function syncImages(Request $request, Product $product): void

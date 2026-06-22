@@ -181,3 +181,54 @@ if (! function_exists('meta_pixel_id')) {
         return theme('meta_pixel_id') ?: config('meta.pixel_id');
     }
 }
+
+if (! function_exists('youtube_id')) {
+    /** Extract the 11-char video id from any YouTube URL form, or null. */
+    function youtube_id(string $url): ?string
+    {
+        if (preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|v/))([A-Za-z0-9_-]{11})~', $url, $m)) {
+            return $m[1];
+        }
+        if (preg_match('~^[A-Za-z0-9_-]{11}$~', trim($url))) {
+            return trim($url);
+        }
+        return null;
+    }
+}
+
+if (! function_exists('video_meta')) {
+    /**
+     * Normalise a video reference (YouTube/Vimeo URL or a stored file path)
+     * into a render-ready shape.
+     *
+     * @return array{type:string, embed:?string, thumb:?string, src:?string}|null
+     */
+    function video_meta(?string $url): ?array
+    {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return null;
+        }
+
+        if ($id = youtube_id($url)) {
+            return [
+                'type' => 'youtube',
+                'embed' => "https://www.youtube.com/embed/{$id}",
+                'thumb' => "https://i.ytimg.com/vi/{$id}/hqdefault.jpg",
+                'src' => null,
+            ];
+        }
+
+        // Vimeo
+        if (preg_match('~vimeo\.com/(?:video/)?(\d+)~', $url, $m)) {
+            return ['type' => 'vimeo', 'embed' => "https://player.vimeo.com/video/{$m[1]}", 'thumb' => null, 'src' => null];
+        }
+
+        // Stored / uploaded file (mp4, webm…) — relative path on public disk or absolute URL.
+        $src = Str::startsWith($url, ['http://', 'https://', '/'])
+            ? $url
+            : Storage::disk('public')->url($url);
+
+        return ['type' => 'file', 'embed' => null, 'thumb' => null, 'src' => $src];
+    }
+}

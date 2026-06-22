@@ -46,6 +46,24 @@
             </div>
         </div>
 
+        {{-- Google login --}}
+        <div class="card p-6">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="font-semibold">Google login</h2>
+                <span class="badge {{ $googleOk ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-600' }}">{{ $googleOk ? 'Connected' : 'Not set up' }}</span>
+            </div>
+            <p class="text-xs text-ink-700/60 mb-4">Lets customers sign in with Google. Create an OAuth client at <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="text-gold-700 underline">Google Cloud Console</a> → Credentials → "OAuth client ID" (Web application), then paste the keys here.</p>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="label">Client ID</label><input name="google_client_id" value="{{ $int['google_client_id'] ?? '' }}" class="input" placeholder="xxxxx.apps.googleusercontent.com"></div>
+                <div><label class="label">Client secret</label><input name="google_client_secret" value="{{ $int['google_client_secret'] ?? '' }}" class="input" placeholder="GOCSPX-…"></div>
+            </div>
+            <div class="mt-3">
+                <label class="label">Authorised redirect URI (paste this into Google Console)</label>
+                <input value="{{ $googleRedirect }}" class="input bg-ink-50 font-mono text-xs" readonly onclick="this.select()">
+            </div>
+            <p class="text-xs text-ink-700/50 mt-2">After saving, the "Continue with Google" button appears automatically on the login &amp; register pages.</p>
+        </div>
+
         {{-- SMS templates --}}
         <div class="card p-6">
             <h2 class="font-semibold mb-1">SMS templates</h2>

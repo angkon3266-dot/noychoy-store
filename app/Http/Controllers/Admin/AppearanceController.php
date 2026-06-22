@@ -16,6 +16,7 @@ class AppearanceController extends Controller
             'home' => home_content(),
             'homeTemplates' => config('theme.homepage_templates'),
             'productTemplates' => config('theme.product_templates'),
+            'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -56,6 +57,8 @@ class AppearanceController extends Controller
             'exit_intent' => ['nullable', 'boolean'],
             'logo' => ['nullable', 'image', 'max:2048'],
             'favicon' => ['nullable', 'image', 'max:512'],
+            'logo_height_desktop' => ['nullable', 'integer', 'min:16', 'max:120'],
+            'logo_height_mobile' => ['nullable', 'integer', 'min:16', 'max:100'],
             // Editable trust strip
             'trust_badges' => ['nullable', 'array'],
             'trust_badges.*.icon' => ['nullable', 'string', 'max:8'],
@@ -65,6 +68,24 @@ class AppearanceController extends Controller
             'home' => ['nullable', 'array'],
             'home.*' => ['nullable', 'string', 'max:500'],
             'hero_image' => ['nullable', 'image', 'max:4096'],
+
+            // Storefront homepage builder
+            'feature_strip' => ['nullable', 'array'],
+            'feature_strip.*.icon' => ['nullable', 'string', 'max:8'],
+            'feature_strip.*.title' => ['nullable', 'string', 'max:60'],
+            'highlight_category_ids' => ['nullable', 'array'],
+            'highlight_category_ids.*' => ['integer'],
+            'home_videos' => ['nullable', 'array'],
+            'home_videos.*.title' => ['nullable', 'string', 'max:120'],
+            'home_videos.*.url' => ['nullable', 'string', 'max:255'],
+            'home_video_files' => ['nullable', 'array'],
+            'home_video_files.*' => ['nullable', 'file', 'mimetypes:video/mp4,video/webm', 'max:30720'],
+            'hero_slides' => ['nullable', 'array'],
+            'hero_slide_images' => ['nullable', 'array'],
+            'hero_slide_images.*' => ['nullable', 'image', 'max:4096'],
+
+            // Floating contact buttons
+            'messenger_url' => ['nullable', 'string', 'max:255'],
         ]);
 
         $current = theme();
@@ -109,10 +130,64 @@ class AppearanceController extends Controller
             }
             $home['hero_image'] = null;
         }
+
+        // ---- Storefront homepage builder ----
+        // Section toggles
+        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_videos'] as $t) {
+            $home[$t] = $request->boolean('home_'.$t);
+        }
+
+        // Feature strip
+        if ($request->has('feature_strip')) {
+            $home['feature_strip'] = collect($request->input('feature_strip', []))
+                ->map(fn ($f) => ['icon' => trim((string) ($f['icon'] ?? '')), 'title' => trim((string) ($f['title'] ?? ''))])
+                ->filter(fn ($f) => $f['title'] !== '')->values()->all();
+        }
+
+        // Highlighted categories
+        if ($request->has('highlight_category_ids')) {
+            $home['highlight_category_ids'] = collect($request->input('highlight_category_ids', []))
+                ->map(fn ($i) => (int) $i)->filter()->values()->all();
+        }
+
+        // Video sections (links + uploaded files)
+        if ($request->has('home_videos') || $request->hasFile('home_video_files')) {
+            $videos = collect($request->input('home_videos', []))
+                ->map(fn ($v) => ['title' => trim((string) ($v['title'] ?? '')), 'url' => trim((string) ($v['url'] ?? ''))])
+                ->filter(fn ($v) => $v['url'] !== '')->values();
+            if ($request->hasFile('home_video_files')) {
+                foreach ($request->file('home_video_files') as $file) {
+                    if ($file && $file->isValid()) {
+                        $videos->push(['title' => '', 'url' => $file->store('home-videos', 'public')]);
+                    }
+                }
+            }
+            $home['videos'] = $videos->values()->all();
+        }
+
+        // Hero slides: edit links / remove existing, then append new uploads
+        $slides = collect($home['hero_slides'] ?? []);
+        $edits = $request->input('hero_slides', []);
+        $slides = $slides->reject(fn ($s, $i) => ! empty($edits[$i]['remove']))
+            ->map(function ($s, $i) use ($edits) {
+                if (isset($edits[$i]['link'])) {
+                    $s['link'] = trim((string) $edits[$i]['link']);
+                }
+                return $s;
+            });
+        if ($request->hasFile('hero_slide_images')) {
+            foreach ($request->file('hero_slide_images') as $file) {
+                if ($file && $file->isValid()) {
+                    $slides->push(['image' => $file->store('hero', 'public'), 'link' => '']);
+                }
+            }
+        }
+        $home['hero_slides'] = $slides->values()->all();
+
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent'] as $bool) {
+        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button'] as $bool) {
             $current[$bool] = $request->boolean($bool);
         }
 
@@ -136,7 +211,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'low_stock_threshold', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_height_desktop', 'logo_height_mobile', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

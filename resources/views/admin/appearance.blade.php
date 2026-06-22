@@ -17,6 +17,11 @@
                 @endif
                 <input type="file" name="logo" accept="image/*" class="input text-sm">
                 <p class="text-xs text-ink-700/50 mt-1">PNG with transparent background recommended. Leave empty to use the text logo.</p>
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                    <div><label class="label text-xs">Logo height — desktop (px)</label><input type="number" name="logo_height_desktop" value="{{ $theme['logo_height_desktop'] ?? 40 }}" min="16" max="120" class="input text-sm"></div>
+                    <div><label class="label text-xs">Logo height — mobile (px)</label><input type="number" name="logo_height_mobile" value="{{ $theme['logo_height_mobile'] ?? 32 }}" min="16" max="100" class="input text-sm"></div>
+                </div>
+                <p class="text-xs text-ink-700/50 mt-1">The logo is centered on mobile.</p>
             </div>
             <div>
                 <label class="label">Favicon</label>
@@ -196,6 +201,90 @@
                 </div>
             @endfor
         </div>
+    </div>
+
+    <!-- Homepage sections (Storefront template) -->
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Homepage sections</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Build the storefront homepage — hero slider, feature strip, best sellers, new arrivals, highlighted categories and videos. Toggle each section on/off.</p>
+
+        {{-- Toggles --}}
+        <div class="grid sm:grid-cols-3 gap-2 mb-6 text-sm">
+            @foreach(['show_feature_strip'=>'Feature strip','show_categories'=>'Category scroller','show_best_selling'=>'Best selling','show_new_arrivals'=>'New arrivals','show_highlights'=>'Highlighted categories','show_videos'=>'Video sections'] as $k => $lbl)
+                <label class="flex items-center gap-2"><input type="checkbox" name="home_{{ $k }}" value="1" @checked($home[$k] ?? true)> {{ $lbl }}</label>
+            @endforeach
+        </div>
+
+        {{-- Best-selling title --}}
+        <div class="mb-6"><label class="label">Best-selling section title</label><input name="home[best_selling_title]" value="{{ $home['best_selling_title'] ?? '' }}" class="input"></div>
+
+        {{-- Hero slides --}}
+        <h3 class="text-sm font-semibold text-ink-700 mb-2">Hero slider</h3>
+        @php $slides = collect($home['hero_slides'] ?? [])->filter(fn($s)=>filled($s['image'] ?? null))->values(); @endphp
+        @if($slides->isNotEmpty())
+            <div class="space-y-3 mb-3">
+                @foreach($slides as $i => $s)
+                    @php $simg = \Illuminate\Support\Str::startsWith($s['image'],['http','/']) ? $s['image'] : \Illuminate\Support\Facades\Storage::disk('public')->url($s['image']); @endphp
+                    <div class="flex items-center gap-3 rounded-lg border border-ink-100 p-2">
+                        <img src="{{ $simg }}" class="w-24 h-14 object-cover rounded" alt="">
+                        <input name="hero_slides[{{ $i }}][link]" value="{{ $s['link'] ?? '' }}" class="input flex-1" placeholder="Link when clicked (optional)">
+                        <label class="flex items-center gap-1 text-xs text-red-600"><input type="checkbox" name="hero_slides[{{ $i }}][remove]" value="1"> Remove</label>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+        <label class="label">Add slide image(s)</label>
+        <input type="file" name="hero_slide_images[]" multiple accept="image/*" class="input text-sm">
+        <p class="text-xs text-ink-700/50 mt-1">Wide images work best (e.g. 1920×800). Add several for an auto-rotating slider.</p>
+
+        {{-- Feature strip --}}
+        <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Feature strip (reassurance icons)</h3>
+        <div x-data="{ rows: @js(array_values($home['feature_strip'] ?? [])) }">
+            <template x-for="(r, i) in rows" :key="i">
+                <div class="flex gap-2 mb-2">
+                    <input :name="`feature_strip[${i}][icon]`" x-model="r.icon" class="input w-16 text-center" placeholder="🚚" maxlength="4">
+                    <input :name="`feature_strip[${i}][title]`" x-model="r.title" class="input flex-1" placeholder="Fastest Shipping Countrywide">
+                    <button type="button" @click="rows.splice(i,1)" class="text-red-500 px-2 text-xl leading-none">&times;</button>
+                </div>
+            </template>
+            <button type="button" @click="rows.push({icon:'✓',title:''})" class="btn-outline text-sm">+ Add feature</button>
+        </div>
+
+        {{-- Highlighted categories --}}
+        <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Highlighted categories</h3>
+        <p class="text-xs text-ink-700/50 mb-2">Pick categories to feature as large editorial banners.</p>
+        @php $hl = collect($home['highlight_category_ids'] ?? [])->map(fn($i)=>(int)$i); @endphp
+        <div class="grid sm:grid-cols-3 gap-2 text-sm">
+            @foreach($allCategories as $cat)
+                <label class="flex items-center gap-2"><input type="checkbox" name="highlight_category_ids[]" value="{{ $cat->id }}" @checked($hl->contains($cat->id))> {{ $cat->name }}</label>
+            @endforeach
+        </div>
+
+        {{-- Video sections --}}
+        <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Video sections</h3>
+        <div x-data="{ vids: @js(array_values($home['videos'] ?? [])) }">
+            <template x-for="(v, i) in vids" :key="i">
+                <div class="flex gap-2 mb-2">
+                    <input :name="`home_videos[${i}][title]`" x-model="v.title" class="input w-48" placeholder="Title (optional)">
+                    <input :name="`home_videos[${i}][url]`" x-model="v.url" class="input flex-1" placeholder="YouTube link or stored path">
+                    <button type="button" @click="vids.splice(i,1)" class="text-red-500 px-2 text-xl leading-none">&times;</button>
+                </div>
+            </template>
+            <button type="button" @click="vids.push({title:'',url:''})" class="btn-outline text-sm">+ Add video link</button>
+        </div>
+        <div class="mt-3"><label class="label text-xs">Or upload MP4/WebM (max 30 MB each)</label><input type="file" name="home_video_files[]" multiple accept="video/mp4,video/webm" class="input text-sm"></div>
+    </div>
+
+    <!-- Floating contact buttons -->
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Floating contact buttons</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Sticky buttons bottom-right of the storefront. The Call button dials your <a href="{{ route('admin.settings') }}" class="text-gold-700 underline">store phone</a>; on mobile it opens the dialer.</p>
+        <div class="grid sm:grid-cols-3 gap-2 text-sm mb-4">
+            <label class="flex items-center gap-2"><input type="checkbox" name="show_call_button" value="1" @checked($theme['show_call_button'] ?? true)> Call now</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="show_whatsapp_button" value="1" @checked($theme['show_whatsapp_button'] ?? true)> WhatsApp</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="show_messenger_button" value="1" @checked($theme['show_messenger_button'] ?? false)> Messenger</label>
+        </div>
+        <div><label class="label">Messenger link (m.me/yourpage)</label><input name="messenger_url" value="{{ $theme['messenger_url'] ?? '' }}" class="input" placeholder="https://m.me/yourpage"></div>
     </div>
 
     <!-- Marketing -->

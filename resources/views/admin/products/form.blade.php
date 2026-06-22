@@ -316,6 +316,7 @@
                     <p class="text-xs text-ink-700/50 mt-2">Use for anything (material, purity, weight…). Shown fields appear on the product page; all are filterable in the admin list.</p>
                 </div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured))> Featured on homepage</label>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_bestseller" value="1" @checked(old('is_bestseller', $product->is_bestseller))> Mark as best seller</label>
                 <button class="btn-primary w-full">{{ $product->exists ? 'Save changes' : 'Create product' }}</button>
             </div>
 
@@ -359,6 +360,23 @@
                 @endif
                 <input type="file" name="images[]" multiple accept="image/*" class="input text-sm">
                 <p class="text-xs text-ink-700/50 mt-2">Upload JPG/PNG/WebP. First uploaded becomes primary if none set.</p>
+
+                {{-- Gallery videos (YouTube/Vimeo link or uploaded MP4) --}}
+                <div class="border-t border-ink-100 mt-4 pt-4" x-data="{ vids: @js(array_values(old('video_urls', $product->video_urls ?? []))) }">
+                    <label class="label">Gallery videos</label>
+                    <p class="text-xs text-ink-700/50 mb-2">Paste a YouTube/Vimeo link, or upload an MP4 below. Videos show inside the product image gallery.</p>
+                    <template x-for="(v, i) in vids" :key="i">
+                        <div class="flex gap-2 mb-2">
+                            <input :name="`video_urls[${i}]`" x-model="vids[i]" class="input flex-1" placeholder="https://youtu.be/…">
+                            <button type="button" @click="vids.splice(i, 1)" class="text-red-500 px-2 text-xl leading-none" title="Remove">&times;</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="vids.push('')" class="btn-outline text-sm">+ Add video link</button>
+                    <div class="mt-3">
+                        <label class="label text-xs">Or upload MP4 / WebM (max 30 MB each)</label>
+                        <input type="file" name="video_files[]" multiple accept="video/mp4,video/webm,video/quicktime" class="input text-sm">
+                    </div>
+                </div>
             </div>
         </div>
     </div>

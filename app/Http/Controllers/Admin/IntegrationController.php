@@ -37,6 +37,8 @@ class IntegrationController extends Controller
             'smsOk' => $sms->isEnabled(),
             'webhookUrl' => route('steadfast.webhook'),
             'smsBalance' => $sms->isEnabled() ? $sms->getBalance() : [],
+            'googleOk' => \App\Http\Controllers\Customer\GoogleController::isEnabled(),
+            'googleRedirect' => route('customer.google.callback'),
         ]);
     }
 
@@ -54,6 +56,9 @@ class IntegrationController extends Controller
             'sms_api_key' => ['nullable', 'string', 'max:200'],
             'sms_secret_key' => ['nullable', 'string', 'max:200'],
             'sms_caller_id' => ['nullable', 'string', 'max:40'],
+            // Google OAuth
+            'google_client_id' => ['nullable', 'string', 'max:200'],
+            'google_client_secret' => ['nullable', 'string', 'max:200'],
             // Templates
             'templates' => ['nullable', 'array'],
             'templates.*' => ['nullable', 'string', 'max:600'],
@@ -63,7 +68,8 @@ class IntegrationController extends Controller
         $int = is_array($int) ? $int : [];
 
         foreach (['steadfast_base_url', 'steadfast_api_key', 'steadfast_secret_key', 'steadfast_webhook_secret',
-                  'sms_base_url', 'sms_api_key', 'sms_secret_key', 'sms_caller_id'] as $key) {
+                  'sms_base_url', 'sms_api_key', 'sms_secret_key', 'sms_caller_id',
+                  'google_client_id', 'google_client_secret'] as $key) {
             $int[$key] = $data[$key] ?? null;
         }
         $int['sms_enabled'] = $request->boolean('sms_enabled');

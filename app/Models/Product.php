@@ -23,6 +23,7 @@ class Product extends Model
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
         'is_preorder', 'preorder_release_date', 'preorder_note', 'tags',
         'custom_label', 'custom_value', 'custom_show', 'custom_fields', 'loves_count',
+        'is_bestseller', 'video_urls',
     ];
 
     protected $casts = [
@@ -45,7 +46,24 @@ class Product extends Model
         'custom_show' => 'boolean',
         'custom_fields' => 'array',
         'loves_count' => 'integer',
+        'is_bestseller' => 'boolean',
+        'video_urls' => 'array',
     ];
+
+    public function scopeBestsellers(Builder $query): Builder
+    {
+        return $query->where('is_bestseller', true);
+    }
+
+    /** Normalised gallery videos: [{type:'youtube'|'file', embed, thumb, src}]. */
+    public function galleryVideos(): array
+    {
+        return collect($this->video_urls ?? [])
+            ->filter(fn ($u) => filled($u))
+            ->map(fn ($u) => video_meta((string) $u))
+            ->filter()
+            ->values()->all();
+    }
 
     /** Custom fields as a clean list: [{label, value, show}]. Includes the
      *  legacy single custom_label/value/show as the first entry for back-compat. */

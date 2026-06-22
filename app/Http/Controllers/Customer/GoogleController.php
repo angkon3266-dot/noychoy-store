@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -12,15 +13,32 @@ use Illuminate\Support\Str;
 /**
  * "Continue with Google" for customers — implemented directly against Google's
  * OAuth2 endpoints (no Socialite dependency, friendlier to shared hosting).
- * Credentials live in config/services.php → env GOOGLE_CLIENT_ID/SECRET/REDIRECT.
+ * Credentials come from Admin → Integrations first, falling back to
+ * config/services.php (env GOOGLE_CLIENT_ID/SECRET/REDIRECT).
  */
 class GoogleController extends Controller
 {
+    /** Read a Google setting from the admin Integrations panel, with config fallback. */
+    protected function cfg(string $key, $default = null)
+    {
+        $int = Setting::get('integrations', []);
+        $value = is_array($int) ? ($int[$key] ?? null) : null;
+
+        return ($value !== null && $value !== '') ? $value : $default;
+    }
+
+    protected function clientId(): ?string { return $this->cfg('google_client_id', config('services.google.client_id')); }
+    protected function clientSecret(): ?string { return $this->cfg('google_client_secret', config('services.google.client_secret')); }
+    protected function redirectUri(): string { return $this->cfg('google_redirect', config('services.google.redirect')) ?: route('customer.google.callback'); }
+
+    public static function isEnabled(): bool
+    {
+        return (new self)->configured();
+    }
+
     protected function configured(): bool
     {
-        return filled(config('services.google.client_id'))
-            && filled(config('services.google.client_secret'))
-            && filled(config('services.google.redirect'));
+        return filled($this->clientId()) && filled($this->clientSecret());
     }
 
     public function redirect(Request $request)
@@ -34,8 +52,8 @@ class GoogleController extends Controller
         $request->session()->put('google_oauth_state', $state);
 
         $params = http_build_query([
-            'client_id' => config('services.google.client_id'),
-            'redirect_uri' => config('services.google.redirect'),
+            'client_id' => $this->clientId(),
+            'redirect_uri' => $this->redirectUri(),
             'response_type' => 'code',
             'scope' => 'openid email profile',
             'state' => $state,
@@ -63,9 +81,9 @@ class GoogleController extends Controller
         // Exchange the authorization code for tokens.
         $tokenResp = Http::asForm()->post('https://oauth2.googleapis.com/token', [
             'code' => $request->get('code'),
-            'client_id' => config('services.google.client_id'),
-            'client_secret' => config('services.google.client_secret'),
-            'redirect_uri' => config('services.google.redirect'),
+            'client_id' => $this->clientId(),
+            'client_secret' => $this->clientSecret(),
+            'redirect_uri' => $this->redirectUri(),
             'grant_type' => 'authorization_code',
         ]);
 

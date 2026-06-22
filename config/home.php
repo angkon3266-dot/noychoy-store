@@ -16,9 +16,35 @@ return [
         'hero_image' => null,                   // optional background/feature image (upload)
 
         // Section titles
-        'categories_title' => 'Shop by category',
+        'categories_title' => 'Browse Our Categories',
         'featured_title' => 'Featured',
-        'new_arrivals_title' => 'New arrivals',
+        'best_selling_title' => 'Best Selling Products',
+        'new_arrivals_title' => 'New Arrival Products',
+
+        // Storefront section toggles (Manfare-style template)
+        'show_feature_strip' => true,
+        'show_categories' => true,
+        'show_best_selling' => true,
+        'show_new_arrivals' => true,
+        'show_highlights' => true,
+        'show_videos' => true,
+
+        // Feature strip (4 reassurance items). Each: icon (emoji) + title.
+        'feature_strip' => [
+            ['icon' => '🚚', 'title' => 'Fastest Shipping Countrywide'],
+            ['icon' => '↩️', 'title' => 'Easy Return Policy'],
+            ['icon' => '💎', 'title' => 'Premium Quality Product'],
+            ['icon' => '🎧', 'title' => 'Online Support 24/7'],
+        ],
+
+        // Hero slider — list of { image, link, alt }. Empty = fall back to hero_image / featured.
+        'hero_slides' => [],
+
+        // Highlighted categories (large editorial tiles) — list of category IDs.
+        'highlight_category_ids' => [],
+
+        // Homepage video sections — list of { title, url }. url = YouTube link or uploaded MP4 path.
+        'videos' => [],
 
         // Trust badges (bottom strip)
         'badge1_title' => 'Cash on Delivery',

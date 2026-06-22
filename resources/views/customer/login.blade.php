@@ -11,13 +11,14 @@
             <div class="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2 text-sm mt-4">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mt-6"><x-google-button>Continue with Google</x-google-button></div>
+        @if(\App\Http\Controllers\Customer\GoogleController::isEnabled())
+            <div class="mt-6"><x-google-button>Continue with Google</x-google-button></div>
+            <div class="flex items-center gap-3 my-5 text-xs text-ink-700/40">
+                <span class="h-px flex-1 bg-ink-100"></span>OR<span class="h-px flex-1 bg-ink-100"></span>
+            </div>
+        @endif
 
-        <div class="flex items-center gap-3 my-5 text-xs text-ink-700/40">
-            <span class="h-px flex-1 bg-ink-100"></span>OR<span class="h-px flex-1 bg-ink-100"></span>
-        </div>
-
-        <form action="{{ route('customer.login.post') }}" method="POST" class="space-y-4">
+        <form action="{{ route('customer.login.post') }}" method="POST" class="mt-6 space-y-4">
             @csrf
             <div><label class="label">Mobile number</label><input name="phone" value="{{ old('phone') }}" class="input" required></div>
             <div><label class="label">Password</label><input type="password" name="password" class="input" required></div>
