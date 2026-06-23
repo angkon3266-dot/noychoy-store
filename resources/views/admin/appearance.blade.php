@@ -36,6 +36,12 @@
                     <div><label class="label text-xs">Center image height (px)</label><input type="number" name="header_center_height" value="{{ $theme['header_center_height'] ?? 32 }}" min="16" max="100" class="input text-sm"></div>
                 </div>
                 <p class="text-xs text-ink-700/50 mt-1">Shows centered in the mobile header (e.g. a badge or campaign mark).</p>
+
+                <label class="label mt-4">Mobile menu icon</label>
+                @if($mi = theme_asset($theme['menu_icon'] ?? null))<img src="{{ $mi }}" class="h-9 mb-2 bg-ink-900 rounded p-1" alt="menu icon">@endif
+                <input type="file" name="menu_icon" accept="image/*" class="input text-sm">
+                <div class="mt-2 max-w-[12rem]"><label class="label text-xs">Rotation when menu opens (degrees)</label><input type="number" name="menu_icon_rotation" value="{{ $theme['menu_icon_rotation'] ?? 45 }}" min="0" max="360" class="input text-sm"></div>
+                <p class="text-xs text-ink-700/50 mt-1">Used as the mobile menu toggle (e.g. your "M" mark). Tapping opens the menu and rotates the icon by this angle over 300ms; tapping again closes &amp; rotates back. Mobile only.</p>
             </div>
             <div>
                 <label class="label">Favicon</label>

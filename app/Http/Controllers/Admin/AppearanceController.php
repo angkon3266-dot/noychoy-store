@@ -66,6 +66,8 @@ class AppearanceController extends Controller
             'logo_height_desktop' => ['nullable', 'integer', 'min:16', 'max:120'],
             'logo_height_mobile' => ['nullable', 'integer', 'min:16', 'max:100'],
             'header_center_height' => ['nullable', 'integer', 'min:16', 'max:100'],
+            'menu_icon' => ['nullable', 'image', 'max:1024'],
+            'menu_icon_rotation' => ['nullable', 'integer', 'min:0', 'max:360'],
             // Editable trust strip
             'trust_badges' => ['nullable', 'array'],
             'trust_badges.*.icon' => ['nullable', 'string', 'max:8'],
@@ -110,7 +112,7 @@ class AppearanceController extends Controller
         $current = theme();
 
         // Files (images)
-        foreach (['logo', 'logo_mobile', 'header_center_image', 'favicon'] as $file) {
+        foreach (['logo', 'logo_mobile', 'header_center_image', 'menu_icon', 'favicon'] as $file) {
             if ($request->hasFile($file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
@@ -248,7 +250,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

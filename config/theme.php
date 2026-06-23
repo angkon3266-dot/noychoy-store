@@ -26,6 +26,8 @@ return [
         'logo_height_desktop' => 40,   // px — logo height on desktop
         'logo_height_mobile' => 32,    // px — logo height on mobile (left-aligned)
         'header_center_height' => 32,  // px — center image height on mobile
+        'menu_icon' => null,           // mobile menu toggle icon (e.g. the "M" mark)
+        'menu_icon_rotation' => 45,    // degrees the icon rotates when the menu is open
         'primary' => '#9a6c2e',     // buttons/links
         'accent' => '#b6863a',      // secondary highlights
         'background' => '#fbf8f1',  // page background
