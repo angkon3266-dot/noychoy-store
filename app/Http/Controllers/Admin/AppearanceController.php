@@ -23,7 +23,7 @@ class AppearanceController extends Controller
         ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, \App\Services\ImageOptimizer $optimizer)
     {
         $data = $request->validate([
             'primary' => ['nullable', 'string', 'max:9'],
@@ -117,12 +117,15 @@ class AppearanceController extends Controller
         $current = theme();
 
         // Files (images) — upload replaces, or "remove" checkbox clears.
+        // Branding art is downscaled + converted to small WebP so pages load fast
+        // (important for ad traffic). Caps are ~2× the largest display size.
+        $brandingMax = ['logo' => 600, 'logo_mobile' => 480, 'header_center_image' => 480, 'menu_icon' => 160, 'favicon' => 128];
         foreach (['logo', 'logo_mobile', 'header_center_image', 'menu_icon', 'favicon'] as $file) {
             if ($request->hasFile($file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
                 }
-                $current[$file] = $request->file($file)->store('branding', 'public');
+                $current[$file] = $optimizer->storeWebp($request->file($file), 'branding', $brandingMax[$file], 90);
             } elseif ($request->boolean('remove_'.$file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);

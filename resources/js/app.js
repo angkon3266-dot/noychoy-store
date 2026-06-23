@@ -52,8 +52,9 @@ document.addEventListener('alpine:init', () => {
                 if (!res.ok) { form.submit(); return; } // fall back to normal post
                 const data = await res.json();
                 this._apply(data);
+                // Confirm with a toast only; the cart drawer opens solely when the
+                // user taps the cart icon (keeps them browsing/adding for conversion).
                 this.showToast((data.added ? data.added : 'Item') + ' added to cart ✓');
-                this.drawer = true;
             } catch (e) {
                 form.submit();
             } finally {
