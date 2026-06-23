@@ -35,6 +35,9 @@
                 <div>
                     <label class="label">Product name *</label>
                     <input name="name" value="{{ old('name', $product->name) }}" class="input" required>
+                    @if($product->serial)
+                        <p class="text-xs text-ink-700/50 mt-1">Serial <span class="font-mono font-semibold text-ink-900">#{{ $product->serial }}</span> — printed on courier labels, hidden from customers. Auto-assigned, not editable.</p>
+                    @endif
                 </div>
                 <div class="grid sm:grid-cols-2 gap-4">
                     <div><label class="label">SKU</label><input name="sku" value="{{ old('sku', $product->sku) }}" class="input"></div>

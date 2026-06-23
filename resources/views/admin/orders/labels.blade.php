@@ -29,6 +29,7 @@
         .label .item .ph { width: 9mm; height: 9mm; border: 1px solid #ddd; border-radius: 2px; flex: 0 0 auto; background: #f3f4f6; }
         .label .item .desc { flex: 1; min-width: 0; }
         .label .item .nm { font-weight: 600; }
+        .label .item .sn { display: inline-block; background: #000; color: #fff; border-radius: 2px; padding: 0 3px; font-size: 8px; }
         .label .item .var { color: #555; }
         .label .item .qp { white-space: nowrap; text-align: right; font-weight: 600; }
         .label .note { margin-top: 1mm; font-style: italic; color: #333; }
@@ -78,7 +79,7 @@
                                 <span class="ph"></span>
                             @endif
                             <span class="desc">
-                                <span class="nm">{{ \Illuminate\Support\Str::limit($item->name, 34) }}</span>
+                                <span class="nm">@if($item->product?->serial)<span class="sn">#{{ $item->product->serial }}</span> @endif{{ \Illuminate\Support\Str::limit($item->name, 34) }}</span>
                                 @if($var)<br><span class="var">{{ $var }}</span>@endif
                             </span>
                             <span class="qp">×{{ $item->quantity }}<br>৳{{ number_format((float) $item->price, 0) }}</span>

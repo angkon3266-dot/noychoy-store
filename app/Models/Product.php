@@ -16,7 +16,7 @@ class Product extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'name', 'slug', 'sku', 'category_id', 'short_description', 'description',
+        'serial', 'name', 'slug', 'sku', 'category_id', 'short_description', 'description',
         'price', 'compare_at_price', 'cost_price', 'transport_cost', 'manage_stock', 'stock_quantity',
         'in_stock', 'weight', 'has_variants', 'options', 'status', 'is_featured',
         'views', 'meta_title', 'meta_description', 'woo_id',
@@ -94,6 +94,13 @@ class Product extends Model
         static::saving(function (Product $product) {
             if (blank($product->slug)) {
                 $product->slug = static::uniqueSlug($product->name, $product->id);
+            }
+        });
+
+        // Assign the next sequential serial on creation (1,2,3…). Internal — never shown on the storefront.
+        static::creating(function (Product $product) {
+            if (blank($product->serial)) {
+                $product->serial = (int) static::withTrashed()->max('serial') + 1;
             }
         });
     }

@@ -13,13 +13,21 @@
             <div>
                 <label class="label">Logo</label>
                 @if($logo = theme_asset($theme['logo']))
-                    <img src="{{ $logo }}" class="h-12 mb-2 bg-ink-900 rounded p-1" alt="logo">
+                    <div class="flex items-center gap-3 mb-2">
+                        <img src="{{ $logo }}" class="h-12 bg-ink-900 rounded p-1" alt="logo">
+                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_logo" value="1"> Remove</label>
+                    </div>
                 @endif
                 <input type="file" name="logo" accept="image/*" class="input text-sm">
                 <p class="text-xs text-ink-700/50 mt-1">Desktop logo. PNG with transparent background recommended. Leave empty to use the text logo.</p>
 
                 <label class="label mt-3">Mobile logo</label>
-                @if($logoM = theme_asset($theme['logo_mobile'] ?? null))<img src="{{ $logoM }}" class="h-10 mb-2 bg-ink-900 rounded p-1" alt="mobile logo">@endif
+                @if($logoM = theme_asset($theme['logo_mobile'] ?? null))
+                    <div class="flex items-center gap-3 mb-2">
+                        <img src="{{ $logoM }}" class="h-10 bg-ink-900 rounded p-1" alt="mobile logo">
+                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_logo_mobile" value="1"> Remove</label>
+                    </div>
+                @endif
                 <input type="file" name="logo_mobile" accept="image/*" class="input text-sm">
                 <p class="text-xs text-ink-700/50 mt-1">Optional. Shown on mobile only (left-aligned). Falls back to the desktop logo.</p>
 
@@ -29,7 +37,12 @@
                 </div>
 
                 <label class="label mt-4">Mobile center image (optional)</label>
-                @if($hc = theme_asset($theme['header_center_image'] ?? null))<img src="{{ $hc }}" class="h-10 mb-2 bg-ink-900 rounded p-1" alt="center">@endif
+                @if($hc = theme_asset($theme['header_center_image'] ?? null))
+                    <div class="flex items-center gap-3 mb-2">
+                        <img src="{{ $hc }}" class="h-10 bg-ink-900 rounded p-1" alt="center">
+                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_header_center_image" value="1"> Remove</label>
+                    </div>
+                @endif
                 <input type="file" name="header_center_image" accept="image/*" class="input text-sm">
                 <div class="grid grid-cols-2 gap-3 mt-2">
                     <div><label class="label text-xs">Center image link</label><input name="header_center_link" value="{{ $theme['header_center_link'] ?? '' }}" class="input text-sm" placeholder="(optional)"></div>
@@ -38,14 +51,27 @@
                 <p class="text-xs text-ink-700/50 mt-1">Shows centered in the mobile header (e.g. a badge or campaign mark).</p>
 
                 <label class="label mt-4">Mobile menu icon</label>
-                @if($mi = theme_asset($theme['menu_icon'] ?? null))<img src="{{ $mi }}" class="h-9 mb-2 bg-ink-900 rounded p-1" alt="menu icon">@endif
+                @if($mi = theme_asset($theme['menu_icon'] ?? null))
+                    <div class="flex items-center gap-3 mb-2">
+                        <img src="{{ $mi }}" class="h-9 bg-ink-900 rounded p-1" alt="menu icon">
+                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_menu_icon" value="1"> Remove</label>
+                    </div>
+                @endif
                 <input type="file" name="menu_icon" accept="image/*" class="input text-sm">
-                <div class="mt-2 max-w-[12rem]"><label class="label text-xs">Rotation when menu opens (degrees)</label><input type="number" name="menu_icon_rotation" value="{{ $theme['menu_icon_rotation'] ?? 45 }}" min="0" max="360" class="input text-sm"></div>
+                <div class="grid grid-cols-2 gap-3 mt-2">
+                    <div><label class="label text-xs">Rotation when menu opens (°)</label><input type="number" name="menu_icon_rotation" value="{{ $theme['menu_icon_rotation'] ?? 45 }}" min="0" max="360" class="input text-sm"></div>
+                    <div><label class="label text-xs">Icon size (px)</label><input type="number" name="menu_icon_height" value="{{ $theme['menu_icon_height'] ?? 28 }}" min="16" max="80" class="input text-sm"></div>
+                </div>
                 <p class="text-xs text-ink-700/50 mt-1">Used as the mobile menu toggle (e.g. your "M" mark). Tapping opens the menu and rotates the icon by this angle over 300ms; tapping again closes &amp; rotates back. Mobile only.</p>
             </div>
             <div>
                 <label class="label">Favicon</label>
-                @if($fav = theme_asset($theme['favicon']))<img src="{{ $fav }}" class="h-8 mb-2" alt="favicon">@endif
+                @if($fav = theme_asset($theme['favicon']))
+                    <div class="flex items-center gap-3 mb-2">
+                        <img src="{{ $fav }}" class="h-8" alt="favicon">
+                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_favicon" value="1"> Remove</label>
+                    </div>
+                @endif
                 <input type="file" name="favicon" accept="image/*" class="input text-sm">
             </div>
             @php

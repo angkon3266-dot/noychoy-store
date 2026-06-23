@@ -152,15 +152,15 @@
         .logo-m { height: {{ $logoHM }}px; }
         .logo-center { height: {{ $centerH }}px; }
     </style>
-    @php $menuIcon = theme_asset(theme('menu_icon')); $menuRot = (int) (theme('menu_icon_rotation') ?? 45); @endphp
+    @php $menuIcon = theme_asset(theme('menu_icon')); $menuRot = (int) (theme('menu_icon_rotation') ?? 45); $menuIconH = (int) (theme('menu_icon_height') ?: 28); @endphp
     <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ open: false, msearch: false, rot: {{ $menuRot }} }">
         <div class="mx-auto max-w-7xl px-4">
             <div class="relative flex h-16 items-center gap-2">
                 {{-- Mobile menu toggle (far left) — uses the uploaded icon, rotating when open --}}
                 <button @click="open = !open" class="md:hidden p-2 -ml-1" aria-label="Menu" :aria-expanded="open">
                     @if($menuIcon)
-                        <img src="{{ $menuIcon }}" alt="Menu" class="h-7 w-7 object-contain"
-                             :style="`transform: rotate(${open ? rot : 0}deg); transition: transform 300ms ease`">
+                        <img src="{{ $menuIcon }}" alt="Menu" class="object-contain"
+                             :style="`height: {{ $menuIconH }}px; width: {{ $menuIconH }}px; transform: rotate(${open ? rot : 0}deg); transition: transform 300ms ease`">
                     @else
                         <svg class="w-6 h-6 transition-transform duration-300" :style="`transform: rotate(${open ? rot : 0}deg)`" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
                     @endif
