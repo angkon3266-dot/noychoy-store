@@ -3,8 +3,20 @@
 @section('heading', 'Appearance & Theme')
 
 @section('content')
-<form action="{{ route('admin.appearance.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6 max-w-4xl">
+<form action="{{ route('admin.appearance.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6 max-w-4xl pb-24">
     @csrf
+
+    @if($errors->any())
+        <div class="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+            <p class="font-semibold mb-1">Couldn't save — please fix:</p>
+            <ul class="list-disc list-inside">
+                @foreach($errors->all() as $err)<li>{{ $err }}</li>@endforeach
+            </ul>
+        </div>
+    @endif
+    @if(session('success'))
+        <div class="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-700">{{ session('success') }}</div>
+    @endif
 
     <!-- Branding -->
     <div class="card p-6">
@@ -29,11 +41,19 @@
                     </div>
                 @endif
                 <input type="file" name="logo_mobile" accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-1">Optional. Shown on mobile only (left-aligned). Falls back to the desktop logo.</p>
+                <p class="text-xs text-ink-700/50 mt-1">Optional. When set, this is used <strong>instead of</strong> the desktop logo on phones. If left empty, the desktop logo is used on mobile too.</p>
 
-                <div class="grid grid-cols-2 gap-3 mt-3">
+                <div class="grid grid-cols-3 gap-3 mt-3">
                     <div><label class="label text-xs">Logo height — desktop (px)</label><input type="number" name="logo_height_desktop" value="{{ $theme['logo_height_desktop'] ?? 40 }}" min="16" max="120" class="input text-sm"></div>
                     <div><label class="label text-xs">Logo height — mobile (px)</label><input type="number" name="logo_height_mobile" value="{{ $theme['logo_height_mobile'] ?? 32 }}" min="16" max="100" class="input text-sm"></div>
+                    <div>
+                        <label class="label text-xs">Logo placement</label>
+                        <select name="logo_align" class="input text-sm">
+                            @foreach(['left'=>'Left','center'=>'Middle','right'=>'Right'] as $v=>$lbl)
+                                <option value="{{ $v }}" @selected(($theme['logo_align'] ?? 'left')===$v)>{{ $lbl }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
 
                 <label class="label mt-4">Mobile center image (optional)</label>
@@ -549,5 +569,12 @@
     <div class="flex justify-end">
         <button class="btn-primary">Save appearance</button>
     </div>
+
+    {{-- Floating save button — always reachable from anywhere on the page --}}
+    <button type="submit"
+        class="btn-primary fixed bottom-6 right-6 z-50 shadow-lg shadow-black/20 flex items-center gap-2 rounded-full px-5 py-3">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Save
+    </button>
 </form>
 @endsection

@@ -32,7 +32,7 @@ class SmsService
      */
     protected function baseUrl(): string
     {
-        $url = rtrim((string) $this->cfg('sms_base_url', config('sms.base_url')), '/');
+        $url = rtrim(trim((string) $this->cfg('sms_base_url', config('sms.base_url'))), '/');
         if (str_ends_with(strtolower($url), '/sendtext')) {
             $url = rtrim(substr($url, 0, -strlen('/sendtext')), '/');
         }
@@ -40,10 +40,12 @@ class SmsService
         return $url;
     }
 
-    protected function apiKey(): ?string { return $this->cfg('sms_api_key', config('sms.api_key')); }
-    protected function secretKey(): ?string { return $this->cfg('sms_secret_key', config('sms.secret_key')); }
-    /** Masking sender ID. Empty/blank ⇒ non-masking (SMS shows from a number). */
-    protected function callerId(): ?string { return $this->cfg('sms_caller_id', config('sms.caller_id')) ?: null; }
+    // Trim credentials: copy-pasted keys often carry trailing spaces/newlines,
+    // which the gateway rejects with "Org Client Not Found".
+    protected function apiKey(): ?string { return trim((string) $this->cfg('sms_api_key', config('sms.api_key'))) ?: null; }
+    protected function secretKey(): ?string { return trim((string) $this->cfg('sms_secret_key', config('sms.secret_key'))) ?: null; }
+    /** Masking sender ID (e.g. brand name), or a non-masking sender ID (e.g. "123"). Blank ⇒ omitted. */
+    protected function callerId(): ?string { return trim((string) $this->cfg('sms_caller_id', config('sms.caller_id'))) ?: null; }
 
     public function isEnabled(): bool
     {

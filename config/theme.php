@@ -19,7 +19,8 @@ return [
     // Default appearance — overridable from Admin → Appearance (stored in settings table).
     'defaults' => [
         'logo' => null,                // desktop logo
-        'logo_mobile' => null,         // mobile logo (falls back to desktop logo)
+        'logo_mobile' => null,         // mobile logo (used instead of the desktop logo on phones)
+        'logo_align' => 'left',        // logo placement: left | center | right
         'header_center_image' => null, // optional image shown centered in the mobile header
         'header_center_link' => null,  // optional link for the center image
         'favicon' => null,

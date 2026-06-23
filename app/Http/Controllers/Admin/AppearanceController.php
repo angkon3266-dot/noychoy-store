@@ -34,8 +34,11 @@ class AppearanceController extends Controller
             'font_heading_src' => ['nullable', 'in:google,custom'],
             'font_body' => ['nullable', 'string', 'max:60'],
             'font_body_src' => ['nullable', 'in:google,custom'],
-            'font_heading_file' => ['nullable', 'file', 'mimes:woff,woff2,ttf,otf', 'max:4096'],
-            'font_body_file' => ['nullable', 'file', 'mimes:woff,woff2,ttf,otf', 'max:4096'],
+            // Validate by filename extension, not MIME: fileinfo often reports
+            // woff2/otf as application/octet-stream, which made `mimes` reject them
+            // and silently revert the whole Appearance save (font "lost").
+            'font_heading_file' => ['nullable', 'file', 'extensions:woff,woff2,ttf,otf', 'max:8192'],
+            'font_body_file' => ['nullable', 'file', 'extensions:woff,woff2,ttf,otf', 'max:8192'],
             'footer_brand' => ['nullable', 'string', 'max:60'],
             'footer_about' => ['nullable', 'string', 'max:300'],
             'footer_facebook' => ['nullable', 'string', 'max:200'],
@@ -60,6 +63,7 @@ class AppearanceController extends Controller
             'exit_intent' => ['nullable', 'boolean'],
             'logo' => ['nullable', 'image', 'max:2048'],
             'logo_mobile' => ['nullable', 'image', 'max:2048'],
+            'logo_align' => ['nullable', 'in:left,center,right'],
             'header_center_image' => ['nullable', 'image', 'max:2048'],
             'header_center_link' => ['nullable', 'string', 'max:255'],
             'favicon' => ['nullable', 'image', 'max:512'],
@@ -256,7 +260,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

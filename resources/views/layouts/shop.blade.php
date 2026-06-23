@@ -24,6 +24,7 @@
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     {{-- Brand fonts (Google and/or uploaded custom) --}}
@@ -144,8 +145,12 @@
         $logoHD = (int) (theme('logo_height_desktop') ?: 40);
         $centerH = (int) (theme('header_center_height') ?: 32);
         $logoDesktop = theme_asset(theme('logo'));
-        $logoMobile = theme_asset(theme('logo_mobile')) ?: $logoDesktop;
+        $logoMobileUp = theme_asset(theme('logo_mobile'));   // explicit mobile upload (if any)
+        $logoMobile = $logoMobileUp ?: $logoDesktop;          // fall back to desktop only when no mobile logo
         $headerCenter = theme_asset(theme('header_center_image'));
+        $logoAlign = theme('logo_align', 'left');
+        // Alignment classes for the logo anchor inside the header row.
+        $logoAlignClass = $logoAlign === 'center' ? 'absolute left-1/2 -translate-x-1/2' : ($logoAlign === 'right' ? 'ml-auto' : '');
     @endphp
     <style>
         .logo-d { height: {{ $logoHD }}px; }
@@ -166,8 +171,8 @@
                     @endif
                 </button>
 
-                {{-- Logo (left). Separate image for desktop & mobile. --}}
-                <a href="{{ route('home') }}" class="shrink-0">
+                {{-- Logo. Separate image for desktop & mobile; placement configurable. --}}
+                <a href="{{ route('home') }}" class="shrink-0 {{ $logoAlignClass }}">
                     @if($logoDesktop || $logoMobile)
                         @if($logoDesktop)<img src="{{ $logoDesktop }}" alt="{{ config('store.name') }}" class="logo-d w-auto hidden md:block">@endif
                         @if($logoMobile)<img src="{{ $logoMobile }}" alt="{{ config('store.name') }}" class="logo-m w-auto md:hidden">@endif

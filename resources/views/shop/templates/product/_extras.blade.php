@@ -28,10 +28,21 @@
     $count = $product->review_count;
     $dist = collect(range(5, 1))->mapWithKeys(fn ($s) => [$s => $reviews->where('rating', $s)->count()]);
 @endphp
-<section class="mt-16 border-t border-ink-100 pt-10" id="reviews">
-    <h2 class="font-display text-2xl font-semibold mb-6">Customer reviews</h2>
+<section class="mt-16 border-t border-ink-100 pt-10" id="reviews" x-data="{ open: false }">
+    <button type="button" @click="open = !open" class="w-full flex items-center justify-between gap-4 text-left">
+        <h2 class="font-display text-2xl font-semibold flex items-center gap-3">
+            Customer reviews
+            @if($count > 0)
+                <span class="text-sm font-normal text-ink-700/60 flex items-center gap-1">
+                    <svg class="w-4 h-4 text-gold-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.96a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.448a1 1 0 00-.363 1.118l1.287 3.96c.3.922-.755 1.688-1.54 1.118l-3.37-2.448a1 1 0 00-1.175 0l-3.37 2.448c-.784.57-1.838-.196-1.539-1.118l1.287-3.96a1 1 0 00-.363-1.118L2.05 9.387c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.96z"/></svg>
+                    {{ number_format($avg, 1) }} · {{ $count }} review{{ $count > 1 ? 's' : '' }}
+                </span>
+            @endif
+        </h2>
+        <svg class="w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+    </button>
 
-    <div class="grid md:grid-cols-3 gap-8">
+    <div class="grid md:grid-cols-3 gap-8 mt-6" x-show="open" x-collapse x-cloak>
         {{-- Summary --}}
         <div>
             @if($count)

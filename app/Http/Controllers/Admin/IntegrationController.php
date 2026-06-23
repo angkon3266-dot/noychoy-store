@@ -91,10 +91,21 @@ class IntegrationController extends Controller
         $data = $request->validate(['phone' => ['required', 'string', 'max:20']]);
         $ok = $sms->send($data['phone'], 'Test SMS from '.config('store.name').' — your SMS gateway is working.');
 
+        $resp = $sms->lastResponse ?? [];
+        $desc = (string) ($resp['StatusDescription'] ?? $resp['Text'] ?? '');
+
+        // Plain-language hint for the most common gateway rejections.
+        $hint = '';
+        if (! $ok && stripos($desc, 'Org Client Not Found') !== false) {
+            $hint = ' — This means KhudeBarta did not recognise your API key/secret on this gateway URL. '
+                  . 'It is NOT a masking/sender-ID problem. Double-check the Base URL, API key and Secret key match exactly '
+                  . 'what KhudeBarta issued for THIS account (no extra spaces), and that API access is activated.';
+        }
+
         // Surface the exact gateway response so problems can be diagnosed.
         $raw = $sms->lastResponse ? ' — gateway response: '.json_encode($sms->lastResponse) : '';
 
         return back()->with($ok ? 'success' : 'error',
-            ($ok ? 'Test SMS sent.' : 'Test SMS failed.').$raw);
+            ($ok ? 'Test SMS sent.' : 'Test SMS failed.').$hint.$raw);
     }
 }
