@@ -164,6 +164,21 @@ document.addEventListener('alpine:init', () => {
         get json() { return JSON.stringify(this.items); },
     }));
 
+    // ── Admin: homepage section/block builder ───────────────────────────────
+    window.Alpine.data('homeBuilder', (init) => ({
+        blocks: (init && init.blocks) || [],
+        newType: 'product_carousel',
+        add() {
+            this.blocks.push({ type: this.newType, enabled: true, title: '', layout: 'single',
+                images: [], videos: [], source: 'new', category_id: '', limit: 10, view_all_link: '', banner: { image: '', link: '' }, html: '' });
+        },
+        remove(i) { this.blocks.splice(i, 1); },
+        move(i, d) { const j = i + d; if (j < 0 || j >= this.blocks.length) return; [this.blocks[i], this.blocks[j]] = [this.blocks[j], this.blocks[i]]; },
+        addImage(b) { if (!b.images) b.images = []; b.images.push({ image: '', link: '' }); },
+        addVideo(b) { if (!b.videos) b.videos = []; b.videos.push({ title: '', url: '' }); },
+        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; return ''; },
+    }));
+
     // ── Admin: searchable related-product picker (upsell / cross-sell) ───────
     window.Alpine.data('relatedPicker', (all, selected, field) => ({
         all: all || [],

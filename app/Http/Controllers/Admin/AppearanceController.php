@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 
 class AppearanceController extends Controller
 {
-    public function index()
+    public function index(\App\Services\StorefrontFilters $filters)
     {
         return view('admin.appearance', [
             'theme' => theme(),
@@ -17,6 +17,9 @@ class AppearanceController extends Controller
             'homeTemplates' => config('theme.homepage_templates'),
             'productTemplates' => config('theme.product_templates'),
             'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
+            'filterConfig' => $filters->config(),
+            'filterAttributes' => $filters->discoverAttributes(),
+            'filterCustomFields' => $filters->discoverCustomFields(),
         ]);
     }
 
@@ -56,9 +59,13 @@ class AppearanceController extends Controller
             'sticky_buy_bar' => ['nullable', 'boolean'],
             'exit_intent' => ['nullable', 'boolean'],
             'logo' => ['nullable', 'image', 'max:2048'],
+            'logo_mobile' => ['nullable', 'image', 'max:2048'],
+            'header_center_image' => ['nullable', 'image', 'max:2048'],
+            'header_center_link' => ['nullable', 'string', 'max:255'],
             'favicon' => ['nullable', 'image', 'max:512'],
             'logo_height_desktop' => ['nullable', 'integer', 'min:16', 'max:120'],
             'logo_height_mobile' => ['nullable', 'integer', 'min:16', 'max:100'],
+            'header_center_height' => ['nullable', 'integer', 'min:16', 'max:100'],
             // Editable trust strip
             'trust_badges' => ['nullable', 'array'],
             'trust_badges.*.icon' => ['nullable', 'string', 'max:8'],
@@ -84,14 +91,26 @@ class AppearanceController extends Controller
             'hero_slide_images' => ['nullable', 'array'],
             'hero_slide_images.*' => ['nullable', 'image', 'max:4096'],
 
+            // Section builder
+            'home_sections_json' => ['nullable', 'string'],
+            'block_image' => ['nullable', 'array'],
+            'block_image.*.*' => ['nullable', 'image', 'max:4096'],
+            'block_banner' => ['nullable', 'array'],
+            'block_banner.*' => ['nullable', 'image', 'max:4096'],
+
             // Floating contact buttons
             'messenger_url' => ['nullable', 'string', 'max:255'],
+
+            // Storefront filters
+            'filter_attributes' => ['nullable', 'array'],
+            'filter_custom_fields' => ['nullable', 'array'],
+            'filter_price_ranges' => ['nullable', 'string'],
         ]);
 
         $current = theme();
 
         // Files (images)
-        foreach (['logo', 'favicon'] as $file) {
+        foreach (['logo', 'logo_mobile', 'header_center_image', 'favicon'] as $file) {
             if ($request->hasFile($file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
@@ -184,6 +203,24 @@ class AppearanceController extends Controller
         }
         $home['hero_slides'] = $slides->values()->all();
 
+        // Section builder blocks (JSON) + per-block image uploads
+        $blocks = json_decode((string) $request->input('home_sections_json', ''), true);
+        if (is_array($blocks)) {
+            foreach ((array) $request->file('block_image', []) as $bi => $imgs) {
+                foreach ((array) $imgs as $ii => $file) {
+                    if ($file && $file->isValid()) {
+                        $blocks[$bi]['images'][$ii]['image'] = $file->store('sections', 'public');
+                    }
+                }
+            }
+            foreach ((array) $request->file('block_banner', []) as $bi => $file) {
+                if ($file && $file->isValid()) {
+                    $blocks[$bi]['banner']['image'] = $file->store('sections', 'public');
+                }
+            }
+            $home['sections'] = $this->normalizeSections($blocks);
+        }
+
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
@@ -211,7 +248,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_height_desktop', 'logo_height_mobile', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }
@@ -219,6 +256,70 @@ class AppearanceController extends Controller
 
         Setting::put('theme', $current);
 
+        // ---- Storefront filters ----
+        $sf = Setting::get('storefront_filters', []);
+        $sf = is_array($sf) ? $sf : [];
+        $sf['attributes'] = array_values(array_filter((array) $request->input('filter_attributes', [])));
+        $sf['custom_fields'] = array_values(array_filter((array) $request->input('filter_custom_fields', [])));
+        $sf['tags'] = $request->boolean('filter_tags');
+        $sf['price'] = $request->boolean('filter_price');
+        $sf['in_stock'] = $request->boolean('filter_in_stock');
+        $sf['on_sale'] = $request->boolean('filter_on_sale');
+        $ranges = collect(preg_split('/\r\n|\r|\n/', (string) $request->input('filter_price_ranges', '')))
+            ->map(fn ($l) => array_map('trim', explode('-', $l)))
+            ->filter(fn ($r) => count($r) === 2 && is_numeric($r[0]) && is_numeric($r[1]))
+            ->map(fn ($r) => [(float) $r[0], (float) $r[1]])->values()->all();
+        if ($ranges) {
+            $sf['price_ranges'] = $ranges;
+        }
+        Setting::put('storefront_filters', $sf);
+
         return back()->with('success', 'Appearance updated.');
+    }
+
+    /** Sanitise builder blocks to a known shape before storing. */
+    protected function normalizeSections(array $blocks): array
+    {
+        $types = ['banner', 'product_carousel', 'banner_carousel', 'video', 'richtext'];
+
+        return collect($blocks)->map(function ($b) use ($types) {
+            $type = in_array($b['type'] ?? '', $types, true) ? $b['type'] : null;
+            if (! $type) {
+                return null;
+            }
+            $out = [
+                'type' => $type,
+                'enabled' => (bool) ($b['enabled'] ?? true),
+                'title' => trim((string) ($b['title'] ?? '')),
+            ];
+            if ($type === 'banner') {
+                $out['layout'] = in_array($b['layout'] ?? 'single', ['single', 'dual', 'grid'], true) ? $b['layout'] : 'single';
+                $out['images'] = collect($b['images'] ?? [])
+                    ->map(fn ($i) => ['image' => trim((string) ($i['image'] ?? '')), 'link' => trim((string) ($i['link'] ?? ''))])
+                    ->filter(fn ($i) => $i['image'] !== '')->values()->all();
+            }
+            if (in_array($type, ['product_carousel', 'banner_carousel'], true)) {
+                $out['source'] = in_array($b['source'] ?? 'new', ['new', 'best', 'featured', 'category'], true) ? $b['source'] : 'new';
+                $out['category_id'] = ((int) ($b['category_id'] ?? 0)) ?: null;
+                $out['limit'] = max(1, min(20, (int) ($b['limit'] ?? 10)));
+                $out['view_all_link'] = trim((string) ($b['view_all_link'] ?? ''));
+            }
+            if ($type === 'banner_carousel') {
+                $out['banner'] = [
+                    'image' => trim((string) ($b['banner']['image'] ?? '')),
+                    'link' => trim((string) ($b['banner']['link'] ?? '')),
+                ];
+            }
+            if ($type === 'video') {
+                $out['videos'] = collect($b['videos'] ?? [])
+                    ->map(fn ($v) => ['title' => trim((string) ($v['title'] ?? '')), 'url' => trim((string) ($v['url'] ?? ''))])
+                    ->filter(fn ($v) => $v['url'] !== '')->values()->all();
+            }
+            if ($type === 'richtext') {
+                $out['html'] = (string) ($b['html'] ?? '');
+            }
+
+            return $out;
+        })->filter()->values()->all();
     }
 }

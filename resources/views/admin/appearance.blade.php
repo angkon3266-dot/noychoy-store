@@ -16,12 +16,26 @@
                     <img src="{{ $logo }}" class="h-12 mb-2 bg-ink-900 rounded p-1" alt="logo">
                 @endif
                 <input type="file" name="logo" accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-1">PNG with transparent background recommended. Leave empty to use the text logo.</p>
+                <p class="text-xs text-ink-700/50 mt-1">Desktop logo. PNG with transparent background recommended. Leave empty to use the text logo.</p>
+
+                <label class="label mt-3">Mobile logo</label>
+                @if($logoM = theme_asset($theme['logo_mobile'] ?? null))<img src="{{ $logoM }}" class="h-10 mb-2 bg-ink-900 rounded p-1" alt="mobile logo">@endif
+                <input type="file" name="logo_mobile" accept="image/*" class="input text-sm">
+                <p class="text-xs text-ink-700/50 mt-1">Optional. Shown on mobile only (left-aligned). Falls back to the desktop logo.</p>
+
                 <div class="grid grid-cols-2 gap-3 mt-3">
                     <div><label class="label text-xs">Logo height — desktop (px)</label><input type="number" name="logo_height_desktop" value="{{ $theme['logo_height_desktop'] ?? 40 }}" min="16" max="120" class="input text-sm"></div>
                     <div><label class="label text-xs">Logo height — mobile (px)</label><input type="number" name="logo_height_mobile" value="{{ $theme['logo_height_mobile'] ?? 32 }}" min="16" max="100" class="input text-sm"></div>
                 </div>
-                <p class="text-xs text-ink-700/50 mt-1">The logo is centered on mobile.</p>
+
+                <label class="label mt-4">Mobile center image (optional)</label>
+                @if($hc = theme_asset($theme['header_center_image'] ?? null))<img src="{{ $hc }}" class="h-10 mb-2 bg-ink-900 rounded p-1" alt="center">@endif
+                <input type="file" name="header_center_image" accept="image/*" class="input text-sm">
+                <div class="grid grid-cols-2 gap-3 mt-2">
+                    <div><label class="label text-xs">Center image link</label><input name="header_center_link" value="{{ $theme['header_center_link'] ?? '' }}" class="input text-sm" placeholder="(optional)"></div>
+                    <div><label class="label text-xs">Center image height (px)</label><input type="number" name="header_center_height" value="{{ $theme['header_center_height'] ?? 32 }}" min="16" max="100" class="input text-sm"></div>
+                </div>
+                <p class="text-xs text-ink-700/50 mt-1">Shows centered in the mobile header (e.g. a badge or campaign mark).</p>
             </div>
             <div>
                 <label class="label">Favicon</label>
@@ -275,6 +289,105 @@
         <div class="mt-3"><label class="label text-xs">Or upload MP4/WebM (max 30 MB each)</label><input type="file" name="home_video_files[]" multiple accept="video/mp4,video/webm" class="input text-sm"></div>
     </div>
 
+    <!-- Section builder -->
+    <div class="card p-6" x-data="homeBuilder({ blocks: @js(array_values($home['sections'] ?? [])) })">
+        <h2 class="font-semibold mb-1">Section builder</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Build the middle of your homepage from blocks. Drag order with ↑/↓. When you add blocks here they replace the default sections above (hero &amp; feature strip stay on top).</p>
+        <input type="hidden" name="home_sections_json" :value="JSON.stringify(blocks)">
+
+        <template x-for="(b, bi) in blocks" :key="bi">
+            <div class="rounded-lg border border-ink-200 p-3 mb-3" x-init="ensure(b)">
+                <div class="flex items-center gap-2 mb-2">
+                    <select x-model="b.type" class="input py-1.5 w-48 text-sm">
+                        <option value="banner">Promo banner(s)</option>
+                        <option value="product_carousel">Product carousel</option>
+                        <option value="banner_carousel">Banner + products</option>
+                        <option value="video">Video row</option>
+                        <option value="richtext">Rich text / HTML</option>
+                    </select>
+                    <input x-model="b.title" class="input py-1.5 flex-1 text-sm" placeholder="Section title (optional)">
+                    <label class="flex items-center gap-1 text-xs"><input type="checkbox" x-model="b.enabled"> On</label>
+                    <button type="button" @click="move(bi,-1)" class="px-2">↑</button>
+                    <button type="button" @click="move(bi,1)" class="px-2">↓</button>
+                    <button type="button" @click="remove(bi)" class="px-2 text-red-500 text-lg">&times;</button>
+                </div>
+
+                {{-- Banner --}}
+                <div x-show="b.type==='banner'" class="space-y-2">
+                    <select x-model="b.layout" class="input py-1.5 w-40 text-sm">
+                        <option value="single">Single (full width)</option>
+                        <option value="dual">Two side-by-side</option>
+                        <option value="grid">Grid (3)</option>
+                    </select>
+                    <template x-for="(im, ii) in b.images" :key="ii">
+                        <div class="flex gap-2 items-center">
+                            <input x-model="im.image" class="input py-1.5 text-sm flex-1" placeholder="image path or URL">
+                            <input type="file" :name="`block_image[${bi}][${ii}]`" accept="image/*" class="text-xs w-40">
+                            <input x-model="im.link" class="input py-1.5 text-sm w-40" placeholder="link">
+                            <button type="button" @click="b.images.splice(ii,1)" class="text-red-500 px-1">&times;</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="addImage(b)" class="btn-outline py-1 text-xs">+ Add image</button>
+                </div>
+
+                {{-- Product carousel / Banner+products shared source controls --}}
+                <div x-show="b.type==='product_carousel' || b.type==='banner_carousel'" class="flex flex-wrap gap-2 items-end mt-1">
+                    <div><label class="label text-xs">Source</label>
+                        <select x-model="b.source" class="input py-1.5 text-sm">
+                            <option value="new">Newest</option><option value="best">Best sellers</option>
+                            <option value="featured">Featured</option><option value="category">Category</option>
+                        </select>
+                    </div>
+                    <div x-show="b.source==='category'"><label class="label text-xs">Category</label>
+                        <select x-model="b.category_id" class="input py-1.5 text-sm">
+                            <option value="">Choose…</option>
+                            @foreach($allCategories as $cat)<option value="{{ $cat->id }}">{{ $cat->name }}</option>@endforeach
+                        </select>
+                    </div>
+                    <div><label class="label text-xs">Max items</label><input type="number" x-model="b.limit" min="1" max="20" class="input py-1.5 w-20 text-sm"></div>
+                    <div><label class="label text-xs">"View all" link</label><input x-model="b.view_all_link" class="input py-1.5 text-sm w-48" placeholder="(optional)"></div>
+                </div>
+
+                {{-- Banner image for banner_carousel --}}
+                <div x-show="b.type==='banner_carousel'" class="flex gap-2 items-center mt-2">
+                    <input x-model="b.banner.image" class="input py-1.5 text-sm flex-1" placeholder="side banner image path/URL">
+                    <input type="file" :name="`block_banner[${bi}]`" accept="image/*" class="text-xs w-40">
+                    <input x-model="b.banner.link" class="input py-1.5 text-sm w-40" placeholder="link">
+                </div>
+
+                {{-- Video --}}
+                <div x-show="b.type==='video'" class="space-y-2">
+                    <template x-for="(v, vi) in b.videos" :key="vi">
+                        <div class="flex gap-2">
+                            <input x-model="v.title" class="input py-1.5 text-sm w-44" placeholder="Title">
+                            <input x-model="v.url" class="input py-1.5 text-sm flex-1" placeholder="YouTube link or MP4 path">
+                            <button type="button" @click="b.videos.splice(vi,1)" class="text-red-500 px-1">&times;</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="addVideo(b)" class="btn-outline py-1 text-xs">+ Add video</button>
+                    <p class="text-xs text-ink-700/50">Upload MP4s in the section above (Homepage sections) or paste links here.</p>
+                </div>
+
+                {{-- Rich text --}}
+                <div x-show="b.type==='richtext'">
+                    <textarea x-model="b.html" rows="4" class="input text-sm font-mono" placeholder="<h2>Custom HTML…</h2>"></textarea>
+                </div>
+            </div>
+        </template>
+
+        <div class="flex items-center gap-2 mt-2">
+            <select x-model="newType" class="input py-1.5 w-48 text-sm">
+                <option value="product_carousel">Product carousel</option>
+                <option value="banner">Promo banner(s)</option>
+                <option value="banner_carousel">Banner + products</option>
+                <option value="video">Video row</option>
+                <option value="richtext">Rich text / HTML</option>
+            </select>
+            <button type="button" @click="add()" class="btn-outline text-sm">+ Add section</button>
+        </div>
+        <p class="text-xs text-ink-700/50 mt-2">Tip: upload a banner image, then Save — the stored path fills in automatically.</p>
+    </div>
+
     <!-- Floating contact buttons -->
     <div class="card p-6">
         <h2 class="font-semibold mb-1">Floating contact buttons</h2>
@@ -285,6 +398,42 @@
             <label class="flex items-center gap-2"><input type="checkbox" name="show_messenger_button" value="1" @checked($theme['show_messenger_button'] ?? false)> Messenger</label>
         </div>
         <div><label class="label">Messenger link (m.me/yourpage)</label><input name="messenger_url" value="{{ $theme['messenger_url'] ?? '' }}" class="input" placeholder="https://m.me/yourpage"></div>
+    </div>
+
+    <!-- Storefront filters -->
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Storefront filters</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Choose which filters appear in the shop sidebar. Values are pulled automatically from your products. "Color" attributes show colour swatches.</p>
+
+        <div class="grid sm:grid-cols-3 gap-2 text-sm mb-4">
+            <label class="flex items-center gap-2"><input type="checkbox" name="filter_price" value="1" @checked($filterConfig['price'] ?? true)> Price ranges</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="filter_in_stock" value="1" @checked($filterConfig['in_stock'] ?? true)> In-stock</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="filter_on_sale" value="1" @checked($filterConfig['on_sale'] ?? true)> On-sale</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="filter_tags" value="1" @checked($filterConfig['tags'] ?? false)> Tags</label>
+        </div>
+
+        <label class="label">Variation attributes to show as filters</label>
+        @if($filterAttributes->isEmpty())
+            <p class="text-xs text-ink-700/50">No variation attributes found yet. Add variable products with attributes (e.g. Color, Size) and they'll appear here.</p>
+        @else
+            <div class="grid sm:grid-cols-3 gap-2 text-sm">
+                @foreach($filterAttributes as $attr)
+                    <label class="flex items-center gap-2"><input type="checkbox" name="filter_attributes[]" value="{{ $attr }}" @checked(in_array($attr, $filterConfig['attributes'] ?? []))> {{ $attr }}</label>
+                @endforeach
+            </div>
+        @endif
+
+        @if($filterCustomFields->isNotEmpty())
+            <label class="label mt-4">Custom fields to show as filters</label>
+            <div class="grid sm:grid-cols-3 gap-2 text-sm">
+                @foreach($filterCustomFields as $cf)
+                    <label class="flex items-center gap-2"><input type="checkbox" name="filter_custom_fields[]" value="{{ $cf }}" @checked(in_array($cf, $filterConfig['custom_fields'] ?? []))> {{ $cf }}</label>
+                @endforeach
+            </div>
+        @endif
+
+        <label class="label mt-4">Price ranges (one per line, "min-max")</label>
+        <textarea name="filter_price_ranges" rows="4" class="input font-mono text-sm">{{ collect($filterConfig['price_ranges'] ?? [])->map(fn($r) => $r[0].'-'.$r[1])->implode("\n") }}</textarea>
     </div>
 
     <!-- Marketing -->

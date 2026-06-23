@@ -174,6 +174,35 @@ if (! function_exists('normalize_menu_item')) {
     }
 }
 
+if (! function_exists('color_hex')) {
+    /** Best-effort hex for a colour name (for filter swatches). Null if unknown. */
+    function color_hex(string $name): ?string
+    {
+        $key = strtolower(trim($name));
+        $map = [
+            'black' => '#111111', 'white' => '#ffffff', 'off white' => '#f4f1ea', 'offwhite' => '#f4f1ea',
+            'red' => '#e11d48', 'maroon' => '#7f1d1d', 'burgundy' => '#7f1d1d',
+            'blue' => '#1d4ed8', 'navy' => '#1e293b', 'sky blue' => '#7dd3fc', 'slate blue' => '#64748b', 'royal blue' => '#1d4ed8',
+            'green' => '#16a34a', 'mint' => '#a7f3d0', 'olive' => '#6b7d3a', 'teal' => '#0d9488',
+            'yellow' => '#facc15', 'mustard' => '#d4a017', 'gold' => '#b6863a',
+            'orange' => '#f97316', 'pastel orange' => '#fdba74', 'biscuit' => '#e3c79a', 'beige' => '#e3d5b8', 'cream' => '#f5edda',
+            'pink' => '#ec4899', 'purple' => '#7e22ce', 'plum' => '#7e22ce', 'brown' => '#8b5e3c', 'tan' => '#d2b48c',
+            'grey' => '#9ca3af', 'gray' => '#9ca3af', 'silver' => '#c0c0c0', 'charcoal' => '#36454f',
+        ];
+        if (isset($map[$key])) {
+            return $map[$key];
+        }
+        if (str_starts_with($key, 'multi')) {
+            return 'multi';
+        }
+        // Allow raw hex values stored as the attribute value.
+        if (preg_match('/^#?[0-9a-f]{6}$/i', $key)) {
+            return '#'.ltrim($key, '#');
+        }
+        return null;
+    }
+}
+
 if (! function_exists('meta_pixel_id')) {
     /** Pixel ID from Appearance settings, falling back to .env. */
     function meta_pixel_id(): ?string

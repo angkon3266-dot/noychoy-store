@@ -7,45 +7,47 @@ use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductLove;
+use App\Services\StorefrontFilters;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CatalogController extends Controller
 {
+    public function __construct(protected StorefrontFilters $filters) {}
+
     public function index(Request $request)
     {
-        $query = Product::published()
-            ->with('images', 'approvedReviews', 'category')
-            ->search($request->query('q'));
-
-        $this->applyFilters($query, $request);
-
-        $products = $query->paginate(24)->withQueryString();
+        $base = Product::published()->search($request->query('q'));
 
         return view('shop.catalog', [
-            'products' => $products,
+            'products' => $this->paginate($base, $request),
+            'filters' => $this->filters->groups($request, Product::published()->search($request->query('q'))),
             'title' => $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry',
         ]);
     }
 
-    /** Shared storefront filters + sort (price range, availability, sale, tag). */
-    protected function applyFilters($query, Request $request): void
+    /** Apply filters + sort to a base query and paginate. */
+    protected function paginate(Builder $base, Request $request)
     {
-        $query
-            ->when($request->filled('price_min'), fn ($q) => $q->where('price', '>=', (float) $request->query('price_min')))
-            ->when($request->filled('price_max'), fn ($q) => $q->where('price', '<=', (float) $request->query('price_max')))
-            ->when($request->boolean('in_stock'), fn ($q) => $q->where('in_stock', true))
-            ->when($request->boolean('on_sale'), fn ($q) => $q->whereNotNull('compare_at_price')->whereColumn('compare_at_price', '>', 'price'))
-            ->when($request->query('tag'), fn ($q, $tag) => $q->where('tags', 'like', "%{$tag}%"))
-            ->when($request->query('sort'), function ($q, $sort) {
-                match ($sort) {
-                    'price_asc' => $q->orderBy('price'),
-                    'price_desc' => $q->orderByDesc('price'),
-                    'name' => $q->orderBy('name'),
-                    'popular' => $q->orderByDesc('views'),
-                    default => $q->latest(),
-                };
-            }, fn ($q) => $q->latest());
+        $query = (clone $base)->with('images', 'approvedReviews', 'category');
+        $this->filters->apply($query, $request);
+        $this->applySort($query, $request);
+
+        return $query->paginate(24)->withQueryString();
+    }
+
+    protected function applySort($query, Request $request): void
+    {
+        $query->when($request->query('sort'), function ($q, $sort) {
+            match ($sort) {
+                'price_asc' => $q->orderBy('price'),
+                'price_desc' => $q->orderByDesc('price'),
+                'name' => $q->orderBy('name'),
+                'popular' => $q->orderByDesc('views'),
+                default => $q->latest(),
+            };
+        }, fn ($q) => $q->latest());
     }
 
     /** JSON type-ahead suggestions for the header search box. */
@@ -76,17 +78,13 @@ class CatalogController extends Controller
 
         $ids = $category->children()->pluck('id')->push($category->id);
 
-        $query = Product::published()
+        $base = Product::published()
             ->where(fn ($q) => $q->whereIn('category_id', $ids)
-                ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)))
-            ->with('images', 'approvedReviews', 'category');
-
-        $this->applyFilters($query, $request);
-
-        $products = $query->paginate(24)->withQueryString();
+                ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)));
 
         return view('shop.catalog', [
-            'products' => $products,
+            'products' => $this->paginate($base, $request),
+            'filters' => $this->filters->groups($request, clone $base),
             'title' => $category->name,
             'category' => $category,
         ]);

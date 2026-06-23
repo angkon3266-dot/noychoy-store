@@ -142,10 +142,15 @@
     @php
         $logoHM = (int) (theme('logo_height_mobile') ?: 32);
         $logoHD = (int) (theme('logo_height_desktop') ?: 40);
+        $centerH = (int) (theme('header_center_height') ?: 32);
+        $logoDesktop = theme_asset(theme('logo'));
+        $logoMobile = theme_asset(theme('logo_mobile')) ?: $logoDesktop;
+        $headerCenter = theme_asset(theme('header_center_image'));
     @endphp
     <style>
-        .site-logo { height: {{ $logoHM }}px; }
-        @media (min-width: 768px) { .site-logo { height: {{ $logoHD }}px; } }
+        .logo-d { height: {{ $logoHD }}px; }
+        .logo-m { height: {{ $logoHM }}px; }
+        .logo-center { height: {{ $centerH }}px; }
     </style>
     <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ open: false, msearch: false }">
         <div class="mx-auto max-w-7xl px-4">
@@ -155,14 +160,22 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
                 </button>
 
-                {{-- Logo — centered on mobile, left on desktop --}}
-                <a href="{{ route('home') }}" class="shrink-0 absolute left-1/2 -translate-x-1/2 md:static md:left-auto md:translate-x-0">
-                    @if($logo = theme_asset(theme('logo')))
-                        <img src="{{ $logo }}" alt="{{ config('store.name') }}" class="site-logo w-auto">
+                {{-- Logo (left). Separate image for desktop & mobile. --}}
+                <a href="{{ route('home') }}" class="shrink-0">
+                    @if($logoDesktop || $logoMobile)
+                        @if($logoDesktop)<img src="{{ $logoDesktop }}" alt="{{ config('store.name') }}" class="logo-d w-auto hidden md:block">@endif
+                        @if($logoMobile)<img src="{{ $logoMobile }}" alt="{{ config('store.name') }}" class="logo-m w-auto md:hidden">@endif
                     @else
-                        <span class="site-logo inline-flex items-center font-display font-bold tracking-wide text-gold-700" style="font-size: calc({{ $logoHM }}px * 0.55)">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                        <span class="logo-m md:logo-d inline-flex items-center font-display font-bold tracking-wide text-gold-700" style="font-size: calc({{ $logoHM }}px * 0.55)">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
                     @endif
                 </a>
+
+                {{-- Optional center image (mobile only) --}}
+                @if($headerCenter)
+                    <a href="{{ theme('header_center_link') ?: route('home') }}" class="md:hidden absolute left-1/2 -translate-x-1/2">
+                        <img src="{{ $headerCenter }}" alt="" class="logo-center w-auto">
+                    </a>
+                @endif
 
                 @php $menuTrigger = theme('menu_desktop_trigger', 'hover'); @endphp
                 <nav class="hidden md:flex items-center gap-6 text-sm font-medium">

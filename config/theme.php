@@ -18,10 +18,14 @@ return [
 
     // Default appearance — overridable from Admin → Appearance (stored in settings table).
     'defaults' => [
-        'logo' => null,
+        'logo' => null,                // desktop logo
+        'logo_mobile' => null,         // mobile logo (falls back to desktop logo)
+        'header_center_image' => null, // optional image shown centered in the mobile header
+        'header_center_link' => null,  // optional link for the center image
         'favicon' => null,
         'logo_height_desktop' => 40,   // px — logo height on desktop
-        'logo_height_mobile' => 32,    // px — logo height on mobile (centered)
+        'logo_height_mobile' => 32,    // px — logo height on mobile (left-aligned)
+        'header_center_height' => 32,  // px — center image height on mobile
         'primary' => '#9a6c2e',     // buttons/links
         'accent' => '#b6863a',      // secondary highlights
         'background' => '#fbf8f1',  // page background

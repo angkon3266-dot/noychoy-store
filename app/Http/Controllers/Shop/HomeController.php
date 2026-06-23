@@ -30,6 +30,9 @@ class HomeController extends Controller
             ->map(fn ($v) => ['title' => $v['title'] ?? '', 'meta' => video_meta($v['url'] ?? '')])
             ->filter(fn ($v) => $v['meta'] !== null)->values();
 
+        // Custom section blocks (page builder). Empty = fall back to fixed sections.
+        $sections = $this->resolveSections(home_content('sections') ?? [], $with);
+
         // Logged-in admins can preview any template via ?preview_home=KEY without saving it.
         $key = theme('homepage_template');
         if ($request->filled('preview_home') && auth('web')->check()
@@ -43,8 +46,45 @@ class HomeController extends Controller
         }
 
         return view($view, compact(
-            'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'homeVideos'
+            'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'homeVideos', 'sections'
         ));
+    }
+
+    /** Turn stored builder blocks into render-ready blocks (with products resolved). */
+    protected function resolveSections(array $blocks, array $with): \Illuminate\Support\Collection
+    {
+        return collect($blocks)
+            ->filter(fn ($b) => ($b['enabled'] ?? true) && filled($b['type'] ?? null))
+            ->map(function ($b) use ($with) {
+                $type = $b['type'];
+                if (in_array($type, ['product_carousel', 'banner_carousel'], true)) {
+                    $b['products'] = $this->sourceProducts($b['source'] ?? 'new', $b['category_id'] ?? null, (int) ($b['limit'] ?? 10), $with);
+                }
+                if ($type === 'video') {
+                    $b['videos'] = collect($b['videos'] ?? [])
+                        ->map(fn ($v) => ['title' => $v['title'] ?? '', 'meta' => video_meta($v['url'] ?? '')])
+                        ->filter(fn ($v) => $v['meta'] !== null)->values();
+                }
+                return $b;
+            })->values();
+    }
+
+    /** Resolve a product source keyword to a collection. */
+    protected function sourceProducts(string $source, $categoryId, int $limit, array $with): \Illuminate\Support\Collection
+    {
+        $limit = max(1, min(20, $limit));
+
+        return match ($source) {
+            'best' => $this->bestSellers($with, $limit),
+            'featured' => Product::published()->featured()->with($with)->latest()->take($limit)->get(),
+            'category' => $categoryId
+                ? Product::published()->with($with)
+                    ->where(fn ($w) => $w->where('category_id', $categoryId)
+                        ->orWhereHas('categories', fn ($c) => $c->where('categories.id', $categoryId)))
+                    ->latest()->take($limit)->get()
+                : collect(),
+            default => Product::published()->with($with)->latest()->take($limit)->get(), // new
+        };
     }
 
     /**
