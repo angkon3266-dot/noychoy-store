@@ -112,6 +112,35 @@ class SmsService
         }
     }
 
+    /**
+     * Human-readable explanation of the most recent send() for admin UIs.
+     * Adds a plain-language hint for common gateway rejections, then the raw JSON.
+     */
+    public function explainLast(): string
+    {
+        $resp = $this->lastResponse ?? [];
+        if (! $resp) {
+            if (! $this->isEnabled()) {
+                return ' — SMS is disabled or missing credentials (Base URL, API key, Secret key). Enable it in Integrations.';
+            }
+            return '';
+        }
+
+        $desc = (string) ($resp['StatusDescription'] ?? $resp['Text'] ?? '');
+        $hint = '';
+        if (stripos($desc, 'Org Client Not Found') !== false) {
+            $hint = ' — KhudeBarta did not recognise your API key/secret on this gateway URL. '
+                  . 'This is NOT a masking/sender-ID problem. Verify the Base URL, API key and Secret key match exactly '
+                  . 'what KhudeBarta issued for THIS account (no extra spaces) and that API access is activated.';
+        } elseif (stripos($desc, 'sender') !== false || stripos($desc, 'mask') !== false || stripos($desc, 'caller') !== false) {
+            $hint = ' — The sender/caller ID was rejected. For non-masking, set the Caller ID to your approved numeric sender (e.g. 123); for masking, use your approved brand name.';
+        } elseif (stripos($desc, 'balance') !== false || stripos($desc, 'insufficient') !== false) {
+            $hint = ' — Your KhudeBarta account has insufficient balance.';
+        }
+
+        return $hint.' — gateway response: '.json_encode($resp);
+    }
+
     /** Editable per-status templates (admin) with config fallback. */
     public function template(string $key): ?string
     {

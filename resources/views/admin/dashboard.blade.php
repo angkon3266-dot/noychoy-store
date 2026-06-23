@@ -81,6 +81,29 @@
     </div>
 </div>
 
+{{-- Most loved products --}}
+<div class="card p-5 mt-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold flex items-center gap-2">
+            <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+            Most loved products
+        </h2>
+        <span class="text-sm text-ink-700/60">{{ number_format($totalLoves) }} total ❤️</span>
+    </div>
+    @forelse($mostLoved as $p)
+        @php $lovedMax = max(1, $mostLoved->max('loves_count')); @endphp
+        <div class="flex items-center gap-3 py-2 border-b border-ink-50 last:border-0 text-sm">
+            <a href="{{ route('admin.products.edit', $p) }}" class="text-gold-700 hover:underline truncate w-48 shrink-0">{{ $p->name }}</a>
+            <div class="flex-1 h-2 rounded-full bg-ink-50 overflow-hidden">
+                <div class="h-full rounded-full bg-red-400" style="width: {{ round($p->loves_count / $lovedMax * 100) }}%"></div>
+            </div>
+            <span class="shrink-0 font-medium text-red-600 w-16 text-right">❤️ {{ number_format($p->loves_count) }}</span>
+        </div>
+    @empty
+        <p class="text-sm text-ink-700/50">No love reactions yet. They'll appear here as customers tap the ❤️ on products.</p>
+    @endforelse
+</div>
+
 {{-- Recent orders --}}
 <div class="card mt-6 overflow-hidden">
     <div class="flex items-center justify-between px-5 py-4 border-b border-ink-100">

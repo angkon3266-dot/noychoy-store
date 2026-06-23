@@ -32,7 +32,8 @@ class SmsController extends Controller
 
         $ok = $sms->send($data['phone'], $data['message']);
 
-        return back()->with($ok ? 'success' : 'error', $ok ? 'SMS sent.' : 'SMS failed (check settings/logs).');
+        return back()->with($ok ? 'success' : 'error',
+            ($ok ? 'SMS sent.' : 'SMS failed.').$sms->explainLast());
     }
 
     public function broadcast(Request $request, SmsService $sms)

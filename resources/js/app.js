@@ -67,6 +67,29 @@ document.addEventListener('alpine:init', () => {
                 this._apply(data);
             } catch (e) { /* ignore */ }
         },
+        _removing: false,
+        async remove(key) {
+            if (this._removing) return;
+            this._removing = true;
+            try {
+                const res = await fetch('/cart/remove', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    body: JSON.stringify({ key }),
+                });
+                if (res.ok) this._apply(await res.json());
+                else this.refresh();
+            } catch (e) {
+                this.refresh();
+            } finally {
+                this._removing = false;
+            }
+        },
         openDrawer() { this.refresh(); this.drawer = true; },
         showToast(msg) {
             this.toastMsg = msg;

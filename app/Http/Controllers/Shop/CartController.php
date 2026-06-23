@@ -122,12 +122,20 @@ class CartController extends Controller
 
         $this->cart->update($data['key'], $data['qty']);
 
+        if ($request->expectsJson()) {
+            return response()->json($this->miniPayload());
+        }
+
         return back();
     }
 
     public function remove(Request $request)
     {
         $this->cart->remove($request->string('key'));
+
+        if ($request->expectsJson()) {
+            return response()->json($this->miniPayload(['removed' => true]));
+        }
 
         return back()->with('success', 'Item removed.');
     }

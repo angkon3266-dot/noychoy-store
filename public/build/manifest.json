@@ -148,7 +148,7 @@
     "src": "_playfair-display-700-normal-Dw3uKy19.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Cjqng68p.css",
+    "file": "assets/app-DppnshpU.css",
     "name": "app",
     "names": [
       "app.css"
@@ -157,7 +157,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-Djus1gkJ.js",
+    "file": "assets/app-eXDVL4uz.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true

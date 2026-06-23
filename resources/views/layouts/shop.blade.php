@@ -213,7 +213,7 @@
                                              style="grid-template-columns: repeat({{ min(5, max(1, count($item['columns'] ?? []))) }}, minmax(0,1fr));">
                                             @forelse($item['columns'] ?? [] as $col)
                                                 <div>
-                                                    @if($col['heading'])<p class="font-display font-semibold text-gold-700 mb-2">{{ $col['heading'] }}</p>@endif
+                                                    @if($col['heading'])<p class="font-display font-bold text-base text-gold-700 mb-2.5 tracking-wide">{{ $col['heading'] }}</p>@endif
                                                     <ul class="space-y-1.5">
                                                         @foreach($col['links'] as $l)
                                                             <li><a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="text-sm text-ink-700/80 hover:text-gold-700">{{ $l['label'] }}</a></li>
@@ -326,7 +326,7 @@
                             <div x-show="sub" x-cloak class="pb-2 pl-3 space-y-1">
                                 @if($mtype === 'mega')
                                     @foreach($item['columns'] ?? [] as $col)
-                                        @if($col['heading'])<p class="pt-1.5 text-xs font-semibold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
+                                        @if($col['heading'])<p class="pt-1.5 text-sm font-bold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
                                         @foreach($col['links'] as $l)
                                             <a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $l['label'] }}</a>
                                         @endforeach
@@ -365,16 +365,23 @@
                     <p class="text-center text-ink-700/50 py-10">Your cart is empty.</p>
                 </template>
                 <template x-for="item in $store.cart.items" :key="item.key">
-                    <a :href="item.url" class="flex gap-3">
-                        <span class="w-16 h-16 rounded-lg bg-gold-100 overflow-hidden shrink-0">
-                            <template x-if="item.image"><img :src="item.image" class="w-full h-full object-cover" alt=""></template>
-                        </span>
-                        <span class="flex-1 min-w-0">
-                            <span class="block text-sm font-medium truncate" x-text="item.name"></span>
-                            <span class="block text-xs text-ink-700/50">Qty <span x-text="item.qty"></span></span>
-                            <span class="block text-sm text-gold-700" x-text="item.price_text"></span>
-                        </span>
-                    </a>
+                    <div class="relative flex gap-3 group/ci">
+                        <a :href="item.url" class="flex gap-3 flex-1 min-w-0 pr-6">
+                            <span class="w-16 h-16 rounded-lg bg-gold-100 overflow-hidden shrink-0">
+                                <template x-if="item.image"><img :src="item.image" class="w-full h-full object-cover" alt=""></template>
+                            </span>
+                            <span class="flex-1 min-w-0">
+                                <span class="block text-sm font-medium truncate" x-text="item.name"></span>
+                                <span class="block text-xs text-ink-700/50">Qty <span x-text="item.qty"></span></span>
+                                <span class="block text-sm text-gold-700" x-text="item.price_text"></span>
+                            </span>
+                        </a>
+                        <button type="button" @click="$store.cart.remove(item.key)"
+                            class="absolute top-0 right-0 p-1 text-ink-700/40 hover:text-red-600 transition"
+                            :title="'Remove ' + item.name" aria-label="Remove item">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
                 </template>
             </div>
             <div class="border-t border-ink-100 p-5 space-y-3" x-show="$store.cart.items.length">

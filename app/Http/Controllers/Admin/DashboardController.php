@@ -70,6 +70,12 @@ class DashboardController extends Controller
         $lowStockProducts = Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)
             ->orderBy('stock_quantity')->take(5)->get(['id', 'name', 'slug', 'stock_quantity']);
 
+        // Most-loved products (by love reactions received).
+        $mostLoved = Product::where('loves_count', '>', 0)
+            ->orderByDesc('loves_count')
+            ->take(8)->get(['id', 'name', 'slug', 'loves_count']);
+        $totalLoves = (int) Product::sum('loves_count');
+
         $recentOrders = Order::latest()->take(10)->get();
 
         $statusCounts = Order::query()
@@ -78,7 +84,8 @@ class DashboardController extends Controller
             ->pluck('count', 'status');
 
         return view('admin.dashboard', compact(
-            'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts'
+            'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
+            'mostLoved', 'totalLoves'
         ));
     }
 }
