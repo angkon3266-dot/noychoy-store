@@ -95,6 +95,8 @@ Route::middleware('auth:customer')->group(function () {
     Route::get('/account/loved', [AccountController::class, 'loved'])->name('account.loved');
 });
 
+Route::get('/discover', [\App\Http\Controllers\Shop\DiscoverController::class, 'index'])->name('discover');
+
 // Catalog (slug routes last so they don't shadow the above)
 Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');
 Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->name('product.show');

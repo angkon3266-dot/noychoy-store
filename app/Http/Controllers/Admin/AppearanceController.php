@@ -20,6 +20,7 @@ class AppearanceController extends Controller
             'filterConfig' => $filters->config(),
             'filterAttributes' => $filters->discoverAttributes(),
             'filterCustomFields' => $filters->discoverCustomFields(),
+            'discoverTiles' => Setting::get('discover_tiles', []),
         ]);
     }
 
@@ -107,6 +108,11 @@ class AppearanceController extends Controller
 
             // Floating contact buttons
             'messenger_url' => ['nullable', 'string', 'max:255'],
+
+            // Discover page tiles
+            'discover_tiles_json' => ['nullable', 'string'],
+            'discover_image' => ['nullable', 'array'],
+            'discover_image.*' => ['nullable', 'image', 'max:2048'],
 
             // Storefront filters
             'filter_attributes' => ['nullable', 'array'],
@@ -288,6 +294,25 @@ class AppearanceController extends Controller
             $sf['price_ranges'] = $ranges;
         }
         Setting::put('storefront_filters', $sf);
+
+        // ---- Discover page tiles (image + name + link) ----
+        $tiles = json_decode((string) $request->input('discover_tiles_json', ''), true);
+        if (is_array($tiles)) {
+            foreach ((array) $request->file('discover_image', []) as $i => $file) {
+                if ($file && $file->isValid()) {
+                    $tiles[$i]['image'] = $optimizer->storeWebp($file, 'discover', 800, 85);
+                }
+            }
+            $tiles = collect($tiles)
+                ->map(fn ($t) => [
+                    'image' => trim((string) ($t['image'] ?? '')),
+                    'name' => trim((string) ($t['name'] ?? '')),
+                    'link' => trim((string) ($t['link'] ?? '')),
+                ])
+                ->filter(fn ($t) => $t['image'] !== '')
+                ->values()->all();
+            Setting::put('discover_tiles', $tiles);
+        }
 
         return back()->with('success', 'Appearance updated.');
     }

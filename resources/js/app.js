@@ -203,6 +203,14 @@ document.addEventListener('alpine:init', () => {
         ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; return ''; },
     }));
 
+    // ── Admin: Discover page tile builder (image + name + link) ─────────────
+    window.Alpine.data('discoverBuilder', (init) => ({
+        tiles: (init && init.tiles) || [],
+        add() { this.tiles.push({ image: '', name: '', link: '' }); },
+        remove(i) { this.tiles.splice(i, 1); },
+        move(i, d) { const j = i + d; if (j < 0 || j >= this.tiles.length) return; [this.tiles[i], this.tiles[j]] = [this.tiles[j], this.tiles[i]]; },
+    }));
+
     // ── Admin: searchable related-product picker (upsell / cross-sell) ───────
     window.Alpine.data('relatedPicker', (all, selected, field) => ({
         all: all || [],

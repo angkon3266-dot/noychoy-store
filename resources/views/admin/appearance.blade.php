@@ -440,6 +440,32 @@
         <p class="text-xs text-ink-700/50 mt-2">Tip: upload a banner image, then Save — the stored path fills in automatically.</p>
     </div>
 
+    <!-- Discover page tiles (mobile bottom-nav "Discover") -->
+    <div class="card p-6" x-data="discoverBuilder({ tiles: @js(array_values($discoverTiles ?? [])) })">
+        <h2 class="font-semibold mb-1">Discover page</h2>
+        <p class="text-xs text-ink-700/60 mb-4">The tiles shown on the mobile <strong>Discover</strong> tab. Each tile has an image, a name and a link (a category, a product, or any URL). Leave it empty to fall back to your top categories.</p>
+        <input type="hidden" name="discover_tiles_json" :value="JSON.stringify(tiles)">
+
+        <template x-for="(t, i) in tiles" :key="i">
+            <div class="rounded-lg border border-ink-200 p-3 mb-3 flex flex-wrap items-end gap-2">
+                <div class="w-16 shrink-0">
+                    <template x-if="t.image"><img :src="t.image.startsWith('http') || t.image.startsWith('/') ? t.image : '/storage/'+t.image" class="w-16 h-16 object-cover rounded bg-ink-50"></template>
+                    <template x-if="!t.image"><div class="w-16 h-16 rounded bg-ink-50 flex items-center justify-center text-ink-300 text-xl">🖼</div></template>
+                </div>
+                <div class="flex-1 min-w-[8rem]"><label class="label text-xs">Name</label><input x-model="t.name" class="input py-1.5 text-sm" placeholder="e.g. Necklaces"></div>
+                <div class="flex-1 min-w-[10rem]"><label class="label text-xs">Link</label><input x-model="t.link" class="input py-1.5 text-sm" placeholder="/category/necklaces"></div>
+                <div><label class="label text-xs">Image</label><input type="file" :name="`discover_image[${i}]`" accept="image/*" class="text-xs w-36"></div>
+                <div class="flex gap-1">
+                    <button type="button" @click="move(i,-1)" class="px-2">↑</button>
+                    <button type="button" @click="move(i,1)" class="px-2">↓</button>
+                    <button type="button" @click="remove(i)" class="px-2 text-red-500 text-lg">&times;</button>
+                </div>
+            </div>
+        </template>
+        <button type="button" @click="add()" class="btn-outline text-sm">+ Add tile</button>
+        <p class="text-xs text-ink-700/50 mt-2">Tip: square images (e.g. 600×600) look best. Upload an image then Save — the stored path fills in automatically.</p>
+    </div>
+
     <!-- Floating contact buttons -->
     <div class="card p-6">
         <h2 class="font-semibold mb-1">Floating contact buttons</h2>
