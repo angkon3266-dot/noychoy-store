@@ -10,5 +10,5 @@ class ProductLove extends Model
     // so the default would (wrongly) resolve to "product_love".
     protected $table = 'product_loves';
 
-    protected $fillable = ['product_id', 'visitor_token'];
+    protected $fillable = ['product_id', 'customer_id', 'visitor_token'];
 }

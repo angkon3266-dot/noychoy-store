@@ -76,6 +76,23 @@ Route::middleware('auth:customer')->group(function () {
     Route::get('/account', [AccountController::class, 'index'])->name('account');
     Route::get('/account/orders', [AccountController::class, 'orders'])->name('account.orders');
     Route::get('/account/orders/{orderNumber}', [AccountController::class, 'order'])->name('account.order');
+    Route::post('/account/orders/{orderNumber}/reorder', [AccountController::class, 'reorder'])->name('account.reorder');
+
+    // Profile & security
+    Route::get('/account/profile', [AccountController::class, 'profile'])->name('account.profile');
+    Route::patch('/account/profile', [AccountController::class, 'updateProfile'])->name('account.profile.update');
+    Route::patch('/account/password', [AccountController::class, 'updatePassword'])->name('account.password.update');
+
+    // Addresses
+    Route::get('/account/addresses', [AccountController::class, 'addresses'])->name('account.addresses');
+    Route::post('/account/addresses', [AccountController::class, 'storeAddress'])->name('account.addresses.store');
+    Route::patch('/account/addresses/{address}', [AccountController::class, 'updateAddress'])->name('account.addresses.update');
+    Route::delete('/account/addresses/{address}', [AccountController::class, 'deleteAddress'])->name('account.addresses.delete');
+    Route::post('/account/addresses/{address}/default', [AccountController::class, 'setDefaultAddress'])->name('account.addresses.default');
+
+    // Reviews & loved
+    Route::get('/account/reviews', [AccountController::class, 'reviews'])->name('account.reviews');
+    Route::get('/account/loved', [AccountController::class, 'loved'])->name('account.loved');
 });
 
 // Catalog (slug routes last so they don't shadow the above)

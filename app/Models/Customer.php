@@ -36,4 +36,22 @@ class Customer extends Authenticatable
     {
         return $this->hasMany(Order::class);
     }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function loves(): HasMany
+    {
+        return $this->hasMany(ProductLove::class);
+    }
+
+    /** Products this customer has loved (newest first). */
+    public function lovedProducts()
+    {
+        return $this->belongsToMany(Product::class, 'product_loves')
+            ->withTimestamps()
+            ->orderByPivot('created_at', 'desc');
+    }
 }

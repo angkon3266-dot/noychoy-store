@@ -24,7 +24,11 @@ class LoveController extends Controller
             $loved = false;
         } else {
             // Guard against the unique constraint under double-clicks.
-            ProductLove::firstOrCreate(['product_id' => $product->id, 'visitor_token' => $token]);
+            $love = ProductLove::firstOrCreate(['product_id' => $product->id, 'visitor_token' => $token]);
+            // Attach the logged-in customer so it shows in their account "Loved" list.
+            if (($customerId = auth('customer')->id()) && $love->customer_id !== $customerId) {
+                $love->forceFill(['customer_id' => $customerId])->save();
+            }
             $loved = true;
         }
 
