@@ -67,6 +67,46 @@ class SteadfastService
         return $this->client()->get("/status_by_trackingcode/{$code}")->json() ?? [];
     }
 
+    /**
+     * Live delivery status for a shipment, cached 10 min so page loads stay fast
+     * and we don't hammer the courier API. Returns the raw Steadfast status string
+     * (e.g. in_review, pending, delivered, partial_delivered, cancelled) or null.
+     */
+    public function deliveryStatus(?string $consignmentId): ?string
+    {
+        if (! $consignmentId || ! $this->isConfigured()) {
+            return null;
+        }
+
+        return \Illuminate\Support\Facades\Cache::remember(
+            "sf_status_{$consignmentId}",
+            now()->addMinutes(10),
+            function () use ($consignmentId) {
+                try {
+                    return $this->statusByConsignmentId($consignmentId)['delivery_status'] ?? null;
+                } catch (\Throwable $e) {
+                    Log::warning('Steadfast status lookup failed', ['cid' => $consignmentId, 'error' => $e->getMessage()]);
+                    return null;
+                }
+            }
+        );
+    }
+
+    /** Map a raw Steadfast status to [label, step(0-3), tone]. */
+    public static function describeStatus(?string $raw): array
+    {
+        $s = strtolower((string) $raw);
+        return match (true) {
+            str_contains($s, 'delivered') && ! str_contains($s, 'partial') => ['Delivered', 3, 'green'],
+            str_contains($s, 'partial') => ['Partially delivered', 3, 'amber'],
+            str_contains($s, 'cancel') => ['Cancelled', 3, 'red'],
+            str_contains($s, 'hold') => ['On hold', 2, 'amber'],
+            in_array($s, ['in_review', '', 'unknown']) => ['Booked with courier', 1, 'gold'],
+            $s === 'pending' => ['Out for delivery', 2, 'gold'],
+            default => [ucwords(str_replace('_', ' ', $s)), 2, 'gold'],
+        };
+    }
+
     public function getBalance(): array
     {
         return $this->client()->get('/get_balance')->json() ?? [];

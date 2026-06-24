@@ -57,16 +57,21 @@ class CheckoutController extends Controller
         return view('shop.confirmation', compact('order'));
     }
 
-    public function track(Request $request)
+    public function track(Request $request, \App\Services\SteadfastService $steadfast)
     {
         $order = null;
+        $tracking = null;
         if ($request->filled('order_number') && $request->filled('phone')) {
             $order = Order::where('order_number', $request->string('order_number'))
                 ->where('customer_phone', 'like', '%'.preg_replace('/\D/', '', $request->string('phone')).'%')
                 ->with(['items', 'shipment', 'history'])
                 ->first();
+
+            if ($order) {
+                $tracking = \App\Http\Controllers\Customer\AccountController::trackingFor($order, $steadfast);
+            }
         }
 
-        return view('shop.track', compact('order'));
+        return view('shop.track', compact('order', 'tracking'));
     }
 }

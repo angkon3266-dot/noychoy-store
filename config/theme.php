@@ -56,6 +56,15 @@ return [
         'announcement_link' => null,
         'announcement_speed' => 6,   // seconds per message (lower = faster scroll)
 
+        // Registered-customer offer bar (personalised greeting + offer)
+        'cbar_enabled' => false,
+        'cbar_text' => 'Welcome back, {name}! Here’s a little something for you 🎁',
+        'cbar_code' => null,              // optional promo code (shown as copy-to-clipboard)
+        'cbar_link' => null,             // optional CTA link
+        'cbar_link_label' => 'Shop now',
+        'cbar_bg' => '#161618',
+        'cbar_color' => '#f5edda',
+
         // Conversion toggles
         'whatsapp_number' => null,            // e.g. 8801XXXXXXXXX
         'messenger_url' => null,              // e.g. https://m.me/yourpage

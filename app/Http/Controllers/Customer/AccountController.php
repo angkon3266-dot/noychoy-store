@@ -40,14 +40,40 @@ class AccountController extends Controller
         return view('customer.orders', compact('orders'));
     }
 
-    public function order(string $orderNumber)
+    public function order(string $orderNumber, \App\Services\SteadfastService $steadfast)
     {
         $order = $this->customer()->orders()
             ->where('order_number', $orderNumber)
             ->with(['items', 'shipment', 'history'])
             ->firstOrFail();
 
-        return view('customer.order', compact('order'));
+        $tracking = $this->trackingFor($order, $steadfast);
+
+        return view('customer.order', compact('order', 'tracking'));
+    }
+
+    /** Build the live courier-tracking view-model for an order (or null). */
+    public static function trackingFor($order, \App\Services\SteadfastService $steadfast): ?array
+    {
+        $cid = $order->shipment?->consignment_id;
+        if (! $cid) {
+            return null;
+        }
+        $raw = $steadfast->deliveryStatus($cid);
+        [$label, $step, $tone] = \App\Services\SteadfastService::describeStatus($raw);
+        $toneClass = [
+            'green' => 'bg-green-100 text-green-700',
+            'amber' => 'bg-amber-100 text-amber-700',
+            'red' => 'bg-red-100 text-red-700',
+            'gold' => 'bg-gold-100 text-gold-800',
+        ][$tone] ?? 'bg-gold-100 text-gold-800';
+
+        return [
+            'label' => $label,
+            'step' => $step,
+            'tone_class' => $toneClass,
+            'tracking_code' => $order->shipment->tracking_code,
+        ];
     }
 
     // ── Profile & security ───────────────────────────────────────────────────

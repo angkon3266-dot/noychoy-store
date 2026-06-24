@@ -71,6 +71,13 @@ class AppearanceController extends Controller
             'logo_height_desktop' => ['nullable', 'integer', 'min:16', 'max:120'],
             'logo_height_mobile' => ['nullable', 'integer', 'min:16', 'max:100'],
             'header_center_height' => ['nullable', 'integer', 'min:16', 'max:100'],
+            'cbar_enabled' => ['nullable', 'boolean'],
+            'cbar_text' => ['nullable', 'string', 'max:200'],
+            'cbar_code' => ['nullable', 'string', 'max:40'],
+            'cbar_link' => ['nullable', 'string', 'max:255'],
+            'cbar_link_label' => ['nullable', 'string', 'max:40'],
+            'cbar_bg' => ['nullable', 'string', 'max:9'],
+            'cbar_color' => ['nullable', 'string', 'max:9'],
             'menu_icon' => ['nullable', 'image', 'max:1024'],
             'menu_icon_rotation' => ['nullable', 'integer', 'min:0', 'max:360'],
             'menu_icon_height' => ['nullable', 'integer', 'min:16', 'max:80'],
@@ -245,7 +252,7 @@ class AppearanceController extends Controller
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button'] as $bool) {
+        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'cbar_enabled'] as $bool) {
             $current[$bool] = $request->boolean($bool);
         }
 
@@ -269,7 +276,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

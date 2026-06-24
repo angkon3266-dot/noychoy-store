@@ -440,6 +440,28 @@
         <p class="text-xs text-ink-700/50 mt-2">Tip: upload a banner image, then Save — the stored path fills in automatically.</p>
     </div>
 
+    <!-- Registered-customer offer bar -->
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="font-semibold">Registered-customer offer bar</h2>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="cbar_enabled" value="1" @checked($theme['cbar_enabled'] ?? false)> Enabled</label>
+        </div>
+        <p class="text-xs text-ink-700/60 mb-4">A personalised bar shown <strong>only to logged-in customers</strong>, just below the header. Use <code>{name}</code> to greet them by their first name. Great for member-only offers.</p>
+        <div class="space-y-4">
+            <div><label class="label">Message</label><input name="cbar_text" value="{{ $theme['cbar_text'] ?? '' }}" class="input" placeholder="Welcome back, {name}! Enjoy 10% off today 🎁"></div>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="label">Promo code (optional)</label><input name="cbar_code" value="{{ $theme['cbar_code'] ?? '' }}" class="input font-mono" placeholder="MEMBER10"></div>
+                <div><label class="label">Button label</label><input name="cbar_link_label" value="{{ $theme['cbar_link_label'] ?? 'Shop now' }}" class="input"></div>
+            </div>
+            <div><label class="label">Button link (optional)</label><input name="cbar_link" value="{{ $theme['cbar_link'] ?? '' }}" class="input" placeholder="/shop"></div>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="label">Background</label><input type="color" name="cbar_bg" value="{{ $theme['cbar_bg'] ?? '#161618' }}" class="h-10 w-14 rounded border border-ink-100"></div>
+                <div><label class="label">Text colour</label><input type="color" name="cbar_color" value="{{ $theme['cbar_color'] ?? '#f5edda' }}" class="h-10 w-14 rounded border border-ink-100"></div>
+            </div>
+            <p class="text-xs text-ink-700/50">Tip: if you set a promo code, customers can tap it to copy. The bar is dismissible and reappears whenever you change the message or code.</p>
+        </div>
+    </div>
+
     <!-- Discover page tiles (mobile bottom-nav "Discover") -->
     <div class="card p-6" x-data="discoverBuilder({ tiles: @js(array_values($discoverTiles ?? [])) })">
         <h2 class="font-semibold mb-1">Discover page</h2>

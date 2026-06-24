@@ -354,6 +354,35 @@
         </div>
     </header>
 
+    {{-- Registered-customer personalised offer bar (logged-in customers only) --}}
+    @auth('customer')
+        @if(theme('cbar_enabled') && filled(theme('cbar_text')))
+            @php
+                $cbarFirst = \Illuminate\Support\Str::of(auth('customer')->user()->name)->trim()->explode(' ')->first();
+                $cbarText = str_replace('{name}', $cbarFirst, theme('cbar_text'));
+                $cbarCode = theme('cbar_code');
+                $cbarKey = md5($cbarText.$cbarCode);
+            @endphp
+            <div x-data="{ show: localStorage.getItem('cbar_dismissed') !== '{{ $cbarKey }}', copied: false }" x-show="show" x-cloak
+                 class="text-sm" style="background: {{ theme('cbar_bg') }}; color: {{ theme('cbar_color') }}">
+                <div class="relative mx-auto max-w-7xl px-4 py-2 flex items-center justify-center gap-3 flex-wrap text-center">
+                    <span>{{ $cbarText }}</span>
+                    @if($cbarCode)
+                        <button type="button" @click="navigator.clipboard.writeText('{{ $cbarCode }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                                class="inline-flex items-center gap-1 rounded-full border border-current/40 px-2.5 py-0.5 font-mono text-xs hover:bg-white/10 transition">
+                            <span x-text="copied ? 'Copied!' : '{{ $cbarCode }}'"></span>
+                            <svg x-show="!copied" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m11.25 2.25h-3.375c-.621 0-1.125.504-1.125 1.125v3.375M21 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5"/></svg>
+                        </button>
+                    @endif
+                    @if(theme('cbar_link'))
+                        <a href="{{ theme('cbar_link') }}" class="underline font-medium hover:no-underline">{{ theme('cbar_link_label') ?: 'Shop now' }}</a>
+                    @endif
+                    <button type="button" @click="show = false; localStorage.setItem('cbar_dismissed', '{{ $cbarKey }}')" class="absolute right-3 opacity-70 hover:opacity-100 text-lg leading-none" aria-label="Dismiss">&times;</button>
+                </div>
+            </div>
+        @endif
+    @endauth
+
     {{-- Mini-cart slide-over --}}
     <div x-data x-show="$store.cart.drawer" x-cloak class="fixed inset-0 z-[60]" style="display:none">
         <div class="absolute inset-0 bg-black/40" @click="$store.cart.drawer=false" x-transition.opacity></div>

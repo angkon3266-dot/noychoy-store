@@ -30,9 +30,7 @@
             <h2 class="font-medium mb-1">Delivery address</h2>
             <p class="text-ink-700/70">{{ $order->customer_name }}, {{ $order->customer_phone }}<br>{{ $order->shipping_address }}{{ $order->area ? ', '.$order->area : '' }}{{ $order->district ? ', '.$order->district : '' }}</p>
         </div>
-        @if($order->shipment?->tracking_code)
-            <p class="mt-4 text-sm">Tracking: <strong>{{ $order->shipment->tracking_code }}</strong></p>
-        @endif
+        @include('shop._order-tracking', ['tracking' => $tracking])
     </div>
 </div>
 @endsection

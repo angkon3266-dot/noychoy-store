@@ -27,9 +27,7 @@
                 <h2 class="font-display text-xl font-semibold">{{ $order->order_number }}</h2>
                 <span class="badge bg-gold-100 text-gold-800 capitalize">{{ $order->status }}</span>
             </div>
-            @if($order->shipment?->tracking_code)
-                <p class="text-sm mt-2 text-ink-700/70">Courier tracking: <strong>{{ $order->shipment->tracking_code }}</strong> ({{ $order->shipment->status }})</p>
-            @endif
+            @include('shop._order-tracking', ['tracking' => $tracking])
 
             <ol class="mt-6 space-y-4 border-l-2 border-gold-200 pl-4">
                 @foreach($order->history as $h)
