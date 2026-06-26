@@ -58,7 +58,7 @@ class AccountController extends Controller
             return response()->json(['ok' => false, 'message' => 'You already earned share points this week.']);
         }
 
-        $points = (int) config('loyalty.share_points', 100);
+        $points = $loyalty->sharePoints();
         $loyalty->award($customer, $points, 'earn_share', 'Shared on '.$request->string('platform', 'social'));
 
         return response()->json([

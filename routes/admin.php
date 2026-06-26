@@ -65,6 +65,7 @@ Route::middleware('admin')->group(function () {
     Route::post('customers/{customer}/offers', [\App\Http\Controllers\Admin\CustomerController::class, 'storeOffer'])->name('customers.offers.store');
     Route::delete('customers/{customer}/offers/{offer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroyOffer'])->name('customers.offers.destroy');
     Route::post('customers/{customer}/points', [\App\Http\Controllers\Admin\CustomerController::class, 'adjustPoints'])->name('customers.points');
+    Route::post('customers/bulk-offer', [\App\Http\Controllers\Admin\CustomerController::class, 'bulkOffer'])->name('customers.bulk-offer');
 
     // Offers & promotions (auto-apply + PDP display)
     Route::get('offers', [\App\Http\Controllers\Admin\OfferController::class, 'index'])->name('offers.index');
@@ -72,6 +73,7 @@ Route::middleware('admin')->group(function () {
     Route::put('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'update'])->name('offers.update');
     Route::delete('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'destroy'])->name('offers.destroy');
     Route::post('offers/register-discount', [\App\Http\Controllers\Admin\OfferController::class, 'saveRegisterOffer'])->name('offers.register');
+    Route::post('offers/loyalty', [\App\Http\Controllers\Admin\OfferController::class, 'saveLoyalty'])->name('offers.loyalty');
 
     // Suppliers & purchase orders (sourcing / procurement)
     Route::get('suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'index'])->name('suppliers.index');
@@ -86,6 +88,8 @@ Route::middleware('admin')->group(function () {
     Route::get('purchase-orders/{purchaseOrder}/edit', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'edit'])->name('purchase-orders.edit');
     Route::put('purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
     Route::post('purchase-orders/{purchaseOrder}/status', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'updateStatus'])->name('purchase-orders.status');
+    Route::get('purchase-orders/{purchaseOrder}/export', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'export'])->name('purchase-orders.export');
+    Route::post('purchase-orders-fetch-image', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'fetchImage'])->name('purchase-orders.fetch-image');
     Route::delete('purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'destroy'])->name('purchase-orders.destroy');
 
     // Reviews (moderation)

@@ -41,14 +41,22 @@
 
             {{-- Rewards & offers (collapsible) --}}
             @if($loyaltyEnabled)
-                @php $msDone = collect($milestones)->where('done', true)->count(); $msTotal = count($milestones); @endphp
+                @php
+                    $msDone = collect($milestones)->where('done', true)->count();
+                    $msTotal = count($milestones);
+                    $L = app(\App\Services\LoyaltyService::class);
+                    $storeName = \App\Models\Setting::get('store_name', config('store.name'));
+                    $per1000 = (int) round($L->earnPerTaka() * 1000);
+                    $value100 = money($L->pointsValue(100));
+                @endphp
                 <div class="card mb-8 overflow-hidden" x-data="{
                         open: true, shareMsg: '', points: {{ $points }},
                         url: '{{ route('home') }}',
                         async share(platform) {
                             const u = encodeURIComponent(this.url);
-                            const t = encodeURIComponent('Shop handcrafted jewelry at {{ \App\Models\Setting::get('store_name', config('store.name')) }}');
+                            const t = encodeURIComponent('Shop handcrafted jewelry at {{ $storeName }}');
                             if (platform === 'facebook') window.open('https://www.facebook.com/sharer/sharer.php?u=' + u, '_blank', 'width=600,height=500');
+                            else if (platform === 'messenger') window.location.href = 'fb-messenger://share/?link=' + u;
                             else if (platform === 'whatsapp') window.open('https://wa.me/?text=' + t + '%20' + u, '_blank');
                             else if (platform === 'copy') { try { await navigator.clipboard.writeText(this.url); } catch (e) {} }
                             try {
@@ -68,7 +76,7 @@
                             <span class="text-2xl">🎁</span>
                             <span>
                                 <span class="block font-semibold">Rewards &amp; offers</span>
-                                <span class="block text-xs text-ink-700/60"><span x-text="points"></span> points · {{ money($pointsValue) }} value</span>
+                                <span class="block text-xs text-ink-700/60"><span x-text="points"></span> points · {{ money($L->pointsValue($points)) }} value</span>
                             </span>
                         </span>
                         <svg class="w-5 h-5 text-ink-700/50 transition" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
@@ -80,9 +88,16 @@
                             <div class="rounded-xl bg-gold-50 border border-gold-200 p-4 flex items-center justify-between flex-wrap gap-3">
                                 <div>
                                     <div class="text-3xl font-semibold text-gold-700"><span x-text="points"></span> <span class="text-base font-normal">points</span></div>
-                                    <div class="text-xs text-ink-700/60">Worth {{ money($pointsValue) }} — redeem at checkout (100 points = {{ money(app(\App\Services\LoyaltyService::class)->pointsValue(100)) }})</div>
+                                    <div class="text-xs text-ink-700/60">Worth <strong>{{ money($L->pointsValue($points)) }}</strong> — 100 points = {{ $value100 }} to redeem at checkout</div>
                                 </div>
                                 <a href="{{ route('shop') }}" class="btn-primary text-sm py-2">Shop &amp; earn more</a>
+                            </div>
+
+                            {{-- How to earn (encourages bigger orders) --}}
+                            <div class="rounded-lg bg-ink-50 border border-ink-100 p-3 text-xs text-ink-700/80 space-y-1">
+                                <p>🛍️ Earn <strong>{{ $per1000 }} points</strong> for every <strong>৳1000</strong> you spend — added once your order is <strong>delivered</strong>. The more you buy, the more you save!</p>
+                                <p>⭐ Write a review: <strong>+{{ $L->reviewPoints() }} points</strong> · 📣 Share with friends: <strong>+{{ $L->sharePoints() }} points</strong> (once a week)</p>
+                                <p>💰 <strong>100 points = {{ $value100 }}</strong> — use them to cut your bill at checkout.</p>
                             </div>
 
                             {{-- Personalised offers --}}
@@ -129,10 +144,14 @@
 
                                 {{-- Share to earn --}}
                                 <div class="mt-4 rounded-lg bg-ink-50 p-3">
-                                    <p class="text-xs text-ink-700/70 mb-2">Share Noychoy on social media to earn <strong>+{{ config('loyalty.share_points', 100) }} points</strong> (once a week):</p>
+                                    <p class="text-xs text-ink-700/70 mb-2">Share {{ $storeName }} to friends to earn <strong>+{{ $L->sharePoints() }} points</strong> (once a week):</p>
                                     <div class="flex items-center gap-2 flex-wrap">
-                                        <button type="button" @click="share('facebook')" class="btn-outline text-xs py-1.5 px-3">Facebook</button>
+                                        <button type="button" @click="share('messenger')" class="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.27 2 2 6.2 2 11.7c0 2.88 1.18 5.37 3.1 7.1.16.14.26.34.27.56l.05 1.75c.02.56.6.92 1.11.7l1.95-.86c.17-.07.36-.09.54-.04 1.25.34 2.58.5 3.88.5 5.73 0 10-4.2 10-9.7C22 6.2 17.73 2 12 2zm6 7.46l-2.93 4.65c-.47.74-1.47.93-2.18.4l-2.33-1.75a.6.6 0 00-.72 0l-3.14 2.39c-.42.32-.97-.18-.69-.63l2.93-4.65c.47-.74 1.47-.93 2.18-.4l2.33 1.75c.21.16.51.16.72 0l3.14-2.38c.42-.32.97.18.69.62z"/></svg>
+                                            Messenger
+                                        </button>
                                         <button type="button" @click="share('whatsapp')" class="btn-outline text-xs py-1.5 px-3">WhatsApp</button>
+                                        <button type="button" @click="share('facebook')" class="btn-outline text-xs py-1.5 px-3">Facebook</button>
                                         <button type="button" @click="share('copy')" class="btn-outline text-xs py-1.5 px-3">Copy link</button>
                                         <span class="text-xs text-green-700" x-text="shareMsg"></span>
                                     </div>

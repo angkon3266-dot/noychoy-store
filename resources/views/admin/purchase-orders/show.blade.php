@@ -15,7 +15,8 @@
             @endforeach
         </select>
     </form>
-    <a href="{{ route('admin.purchase-orders.edit', $order) }}" class="btn-outline text-sm py-1.5 ml-auto">Edit</a>
+    <a href="{{ route('admin.purchase-orders.export', $order) }}" class="btn-outline text-sm py-1.5 ml-auto">⬇ Export Excel</a>
+    <a href="{{ route('admin.purchase-orders.edit', $order) }}" class="btn-outline text-sm py-1.5">Edit</a>
     <form action="{{ route('admin.purchase-orders.destroy', $order) }}" method="POST" onsubmit="return confirm('Delete this purchase order?')">
         @csrf @method('DELETE')
         <button class="btn-outline text-sm py-1.5 text-red-600">Delete</button>
@@ -32,13 +33,21 @@
                 @forelse($order->items as $it)
                     <tr>
                         <td class="px-4 py-3">
-                            <div class="font-medium">
-                                @if($it->product_link)<a href="{{ $it->product_link }}" target="_blank" rel="noopener" class="text-gold-700 hover:underline">{{ $it->product_name }}</a>@else{{ $it->product_name }}@endif
-                            </div>
-                            <div class="text-xs text-ink-700/50">
-                                @if($it->sku){{ $it->sku }} · @endif
-                                @if($it->color){{ $it->color }} @endif
-                                @if($it->size)/ {{ $it->size }}@endif
+                            <div class="flex items-start gap-2">
+                                @if($it->image_url)<img src="{{ $it->image_url }}" alt="" class="w-9 h-9 rounded object-cover shrink-0">@endif
+                                <div class="min-w-0">
+                                    <div class="font-medium">
+                                        @if($it->product_link)<a href="{{ $it->product_link }}" target="_blank" rel="noopener" class="text-gold-700 hover:underline">{{ $it->product_name }}</a>@else{{ $it->product_name }}@endif
+                                    </div>
+                                    @if($it->sku)<div class="text-xs text-ink-700/50">{{ $it->sku }}</div>@endif
+                                    @if($it->variants)
+                                        <ul class="text-xs text-ink-700/60 mt-0.5">
+                                            @foreach($it->variants as $v)
+                                                <li>{{ collect($v['attrs'] ?? [])->map(fn ($val, $k) => "$k: $val")->implode(', ') }} — ×{{ $v['qty'] ?? 0 }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                </div>
                             </div>
                         </td>
                         <td class="px-4 py-3">{{ $it->qty }}</td>

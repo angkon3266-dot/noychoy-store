@@ -44,8 +44,10 @@ class OrderController extends Controller
             ->groupBy('product_id', 'name')
             ->orderByDesc('qty')
             ->get();
-        $processingSerials = Product::whereIn('id', $processingItems->pluck('product_id')->filter())
-            ->pluck('serial', 'id');
+        $processingProducts = Product::whereIn('id', $processingItems->pluck('product_id')->filter())
+            ->with('images')->get();
+        $processingSerials = $processingProducts->pluck('serial', 'id');
+        $processingImages = $processingProducts->mapWithKeys(fn ($p) => [$p->id => $p->thumbnail]);
 
         return view('admin.orders.index', [
             'orders' => $orders,
@@ -53,6 +55,7 @@ class OrderController extends Controller
             'orderCounts' => $orderCounts,
             'processingItems' => $processingItems,
             'processingSerials' => $processingSerials,
+            'processingImages' => $processingImages,
         ]);
     }
 

@@ -140,6 +140,41 @@ class CustomerController extends Controller
         return back()->with('success', 'Offer removed.');
     }
 
+    /** Assign one personalised offer to many selected customers at once. */
+    public function bulkOffer(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:customers,id'],
+            'title' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'type' => ['required', 'in:'.implode(',', array_keys(\App\Models\CustomerOffer::TYPES))],
+            'value' => ['nullable', 'numeric', 'min:0'],
+            'code' => ['nullable', 'string', 'max:40'],
+            'expires_at' => ['nullable', 'date'],
+        ]);
+
+        $loyalty = app(\App\Services\LoyaltyService::class);
+        $customers = Customer::whereIn('id', $data['ids'])->get();
+
+        foreach ($customers as $customer) {
+            $offer = $customer->offers()->create([
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'type' => $data['type'],
+                'value' => $data['value'] ?? 0,
+                'code' => $data['code'] ?? null,
+                'expires_at' => $data['expires_at'] ?? null,
+                'is_active' => true,
+            ]);
+            if ($offer->type === 'points' && (int) $offer->value > 0) {
+                $loyalty->award($customer, (int) $offer->value, 'adjust', 'Bonus: '.$offer->title, $offer);
+            }
+        }
+
+        return back()->with('success', 'Offer applied to '.$customers->count().' customer(s).');
+    }
+
     /** Manually add or subtract loyalty points. */
     public function adjustPoints(Request $request, Customer $customer)
     {

@@ -24,18 +24,47 @@ class LoyaltyService
         return (bool) Setting::get('loyalty_enabled', config('loyalty.enabled', true));
     }
 
+    // ── Admin-configurable rates (Setting override → config default) ─────────
+
+    /** Points earned per taka spent. */
+    public function earnPerTaka(): float
+    {
+        return (float) Setting::get('loyalty_earn_per_taka', config('loyalty.earn_per_taka', 0.1));
+    }
+
+    /** Taka value of one point. */
+    public function redeemValue(): float
+    {
+        return (float) Setting::get('loyalty_redeem_value', config('loyalty.redeem_value', 0.05));
+    }
+
+    public function reviewPoints(): int
+    {
+        return (int) Setting::get('loyalty_review_points', config('loyalty.review_points', 200));
+    }
+
+    public function sharePoints(): int
+    {
+        return (int) Setting::get('loyalty_share_points', config('loyalty.share_points', 100));
+    }
+
+    public function signupPoints(): int
+    {
+        return (int) Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0));
+    }
+
     // ── Conversions ─────────────────────────────────────────────────────────
 
     /** Points earned for spending an amount of money. */
     public function pointsForSpend(float $amount): int
     {
-        return (int) floor(max(0, $amount) * (float) config('loyalty.earn_per_taka', 0.1));
+        return (int) floor(max(0, $amount) * $this->earnPerTaka());
     }
 
     /** Taka value of a number of points. */
     public function pointsValue(int $points): float
     {
-        return round(max(0, $points) * (float) config('loyalty.redeem_value', 0.05), 2);
+        return round(max(0, $points) * $this->redeemValue(), 2);
     }
 
     public function redeemStep(): int

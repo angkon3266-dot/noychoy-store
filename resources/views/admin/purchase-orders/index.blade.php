@@ -26,8 +26,8 @@
     <a href="{{ route('admin.purchase-orders.create') }}" class="btn-primary ml-auto">+ New purchase order</a>
 </form>
 
-<div class="card overflow-hidden">
-    <table class="w-full text-sm">
+<div class="card overflow-x-auto">
+    <table class="w-full min-w-[720px] text-sm">
         <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
             <tr><th class="px-4 py-3">PO #</th><th class="px-4 py-3">Supplier</th><th class="px-4 py-3">Items</th><th class="px-4 py-3">Total</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Ordered</th><th class="px-4 py-3">Expected</th></tr>
         </thead>

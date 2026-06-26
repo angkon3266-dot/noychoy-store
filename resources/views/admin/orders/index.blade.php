@@ -48,8 +48,8 @@
 
     <div class="grid xl:grid-cols-[1fr_320px] gap-6 items-start">
     <div class="min-w-0">
-    <div class="card overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="card overflow-x-auto">
+        <table class="w-full min-w-[640px] text-sm">
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
                 <tr>
                     <th class="px-3 py-3 w-8"><input type="checkbox" :checked="allChecked" @change="toggleAll($event)"></th>
@@ -105,8 +105,13 @@
         </div>
         <p class="text-xs text-ink-700/50 mb-3">Items across all orders currently in <strong>Processing</strong>.</p>
         @forelse($processingItems as $it)
-            <div class="flex items-start justify-between gap-2 py-2 border-b border-ink-50 last:border-0 text-sm">
-                <div class="min-w-0">
+            <div class="flex items-start gap-2.5 py-2 border-b border-ink-50 last:border-0 text-sm">
+                <span class="w-10 h-10 rounded-md bg-ink-100 overflow-hidden shrink-0">
+                    @if($it->product_id && ($processingImages[$it->product_id] ?? null))
+                        <img src="{{ $processingImages[$it->product_id] }}" alt="" class="w-full h-full object-cover" loading="lazy">
+                    @endif
+                </span>
+                <div class="min-w-0 flex-1">
                     <div class="truncate">{{ $it->name }}</div>
                     <div class="text-[11px] text-ink-700/45">
                         @if($it->product_id)ID #{{ $processingSerials[$it->product_id] ?? $it->product_id }}@else (deleted) @endif

@@ -42,7 +42,7 @@ class ReviewController extends Controller
         if ($data['status'] === 'approved' && $review->customer_id) {
             $loyalty = app(\App\Services\LoyaltyService::class);
             if ($loyalty->enabled() && ($customer = $review->customer)) {
-                $loyalty->award($customer, (int) config('loyalty.review_points', 100), 'earn_review', 'Approved review', $review);
+                $loyalty->award($customer, $loyalty->reviewPoints(), 'earn_review', 'Approved review', $review);
             }
         }
 

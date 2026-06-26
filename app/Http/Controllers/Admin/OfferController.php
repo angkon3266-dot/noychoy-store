@@ -21,7 +21,36 @@ class OfferController extends Controller
                 'percent' => \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3)),
                 'text' => \App\Models\Setting::get('register_offer_text', 'Get an extra discount plus loyalty points on every order.'),
             ],
+            'loyalty' => [
+                'enabled' => (bool) \App\Models\Setting::get('loyalty_enabled', config('loyalty.enabled', true)),
+                'per_1000' => round(((float) \App\Models\Setting::get('loyalty_earn_per_taka', config('loyalty.earn_per_taka', 0.1))) * 1000),
+                'value_per_100' => round(((float) \App\Models\Setting::get('loyalty_redeem_value', config('loyalty.redeem_value', 0.05))) * 100, 2),
+                'review' => (int) \App\Models\Setting::get('loyalty_review_points', config('loyalty.review_points', 200)),
+                'share' => (int) \App\Models\Setting::get('loyalty_share_points', config('loyalty.share_points', 100)),
+                'signup' => (int) \App\Models\Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0)),
+            ],
         ]);
+    }
+
+    /** Save the loyalty/points configuration. */
+    public function saveLoyalty(Request $request)
+    {
+        $data = $request->validate([
+            'per_1000' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'value_per_100' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'review' => ['required', 'integer', 'min:0', 'max:100000'],
+            'share' => ['required', 'integer', 'min:0', 'max:100000'],
+            'signup' => ['required', 'integer', 'min:0', 'max:100000'],
+        ]);
+
+        \App\Models\Setting::put('loyalty_enabled', $request->boolean('enabled'));
+        \App\Models\Setting::put('loyalty_earn_per_taka', (float) $data['per_1000'] / 1000);
+        \App\Models\Setting::put('loyalty_redeem_value', (float) $data['value_per_100'] / 100);
+        \App\Models\Setting::put('loyalty_review_points', (int) $data['review']);
+        \App\Models\Setting::put('loyalty_share_points', (int) $data['share']);
+        \App\Models\Setting::put('loyalty_signup_points', (int) $data['signup']);
+
+        return back()->with('success', 'Loyalty settings saved.');
     }
 
     /** Save the "register for an extra discount" offer (shown to guests, applied to members). */

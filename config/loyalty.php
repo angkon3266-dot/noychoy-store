@@ -12,9 +12,9 @@ return [
     'redeem_step' => 100,   // redeem in multiples of this
     'min_redeem' => 100,    // minimum points that can be redeemed at once
 
-    // Action rewards.
-    'review_points' => 100,   // approved review
-    'share_points' => 100,    // share a product/page on social (once per product per week)
+    // Action rewards (all overridable from Admin → Offers → Loyalty & points).
+    'review_points' => 200,   // approved review
+    'share_points' => 100,    // share on social (once per week)
     'signup_points' => 0,     // welcome bonus on registration
 
     // Weekly milestones — reset every week (Mon–Sun). Customers see a progress bar.

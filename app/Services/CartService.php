@@ -293,7 +293,9 @@ class CartService
         }
 
         if ($this->memberSignupDiscount() > 0) {
-            $lines[] = ['label' => 'Member discount', 'amount' => round($this->memberSignupDiscount(), 2)];
+            $pct = (float) Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 0));
+            $label = 'Member discount'.($pct > 0 ? ' ('.rtrim(rtrim(number_format($pct, 2), '0'), '.').'% off)' : '');
+            $lines[] = ['label' => $label, 'amount' => round($this->memberSignupDiscount(), 2)];
         }
 
         if (($coupon = $this->coupon()) && $this->couponDiscount() > 0) {

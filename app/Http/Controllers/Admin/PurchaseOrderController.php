@@ -90,14 +90,24 @@ class PurchaseOrderController extends Controller
             'sku' => $i->sku,
             'qty' => $i->qty,
             'unit_cost' => (float) $i->unit_cost,
+            'target_price' => $i->target_price !== null ? (float) $i->target_price : null,
             'received_qty' => $i->received_qty,
             'product_link' => $i->product_link,
             'image_url' => $i->image_url,
-            'color' => $i->color,
-            'size' => $i->size,
+            'attribute_names' => $i->attribute_names ?: [],
+            'variants' => $i->variants ?: [],
         ])->all() : [];
 
-        return $items ?: [['product_name' => '', 'sku' => '', 'qty' => 1, 'unit_cost' => 0, 'color' => '', 'size' => '', 'product_link' => '', 'image_url' => '', 'received_qty' => 0]];
+        return $items ?: [$this->blankItem()];
+    }
+
+    protected function blankItem(): array
+    {
+        return [
+            'product_name' => '', 'sku' => '', 'qty' => 0, 'unit_cost' => 0, 'target_price' => null,
+            'received_qty' => 0, 'product_link' => '', 'image_url' => '',
+            'attribute_names' => [], 'variants' => [['attrs' => [], 'qty' => 1]],
+        ];
     }
 
     public function update(Request $request, PurchaseOrder $purchaseOrder)
@@ -149,22 +159,34 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    /** Replace the PO's line items from the submitted rows. */
+    /** Replace the PO's line items from the submitted rows (variant-aware). */
     protected function syncItems(PurchaseOrder $po, Request $request): void
     {
         $rows = collect($request->input('items', []))
-            ->map(fn ($r) => [
-                'product_id' => $r['product_id'] ?? null,
-                'product_name' => trim((string) ($r['product_name'] ?? '')),
-                'sku' => trim((string) ($r['sku'] ?? '')) ?: null,
-                'qty' => max(0, (int) ($r['qty'] ?? 0)),
-                'unit_cost' => (float) ($r['unit_cost'] ?? 0),
-                'received_qty' => max(0, (int) ($r['received_qty'] ?? 0)),
-                'product_link' => trim((string) ($r['product_link'] ?? '')) ?: null,
-                'image_url' => trim((string) ($r['image_url'] ?? '')) ?: null,
-                'color' => trim((string) ($r['color'] ?? '')) ?: null,
-                'size' => trim((string) ($r['size'] ?? '')) ?: null,
-            ])
+            ->map(function ($r) {
+                $attrNames = array_values(array_filter(array_map('trim', (array) (json_decode((string) ($r['attribute_names_json'] ?? '[]'), true) ?: []))));
+                $variants = collect(json_decode((string) ($r['variants_json'] ?? '[]'), true) ?: [])
+                    ->map(fn ($v) => ['attrs' => (array) ($v['attrs'] ?? []), 'qty' => max(0, (int) ($v['qty'] ?? 0))])
+                    ->filter(fn ($v) => $v['qty'] > 0)
+                    ->values()->all();
+
+                // Total qty = sum of variant qtys, or the plain qty field when no variants.
+                $qty = $variants ? array_sum(array_column($variants, 'qty')) : max(0, (int) ($r['qty'] ?? 0));
+
+                return [
+                    'product_id' => $r['product_id'] ?? null,
+                    'product_name' => trim((string) ($r['product_name'] ?? '')),
+                    'sku' => trim((string) ($r['sku'] ?? '')) ?: null,
+                    'qty' => $qty,
+                    'unit_cost' => (float) ($r['unit_cost'] ?? 0),
+                    'target_price' => ($r['target_price'] ?? '') !== '' ? (float) $r['target_price'] : null,
+                    'received_qty' => max(0, (int) ($r['received_qty'] ?? 0)),
+                    'product_link' => trim((string) ($r['product_link'] ?? '')) ?: null,
+                    'image_url' => trim((string) ($r['image_url'] ?? '')) ?: null,
+                    'attribute_names' => $attrNames ?: null,
+                    'variants' => $variants ?: null,
+                ];
+            })
             ->filter(fn ($r) => $r['product_name'] !== '' && $r['qty'] > 0)
             ->values();
 
@@ -172,5 +194,57 @@ class PurchaseOrderController extends Controller
         foreach ($rows as $row) {
             $po->items()->create($row);
         }
+    }
+
+    /** Fetch a product image (og:image) from a supplier URL for the form preview. */
+    public function fetchImage(Request $request)
+    {
+        $url = $request->input('url');
+        if (! $url || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return response()->json(['ok' => false]);
+        }
+
+        try {
+            $html = \Illuminate\Support\Facades\Http::timeout(8)
+                ->withHeaders(['User-Agent' => 'Mozilla/5.0'])->get($url)->body();
+            if (preg_match('/<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $m)
+                || preg_match('/<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']/i', $html, $m)) {
+                return response()->json(['ok' => true, 'image' => $m[1]]);
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        return response()->json(['ok' => false]);
+    }
+
+    /** Export a purchase order's items to an Excel-friendly CSV. */
+    public function export(PurchaseOrder $purchaseOrder)
+    {
+        $purchaseOrder->load('supplier', 'items');
+        $filename = $purchaseOrder->po_number.'.csv';
+
+        return response()->streamDownload(function () use ($purchaseOrder) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['PO', $purchaseOrder->po_number, 'Supplier', $purchaseOrder->supplier->name ?? '']);
+            fputcsv($out, []);
+            fputcsv($out, ['Product', 'SKU', 'Variant', 'Qty', 'Unit cost ('.$purchaseOrder->currency.')', 'Line total', 'Product link']);
+            foreach ($purchaseOrder->items as $it) {
+                if ($it->variants) {
+                    foreach ($it->variants as $v) {
+                        $variant = collect($v['attrs'] ?? [])->map(fn ($val, $k) => "$k: $val")->implode(', ');
+                        fputcsv($out, [$it->product_name, $it->sku, $variant, $v['qty'] ?? 0, $it->unit_cost, ($v['qty'] ?? 0) * (float) $it->unit_cost, $it->product_link]);
+                    }
+                } else {
+                    fputcsv($out, [$it->product_name, $it->sku, '', $it->qty, $it->unit_cost, $it->lineTotal(), $it->product_link]);
+                }
+            }
+            fputcsv($out, []);
+            fputcsv($out, ['', '', '', '', 'Items', $purchaseOrder->itemsSubtotal()]);
+            fputcsv($out, ['', '', '', '', 'Courier', $purchaseOrder->courier_cost]);
+            fputcsv($out, ['', '', '', '', 'Total', $purchaseOrder->total_cost]);
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

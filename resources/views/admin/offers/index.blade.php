@@ -29,6 +29,39 @@
     </form>
 </div>
 
+{{-- Loyalty & points configuration --}}
+<div class="card p-5 mb-6 max-w-3xl">
+    <h2 class="font-semibold mb-1">Loyalty &amp; points</h2>
+    <p class="text-xs text-ink-700/60 mb-3">Control how customers earn and spend points. Points are credited <strong>after an order is delivered</strong>.</p>
+    <form action="{{ route('admin.offers.loyalty') }}" method="POST">
+        @csrf
+        <label class="flex items-center gap-2 text-sm mb-3"><input type="checkbox" name="enabled" value="1" @checked($loyalty['enabled'])> Enable the points / rewards program</label>
+        <div class="grid sm:grid-cols-3 gap-3">
+            <div>
+                <label class="label">Points per ৳1000 spent</label>
+                <input name="per_1000" type="number" step="1" min="0" value="{{ $loyalty['per_1000'] }}" class="input">
+            </div>
+            <div>
+                <label class="label">৳ value of 100 points</label>
+                <input name="value_per_100" type="number" step="0.01" min="0" value="{{ $loyalty['value_per_100'] }}" class="input">
+            </div>
+            <div>
+                <label class="label">Points for a review</label>
+                <input name="review" type="number" step="1" min="0" value="{{ $loyalty['review'] }}" class="input">
+            </div>
+            <div>
+                <label class="label">Points for a social share</label>
+                <input name="share" type="number" step="1" min="0" value="{{ $loyalty['share'] }}" class="input">
+            </div>
+            <div>
+                <label class="label">Welcome bonus (signup)</label>
+                <input name="signup" type="number" step="1" min="0" value="{{ $loyalty['signup'] }}" class="input">
+            </div>
+        </div>
+        <button class="btn-primary mt-3">Save loyalty settings</button>
+    </form>
+</div>
+
 <div class="grid lg:grid-cols-3 gap-6">
     {{-- Form --}}
     <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}', applies: '{{ old('applies_to', $editing->applies_to ?? 'all') }}', catQ: '' }">
@@ -92,8 +125,8 @@
     </div>
 
     {{-- List --}}
-    <div class="lg:col-span-2 card overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="lg:col-span-2 card overflow-x-auto">
+        <table class="w-full min-w-[640px] text-sm">
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
                 <tr><th class="px-4 py-3">Offer</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Conditions</th><th class="px-4 py-3">On PDP</th><th class="px-4 py-3">Active</th><th></th></tr>
             </thead>

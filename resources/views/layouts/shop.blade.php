@@ -312,8 +312,11 @@
             </div>
             @endif
 
-            {{-- Mobile navigation — left slide-in drawer --}}
-            <div x-show="open" x-cloak class="md:hidden fixed inset-0 z-[55]" style="display:none">
+            {{-- Mobile navigation — left slide-in drawer. Teleported to <body> because the
+                 header's backdrop-filter creates a containing block that would otherwise trap
+                 this fixed overlay inside the 64px-tall header. --}}
+            <template x-teleport="body">
+            <div x-show="open" x-cloak class="md:hidden fixed inset-0 z-[60]" style="display:none">
                 <div class="absolute inset-0 bg-black/30" @click="open=false" x-transition.opacity></div>
                 <div class="absolute left-0 top-0 h-full w-[82%] max-w-[320px] bg-gold-50 shadow-2xl flex flex-col"
                      x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
@@ -363,6 +366,7 @@
                     </div>
                 </div>
             </div>
+            </template>
         </div>
     </header>
 

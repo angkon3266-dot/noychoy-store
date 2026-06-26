@@ -94,6 +94,15 @@
                 <div class="flex justify-between"><dt class="text-ink-700/70">Shipping</dt><dd>৳<span x-text="ship"></span></dd></div>
                 <div class="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>৳<span x-text="total.toLocaleString()"></span></dd></div>
             </dl>
+
+            {{-- Total savings summary (criteria fulfilled → % + value) --}}
+            @if($cart->discount() > 0)
+                @php $savePct = $cart->subtotal() > 0 ? round($cart->discount() / $cart->subtotal() * 100) : 0; @endphp
+                <div class="mt-3 rounded-md bg-green-50 border border-green-200 text-green-800 px-3 py-2 text-sm font-medium">
+                    🎉 You're saving {{ money($cart->discount()) }}@if($savePct > 0) ({{ $savePct }}% off){{-- --}}@endif
+                </div>
+            @endif
+
             @foreach($cart->offerHints() as $hint)
                 <div class="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {{ $hint }}</div>
             @endforeach

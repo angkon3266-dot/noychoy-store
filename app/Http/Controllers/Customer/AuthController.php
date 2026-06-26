@@ -59,6 +59,12 @@ class AuthController extends Controller
             'password' => $data['password'],
         ]);
 
+        // Welcome loyalty bonus (Admin → Offers → Loyalty & points).
+        $loyalty = app(\App\Services\LoyaltyService::class);
+        if ($loyalty->enabled() && $loyalty->signupPoints() > 0) {
+            $loyalty->award($customer, $loyalty->signupPoints(), 'signup', 'Welcome bonus');
+        }
+
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
 
