@@ -318,9 +318,9 @@
                  header's backdrop-filter creates a containing block that would otherwise trap
                  this fixed overlay inside the 64px-tall header. --}}
             <template x-teleport="body">
-            <div x-show="open" x-cloak class="md:hidden fixed inset-0 z-[60]" style="display:none">
-                <div class="absolute inset-0 bg-black/30" @click="open=false" x-transition.opacity></div>
-                <div class="absolute left-0 top-0 h-full w-[82%] max-w-[320px] bg-gold-50 shadow-2xl flex flex-col"
+            <div x-show="open" x-cloak class="md:hidden" style="display:none; position:fixed; inset:0; z-index:60;">
+                <div class="bg-black/30" style="position:absolute; inset:0; background:rgba(0,0,0,.35);" @click="open=false" x-transition.opacity></div>
+                <div class="bg-gold-50 shadow-2xl flex flex-col" style="position:absolute; left:0; top:0; height:100%; width:82%; max-width:320px;"
                      x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
                      x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full">
                     <div class="flex items-center justify-between px-4 py-3 border-b border-gold-200">
@@ -402,9 +402,9 @@
     @endauth
 
     {{-- Mini-cart slide-over --}}
-    <div x-data x-show="$store.cart.drawer" x-cloak class="fixed inset-0 z-[60]" style="display:none">
-        <div class="absolute inset-0 bg-black/25" @click="$store.cart.drawer=false" x-transition.opacity></div>
-        <div class="absolute right-0 top-0 h-full w-[82%] max-w-[340px] bg-white shadow-2xl flex flex-col"
+    <div x-data x-show="$store.cart.drawer" x-cloak style="display:none; position:fixed; inset:0; z-index:60;">
+        <div class="bg-black/25" style="position:absolute; inset:0; background:rgba(0,0,0,.25);" @click="$store.cart.drawer=false" x-transition.opacity></div>
+        <div class="bg-white shadow-2xl flex flex-col" style="position:absolute; right:0; top:0; height:100%; width:82%; max-width:340px;"
              x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
             <div class="flex items-center justify-between px-5 py-4 border-b border-ink-100">

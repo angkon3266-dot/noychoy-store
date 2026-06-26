@@ -75,6 +75,11 @@ Route::middleware('admin')->group(function () {
     Route::post('offers/register-discount', [\App\Http\Controllers\Admin\OfferController::class, 'saveRegisterOffer'])->name('offers.register');
     Route::post('offers/loyalty', [\App\Http\Controllers\Admin\OfferController::class, 'saveLoyalty'])->name('offers.loyalty');
 
+    // Media library (browse / optimize / delete uploaded images & videos)
+    Route::get('media', [\App\Http\Controllers\Admin\MediaController::class, 'index'])->name('media.index');
+    Route::post('media/optimize', [\App\Http\Controllers\Admin\MediaController::class, 'optimize'])->name('media.optimize');
+    Route::delete('media', [\App\Http\Controllers\Admin\MediaController::class, 'destroy'])->name('media.destroy');
+
     // Suppliers & purchase orders (sourcing / procurement)
     Route::get('suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'index'])->name('suppliers.index');
     Route::post('suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'store'])->name('suppliers.store');

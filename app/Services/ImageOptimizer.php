@@ -99,6 +99,58 @@ class ImageOptimizer
         }
     }
 
+    /**
+     * Re-encode an existing public-disk image in place (same path/format) at a
+     * smaller width and/or lower quality to shrink its file size. Keeps the path
+     * so DB references (product images, branding, etc.) stay valid.
+     *
+     * @return array{old_size:int,new_size:int,width:int,height:int}|null
+     */
+    public function optimizeExisting(string $relativePath, int $maxWidth = 1600, int $quality = 80): ?array
+    {
+        $disk = Storage::disk('public');
+        $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        if (! $disk->exists($relativePath) || ! $this->canConvert() || ! in_array($ext, ['webp', 'jpg', 'jpeg', 'png'], true)) {
+            return null;
+        }
+
+        try {
+            $binary = $disk->get($relativePath);
+            $oldSize = strlen((string) $binary);
+
+            $src = @imagecreatefromstring($binary);
+            if ($src === false) {
+                return null;
+            }
+
+            $src = $this->downscale($src, $maxWidth);
+            imagepalettetotruecolor($src);
+            imagealphablending($src, true);
+            imagesavealpha($src, true);
+            $w = imagesx($src);
+            $h = imagesy($src);
+
+            ob_start();
+            if ($ext === 'png') {
+                imagepng($src, null, 6);
+            } elseif ($ext === 'webp') {
+                imagewebp($src, null, $quality);
+            } else {
+                imagejpeg($src, null, $quality);
+            }
+            $out = ob_get_clean();
+            imagedestroy($src);
+
+            $disk->put($relativePath, $out);
+
+            return ['old_size' => $oldSize, 'new_size' => strlen($out), 'width' => $w, 'height' => $h];
+        } catch (\Throwable $e) {
+            Log::warning('optimizeExisting failed', ['path' => $relativePath, 'error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
     protected function canConvert(): bool
     {
         return function_exists('imagewebp') && function_exists('imagecreatefromstring');
