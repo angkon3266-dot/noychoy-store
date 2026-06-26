@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use App\Services\CustomerInsight;
 use App\Services\SmsService;
 use App\Services\SteadfastService;
@@ -35,10 +37,22 @@ class OrderController extends Controller
             ->groupBy('customer_phone')
             ->pluck('c', 'customer_phone');
 
+        // Fulfilment queue: products inside "processing" orders (qty to prepare + product ID/serial).
+        $processingItems = OrderItem::query()
+            ->whereHas('order', fn ($q) => $q->where('status', 'processing'))
+            ->select('product_id', 'name', DB::raw('SUM(quantity) as qty'), DB::raw('COUNT(DISTINCT order_id) as orders'))
+            ->groupBy('product_id', 'name')
+            ->orderByDesc('qty')
+            ->get();
+        $processingSerials = Product::whereIn('id', $processingItems->pluck('product_id')->filter())
+            ->pluck('serial', 'id');
+
         return view('admin.orders.index', [
             'orders' => $orders,
             'statuses' => Order::STATUSES,
             'orderCounts' => $orderCounts,
+            'processingItems' => $processingItems,
+            'processingSerials' => $processingSerials,
         ]);
     }
 

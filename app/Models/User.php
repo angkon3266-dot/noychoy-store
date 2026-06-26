@@ -32,7 +32,7 @@ class User extends Authenticatable
     public static function sectionsFor(string $role): array
     {
         return match ($role) {
-            'manager' => ['dashboard', 'products', 'categories', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'customers', 'menu', 'profile'],
+            'manager' => ['dashboard', 'products', 'categories', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'customers', 'suppliers', 'purchase-orders', 'menu', 'profile'],
             'staff' => ['dashboard', 'orders', 'profile'],
             default => ['*'], // admin
         };

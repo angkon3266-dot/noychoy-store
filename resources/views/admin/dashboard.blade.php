@@ -67,6 +67,24 @@
         @endforelse
     </div>
 
+    {{-- Best-selling categories --}}
+    <div class="card p-5">
+        <h2 class="font-semibold mb-3">Best-selling categories · 30 days</h2>
+        @forelse($topCategories as $cat)
+            <div class="py-1.5">
+                <div class="flex items-center justify-between text-sm mb-1">
+                    <span class="truncate pr-3">{{ $cat->name }}</span>
+                    <span class="shrink-0 text-ink-700/60">{{ $cat->qty }} sold · {{ money($cat->revenue) }}</span>
+                </div>
+                <div class="h-1.5 rounded-full bg-ink-100 overflow-hidden"><div class="h-full bg-gold-500" style="width: {{ round($cat->qty / $catMax * 100) }}%"></div></div>
+            </div>
+        @empty
+            <p class="text-sm text-ink-700/50">No category sales in the last 30 days yet.</p>
+        @endforelse
+    </div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6 mt-6">
     {{-- Low stock --}}
     <div class="card p-5">
         <h2 class="font-semibold mb-3">Low stock alerts</h2>
@@ -77,6 +95,22 @@
             </div>
         @empty
             <p class="text-sm text-ink-700/50">Everything's well stocked. 🎉</p>
+        @endforelse
+    </div>
+
+    {{-- Most valuable customers --}}
+    <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">Top customers</h2>
+            <span class="text-xs text-ink-700/50">Points liability: {{ money($pointsLiability) }} ({{ number_format($pointsOutstanding) }} pts)</span>
+        </div>
+        @forelse($topCustomers as $c)
+            <div class="flex items-center justify-between py-2 border-b border-ink-50 last:border-0 text-sm">
+                <a href="{{ route('admin.customers.show', $c) }}" class="text-gold-700 hover:underline truncate pr-3">{{ $c->name }} <span class="text-ink-700/40">· {{ $c->total_orders }} orders</span></a>
+                <span class="shrink-0 text-ink-700/60">{{ money($c->total_spent) }}</span>
+            </div>
+        @empty
+            <p class="text-sm text-ink-700/50">No customer sales yet.</p>
         @endforelse
     </div>
 </div>

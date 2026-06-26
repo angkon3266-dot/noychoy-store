@@ -67,6 +67,24 @@ class DashboardController extends Controller
             ->select('name', DB::raw('SUM(quantity) as qty'), DB::raw('SUM(subtotal) as revenue'))
             ->groupBy('name')->orderByDesc('qty')->take(5)->get();
 
+        // Best-selling categories (last 30 days, by units sold).
+        $topCategories = OrderItem::query()
+            ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['cancelled', 'returned'])->where('created_at', '>=', $last30))
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
+            ->select('categories.name', DB::raw('SUM(order_items.quantity) as qty'), DB::raw('SUM(order_items.subtotal) as revenue'))
+            ->groupBy('categories.name')->orderByDesc('qty')->take(5)->get();
+        $catMax = max(1, (float) $topCategories->max('qty'));
+
+        // Most valuable customers (lifetime spend) — for retention/VIP outreach.
+        $topCustomers = Customer::where('total_orders', '>', 0)
+            ->orderByDesc('total_spent')->take(5)
+            ->get(['id', 'name', 'phone', 'total_spent', 'total_orders', 'points']);
+
+        // Outstanding loyalty-points liability (what redemption would cost).
+        $pointsOutstanding = (int) Customer::sum('points');
+        $pointsLiability = app(\App\Services\LoyaltyService::class)->pointsValue($pointsOutstanding);
+
         $lowStockProducts = Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)
             ->orderBy('stock_quantity')->take(5)->get(['id', 'name', 'slug', 'stock_quantity']);
 
@@ -85,7 +103,7 @@ class DashboardController extends Controller
 
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
-            'mostLoved', 'totalLoves'
+            'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability'
         ));
     }
 }

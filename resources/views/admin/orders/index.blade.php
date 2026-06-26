@@ -46,6 +46,8 @@
         <button type="button" class="text-sm text-ink-700/60 hover:underline ml-auto" @click="sel = []">Clear</button>
     </div>
 
+    <div class="grid xl:grid-cols-[1fr_320px] gap-6 items-start">
+    <div class="min-w-0">
     <div class="card overflow-hidden">
         <table class="w-full text-sm">
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
@@ -93,5 +95,30 @@
         </table>
     </div>
     <div class="mt-6">{{ $orders->links() }}</div>
+    </div>
+
+    {{-- Processing fulfilment queue (products to prepare) --}}
+    <aside class="card p-4 xl:sticky xl:top-4">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="font-semibold">To prepare · Processing</h2>
+            <span class="badge bg-amber-100 text-amber-700 text-[10px]">{{ $processingItems->sum('qty') }} units</span>
+        </div>
+        <p class="text-xs text-ink-700/50 mb-3">Items across all orders currently in <strong>Processing</strong>.</p>
+        @forelse($processingItems as $it)
+            <div class="flex items-start justify-between gap-2 py-2 border-b border-ink-50 last:border-0 text-sm">
+                <div class="min-w-0">
+                    <div class="truncate">{{ $it->name }}</div>
+                    <div class="text-[11px] text-ink-700/45">
+                        @if($it->product_id)ID #{{ $processingSerials[$it->product_id] ?? $it->product_id }}@else (deleted) @endif
+                        · {{ $it->orders }} order{{ $it->orders > 1 ? 's' : '' }}
+                    </div>
+                </div>
+                <span class="shrink-0 font-semibold text-gold-700">×{{ $it->qty }}</span>
+            </div>
+        @empty
+            <p class="text-sm text-ink-700/50">Nothing in processing right now. 🎉</p>
+        @endforelse
+    </aside>
+    </div>
 </div>
 @endsection

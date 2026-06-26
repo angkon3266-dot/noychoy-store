@@ -73,6 +73,21 @@ Route::middleware('admin')->group(function () {
     Route::delete('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'destroy'])->name('offers.destroy');
     Route::post('offers/register-discount', [\App\Http\Controllers\Admin\OfferController::class, 'saveRegisterOffer'])->name('offers.register');
 
+    // Suppliers & purchase orders (sourcing / procurement)
+    Route::get('suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'index'])->name('suppliers.index');
+    Route::post('suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'store'])->name('suppliers.store');
+    Route::put('suppliers/{supplier}', [\App\Http\Controllers\Admin\SupplierController::class, 'update'])->name('suppliers.update');
+    Route::delete('suppliers/{supplier}', [\App\Http\Controllers\Admin\SupplierController::class, 'destroy'])->name('suppliers.destroy');
+
+    Route::get('purchase-orders', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
+    Route::get('purchase-orders/create', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
+    Route::post('purchase-orders', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+    Route::get('purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+    Route::get('purchase-orders/{purchaseOrder}/edit', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'edit'])->name('purchase-orders.edit');
+    Route::put('purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
+    Route::post('purchase-orders/{purchaseOrder}/status', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'updateStatus'])->name('purchase-orders.status');
+    Route::delete('purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'destroy'])->name('purchase-orders.destroy');
+
     // Reviews (moderation)
     Route::get('reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');
     Route::patch('reviews/{review}/status', [\App\Http\Controllers\Admin\ReviewController::class, 'updateStatus'])->name('reviews.status');
