@@ -1,3 +1,12 @@
+// Alpine.js is bundled through Vite (no CDN) for fewer external requests and
+// reliability. Plugins + components register on the alpine:init listeners below,
+// then Alpine.start() at the very end of this file boots everything.
+import Alpine from 'alpinejs';
+import collapse from '@alpinejs/collapse';
+
+window.Alpine = Alpine;
+Alpine.plugin(collapse);
+
 // Shared Alpine component for product pages: gallery, variant selection,
 // quantity, and Meta Pixel AddToCart firing. Used by every product template.
 // Prevent double-submits: disable the submit button once a form starts submitting
@@ -315,3 +324,6 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 });
+
+// Boot Alpine after all stores/components/plugins are registered above.
+Alpine.start();

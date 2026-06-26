@@ -24,8 +24,7 @@
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}
 
     {{-- Brand fonts (Google and/or uploaded custom) --}}
     @php
@@ -41,9 +40,12 @@
         $googleFonts = $googleFonts->filter()->unique()->values();
     @endphp
     @if($googleFonts->isNotEmpty())
+        @php $googleFontsUrl = 'https://fonts.googleapis.com/css2?'.$googleFonts->map(fn($f) => 'family='.str_replace(' ', '+', $f).':wght@400;500;600;700')->implode('&').'&display=swap'; @endphp
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?{{ $googleFonts->map(fn($f) => 'family='.str_replace(' ', '+', $f).':wght@400;500;600;700')->implode('&') }}&display=swap" rel="stylesheet">
+        {{-- Load font CSS without blocking render; flip to all once loaded. font-display:swap shows text immediately. --}}
+        <link href="{{ $googleFontsUrl }}" rel="stylesheet" media="print" onload="this.media='all'">
+        <noscript><link href="{{ $googleFontsUrl }}" rel="stylesheet"></noscript>
     @endif
     <style>
         @if($fHeadingSrc === 'custom' && $fHeadingFile)
