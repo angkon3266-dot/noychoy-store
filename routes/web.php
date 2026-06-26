@@ -32,6 +32,8 @@ Route::controller(CartController::class)->group(function () {
     Route::delete('/cart/remove', 'remove')->name('cart.remove');
     Route::post('/cart/coupon', 'applyCoupon')->name('cart.coupon');
     Route::delete('/cart/coupon', 'removeCoupon')->name('cart.coupon.remove');
+    Route::post('/cart/points', 'applyPoints')->name('cart.points');
+    Route::delete('/cart/points', 'removePoints')->name('cart.points.remove');
 });
 
 // Checkout
@@ -93,6 +95,9 @@ Route::middleware('auth:customer')->group(function () {
     // Reviews & loved
     Route::get('/account/reviews', [AccountController::class, 'reviews'])->name('account.reviews');
     Route::get('/account/loved', [AccountController::class, 'loved'])->name('account.loved');
+
+    // Loyalty — social share reward
+    Route::post('/account/share', [AccountController::class, 'share'])->name('account.share');
 });
 
 Route::get('/discover', [\App\Http\Controllers\Shop\DiscoverController::class, 'index'])->name('discover');

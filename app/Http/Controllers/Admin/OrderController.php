@@ -248,6 +248,11 @@ class OrderController extends Controller
             'created_by' => auth()->user()->name,
         ]);
 
+        // Award loyalty points once the order is delivered (idempotent).
+        if ($data['status'] === 'delivered') {
+            app(\App\Services\LoyaltyService::class)->awardForOrder($order->fresh('customer'));
+        }
+
         if ($request->boolean('notify')) {
             $template = match ($data['status']) {
                 'confirmed' => 'order_confirmed',

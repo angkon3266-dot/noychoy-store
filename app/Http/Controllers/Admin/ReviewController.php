@@ -38,6 +38,14 @@ class ReviewController extends Controller
 
         $review->update($data);
 
+        // Reward the customer with loyalty points the first time a review is approved.
+        if ($data['status'] === 'approved' && $review->customer_id) {
+            $loyalty = app(\App\Services\LoyaltyService::class);
+            if ($loyalty->enabled() && ($customer = $review->customer)) {
+                $loyalty->award($customer, (int) config('loyalty.review_points', 100), 'earn_review', 'Approved review', $review);
+            }
+        }
+
         return back()->with('success', 'Review '.$data['status'].'.');
     }
 

@@ -39,6 +39,111 @@
                 </a>
             </div>
 
+            {{-- Rewards & offers (collapsible) --}}
+            @if($loyaltyEnabled)
+                @php $msDone = collect($milestones)->where('done', true)->count(); $msTotal = count($milestones); @endphp
+                <div class="card mb-8 overflow-hidden" x-data="{
+                        open: true, shareMsg: '', points: {{ $points }},
+                        url: '{{ route('home') }}',
+                        async share(platform) {
+                            const u = encodeURIComponent(this.url);
+                            const t = encodeURIComponent('Shop handcrafted jewelry at {{ \App\Models\Setting::get('store_name', config('store.name')) }}');
+                            if (platform === 'facebook') window.open('https://www.facebook.com/sharer/sharer.php?u=' + u, '_blank', 'width=600,height=500');
+                            else if (platform === 'whatsapp') window.open('https://wa.me/?text=' + t + '%20' + u, '_blank');
+                            else if (platform === 'copy') { try { await navigator.clipboard.writeText(this.url); } catch (e) {} }
+                            try {
+                                const res = await fetch('{{ route('account.share') }}', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
+                                    body: JSON.stringify({ platform })
+                                });
+                                const data = await res.json();
+                                this.shareMsg = data.message || '';
+                                if (data.ok && data.points !== undefined) this.points = data.points;
+                            } catch (e) {}
+                        }
+                    }">
+                    <button type="button" @click="open = !open" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="flex items-center gap-3">
+                            <span class="text-2xl">🎁</span>
+                            <span>
+                                <span class="block font-semibold">Rewards &amp; offers</span>
+                                <span class="block text-xs text-ink-700/60"><span x-text="points"></span> points · {{ money($pointsValue) }} value</span>
+                            </span>
+                        </span>
+                        <svg class="w-5 h-5 text-ink-700/50 transition" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+
+                    <div x-show="open" x-collapse>
+                        <div class="px-5 pb-5 space-y-5">
+                            {{-- Points summary --}}
+                            <div class="rounded-xl bg-gold-50 border border-gold-200 p-4 flex items-center justify-between flex-wrap gap-3">
+                                <div>
+                                    <div class="text-3xl font-semibold text-gold-700"><span x-text="points"></span> <span class="text-base font-normal">points</span></div>
+                                    <div class="text-xs text-ink-700/60">Worth {{ money($pointsValue) }} — redeem at checkout (100 points = {{ money(app(\App\Services\LoyaltyService::class)->pointsValue(100)) }})</div>
+                                </div>
+                                <a href="{{ route('shop') }}" class="btn-primary text-sm py-2">Shop &amp; earn more</a>
+                            </div>
+
+                            {{-- Personalised offers --}}
+                            @if($liveOffers->isNotEmpty())
+                                <div>
+                                    <h3 class="text-sm font-semibold mb-2">Your exclusive offers</h3>
+                                    <div class="space-y-2">
+                                        @foreach($liveOffers as $offer)
+                                            <div class="rounded-lg border border-gold-200 bg-white p-3 flex items-center justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-medium">{{ $offer->title }}</p>
+                                                    @if($offer->description)<p class="text-xs text-ink-700/60">{{ $offer->description }}</p>@endif
+                                                    <p class="text-xs text-gold-700 mt-0.5">{{ $offer->rewardText() }}@if($offer->expires_at) · expires {{ $offer->expires_at->format('d M') }}@endif</p>
+                                                </div>
+                                                @if($offer->code)
+                                                    <span class="shrink-0 font-mono text-xs rounded-full border border-gold-300 px-2.5 py-1 bg-gold-50">{{ $offer->code }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Weekly milestones --}}
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-sm font-semibold">This week's milestones</h3>
+                                    <span class="text-xs text-ink-700/60">{{ $msDone }}/{{ $msTotal }} done</span>
+                                </div>
+                                <div class="h-2 rounded-full bg-ink-100 overflow-hidden mb-3">
+                                    <div class="h-full bg-gold-600 transition-all" style="width: {{ $msTotal ? round($msDone / $msTotal * 100) : 0 }}%"></div>
+                                </div>
+                                <ul class="space-y-2">
+                                    @foreach($milestones as $m)
+                                        <li class="flex items-center gap-3 text-sm">
+                                            <span class="w-7 h-7 grid place-items-center rounded-full {{ $m['done'] ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-400' }}">
+                                                {!! $m['done'] ? '&check;' : $m['icon'] !!}
+                                            </span>
+                                            <span class="flex-1 {{ $m['done'] ? 'text-ink-700/50 line-through' : '' }}">{{ $m['label'] }}</span>
+                                            <span class="text-xs font-medium text-gold-700">+{{ $m['points'] }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+
+                                {{-- Share to earn --}}
+                                <div class="mt-4 rounded-lg bg-ink-50 p-3">
+                                    <p class="text-xs text-ink-700/70 mb-2">Share Noychoy on social media to earn <strong>+{{ config('loyalty.share_points', 100) }} points</strong> (once a week):</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <button type="button" @click="share('facebook')" class="btn-outline text-xs py-1.5 px-3">Facebook</button>
+                                        <button type="button" @click="share('whatsapp')" class="btn-outline text-xs py-1.5 px-3">WhatsApp</button>
+                                        <button type="button" @click="share('copy')" class="btn-outline text-xs py-1.5 px-3">Copy link</button>
+                                        <span class="text-xs text-green-700" x-text="shareMsg"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            @endif
+
             {{-- Default address --}}
             <div class="card p-5 mb-8">
                 <div class="flex items-center justify-between mb-2">

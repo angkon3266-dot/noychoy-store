@@ -9,7 +9,7 @@ class Customer extends Authenticatable
 {
     protected $fillable = [
         'name', 'phone', 'email', 'password', 'total_orders',
-        'total_spent', 'last_order_at', 'blacklisted', 'notes', 'woo_id',
+        'total_spent', 'points', 'points_lifetime', 'last_order_at', 'blacklisted', 'notes', 'woo_id',
         'google_id', 'avatar',
     ];
 
@@ -18,6 +18,8 @@ class Customer extends Authenticatable
     protected $casts = [
         'last_order_at' => 'datetime',
         'total_spent' => 'decimal:2',
+        'points' => 'integer',
+        'points_lifetime' => 'integer',
         'blacklisted' => 'boolean',
         'password' => 'hashed',
     ];
@@ -45,6 +47,22 @@ class Customer extends Authenticatable
     public function loves(): HasMany
     {
         return $this->hasMany(ProductLove::class);
+    }
+
+    public function pointTransactions(): HasMany
+    {
+        return $this->hasMany(PointTransaction::class)->latest();
+    }
+
+    public function offers(): HasMany
+    {
+        return $this->hasMany(CustomerOffer::class)->latest();
+    }
+
+    /** Currently usable per-customer offers. */
+    public function liveOffers()
+    {
+        return $this->hasMany(CustomerOffer::class)->live()->latest();
     }
 
     /** Products this customer has loved (newest first). */

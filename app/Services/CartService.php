@@ -16,6 +16,7 @@ class CartService
 {
     protected string $sessionKey = 'cart';
     protected string $couponKey = 'cart_coupon';
+    protected string $pointsKey = 'cart_points';
 
     public function items(): Collection
     {
@@ -76,7 +77,7 @@ class CartService
 
     public function clear(): void
     {
-        session()->forget([$this->sessionKey, $this->couponKey]);
+        session()->forget([$this->sessionKey, $this->couponKey, $this->pointsKey]);
     }
 
     public function count(): int
@@ -171,6 +172,20 @@ class CartService
         return $this->matchingOffers()->contains(fn (Offer $o) => $o->type === 'free_shipping');
     }
 
+    /** Extra "thanks for registering" discount for logged-in customers (Admin → Offers). */
+    public function memberSignupDiscount(): float
+    {
+        if (! auth('customer')->check()) {
+            return 0.0;
+        }
+        $pct = (float) Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 0));
+        if ($pct <= 0) {
+            return 0.0;
+        }
+
+        return round($this->promoBase() * $pct / 100, 2);
+    }
+
     // ── Coupons ───────────────────────────────────────────────────────────
     public function applyCoupon(Coupon $coupon): void
     {
@@ -185,7 +200,7 @@ class CartService
     /** Base the coupon is calculated against: subtotal after product + auto offers. */
     protected function couponBase(): float
     {
-        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount());
+        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount());
     }
 
     public function coupon(): ?Coupon
@@ -205,10 +220,51 @@ class CartService
         return $coupon ? $coupon->discountFor($this->couponBase(), $this) : 0.0;
     }
 
-    /** Total discount = quantity offers + auto promo offers + coupon. */
+    // ── Loyalty points redemption ───────────────────────────────────────────
+
+    /** Customer requests to redeem N points (snapped/clamped when read). */
+    public function redeemPoints(int $points): void
+    {
+        session([$this->pointsKey => max(0, $points)]);
+    }
+
+    public function clearPoints(): void
+    {
+        session()->forget($this->pointsKey);
+    }
+
+    /** Discountable base before any points are applied. */
+    protected function baseBeforePoints(): float
+    {
+        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount() - $this->couponDiscount());
+    }
+
+    /** Whole points that will actually be redeemed for this cart (0 for guests). */
+    public function redeemablePoints(): int
+    {
+        $loyalty = app(LoyaltyService::class);
+        if (! $loyalty->enabled()) {
+            return 0;
+        }
+        $customer = auth('customer')->user();
+        $requested = (int) session($this->pointsKey, 0);
+        if (! $customer || $requested <= 0) {
+            return 0;
+        }
+
+        return $loyalty->clampRedeemable($requested, (int) $customer->points, $this->baseBeforePoints());
+    }
+
+    /** Taka value of the redeemed points. */
+    public function pointsDiscount(): float
+    {
+        return app(LoyaltyService::class)->pointsValue($this->redeemablePoints());
+    }
+
+    /** Total discount = quantity offers + auto promo offers + member + coupon + points. */
     public function discount(): float
     {
-        return round($this->offerDiscount() + $this->promoDiscount() + $this->couponDiscount(), 2);
+        return round($this->offerDiscount() + $this->promoDiscount() + $this->memberSignupDiscount() + $this->couponDiscount() + $this->pointsDiscount(), 2);
     }
 
     /**
@@ -236,8 +292,16 @@ class CartService
             $lines[] = ['label' => 'Quantity / bundle offer', 'amount' => round($this->offerDiscount(), 2)];
         }
 
+        if ($this->memberSignupDiscount() > 0) {
+            $lines[] = ['label' => 'Member discount', 'amount' => round($this->memberSignupDiscount(), 2)];
+        }
+
         if (($coupon = $this->coupon()) && $this->couponDiscount() > 0) {
             $lines[] = ['label' => 'Coupon '.$coupon->code, 'amount' => round($this->couponDiscount(), 2)];
+        }
+
+        if ($this->pointsDiscount() > 0) {
+            $lines[] = ['label' => $this->redeemablePoints().' points redeemed', 'amount' => round($this->pointsDiscount(), 2)];
         }
 
         return $lines;

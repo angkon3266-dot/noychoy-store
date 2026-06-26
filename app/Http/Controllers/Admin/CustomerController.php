@@ -23,9 +23,19 @@ class CustomerController extends Controller
             ->when($request->boolean('repeat'), fn ($q) => $q->where('total_orders', '>', 1))
             ->when($request->boolean('blacklisted'), fn ($q) => $q->where('blacklisted', true))
             ->when($request->boolean('members'), fn ($q) => $q->whereNotNull('password'))
+            ->when($request->boolean('has_points'), fn ($q) => $q->where('points', '>', 0))
+            ->when($request->boolean('has_email'), fn ($q) => $q->whereNotNull('email')->where('email', '!=', ''))
+            ->when($request->boolean('new_month'), fn ($q) => $q->where('created_at', '>=', now()->startOfMonth()))
+            ->when($request->filled('min_spend'), fn ($q) => $q->where('total_spent', '>=', (float) $request->query('min_spend')))
+            ->when($request->filled('max_spend'), fn ($q) => $q->where('total_spent', '<=', (float) $request->query('max_spend')))
+            ->when($request->filled('min_orders'), fn ($q) => $q->where('total_orders', '>=', (int) $request->query('min_orders')))
+            // Lapsed = has ordered but not in the last N days (default 30 when toggled).
+            ->when($request->boolean('lapsed'), fn ($q) => $q->where('total_orders', '>', 0)
+                ->where('last_order_at', '<', now()->subDays((int) ($request->query('lapsed_days') ?: 30))))
             ->orderBy(match ($sort) {
                 'orders' => 'total_orders',
                 'recent' => 'last_order_at',
+                'points' => 'points',
                 'name' => 'name',
                 default => 'total_spent',
             }, $sort === 'name' ? 'asc' : 'desc')
@@ -54,7 +64,95 @@ class CustomerController extends Controller
             'customer' => $customer,
             'orders' => $orders,
             'insight' => $customer->phone ? $insight->forPhone($customer->phone) : null,
+            'offers' => $customer->offers()->get(),
+            'pointLog' => $customer->pointTransactions()->take(20)->get(),
         ]);
+    }
+
+    /** Export customers (name, phone, address, spend…) to an Excel-friendly CSV. */
+    public function export(Request $request)
+    {
+        $rows = Customer::query()
+            ->when($request->boolean('members'), fn ($q) => $q->whereNotNull('password'))
+            ->when($request->filled('min_spend'), fn ($q) => $q->where('total_spent', '>=', (float) $request->query('min_spend')))
+            ->orderByDesc('total_spent')
+            ->with('defaultAddress')
+            ->get();
+
+        $filename = 'noychoy-customers-'.now()->format('Y-m-d').'.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ];
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads Bangla/symbols correctly
+            fputcsv($out, ['Name', 'Phone', 'Email', 'Address', 'Area', 'District', 'Orders', 'Total spent', 'Points', 'Last order', 'Registered']);
+            foreach ($rows as $c) {
+                $a = $c->defaultAddress;
+                fputcsv($out, [
+                    $c->name,
+                    $c->phone,
+                    $c->email,
+                    $a?->address,
+                    $a?->area,
+                    $a?->district,
+                    $c->total_orders,
+                    number_format((float) $c->total_spent, 2, '.', ''),
+                    $c->points,
+                    $c->last_order_at?->format('Y-m-d'),
+                    $c->created_at?->format('Y-m-d'),
+                ]);
+            }
+            fclose($out);
+        }, $filename, $headers);
+    }
+
+    /** Assign a personalised offer to a customer (shown in their rewards panel). */
+    public function storeOffer(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'type' => ['required', 'in:'.implode(',', array_keys(\App\Models\CustomerOffer::TYPES))],
+            'value' => ['nullable', 'numeric', 'min:0'],
+            'code' => ['nullable', 'string', 'max:40'],
+            'min_subtotal' => ['nullable', 'numeric', 'min:0'],
+            'expires_at' => ['nullable', 'date'],
+        ]);
+
+        $offer = $customer->offers()->create($data + ['is_active' => true]);
+
+        // "Bonus points" offers credit immediately and stay as a record.
+        if ($offer->type === 'points' && (int) $offer->value > 0) {
+            app(\App\Services\LoyaltyService::class)->award($customer, (int) $offer->value, 'adjust', 'Bonus: '.$offer->title, $offer);
+        }
+
+        return back()->with('success', 'Offer added for '.$customer->name.'.');
+    }
+
+    public function destroyOffer(Customer $customer, \App\Models\CustomerOffer $offer)
+    {
+        abort_unless($offer->customer_id === $customer->id, 404);
+        $offer->delete();
+
+        return back()->with('success', 'Offer removed.');
+    }
+
+    /** Manually add or subtract loyalty points. */
+    public function adjustPoints(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'points' => ['required', 'integer'],
+            'reason' => ['nullable', 'string', 'max:160'],
+        ]);
+
+        app(\App\Services\LoyaltyService::class)->award(
+            $customer, (int) $data['points'], 'adjust', $data['reason'] ?: 'Manual adjustment',
+        );
+
+        return back()->with('success', 'Points adjusted.');
     }
 
     public function update(Request $request, Customer $customer)

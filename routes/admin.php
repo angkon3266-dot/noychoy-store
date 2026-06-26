@@ -61,12 +61,17 @@ Route::middleware('admin')->group(function () {
     Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');
     Route::put('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'update'])->name('customers.update');
     Route::post('customers/{customer}/sms', [\App\Http\Controllers\Admin\CustomerController::class, 'sendSms'])->name('customers.sms');
+    Route::get('customers-export', [\App\Http\Controllers\Admin\CustomerController::class, 'export'])->name('customers.export');
+    Route::post('customers/{customer}/offers', [\App\Http\Controllers\Admin\CustomerController::class, 'storeOffer'])->name('customers.offers.store');
+    Route::delete('customers/{customer}/offers/{offer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroyOffer'])->name('customers.offers.destroy');
+    Route::post('customers/{customer}/points', [\App\Http\Controllers\Admin\CustomerController::class, 'adjustPoints'])->name('customers.points');
 
     // Offers & promotions (auto-apply + PDP display)
     Route::get('offers', [\App\Http\Controllers\Admin\OfferController::class, 'index'])->name('offers.index');
     Route::post('offers', [\App\Http\Controllers\Admin\OfferController::class, 'store'])->name('offers.store');
     Route::put('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'update'])->name('offers.update');
     Route::delete('offers/{offer}', [\App\Http\Controllers\Admin\OfferController::class, 'destroy'])->name('offers.destroy');
+    Route::post('offers/register-discount', [\App\Http\Controllers\Admin\OfferController::class, 'saveRegisterOffer'])->name('offers.register');
 
     // Reviews (moderation)
     Route::get('reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');

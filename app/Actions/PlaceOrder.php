@@ -35,7 +35,11 @@ class PlaceOrder
         $shipping = $this->cart->shipping($insideDhaka);
         $coupon = $this->cart->coupon();
 
-        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon) {
+        // Loyalty points the customer chose to redeem (already reflected in $discount).
+        $pointsRedeemed = $this->cart->redeemablePoints();
+        $pointsDiscount = $this->cart->pointsDiscount();
+
+        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount) {
             // Attach to a customer record (find-or-create by phone) even for guests.
             $customer = Customer::firstOrCreate(
                 ['phone' => $data['phone']],
@@ -60,6 +64,8 @@ class PlaceOrder
                 'subtotal' => $subtotal,
                 'shipping_cost' => $shipping,
                 'discount' => $discount,
+                'points_redeemed' => $pointsRedeemed,
+                'points_discount' => $pointsDiscount,
                 'total' => max(0, $subtotal - $discount + $shipping),
                 'payment_method' => 'cod',
                 'payment_status' => 'unpaid',
@@ -97,6 +103,14 @@ class PlaceOrder
 
             if ($coupon) {
                 $coupon->increment('used_count');
+            }
+
+            // Deduct any redeemed loyalty points (logged-in customers only).
+            if ($pointsRedeemed > 0 && auth('customer')->check()) {
+                app(\App\Services\LoyaltyService::class)->award(
+                    $customer, -$pointsRedeemed, 'redeem',
+                    'Redeemed on order '.$order->order_number, $order,
+                );
             }
 
             // Update customer rollups.

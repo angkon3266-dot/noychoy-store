@@ -98,6 +98,49 @@
                 <div class="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {{ $hint }}</div>
             @endforeach
 
+            {{-- Loyalty points redemption (logged-in customers) --}}
+            @php $custPoints = (int) ($customer->points ?? 0); $appliedPoints = $cart->redeemablePoints(); $loyalty = app(\App\Services\LoyaltyService::class); @endphp
+            @auth('customer')
+                @if($loyalty->enabled() && ($custPoints > 0 || $appliedPoints > 0))
+                    <div class="mt-3 rounded-md border border-gold-200 bg-gold-50 p-3 text-sm"
+                         x-data="{ busy: false, msg: '',
+                                   async apply(remove) {
+                                       this.busy = true;
+                                       const url = '{{ route('cart.points') }}';
+                                       const opts = { headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } };
+                                       try {
+                                           if (remove) { await fetch(url, { method: 'DELETE', ...opts }); }
+                                           else { await fetch(url, { method: 'POST', body: JSON.stringify({ points: this.$refs.pts.value }), ...opts }); }
+                                           window.location.reload();
+                                       } catch (e) { this.busy = false; }
+                                   } }">
+                        @if($appliedPoints > 0)
+                            <div class="flex items-center justify-between">
+                                <span>✓ <strong>{{ $appliedPoints }}</strong> points redeemed (−{{ money($cart->pointsDiscount()) }})</span>
+                                <button type="button" @click="apply(true)" :disabled="busy" class="text-xs text-red-600 hover:underline">Remove</button>
+                            </div>
+                        @else
+                            <p class="mb-2">You have <strong>{{ $custPoints }}</strong> points (worth {{ money($loyalty->pointsValue($custPoints)) }}). Redeem in steps of {{ $loyalty->redeemStep() }}.</p>
+                            <div class="flex items-center gap-2">
+                                <input x-ref="pts" type="number" min="{{ $loyalty->minRedeem() }}" step="{{ $loyalty->redeemStep() }}" max="{{ $custPoints }}" value="{{ (int) (floor($custPoints / $loyalty->redeemStep()) * $loyalty->redeemStep()) }}" class="input py-1.5 w-28 text-sm">
+                                <button type="button" @click="apply(false)" :disabled="busy" class="btn-outline text-xs py-1.5 px-3">Apply points</button>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+            @endauth
+
+            {{-- Save more: register nudge for guests --}}
+            @guest('customer')
+                @php $regPct = (float) (\App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3))); @endphp
+                @if($regPct > 0)
+                    <div class="mt-3 rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs flex items-center justify-between gap-2">
+                        <span>🎉 Get an extra <strong>{{ rtrim(rtrim(number_format($regPct, 2), '0'), '.') }}%</strong> off — plus loyalty points on every order.</span>
+                        <a href="{{ route('customer.register') }}" class="shrink-0 underline font-medium">Create account</a>
+                    </div>
+                @endif
+            @endguest
+
             <div class="mt-4 rounded-md bg-gold-100/60 p-3 text-sm">💵 <strong>Cash on Delivery</strong> — pay when you receive your order.</div>
             <button type="submit" class="btn-primary w-full mt-6">Place order</button>
 

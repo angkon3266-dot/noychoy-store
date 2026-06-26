@@ -11,6 +11,24 @@
     For single-use codes use <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a>.
 </p>
 
+{{-- Registration offer (shown to guests, applied automatically to logged-in members) --}}
+<div class="card p-5 mb-6 max-w-3xl">
+    <h2 class="font-semibold mb-1">Register-for-discount offer</h2>
+    <p class="text-xs text-ink-700/60 mb-3">Guests see this as a nudge at checkout &amp; on the register page. Logged-in customers get the discount automatically on every order. Set the percent to 0 to turn it off.</p>
+    <form action="{{ route('admin.offers.register') }}" method="POST" class="flex flex-wrap items-end gap-3">
+        @csrf
+        <div>
+            <label class="label">Extra discount %</label>
+            <input name="register_offer_percent" type="number" step="0.1" min="0" max="90" value="{{ $registerOffer['percent'] }}" class="input w-32">
+        </div>
+        <div class="flex-1 min-w-[220px]">
+            <label class="label">Nudge text</label>
+            <input name="register_offer_text" value="{{ $registerOffer['text'] }}" class="input" placeholder="Create an account for an extra discount + points">
+        </div>
+        <button class="btn-primary">Save</button>
+    </form>
+</div>
+
 <div class="grid lg:grid-cols-3 gap-6">
     {{-- Form --}}
     <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}', applies: '{{ old('applies_to', $editing->applies_to ?? 'all') }}', catQ: '' }">

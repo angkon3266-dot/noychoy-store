@@ -18,7 +18,7 @@ class AccountController extends Controller
         return auth('customer')->user();
     }
 
-    public function index()
+    public function index(\App\Services\LoyaltyService $loyalty)
     {
         $customer = $this->customer();
         $orders = $customer->orders()->with('shipment')->latest()->take(5)->get();
@@ -30,6 +30,41 @@ class AccountController extends Controller
             'lovedCount' => $customer->loves()->count(),
             'reviewCount' => $customer->reviews()->count(),
             'addressCount' => $customer->addresses()->count(),
+            // Loyalty
+            'loyaltyEnabled' => $loyalty->enabled(),
+            'points' => (int) $customer->points,
+            'pointsValue' => $loyalty->pointsValue((int) $customer->points),
+            'liveOffers' => $customer->liveOffers()->get(),
+            'milestones' => $loyalty->weeklyMilestones($customer),
+        ]);
+    }
+
+    /** Award one-per-week social-share points (called from the storefront share buttons). */
+    public function share(Request $request, \App\Services\LoyaltyService $loyalty)
+    {
+        $customer = $this->customer();
+
+        if (! $loyalty->enabled()) {
+            return response()->json(['ok' => false, 'message' => 'Rewards are currently off.']);
+        }
+
+        // Once per ISO week.
+        $already = $customer->pointTransactions()
+            ->where('type', 'earn_share')
+            ->where('created_at', '>=', now()->startOfWeek())
+            ->exists();
+
+        if ($already) {
+            return response()->json(['ok' => false, 'message' => 'You already earned share points this week.']);
+        }
+
+        $points = (int) config('loyalty.share_points', 100);
+        $loyalty->award($customer, $points, 'earn_share', 'Shared on '.$request->string('platform', 'social'));
+
+        return response()->json([
+            'ok' => true,
+            'message' => '+'.$points.' points for sharing — thank you!',
+            'points' => (int) $customer->fresh()->points,
         ]);
     }
 

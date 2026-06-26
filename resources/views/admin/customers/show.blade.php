@@ -71,6 +71,73 @@
             </form>
         </div>
 
+        {{-- Loyalty points --}}
+        <div class="card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold">Loyalty points</h2>
+                <span class="text-lg font-semibold text-gold-700">{{ $customer->points }} pts</span>
+            </div>
+            <p class="text-xs text-ink-700/50 mb-3">Lifetime earned: {{ $customer->points_lifetime }} · worth {{ money(app(\App\Services\LoyaltyService::class)->pointsValue((int) $customer->points)) }}</p>
+            <form action="{{ route('admin.customers.points', $customer) }}" method="POST" class="flex items-end gap-2">
+                @csrf
+                <div class="flex-1"><label class="label">Adjust (+/−)</label><input name="points" type="number" class="input" placeholder="e.g. 100 or -50" required></div>
+                <input name="reason" class="input flex-1" placeholder="Reason (optional)">
+                <button class="btn-outline">Apply</button>
+            </form>
+            @if($pointLog->isNotEmpty())
+                <details class="mt-3">
+                    <summary class="text-xs text-gold-700 cursor-pointer">Recent points activity</summary>
+                    <ul class="mt-2 space-y-1 text-xs text-ink-700/70">
+                        @foreach($pointLog as $tx)
+                            <li class="flex justify-between gap-2">
+                                <span>{{ $tx->description ?: $tx->type }} <span class="text-ink-700/40">· {{ $tx->created_at->format('d M') }}</span></span>
+                                <span class="{{ $tx->points >= 0 ? 'text-green-700' : 'text-red-600' }}">{{ $tx->points >= 0 ? '+' : '' }}{{ $tx->points }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </details>
+            @endif
+        </div>
+
+        {{-- Personalised offers --}}
+        <div class="card p-5">
+            <h2 class="font-semibold mb-3">Personalised offers</h2>
+            @forelse($offers as $offer)
+                <div class="flex items-start justify-between gap-2 border-b border-ink-100 py-2 text-sm">
+                    <div class="min-w-0">
+                        <p class="font-medium">{{ $offer->title }} <span class="text-xs text-ink-700/50">· {{ $offer->rewardText() }}</span></p>
+                        @if($offer->code)<p class="text-xs font-mono text-gold-700">{{ $offer->code }}</p>@endif
+                        <p class="text-xs {{ $offer->isLive() ? 'text-green-700' : 'text-ink-700/40' }}">{{ $offer->isLive() ? 'Live' : 'Inactive/expired' }}@if($offer->expires_at) · until {{ $offer->expires_at->format('d M Y') }}@endif</p>
+                    </div>
+                    <form action="{{ route('admin.customers.offers.destroy', [$customer, $offer]) }}" method="POST" onsubmit="return confirm('Remove this offer?')">
+                        @csrf @method('DELETE')
+                        <button class="text-red-600 text-xs hover:underline">Remove</button>
+                    </form>
+                </div>
+            @empty
+                <p class="text-sm text-ink-700/50 mb-3">No personalised offers yet.</p>
+            @endforelse
+
+            <form action="{{ route('admin.customers.offers.store', $customer) }}" method="POST" class="space-y-2 mt-3">
+                @csrf
+                <input name="title" class="input" placeholder="Offer title (e.g. VIP 15% off)" required>
+                <input name="description" class="input" placeholder="Short description (optional)">
+                <div class="grid grid-cols-2 gap-2">
+                    <select name="type" class="input">
+                        @foreach(\App\Models\CustomerOffer::TYPES as $k => $label)
+                            <option value="{{ $k }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <input name="value" type="number" step="0.01" class="input" placeholder="Value (% / ৳ / pts)">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input name="code" class="input" placeholder="Code (optional)">
+                    <input name="expires_at" type="date" class="input">
+                </div>
+                <button class="btn-primary w-full">Add offer</button>
+            </form>
+        </div>
+
         {{-- Send SMS --}}
         <div class="card p-5">
             <h2 class="font-semibold mb-3">Send SMS</h2>

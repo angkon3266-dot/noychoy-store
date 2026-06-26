@@ -17,7 +17,25 @@ class OfferController extends Controller
             'categories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
             'products' => \App\Models\Product::orderBy('name')->get(['id', 'name']),
             'editing' => $request->filled('edit') ? Offer::find($request->query('edit')) : null,
+            'registerOffer' => [
+                'percent' => \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3)),
+                'text' => \App\Models\Setting::get('register_offer_text', 'Get an extra discount plus loyalty points on every order.'),
+            ],
         ]);
+    }
+
+    /** Save the "register for an extra discount" offer (shown to guests, applied to members). */
+    public function saveRegisterOffer(Request $request)
+    {
+        $data = $request->validate([
+            'register_offer_percent' => ['nullable', 'numeric', 'min:0', 'max:90'],
+            'register_offer_text' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        \App\Models\Setting::put('register_offer_percent', (float) ($data['register_offer_percent'] ?? 0));
+        \App\Models\Setting::put('register_offer_text', $data['register_offer_text'] ?? null);
+
+        return back()->with('success', 'Registration offer saved.');
     }
 
     public function store(Request $request)

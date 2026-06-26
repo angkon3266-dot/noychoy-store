@@ -167,4 +167,37 @@ class CartController extends Controller
 
         return back();
     }
+
+    /** Apply loyalty points to the cart (logged-in customers only). */
+    public function applyPoints(Request $request)
+    {
+        $request->validate(['points' => ['required', 'integer', 'min:0']]);
+
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return back()->with('error', 'Please log in to redeem points.');
+        }
+
+        $this->cart->redeemPoints((int) $request->integer('points'));
+        $applied = $this->cart->redeemablePoints();
+
+        if ($applied <= 0) {
+            $this->cart->clearPoints();
+            $min = app(\App\Services\LoyaltyService::class)->minRedeem();
+            $msg = 'Not enough points to redeem (minimum '.$min.').';
+            return $request->wantsJson() ? response()->json(['ok' => false, 'message' => $msg]) : back()->with('error', $msg);
+        }
+
+        $msg = $applied.' points applied — '.money($this->cart->pointsDiscount()).' off.';
+        return $request->wantsJson()
+            ? response()->json(['ok' => true, 'message' => $msg, 'applied' => $applied])
+            : back()->with('success', $msg);
+    }
+
+    public function removePoints(Request $request)
+    {
+        $this->cart->clearPoints();
+
+        return $request->wantsJson() ? response()->json(['ok' => true]) : back();
+    }
 }

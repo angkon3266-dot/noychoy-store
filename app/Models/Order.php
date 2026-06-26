@@ -23,6 +23,7 @@ class Order extends Model
         'order_number', 'customer_id', 'customer_name', 'customer_phone', 'customer_email',
         'shipping_address', 'area', 'city', 'district', 'is_inside_dhaka',
         'subtotal', 'shipping_cost', 'discount', 'total',
+        'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'source', 'woo_id',
     ];
@@ -33,6 +34,9 @@ class Order extends Model
         'shipping_cost' => 'decimal:2',
         'discount' => 'decimal:2',
         'total' => 'decimal:2',
+        'points_redeemed' => 'integer',
+        'points_discount' => 'decimal:2',
+        'points_earned' => 'integer',
     ];
 
     public function customer(): BelongsTo
