@@ -299,9 +299,21 @@
                 @endforeach
             </div>
         @endif
-        <label class="label">Add slide image(s)</label>
-        <input type="file" name="hero_slide_images[]" multiple accept="image/*" class="input text-sm">
-        <p class="text-xs text-ink-700/50 mt-1">Wide images work best (e.g. 1920×800). Add several for an auto-rotating slider.</p>
+        <label class="label">Add slide images</label>
+        @php $existingSlides = $slides->count(); @endphp
+        <div x-data="{ rows: 1, max: Math.max(1, 10 - {{ $existingSlides }}) }">
+            <template x-for="r in rows" :key="r">
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="file" name="hero_slide_images[]" accept="image/*" multiple class="input text-sm flex-1">
+                    <button type="button" x-show="rows > 1" @click="rows--" class="shrink-0 text-red-600 text-sm px-2 py-1 hover:bg-red-50 rounded" title="Remove this row">✕</button>
+                </div>
+            </template>
+            <button type="button" @click="if (rows < max) rows++" x-show="rows < max"
+                    class="mt-1 inline-flex items-center gap-1 text-sm text-gold-700 font-medium hover:text-gold-800">
+                <span class="text-lg leading-none">＋</span> Add another image <span class="text-ink-700/40" x-text="'(' + rows + '/' + max + ')'"></span>
+            </button>
+            <p class="text-xs text-ink-700/50 mt-2">Add up to 10 slides total. Wide images work best (e.g. 1920×800). You can also select multiple files in one row. Links are editable after saving.</p>
+        </div>
 
         {{-- Feature strip --}}
         <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Feature strip (reassurance icons)</h3>

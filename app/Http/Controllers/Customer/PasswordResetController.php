@@ -40,7 +40,15 @@ class PasswordResetController extends Controller
         if ($customer) {
             $otp = (string) random_int(100000, 999999);
             Cache::put($this->cacheKey($data['phone']), ['otp' => Hash::make($otp), 'tries' => 0], now()->addMinutes(10));
-            $sms->send($customer->phone, 'Your '.config('store.name').' password reset code is '.$otp.'. Valid for 10 minutes.');
+
+            // Editable template (Admin → Integrations → SMS templates → "Password reset code").
+            $template = $sms->template('password_reset') ?: 'Your {store} password reset code is {code}. Valid for {minutes} minutes.';
+            $message = strtr($template, [
+                '{store}' => \App\Models\Setting::get('store_name', config('store.name')),
+                '{code}' => $otp,
+                '{minutes}' => '10',
+            ]);
+            $sms->send($customer->phone, $message);
         }
 
         return redirect()->route('customer.password.reset', ['phone' => $data['phone']])

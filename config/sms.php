@@ -17,5 +17,6 @@ return [
         'order_shipped' => 'Dear {name}, your Noychoy order {order} has been shipped via Steadfast. Tracking: {tracking}.',
         'order_delivered' => 'Dear {name}, your Noychoy order {order} has been delivered. Thank you for shopping with us!',
         'order_cancelled' => 'Dear {name}, your Noychoy order {order} has been cancelled. Contact us for any questions.',
+        'password_reset' => 'Your {store} password reset code is {code}. Valid for {minutes} minutes.',
     ],
 ];

@@ -312,7 +312,17 @@
             </div>
             @endif
 
-            <div x-show="open" x-cloak class="md:hidden pb-4 space-y-1">
+            {{-- Mobile navigation — left slide-in drawer --}}
+            <div x-show="open" x-cloak class="md:hidden fixed inset-0 z-[55]" style="display:none">
+                <div class="absolute inset-0 bg-black/30" @click="open=false" x-transition.opacity></div>
+                <div class="absolute left-0 top-0 h-full w-[82%] max-w-[320px] bg-gold-50 shadow-2xl flex flex-col"
+                     x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+                     x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-gold-200">
+                        <span class="font-display font-semibold">Menu</span>
+                        <button type="button" @click="open=false" class="p-1 text-ink-700/60 hover:text-ink-900 text-2xl leading-none" aria-label="Close menu">&times;</button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto px-4 py-3 space-y-1">
                 @foreach($siteMenu ?? [] as $item)
                     @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
                     @if($mtype === 'link')
@@ -350,6 +360,8 @@
                 @if($ctaLabel = theme('menu_cta_label'))
                     <a href="{{ theme('menu_cta_link') ?: route('shop') }}" class="block py-2 mt-1 text-gold-700 font-medium">{{ $ctaLabel }}</a>
                 @endif
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -385,8 +397,8 @@
 
     {{-- Mini-cart slide-over --}}
     <div x-data x-show="$store.cart.drawer" x-cloak class="fixed inset-0 z-[60]" style="display:none">
-        <div class="absolute inset-0 bg-black/40" @click="$store.cart.drawer=false" x-transition.opacity></div>
-        <div class="absolute right-0 top-0 h-full w-full max-w-sm bg-white shadow-2xl flex flex-col"
+        <div class="absolute inset-0 bg-black/25" @click="$store.cart.drawer=false" x-transition.opacity></div>
+        <div class="absolute right-0 top-0 h-full w-[82%] max-w-[340px] bg-white shadow-2xl flex flex-col"
              x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
             <div class="flex items-center justify-between px-5 py-4 border-b border-ink-100">

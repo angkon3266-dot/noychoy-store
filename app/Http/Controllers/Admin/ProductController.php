@@ -307,6 +307,7 @@ class ProductController extends Controller
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', 'in:draft,published'],
             'tags' => ['nullable', 'string', 'max:255'],
+            'colors' => ['nullable', 'string', 'max:255'],
             'custom_label' => ['nullable', 'string', 'max:60'],
             'custom_value' => ['nullable', 'string', 'max:255'],
             'custom_show' => ['nullable', 'boolean'],
@@ -337,6 +338,10 @@ class ProductController extends Controller
         $validated['is_preorder'] = $request->boolean('is_preorder');
         $validated['custom_show'] = $request->boolean('custom_show');
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
+
+        // Colours: comma-separated string → clean unique array (stored as JSON).
+        $validated['colors'] = collect(explode(',', (string) ($validated['colors'] ?? '')))
+            ->map(fn ($c) => trim($c))->filter()->unique()->values()->all();
 
         // Gallery video references (YouTube/Vimeo URLs + previously-stored file paths).
         $validated['video_urls'] = collect($validated['video_urls'] ?? [])

@@ -17,6 +17,7 @@ class IntegrationController extends Controller
         'order_shipped' => 'Order shipped',
         'order_delivered' => 'Order delivered / completed',
         'order_cancelled' => 'Order cancelled',
+        'password_reset' => 'Password reset code — placeholders: {store}, {code}, {minutes}',
     ];
 
     public function index(SteadfastService $steadfast, SmsService $sms)

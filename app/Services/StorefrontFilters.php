@@ -24,6 +24,7 @@ class StorefrontFilters
             'attributes' => [],        // variation attribute names shown as filters
             'custom_fields' => [],     // custom field labels shown as filters
             'tags' => false,
+            'colors' => true,
             'price' => true,
             'in_stock' => true,
             'on_sale' => true,
@@ -100,6 +101,16 @@ class StorefrontFilters
             });
         }
 
+        // Colour filters: colors[]=Gold (matches the product's JSON colour list).
+        $colors = array_filter((array) $request->query('colors', []));
+        if ($colors) {
+            $query->where(function ($w) use ($colors) {
+                foreach ($colors as $c) {
+                    $w->orWhere('colors', 'like', '%"'.$c.'"%');
+                }
+            });
+        }
+
         // Tag filters: tags[]=bestseller
         $tags = array_filter((array) $request->query('tags', []));
         if ($tags) {
@@ -120,7 +131,7 @@ class StorefrontFilters
     {
         $cfg = $this->config();
         $scope ??= Product::published();
-        $products = (clone $scope)->get(['id', 'options', 'tags', 'custom_label', 'custom_value', 'custom_fields', 'price', 'compare_at_price']);
+        $products = (clone $scope)->get(['id', 'options', 'tags', 'colors', 'custom_label', 'custom_value', 'custom_fields', 'price', 'compare_at_price']);
 
         $groups = [];
 
@@ -145,6 +156,21 @@ class StorefrontFilters
                     'checked' => in_array($v, $selected, true),
                 ])->all(),
             ];
+        }
+
+        // Colours (from the product colour field) — rendered as swatches.
+        if ($cfg['colors'] ?? true) {
+            $colors = $products->flatMap(fn ($p) => $p->color_list)
+                ->map(fn ($c) => trim((string) $c))->filter()->unique()->sort()->values();
+            if ($colors->isNotEmpty()) {
+                $sel = array_filter((array) $request->query('colors', []));
+                $groups[] = [
+                    'type' => 'attribute', 'label' => 'Colour', 'param' => 'colors[]', 'is_color' => true,
+                    'options' => $colors->map(fn ($c) => [
+                        'value' => $c, 'label' => $c, 'hex' => color_hex($c), 'checked' => in_array($c, $sel, true),
+                    ])->all(),
+                ];
+            }
         }
 
         // Price ranges

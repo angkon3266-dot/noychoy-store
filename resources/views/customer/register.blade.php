@@ -23,7 +23,7 @@
             @csrf
             <div><label class="label">Full name</label><input name="name" value="{{ old('name') }}" class="input" required></div>
             <div><label class="label">Mobile number *</label><input name="phone" value="{{ old('phone') }}" placeholder="01XXXXXXXXX" class="input" required></div>
-            <div><label class="label">Email *</label><input type="email" name="email" value="{{ old('email') }}" class="input" required></div>
+            <div><label class="label">Email <span class="text-ink-700/40 font-normal">(optional)</span></label><input type="email" name="email" value="{{ old('email') }}" class="input"></div>
             <div><label class="label">Password</label><input type="password" name="password" class="input" required></div>
             <div><label class="label">Confirm password</label><input type="password" name="password_confirmation" class="input" required></div>
             <button class="btn-primary w-full">Register</button>

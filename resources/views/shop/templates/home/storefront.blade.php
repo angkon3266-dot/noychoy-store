@@ -12,11 +12,15 @@
 
 {{-- ── Hero slider ───────────────────────────────────────────────────── --}}
 @if($slides->isNotEmpty())
-<section x-data="{ i: 0, n: {{ $slides->count() }}, t: null,
+<section x-data="{ i: 0, n: {{ $slides->count() }}, t: null, x0: null,
                    start(){ if(this.n>1){ this.t = setInterval(()=>this.i=(this.i+1)%this.n, 5500) } },
-                   go(k){ this.i=(k+this.n)%this.n } }"
+                   go(k){ this.i=(k+this.n)%this.n },
+                   sStart(e){ this.x0 = e.changedTouches[0].clientX; clearInterval(this.t) },
+                   sEnd(e){ if(this.x0===null) return; const dx = e.changedTouches[0].clientX - this.x0;
+                            if(Math.abs(dx) > 40){ this.go(dx < 0 ? this.i+1 : this.i-1) } this.x0 = null; this.start() } }"
          x-init="start()" @mouseenter="clearInterval(t)" @mouseleave="start()"
-         class="relative overflow-hidden">
+         @touchstart.passive="sStart($event)" @touchend.passive="sEnd($event)"
+         class="relative overflow-hidden select-none">
     <div class="flex transition-transform duration-700 ease-out" :style="`transform: translateX(-${i*100}%)`">
         @foreach($slides as $s)
             <a href="{{ $s['link'] ?? route('shop') }}" class="block w-full shrink-0">

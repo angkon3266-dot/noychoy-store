@@ -46,7 +46,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', 'regex:/^(\+?880|0)1[3-9]\d{8}$/', 'unique:customers,phone'],
-            'email' => ['required', 'email', 'max:160', 'unique:customers,email'],
+            'email' => ['nullable', 'email', 'max:160', 'unique:customers,email'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
         ], [
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',

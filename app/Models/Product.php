@@ -21,7 +21,7 @@ class Product extends Model
         'in_stock', 'weight', 'has_variants', 'options', 'status', 'is_featured',
         'views', 'meta_title', 'meta_description', 'woo_id',
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
-        'is_preorder', 'preorder_release_date', 'preorder_note', 'tags',
+        'is_preorder', 'preorder_release_date', 'preorder_note', 'tags', 'colors',
         'custom_label', 'custom_value', 'custom_show', 'custom_fields', 'loves_count',
         'is_bestseller', 'video_urls',
     ];
@@ -43,6 +43,7 @@ class Product extends Model
         'cross_sell_ids' => 'array',
         'is_preorder' => 'boolean',
         'preorder_release_date' => 'date',
+        'colors' => 'array',
         'custom_show' => 'boolean',
         'custom_fields' => 'array',
         'loves_count' => 'integer',
@@ -238,6 +239,12 @@ class Product extends Model
     public function getTagListAttribute(): array
     {
         return collect(explode(',', (string) $this->tags))->map(fn ($t) => trim($t))->filter()->values()->all();
+    }
+
+    /** Colours as a clean array (used by the storefront colour filter). */
+    public function getColorListAttribute(): array
+    {
+        return collect($this->colors ?? [])->map(fn ($c) => trim((string) $c))->filter()->unique()->values()->all();
     }
 
     /** Human product type. */

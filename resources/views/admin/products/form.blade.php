@@ -289,6 +289,11 @@
                     <input name="tags" value="{{ old('tags', $product->tags) }}" class="input" placeholder="bestseller, new-arrival, eid">
                     <p class="text-xs text-ink-700/50 mt-1">Comma-separated. Used to filter products in the admin list &amp; on the shop.</p>
                 </div>
+                <div>
+                    <label class="label">Colours</label>
+                    <input name="colors" value="{{ old('colors', implode(', ', $product->color_list ?? [])) }}" class="input" placeholder="Gold, Rose Gold, Silver">
+                    <p class="text-xs text-ink-700/50 mt-1">Comma-separated. Shown as a colour filter on the shop &amp; category pages.</p>
+                </div>
                 <div class="border-t border-ink-100 pt-4" x-data="{ rows: @js(array_values(old('custom_fields', $product->custom_fields ?? []))) }">
                     <label class="label">Custom fields (any purpose)</label>
 
