@@ -36,6 +36,10 @@ class AccountController extends Controller
             'pointsValue' => $loyalty->pointsValue((int) $customer->points),
             'liveOffers' => $customer->liveOffers()->get(),
             'milestones' => $loyalty->weeklyMilestones($customer),
+            'tier' => $loyalty->tierFor($customer),
+            'referralCode' => $customer->ensureReferralCode(),
+            'referralCount' => $customer->referrals()->count(),
+            'referralPoints' => $loyalty->referralPoints(),
         ]);
     }
 

@@ -12,8 +12,12 @@
             </div>
         @endif
 
+        @if(request('ref'))
+            <div class="mt-4 rounded-md bg-gold-50 border border-gold-200 text-gold-800 px-3 py-2 text-sm">🎁 You were invited by a friend — place your first order and you both earn bonus points!</div>
+        @endif
         <form action="{{ route('customer.register.post') }}" method="POST" class="mt-6 space-y-4">
             @csrf
+            <input type="hidden" name="ref" value="{{ request('ref', old('ref')) }}">
             <div><label class="label">Full name</label><input name="name" value="{{ old('name') }}" class="input" required></div>
             <div><label class="label">Mobile number *</label><input name="phone" value="{{ old('phone') }}" placeholder="01XXXXXXXXX" class="input" required></div>
             <div><label class="label">Email <span class="text-ink-700/40 font-normal">(optional)</span></label><input type="email" name="email" value="{{ old('email') }}" class="input"></div>

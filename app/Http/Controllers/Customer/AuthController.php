@@ -52,12 +52,20 @@ class AuthController extends Controller
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);
 
+        // Attribute the signup to a referrer if they arrived via a referral link.
+        $referrer = null;
+        if ($ref = trim((string) $request->input('ref'))) {
+            $referrer = Customer::where('referral_code', $ref)->first();
+        }
+
         $customer = Customer::create([
             'name' => $data['name'],
             'phone' => $data['phone'],
             'email' => $data['email'] ?? null,
             'password' => $data['password'],
+            'referred_by' => $referrer?->id,
         ]);
+        $customer->ensureReferralCode();
 
         // Welcome loyalty bonus (Admin → Offers → Loyalty & points).
         $loyalty = app(\App\Services\LoyaltyService::class);

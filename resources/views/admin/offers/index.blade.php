@@ -57,6 +57,14 @@
                 <label class="label">Welcome bonus (signup)</label>
                 <input name="signup" type="number" step="1" min="0" value="{{ $loyalty['signup'] }}" class="input">
             </div>
+            <div>
+                <label class="label">Referral (each side)</label>
+                <input name="referral" type="number" step="1" min="0" value="{{ $loyalty['referral'] }}" class="input">
+            </div>
+            <div>
+                <label class="label">Review-with-photo bonus</label>
+                <input name="photo_bonus" type="number" step="1" min="0" value="{{ $loyalty['photo_bonus'] }}" class="input">
+            </div>
         </div>
         <button class="btn-primary mt-3">Save loyalty settings</button>
     </form>

@@ -38,11 +38,14 @@ class ReviewController extends Controller
 
         $review->update($data);
 
-        // Reward the customer with loyalty points the first time a review is approved.
+        // Reward the customer with loyalty points the first time a review is approved
+        // (+ a bonus when the review includes at least one photo).
         if ($data['status'] === 'approved' && $review->customer_id) {
             $loyalty = app(\App\Services\LoyaltyService::class);
             if ($loyalty->enabled() && ($customer = $review->customer)) {
-                $loyalty->award($customer, $loyalty->reviewPoints(), 'earn_review', 'Approved review', $review);
+                $hasPhoto = filled($review->photos);
+                $points = $loyalty->reviewPoints() + ($hasPhoto ? $loyalty->reviewPhotoBonus() : 0);
+                $loyalty->award($customer, $points, 'earn_review', 'Approved review'.($hasPhoto ? ' (with photo)' : ''), $review);
             }
         }
 

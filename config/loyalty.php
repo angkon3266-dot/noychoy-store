@@ -27,4 +27,19 @@ return [
 
     // Default extra discount offered to guests for creating an account (editable in Admin → Offers).
     'register_discount_percent' => 3,
+
+    // Referral: points granted to BOTH the referrer and the new customer when the
+    // referred customer's first order is delivered.
+    'referral_points' => 300,
+
+    // Bonus points when an approved review includes at least one photo.
+    'review_photo_bonus' => 100,
+
+    // Membership tiers by lifetime points earned. `multiplier` boosts order-earned
+    // points (e.g. Gold earns 1.25× points). Highest qualifying tier wins.
+    'tiers' => [
+        ['key' => 'silver', 'label' => 'Silver', 'min_points' => 0, 'multiplier' => 1.0, 'perk' => 'Earn points on every order'],
+        ['key' => 'gold', 'label' => 'Gold', 'min_points' => 3000, 'multiplier' => 1.25, 'perk' => '1.25× points + early access to drops'],
+        ['key' => 'platinum', 'label' => 'Platinum', 'min_points' => 10000, 'multiplier' => 1.5, 'perk' => '1.5× points + priority support & gifts'],
+    ],
 ];

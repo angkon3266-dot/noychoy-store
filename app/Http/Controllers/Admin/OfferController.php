@@ -28,6 +28,8 @@ class OfferController extends Controller
                 'review' => (int) \App\Models\Setting::get('loyalty_review_points', config('loyalty.review_points', 200)),
                 'share' => (int) \App\Models\Setting::get('loyalty_share_points', config('loyalty.share_points', 100)),
                 'signup' => (int) \App\Models\Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0)),
+                'referral' => (int) \App\Models\Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300)),
+                'photo_bonus' => (int) \App\Models\Setting::get('loyalty_review_photo_bonus', config('loyalty.review_photo_bonus', 100)),
             ],
         ]);
     }
@@ -41,6 +43,8 @@ class OfferController extends Controller
             'review' => ['required', 'integer', 'min:0', 'max:100000'],
             'share' => ['required', 'integer', 'min:0', 'max:100000'],
             'signup' => ['required', 'integer', 'min:0', 'max:100000'],
+            'referral' => ['required', 'integer', 'min:0', 'max:100000'],
+            'photo_bonus' => ['required', 'integer', 'min:0', 'max:100000'],
         ]);
 
         \App\Models\Setting::put('loyalty_enabled', $request->boolean('enabled'));
@@ -49,6 +53,8 @@ class OfferController extends Controller
         \App\Models\Setting::put('loyalty_review_points', (int) $data['review']);
         \App\Models\Setting::put('loyalty_share_points', (int) $data['share']);
         \App\Models\Setting::put('loyalty_signup_points', (int) $data['signup']);
+        \App\Models\Setting::put('loyalty_referral_points', (int) $data['referral']);
+        \App\Models\Setting::put('loyalty_review_photo_bonus', (int) $data['photo_bonus']);
 
         return back()->with('success', 'Loyalty settings saved.');
     }

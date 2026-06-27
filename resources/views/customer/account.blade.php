@@ -93,11 +93,40 @@
                                 <a href="{{ route('shop') }}" class="btn-primary text-sm py-2">Shop &amp; earn more</a>
                             </div>
 
+                            {{-- Membership tier --}}
+                            <div class="rounded-xl border border-ink-100 p-4">
+                                <div class="flex items-center justify-between">
+                                    <span class="inline-flex items-center gap-2 font-semibold">
+                                        <span class="text-lg">{{ ['silver'=>'🥈','gold'=>'🥇','platinum'=>'💎'][$tier['current']['key']] ?? '⭐' }}</span>
+                                        {{ $tier['current']['label'] }} member
+                                    </span>
+                                    <span class="text-xs text-ink-700/50">{{ number_format($tier['lifetime']) }} lifetime pts</span>
+                                </div>
+                                <p class="text-xs text-ink-700/60 mt-1">{{ $tier['current']['perk'] }}</p>
+                                @if($tier['next'])
+                                    <div class="mt-3">
+                                        <div class="h-2 rounded-full bg-ink-100 overflow-hidden"><div class="h-full bg-gold-600" style="width: {{ $tier['progress'] }}%"></div></div>
+                                        <p class="text-xs text-ink-700/50 mt-1">Earn {{ number_format($tier['to_next']) }} more points to reach <strong>{{ $tier['next']['label'] }}</strong> ({{ $tier['next']['perk'] }}).</p>
+                                    </div>
+                                @endif
+                            </div>
+
                             {{-- How to earn (encourages bigger orders) --}}
                             <div class="rounded-lg bg-ink-50 border border-ink-100 p-3 text-xs text-ink-700/80 space-y-1">
                                 <p>🛍️ Earn <strong>{{ $per1000 }} points</strong> for every <strong>৳1000</strong> you spend — added once your order is <strong>delivered</strong>. The more you buy, the more you save!</p>
-                                <p>⭐ Write a review: <strong>+{{ $L->reviewPoints() }} points</strong> · 📣 Share with friends: <strong>+{{ $L->sharePoints() }} points</strong> (once a week)</p>
+                                <p>⭐ Write a review: <strong>+{{ $L->reviewPoints() }} points</strong> (+{{ $L->reviewPhotoBonus() }} with a photo) · 📣 Share: <strong>+{{ $L->sharePoints() }} points</strong>/week</p>
                                 <p>💰 <strong>100 points = {{ $value100 }}</strong> — use them to cut your bill at checkout.</p>
+                            </div>
+
+                            {{-- Refer a friend --}}
+                            <div class="rounded-xl bg-gold-600 text-white p-4" x-data="{ copied: false, link: '{{ route('customer.register', ['ref' => $referralCode]) }}' }">
+                                <h3 class="font-semibold flex items-center gap-2">🤝 Refer friends, both earn {{ $referralPoints }} points</h3>
+                                <p class="text-xs text-white/80 mt-1">Share your link. When a friend signs up and their first order is delivered, you <strong>both</strong> get {{ $referralPoints }} points.@if($referralCount > 0) You've referred <strong>{{ $referralCount }}</strong> so far!@endif</p>
+                                <div class="mt-3 flex items-center gap-2">
+                                    <input readonly :value="link" class="flex-1 min-w-0 rounded-md px-2 py-1.5 text-xs text-ink-900" @focus="$event.target.select()">
+                                    <button type="button" @click="navigator.clipboard.writeText(link); copied = true; setTimeout(() => copied = false, 1500)" class="shrink-0 rounded-md bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-medium" x-text="copied ? 'Copied!' : 'Copy'"></button>
+                                    <a :href="'https://wa.me/?text=' + encodeURIComponent('Shop at {{ $storeName }} — sign up with my link and we both get rewards! ' + link)" target="_blank" class="shrink-0 rounded-md bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-medium">WhatsApp</a>
+                                </div>
                             </div>
 
                             {{-- Personalised offers --}}

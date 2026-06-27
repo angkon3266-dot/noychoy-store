@@ -133,13 +133,57 @@ class LoyaltyService
         });
     }
 
-    /** Award the earn-on-delivery points for an order (idempotent). */
+    public function reviewPhotoBonus(): int
+    {
+        return (int) Setting::get('loyalty_review_photo_bonus', config('loyalty.review_photo_bonus', 100));
+    }
+
+    public function referralPoints(): int
+    {
+        return (int) Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300));
+    }
+
+    // ── Membership tiers ──────────────────────────────────────────────────────
+
+    /**
+     * @return array{current:array,next:?array,lifetime:int,to_next:int,progress:int}
+     */
+    public function tierFor(Customer $customer): array
+    {
+        $tiers = collect(config('loyalty.tiers', []))->sortBy('min_points')->values();
+        $lifetime = (int) $customer->points_lifetime;
+
+        $current = $tiers->first() ?? ['key' => 'silver', 'label' => 'Member', 'min_points' => 0, 'multiplier' => 1.0, 'perk' => ''];
+        foreach ($tiers as $t) {
+            if ($lifetime >= $t['min_points']) {
+                $current = $t;
+            }
+        }
+        $next = $tiers->first(fn ($t) => $t['min_points'] > $lifetime);
+
+        $span = $next ? max(1, $next['min_points'] - $current['min_points']) : 1;
+
+        return [
+            'current' => $current,
+            'next' => $next,
+            'lifetime' => $lifetime,
+            'to_next' => $next ? max(0, $next['min_points'] - $lifetime) : 0,
+            'progress' => $next ? (int) min(100, round(($lifetime - $current['min_points']) / $span * 100)) : 100,
+        ];
+    }
+
+    public function tierMultiplier(Customer $customer): float
+    {
+        return (float) ($this->tierFor($customer)['current']['multiplier'] ?? 1.0);
+    }
+
+    /** Award the earn-on-delivery points for an order (idempotent), boosted by tier. */
     public function awardForOrder(\App\Models\Order $order): ?PointTransaction
     {
         if (! $this->enabled() || ! $order->customer) {
             return null;
         }
-        $points = $this->pointsForSpend((float) $order->subtotal);
+        $points = (int) round($this->pointsForSpend((float) $order->subtotal) * $this->tierMultiplier($order->customer));
         if ($points <= 0) {
             return null;
         }
@@ -147,9 +191,27 @@ class LoyaltyService
         $tx = $this->award($order->customer, $points, 'earn_order', 'Order '.$order->order_number.' delivered', $order);
         if ($tx) {
             $order->update(['points_earned' => $points]);
+            $this->rewardReferralIfFirst($order->customer->fresh());
         }
 
         return $tx;
+    }
+
+    /** When a referred customer's first order is delivered, reward both sides once. */
+    public function rewardReferralIfFirst(Customer $customer): void
+    {
+        if ($customer->referral_rewarded || ! $customer->referred_by) {
+            return;
+        }
+        $referrer = $customer->referrer;
+        if (! $referrer) {
+            return;
+        }
+
+        $pts = $this->referralPoints();
+        $this->award($customer, $pts, 'adjust', 'Referral welcome bonus 🎁');
+        $this->award($referrer, $pts, 'adjust', 'Referral reward — '.$customer->name.' placed their first order');
+        $customer->forceFill(['referral_rewarded' => true])->saveQuietly();
     }
 
     // ── Weekly milestones ─────────────────────────────────────────────────────
