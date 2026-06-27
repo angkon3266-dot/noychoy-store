@@ -314,20 +314,8 @@
             </div>
             @endif
 
-            {{-- Mobile navigation — left slide-in drawer. Teleported to <body> because the
-                 header's backdrop-filter creates a containing block that would otherwise trap
-                 this fixed overlay inside the 64px-tall header. --}}
-            <template x-teleport="body">
-            <div x-show="open" x-cloak class="md:hidden" style="display:none; position:fixed; inset:0; z-index:60;">
-                <div class="bg-black/30" style="position:absolute; inset:0; background:rgba(0,0,0,.35);" @click="open=false" x-transition.opacity></div>
-                <div class="bg-gold-50 shadow-2xl flex flex-col" style="position:absolute; left:0; top:0; height:100%; width:82%; max-width:320px;"
-                     x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
-                     x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full">
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-gold-200">
-                        <span class="font-display font-semibold">Menu</span>
-                        <button type="button" @click="open=false" class="p-1 text-ink-700/60 hover:text-ink-900 text-2xl leading-none" aria-label="Close menu">&times;</button>
-                    </div>
-                    <div class="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+            {{-- Mobile navigation — inline dropdown below the header --}}
+            <div x-show="open" x-cloak class="md:hidden pb-4 space-y-1">
                 @foreach($siteMenu ?? [] as $item)
                     @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
                     @if($mtype === 'link')
@@ -365,10 +353,7 @@
                 @if($ctaLabel = theme('menu_cta_label'))
                     <a href="{{ theme('menu_cta_link') ?: route('shop') }}" class="block py-2 mt-1 text-gold-700 font-medium">{{ $ctaLabel }}</a>
                 @endif
-                    </div>
-                </div>
             </div>
-            </template>
         </div>
     </header>
 
