@@ -12,13 +12,6 @@
             </div>
         @endif
 
-        @if(\App\Http\Controllers\Customer\GoogleController::isEnabled())
-            <div class="mt-6"><x-google-button>Sign up with Google</x-google-button></div>
-            <div class="flex items-center gap-3 my-5 text-xs text-ink-700/40">
-                <span class="h-px flex-1 bg-ink-100"></span>OR<span class="h-px flex-1 bg-ink-100"></span>
-            </div>
-        @endif
-
         <form action="{{ route('customer.register.post') }}" method="POST" class="mt-6 space-y-4">
             @csrf
             <div><label class="label">Full name</label><input name="name" value="{{ old('name') }}" class="input" required></div>
