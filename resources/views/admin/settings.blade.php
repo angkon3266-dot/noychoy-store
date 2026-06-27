@@ -3,6 +3,10 @@
 @section('heading', 'Settings')
 
 @section('content')
+@if(session('success'))<div class="mb-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-2.5 text-sm">{{ session('success') }}</div>@endif
+@if(session('error'))<div class="mb-4 rounded-md bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 text-sm">{{ session('error') }}</div>@endif
+@if($errors->any())<div class="mb-4 rounded-md bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 text-sm">{{ $errors->first() }}</div>@endif
+
 <div class="grid lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 card p-6">
         <h2 class="font-semibold mb-4">Store settings</h2>
@@ -36,5 +40,43 @@
         </ul>
         <p class="text-xs text-ink-700/50 mt-4">API keys for Steadfast &amp; SMS are configured in the server <code>.env</code> file for security.</p>
     </div>
+</div>
+
+{{-- Email (SMTP) — sends order confirmations & invoices --}}
+<div class="card p-6 mt-6 max-w-3xl">
+    <div class="flex items-center justify-between mb-1">
+        <h2 class="font-semibold">Email (SMTP)</h2>
+        <span class="badge {{ $mail['enabled'] && $mail['host'] ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }}">{{ $mail['enabled'] && $mail['host'] ? 'Active' : 'Off' }}</span>
+    </div>
+    <p class="text-xs text-ink-700/60 mb-4">Used to email customers their <strong>order confirmation &amp; invoice</strong> when they provide an email. Create a mailbox in cPanel (e.g. <code>orders@meridianeclat.shop</code>) and enter its SMTP details below.</p>
+
+    <form action="{{ route('admin.settings.mail') }}" method="POST" class="space-y-4">
+        @csrf
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="mail_enabled" value="1" @checked($mail['enabled'])> Enable sending email via SMTP</label>
+        <div class="grid sm:grid-cols-2 gap-4">
+            <div><label class="label">SMTP host</label><input name="mail_host" value="{{ $mail['host'] }}" class="input" placeholder="mail.meridianeclat.shop"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="label">Port</label><input name="mail_port" type="number" value="{{ $mail['port'] }}" class="input" placeholder="465"></div>
+                <div><label class="label">Encryption</label>
+                    <select name="mail_encryption" class="input">
+                        <option value="ssl" @selected($mail['encryption']=='ssl')>SSL (465)</option>
+                        <option value="tls" @selected($mail['encryption']=='tls')>TLS (587)</option>
+                        <option value="none" @selected($mail['encryption']=='none')>None</option>
+                    </select>
+                </div>
+            </div>
+            <div><label class="label">Username (full email)</label><input name="mail_username" value="{{ $mail['username'] }}" class="input" placeholder="orders@meridianeclat.shop"></div>
+            <div><label class="label">Password</label><input name="mail_password" type="password" class="input" placeholder="{{ $mail['has_password'] ? '•••••••• (unchanged)' : 'mailbox password' }}"><p class="text-xs text-ink-700/40 mt-1">Leave blank to keep the saved password.</p></div>
+            <div><label class="label">From address</label><input name="mail_from_address" type="email" value="{{ $mail['from_address'] }}" class="input" placeholder="orders@meridianeclat.shop"></div>
+            <div><label class="label">From name</label><input name="mail_from_name" value="{{ $mail['from_name'] }}" class="input" placeholder="Meridian Éclat"></div>
+        </div>
+        <button class="btn-primary">Save email settings</button>
+    </form>
+
+    <form action="{{ route('admin.settings.mail.test') }}" method="POST" class="mt-4 flex flex-wrap items-end gap-2 border-t border-ink-100 pt-4">
+        @csrf
+        <div class="flex-1 min-w-[220px]"><label class="label">Send a test email to</label><input name="test_email" type="email" class="input" placeholder="you@gmail.com" required></div>
+        <button class="btn-outline">Send test</button>
+    </form>
 </div>
 @endsection

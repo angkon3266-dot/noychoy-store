@@ -16,6 +16,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Apply admin-managed SMTP settings to the live mailer (overrides .env / cached config).
+        app(\App\Services\MailConfigurator::class)->apply();
+
         // Shared data for the storefront layout (nav menu + cart badge).
         View::composer(['shop.*', 'components.shop.*', 'layouts.shop'], function ($view) {
             $view->with('navCategories', Category::active()->whereNull('parent_id')

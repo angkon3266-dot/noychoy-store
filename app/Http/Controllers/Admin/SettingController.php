@@ -24,7 +24,66 @@ class SettingController extends Controller
                 'steadfast_configured' => $steadfast->isConfigured(),
                 'sms_enabled' => $sms->isEnabled(),
             ],
+            'mail' => [
+                'enabled' => (bool) Setting::get('mail_enabled', false),
+                'host' => Setting::get('mail_host', ''),
+                'port' => Setting::get('mail_port', '465'),
+                'username' => Setting::get('mail_username', ''),
+                'has_password' => filled(Setting::get('mail_password')),
+                'encryption' => Setting::get('mail_encryption', 'ssl'),
+                'from_address' => Setting::get('mail_from_address', ''),
+                'from_name' => Setting::get('mail_from_name', Setting::get('store_name', config('store.name'))),
+            ],
         ]);
+    }
+
+    /** Save SMTP email settings (used to send order confirmations & invoices). */
+    public function updateMail(Request $request)
+    {
+        $data = $request->validate([
+            'mail_host' => ['nullable', 'string', 'max:160'],
+            'mail_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'mail_username' => ['nullable', 'string', 'max:160'],
+            'mail_password' => ['nullable', 'string', 'max:200'],
+            'mail_encryption' => ['nullable', 'in:ssl,tls,none'],
+            'mail_from_address' => ['nullable', 'email', 'max:160'],
+            'mail_from_name' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        Setting::put('mail_enabled', $request->boolean('mail_enabled'));
+        Setting::put('mail_host', $data['mail_host'] ?? null);
+        Setting::put('mail_port', $data['mail_port'] ?? 465);
+        Setting::put('mail_username', $data['mail_username'] ?? null);
+        Setting::put('mail_encryption', $data['mail_encryption'] ?? 'ssl');
+        Setting::put('mail_from_address', $data['mail_from_address'] ?? null);
+        Setting::put('mail_from_name', $data['mail_from_name'] ?? null);
+
+        // Only overwrite the stored password when a new one is typed in.
+        if (filled($data['mail_password'] ?? null)) {
+            Setting::put('mail_password', $data['mail_password']);
+        }
+
+        return back()->with('success', 'Email (SMTP) settings saved.');
+    }
+
+    /** Send a test email to confirm SMTP works. */
+    public function testMail(Request $request)
+    {
+        $data = $request->validate(['test_email' => ['required', 'email']]);
+
+        // Apply the just-saved DB settings to the live mailer for this request.
+        app(\App\Services\MailConfigurator::class)->apply();
+
+        try {
+            \Illuminate\Support\Facades\Mail::raw(
+                'This is a test email from your '.Setting::get('store_name', config('store.name')).' store. If you received this, SMTP is working. 🎉',
+                fn ($m) => $m->to($data['test_email'])->subject('SMTP test — '.Setting::get('store_name', config('store.name')))
+            );
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Test failed: '.$e->getMessage());
+        }
+
+        return back()->with('success', 'Test email sent to '.$data['test_email'].'. Check the inbox (and spam).');
     }
 
     public function update(Request $request)

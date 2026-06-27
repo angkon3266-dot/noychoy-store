@@ -144,4 +144,6 @@ Route::middleware('admin')->group(function () {
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::post('settings/mail', [SettingController::class, 'updateMail'])->name('settings.mail');
+    Route::post('settings/mail/test', [SettingController::class, 'testMail'])->name('settings.mail.test');
 });
