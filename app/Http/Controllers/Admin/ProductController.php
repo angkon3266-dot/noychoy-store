@@ -224,6 +224,45 @@ class ProductController extends Controller
         return back()->with('success', $product->name.' updated.');
     }
 
+    /**
+     * Inline quick-edit from the product list: price, stock, append images & video
+     * links — all without opening the full product form.
+     */
+    public function quickMedia(Request $request, Product $product)
+    {
+        $data = $request->validate([
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'stock_quantity' => ['nullable', 'integer', 'min:0'],
+            'images' => ['nullable', 'array'],
+            'images.*' => ['image', 'max:8192'],
+            'video_urls' => ['nullable', 'array'],
+            'video_urls.*' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if (filled($data['price'] ?? null)) {
+            $product->price = $data['price'];
+        }
+        if (array_key_exists('stock_quantity', $data) && $data['stock_quantity'] !== null) {
+            $product->stock_quantity = $data['stock_quantity'];
+            if ($product->manage_stock) {
+                $product->in_stock = $data['stock_quantity'] > 0;
+            }
+        }
+
+        // Append any new video links to the existing gallery videos.
+        $newVideos = collect($data['video_urls'] ?? [])->map(fn ($u) => trim((string) $u))->filter()->values();
+        if ($newVideos->isNotEmpty()) {
+            $product->video_urls = collect($product->video_urls ?? [])->merge($newVideos)->filter()->unique()->values()->all();
+        }
+
+        $product->save();
+
+        // Append uploaded images to the gallery (reuses the full-form logic).
+        $this->syncImages($request, $product);
+
+        return back()->with('success', $product->name.' updated.');
+    }
+
     /** Bulk actions on selected products. */
     public function bulk(Request $request)
     {

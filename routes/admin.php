@@ -32,6 +32,7 @@ Route::middleware('admin')->group(function () {
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate');
     Route::patch('products/{product}/quick', [ProductController::class, 'quickUpdate'])->name('products.quick');
+    Route::post('products/{product}/quick-media', [ProductController::class, 'quickMedia'])->name('products.quick-media');
     Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     Route::delete('product-images/{image}', [ProductController::class, 'deleteImage'])->name('products.images.delete');

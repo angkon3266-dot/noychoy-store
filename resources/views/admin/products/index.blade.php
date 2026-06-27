@@ -84,56 +84,74 @@
                     <th></th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-ink-100">
-                @forelse($products as $product)
-                    <tr class="hover:bg-ink-50">
-                        <td class="px-4 py-3"><input type="checkbox" value="{{ $product->id }}" x-model.number="sel"></td>
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded bg-gold-100 overflow-hidden shrink-0">
-                                    @if($product->thumbnail)<img src="{{ $product->thumbnail }}" class="w-full h-full object-cover" alt="">@endif
-                                </div>
-                                <div>
-                                    <div class="font-medium">{{ $product->name }} @if($product->is_featured)<span class="badge bg-gold-100 text-gold-700 text-[10px]">★</span>@endif</div>
-                                    <div class="text-xs text-ink-700/50 flex items-center gap-1.5 flex-wrap">
-                                        <span class="badge {{ $product->has_variants ? 'bg-violet-100 text-violet-700' : 'bg-ink-100 text-ink-600' }} text-[10px]">{{ $product->type_label }}</span>
-                                        @if($product->sku)<span>{{ $product->sku }}</span>@endif
-                                        @foreach($product->tag_list as $t)<span class="badge bg-gold-50 text-gold-700 text-[10px]">{{ $t }}</span>@endforeach
-                                    </div>
+            @forelse($products as $product)
+            <tbody x-data="{ q: false }" class="border-b border-ink-100">
+                <tr class="hover:bg-ink-50">
+                    <td class="px-4 py-3"><input type="checkbox" value="{{ $product->id }}" x-model.number="sel"></td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded bg-gold-100 overflow-hidden shrink-0">
+                                @if($product->thumbnail)<img src="{{ $product->thumbnail }}" class="w-full h-full object-cover" alt="">@endif
+                            </div>
+                            <div>
+                                <div class="font-medium">{{ $product->name }} @if($product->is_featured)<span class="badge bg-gold-100 text-gold-700 text-[10px]">★</span>@endif</div>
+                                <div class="text-xs text-ink-700/50 flex items-center gap-1.5 flex-wrap">
+                                    <span class="badge bg-ink-100 text-ink-600 text-[10px]">ID #{{ $product->serial }}</span>
+                                    <span class="badge {{ $product->has_variants ? 'bg-violet-100 text-violet-700' : 'bg-ink-100 text-ink-600' }} text-[10px]">{{ $product->type_label }}</span>
+                                    @if($product->sku)<span>{{ $product->sku }}</span>@endif
+                                    @foreach($product->tag_list as $t)<span class="badge bg-gold-50 text-gold-700 text-[10px]">{{ $t }}</span>@endforeach
                                 </div>
                             </div>
-                        </td>
-                        <td class="px-4 py-3 text-ink-700/70">{{ $product->category->name ?? '—' }}</td>
-                        <td class="px-4 py-3">
-                            <form action="{{ route('admin.products.quick', $product) }}" method="POST" class="flex items-center gap-1.5">
-                                @csrf @method('PATCH')
-                                <span class="text-ink-700/50 text-xs">৳</span>
-                                <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Price">
-                                <input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input py-1 w-16 text-xs" title="Stock" @disabled(!$product->manage_stock) placeholder="∞">
-                                <button class="text-xs text-gold-700 hover:underline">Save</button>
-                            </form>
-                        </td>
-                        <td class="px-4 py-3">
-                            @if($product->margin_percent !== null)
-                                <span class="font-medium {{ $product->margin_amount < 0 ? 'text-red-600' : ($product->margin_percent < 20 ? 'text-amber-600' : 'text-green-700') }}">{{ $product->margin_percent }}%</span>
-                                <div class="text-xs text-ink-700/50">{{ money($product->margin_amount) }}/unit</div>
-                            @else
-                                <span class="text-xs text-ink-700/40">—</span>
-                            @endif
-                        </td>
-                        <td class="px-4 py-3"><span class="badge {{ $product->status=='published' ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} capitalize">{{ $product->status }}</span></td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <a href="{{ route('admin.products.edit', $product) }}" class="text-gold-700 hover:underline">Edit</a>
-                            <form action="{{ route('admin.products.duplicate', $product) }}" method="POST" class="inline">@csrf<button class="text-ink-700/70 hover:underline ml-2">Duplicate</button></form>
-                            <form action="{{ route('admin.products.destroy', $product) }}" method="POST" class="inline" onsubmit="return confirm('Delete this product?')">
-                                @csrf @method('DELETE')<button class="text-red-600 hover:underline ml-2">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No products yet. <a href="{{ route('admin.products.create') }}" class="text-gold-700 hover:underline">Add your first product</a>.</td></tr>
-                @endforelse
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-ink-700/70">{{ $product->category->name ?? '—' }}</td>
+                    <td class="px-4 py-3">
+                        <form action="{{ route('admin.products.quick', $product) }}" method="POST" class="flex items-center gap-1.5">
+                            @csrf @method('PATCH')
+                            <span class="text-ink-700/50 text-xs">৳</span>
+                            <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Price">
+                            <input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input py-1 w-16 text-xs" title="Stock" @disabled(!$product->manage_stock) placeholder="∞">
+                            <button class="text-xs text-gold-700 hover:underline">Save</button>
+                        </form>
+                    </td>
+                    <td class="px-4 py-3">
+                        @if($product->margin_percent !== null)
+                            <span class="font-medium {{ $product->margin_amount < 0 ? 'text-red-600' : ($product->margin_percent < 20 ? 'text-amber-600' : 'text-green-700') }}">{{ $product->margin_percent }}%</span>
+                            <div class="text-xs text-ink-700/50">{{ money($product->margin_amount) }}/unit</div>
+                        @else
+                            <span class="text-xs text-ink-700/40">—</span>
+                        @endif
+                    </td>
+                    <td class="px-4 py-3"><span class="badge {{ $product->status=='published' ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} capitalize">{{ $product->status }}</span></td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <button type="button" @click="q=!q" class="text-gold-700 hover:underline" x-text="q ? 'Close' : 'Quick edit'"></button>
+                        <a href="{{ route('admin.products.edit', $product) }}" class="text-ink-700/70 hover:underline ml-2">Edit</a>
+                        <form action="{{ route('admin.products.duplicate', $product) }}" method="POST" class="inline">@csrf<button class="text-ink-700/70 hover:underline ml-2">Duplicate</button></form>
+                        <form action="{{ route('admin.products.destroy', $product) }}" method="POST" class="inline" onsubmit="return confirm('Delete this product?')">
+                            @csrf @method('DELETE')<button class="text-red-600 hover:underline ml-2">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {{-- Inline quick-edit: price, stock, add images & video links without opening the full editor --}}
+                <tr x-show="q" x-cloak>
+                    <td colspan="7" class="bg-ink-50/60 px-4 py-4">
+                        <form action="{{ route('admin.products.quick-media', $product) }}" method="POST" enctype="multipart/form-data" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
+                            @csrf
+                            <div><label class="label">Selling price (৳)</label><input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input"></div>
+                            <div><label class="label">Stock</label><input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input" @disabled(!$product->manage_stock) placeholder="{{ $product->manage_stock ? '' : 'Not tracked' }}"></div>
+                            <div class="lg:col-span-2"><label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images()->count() }} now)</span></label><input type="file" name="images[]" accept="image/*" multiple class="input text-sm"></div>
+                            <div class="lg:col-span-2"><label class="label">Add video link</label><input name="video_urls[]" class="input" placeholder="YouTube link or .mp4 URL"></div>
+                            <div class="lg:col-span-2 flex items-center gap-3">
+                                <button class="btn-primary">Save</button>
+                                <a href="{{ route('admin.products.edit', $product) }}" class="text-xs text-ink-700/60 hover:underline">Open full editor (variants, SEO, reorder…)</a>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
             </tbody>
+            @empty
+            <tbody><tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No products yet. <a href="{{ route('admin.products.create') }}" class="text-gold-700 hover:underline">Add your first product</a>.</td></tr></tbody>
+            @endforelse
         </table>
     </div>
 </div>

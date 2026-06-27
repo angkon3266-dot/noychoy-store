@@ -3,6 +3,9 @@
 @section('heading', $product->exists ? 'Edit product' : 'Add product')
 
 @section('content')
+@if($product->exists)
+    <p class="text-sm text-ink-700/50 mb-3">Product ID <span class="font-semibold text-ink-700">#{{ $product->serial }}</span>@if($product->sku) · SKU {{ $product->sku }}@endif</p>
+@endif
 @if($errors->any())
     <div class="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm mb-4">
         <ul class="list-disc list-inside">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
