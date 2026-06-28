@@ -142,6 +142,11 @@ class ImageOptimizer
             $out = ob_get_clean();
             imagedestroy($src);
 
+            // Never replace with a larger file (e.g. an already well-compressed image).
+            if (strlen($out) >= $oldSize) {
+                return ['old_size' => $oldSize, 'new_size' => $oldSize, 'width' => $w, 'height' => $h];
+            }
+
             $disk->put($relativePath, $out);
 
             return ['old_size' => $oldSize, 'new_size' => strlen($out), 'width' => $w, 'height' => $h];
