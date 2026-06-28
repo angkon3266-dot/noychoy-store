@@ -351,12 +351,16 @@
             <div class="card p-6">
                 <h2 class="font-semibold mb-3">Images</h2>
                 @if($product->exists && $product->images->isNotEmpty())
-                    <p class="text-xs text-ink-700/50 mb-2">Drag to reorder. The ★ image is the primary (shown first).</p>
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs text-ink-700/50">Drag to reorder. The ★ image is the primary. Tick boxes to delete several at once.</p>
+                        <button type="button" id="imgBulkDelBtn" class="text-xs text-red-600 hover:underline hidden">Delete selected (<span id="imgSelCount">0</span>)</button>
+                    </div>
                     <div id="imgGrid" class="grid grid-cols-3 gap-2 mb-3">
                         @foreach($product->images as $image)
                             <div class="img-card relative group cursor-move" draggable="true" data-img-id="{{ $image->id }}">
                                 <img src="{{ $image->url }}" class="aspect-square w-full object-cover rounded-lg pointer-events-none {{ $image->is_primary ? 'ring-2 ring-gold-500' : '' }}" alt="">
-                                @if($image->is_primary)<span class="absolute top-1 left-1 text-xs bg-gold-500 text-white rounded px-1">★</span>@endif
+                                <input type="checkbox" class="img-sel-cb absolute top-1.5 left-1.5 w-4 h-4 z-10" value="{{ $image->id }}" title="Select for bulk delete">
+                                @if($image->is_primary)<span class="absolute top-1 right-1 text-xs bg-gold-500 text-white rounded px-1">★</span>@endif
                                 {{-- Buttons target standalone forms (below) via form="" so they are NOT nested in the product form --}}
                                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 rounded-lg">
                                     @unless($image->is_primary)
@@ -384,8 +388,9 @@
                     </template>
                     <button type="button" @click="vids.push('')" class="btn-outline text-sm">+ Add video link</button>
                     <div class="mt-3">
-                        <label class="label text-xs">Or upload MP4 / WebM (max 30 MB each)</label>
-                        <input type="file" name="video_files[]" multiple accept="video/mp4,video/webm,video/quicktime" class="input text-sm">
+                        <label class="label text-xs">Or upload MP4 / WebM / MOV</label>
+                        <input type="file" name="video_files[]" multiple accept="video/mp4,video/webm,video/quicktime,video/x-m4v" class="input text-sm">
+                        <p class="text-xs text-ink-700/50 mt-1">Max upload on this server: <strong>{{ upload_limit_mb() }} MB</strong> per file. Bigger videos are dropped before upload — compress them first (or paste a YouTube link instead).</p>
                     </div>
                 </div>
             </div>
@@ -401,6 +406,7 @@
         @endunless
         <form id="img-del-{{ $image->id }}" action="{{ route('admin.products.images.delete', $image) }}" method="POST" class="hidden" onsubmit="return confirm('Delete this image?')">@csrf @method('DELETE')</form>
     @endforeach
+    <form id="img-bulk-del" action="{{ route('admin.products.images.bulk-delete', $product) }}" method="POST" class="hidden">@csrf @method('DELETE')<div id="imgBulkInputs"></div></form>
 @endif
 
 <script>
@@ -434,6 +440,40 @@
             out.appendChild(input);
         });
     });
+
+    // Multi-select delete.
+    const cbs = grid.querySelectorAll('.img-sel-cb');
+    const delBtn = document.getElementById('imgBulkDelBtn');
+    const countEl = document.getElementById('imgSelCount');
+    const bulkForm = document.getElementById('img-bulk-del');
+    const bulkInputs = document.getElementById('imgBulkInputs');
+    const selected = () => Array.from(cbs).filter(c => c.checked);
+    const refresh = () => {
+        const n = selected().length;
+        if (countEl) countEl.textContent = n;
+        if (delBtn) delBtn.classList.toggle('hidden', n === 0);
+    };
+    // Don't let a click on the checkbox start a drag.
+    cbs.forEach(cb => {
+        cb.addEventListener('change', refresh);
+        cb.addEventListener('mousedown', e => e.stopPropagation());
+    });
+    if (delBtn && bulkForm) {
+        delBtn.addEventListener('click', () => {
+            const ids = selected().map(c => c.value);
+            if (!ids.length) return;
+            if (!confirm('Delete ' + ids.length + ' selected image(s)? This cannot be undone.')) return;
+            bulkInputs.innerHTML = '';
+            ids.forEach(id => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'image_ids[]';
+                input.value = id;
+                bulkInputs.appendChild(input);
+            });
+            bulkForm.submit();
+        });
+    }
 })();
 </script>
 @endsection

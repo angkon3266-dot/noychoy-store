@@ -48,14 +48,40 @@ class ProductController extends Controller
 
     /**
      * Bulk-create products from an uploaded CSV.
-     * Header row expected: name, price, sku, category, short_description, description, stock, status, tags
+     * Header row expected: name, price, sku, category, short_description, description,
+     * meta_description, stock, status, tags, images
+     *
+     * The optional "images" column names a folder or file(s) inside an uploaded ZIP
+     * of media — so product photos/videos kept on your local drive can be imported
+     * by simply zipping them up and uploading the zip alongside the CSV.
      */
-    public function import(Request $request)
+    public function import(Request $request, ImageOptimizer $optimizer)
     {
-        $request->validate(['file' => ['required', 'file', 'extensions:csv,txt', 'max:5120']]);
+        $request->validate([
+            'file' => ['required', 'file', 'extensions:csv,txt', 'max:5120'],
+            'media' => ['nullable', 'file', 'extensions:zip', 'max:'.(upload_limit_mb() * 1024)],
+        ]);
+
+        // Extract the optional media ZIP so rows can reference images/videos by folder/name.
+        $mediaDir = null;
+        $mediaFiles = [];
+        if ($request->hasFile('media')) {
+            if (! class_exists(\ZipArchive::class)) {
+                return back()->with('error', 'This server has no ZIP support, so the media zip cannot be read. Import the CSV without it, or add images per product.');
+            }
+            $mediaDir = storage_path('app/import-media/'.\Illuminate\Support\Str::uuid());
+            @mkdir($mediaDir, 0775, true);
+            $zip = new \ZipArchive();
+            if ($zip->open($request->file('media')->getRealPath()) === true) {
+                $zip->extractTo($mediaDir);
+                $zip->close();
+                $mediaFiles = $this->indexMediaFolder($mediaDir);
+            }
+        }
 
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         if (! $handle) {
+            $this->rrmdir($mediaDir);
             return back()->with('error', 'Could not read the file.');
         }
 
@@ -71,6 +97,7 @@ class ProductController extends Controller
         $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
         $created = 0;
         $skipped = 0;
+        $imagesAttached = 0;
         $row = 1;
 
         while (($line = fgetcsv($handle)) !== false) {
@@ -114,6 +141,7 @@ class ProductController extends Controller
                 'category_id' => $categoryId,
                 'short_description' => $data['short_description'] ?? null,
                 'description' => $data['description'] ?? null,
+                'meta_description' => $data['meta_description'] ?? null,
                 'price' => is_numeric($data['price'] ?? null) ? (float) $data['price'] : 0,
                 'manage_stock' => isset($data['stock']) && $data['stock'] !== '',
                 'stock_quantity' => (int) ($data['stock'] ?? 0),
@@ -124,12 +152,131 @@ class ProductController extends Controller
             if ($categoryId) {
                 $product->categories()->sync([$categoryId]);
             }
+
+            // Attach images/videos referenced in the "images" (or "image"/"product_image") column.
+            $mediaCell = trim((string) ($data['images'] ?? $data['image'] ?? $data['product_image'] ?? ''));
+            if ($mediaCell !== '' && $mediaDir) {
+                $imagesAttached += $this->importRowMedia($product, $mediaCell, $mediaFiles, $optimizer);
+            }
+
             $created++;
         }
         fclose($handle);
+        $this->rrmdir($mediaDir);
 
-        return redirect()->route('admin.products.index')
-            ->with('success', "Imported {$created} product(s)".($skipped ? ", skipped {$skipped} row(s) with no name." : '.'));
+        $msg = "Imported {$created} product(s)";
+        $msg .= $imagesAttached ? ", attached {$imagesAttached} media file(s)" : '';
+        $msg .= $skipped ? ", skipped {$skipped} row(s) with no name." : '.';
+
+        return redirect()->route('admin.products.index')->with('success', $msg);
+    }
+
+    /**
+     * Recursively index extracted media: returns a flat list of
+     * ['rel' => relative path lower, 'dir' => parent dir lower, 'base' => filename lower, 'abs' => full path].
+     */
+    protected function indexMediaFolder(string $baseDir): array
+    {
+        $out = [];
+        $iter = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($baseDir, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iter as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+            $rel = str_replace('\\', '/', ltrim(substr($file->getPathname(), strlen($baseDir)), '/\\'));
+            // Skip macOS zip junk (__MACOSX/, ._resource forks) and dotfiles.
+            if (str_contains($rel, '__MACOSX') || str_starts_with(basename($rel), '._') || str_starts_with(basename($rel), '.')) {
+                continue;
+            }
+            $out[] = [
+                'rel' => strtolower($rel),
+                'dir' => strtolower(trim(dirname($rel), '.')),
+                'base' => strtolower(basename($rel)),
+                'abs' => $file->getPathname(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Resolve a CSV media cell (a folder name, or comma-separated filenames) against the
+     * extracted ZIP, then attach matching images & videos to the product.
+     * Returns the number of media files attached.
+     */
+    protected function importRowMedia(Product $product, string $cell, array $mediaFiles, ImageOptimizer $optimizer): int
+    {
+        $imageExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'];
+        $videoExt = ['mp4', 'webm', 'mov', 'm4v', 'ogg'];
+
+        // Each token may be a folder or a specific file. Gather absolute paths in order.
+        $targets = [];
+        foreach (preg_split('/[,;|]/', $cell) as $token) {
+            $token = strtolower(trim(str_replace('\\', '/', $token), " \t/"));
+            if ($token === '') {
+                continue;
+            }
+            foreach ($mediaFiles as $m) {
+                $isFolderMatch = $m['dir'] === $token || str_ends_with($m['dir'], '/'.$token) || basename($m['dir']) === $token;
+                $isFileMatch = $m['rel'] === $token || $m['base'] === $token || $m['base'] === basename($token);
+                if ($isFolderMatch || $isFileMatch) {
+                    $targets[$m['abs']] = $m['base'];
+                }
+            }
+        }
+
+        $attached = 0;
+        $hasPrimary = $product->images()->where('is_primary', true)->exists();
+        $position = (int) $product->images()->max('position');
+        $videoUrls = collect($product->video_urls ?? []);
+
+        foreach ($targets as $abs => $base) {
+            $ext = strtolower(pathinfo($base, PATHINFO_EXTENSION));
+
+            if (in_array($ext, $imageExt, true)) {
+                // storeWebpFromUrl reads any path file_get_contents() can open, incl. local files.
+                $path = $optimizer->storeWebpFromUrl($abs, 'products');
+                if ($path) {
+                    $product->images()->create([
+                        'path' => $path,
+                        'alt' => $product->name,
+                        'position' => ++$position,
+                        'is_primary' => ! $hasPrimary,
+                    ]);
+                    $hasPrimary = true;
+                    $attached++;
+                }
+            } elseif (in_array($ext, $videoExt, true)) {
+                $dest = 'product-videos/'.\Illuminate\Support\Str::uuid()->toString().'.'.$ext;
+                Storage::disk('public')->put($dest, file_get_contents($abs));
+                $videoUrls->push($dest);
+                $attached++;
+            }
+        }
+
+        if ($videoUrls->isNotEmpty()) {
+            $product->update(['video_urls' => $videoUrls->filter()->unique()->values()->all()]);
+        }
+
+        return $attached;
+    }
+
+    /** Recursively remove a temp directory (used for extracted import media). */
+    protected function rrmdir(?string $dir): void
+    {
+        if (! $dir || ! is_dir($dir)) {
+            return;
+        }
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($items as $item) {
+            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+        }
+        @rmdir($dir);
     }
 
     public function create()
@@ -262,6 +409,8 @@ class ProductController extends Controller
             'images.*' => ['image', 'max:8192'],
             'video_urls' => ['nullable', 'array'],
             'video_urls.*' => ['nullable', 'string', 'max:255'],
+            'video_files' => ['nullable', 'array'],
+            'video_files.*' => ['nullable', 'file', 'mimes:mp4,webm,mov,m4v,ogg', 'max:51200'],
         ]);
 
         if (filled($data['price'] ?? null)) {
@@ -293,8 +442,9 @@ class ProductController extends Controller
 
         $product->save();
 
-        // Append uploaded images to the gallery (reuses the full-form logic).
+        // Append uploaded images & videos to the gallery (reuses the full-form logic).
         $this->syncImages($request, $product);
+        $this->syncVideos($request, $product);
 
         return back()->with('success', $product->name.' updated.');
     }
@@ -329,6 +479,30 @@ class ProductController extends Controller
             : "$count product(s) updated.";
 
         return back()->with('success', $msg);
+    }
+
+    /** Delete several selected images of a product at once. */
+    public function bulkDeleteImages(Request $request, Product $product)
+    {
+        $data = $request->validate([
+            'image_ids' => ['required', 'array', 'min:1'],
+            'image_ids.*' => ['integer'],
+        ]);
+
+        $images = $product->images()->whereIn('id', $data['image_ids'])->get();
+        foreach ($images as $image) {
+            if (! str_starts_with($image->path, 'http')) {
+                Storage::disk('public')->delete($image->path);
+            }
+            $image->delete();
+        }
+
+        // Make sure the product still has a primary image.
+        if (! $product->images()->where('is_primary', true)->exists()) {
+            $product->images()->orderBy('position')->first()?->update(['is_primary' => true]);
+        }
+
+        return back()->with('success', $images->count().' image(s) removed.');
     }
 
     public function deleteImage(ProductImage $image)
@@ -395,7 +569,7 @@ class ProductController extends Controller
             'video_urls' => ['nullable', 'array'],
             'video_urls.*' => ['nullable', 'string', 'max:255'],
             'video_files' => ['nullable', 'array'],
-            'video_files.*' => ['nullable', 'file', 'mimetypes:video/mp4,video/webm,video/quicktime', 'max:30720'],
+            'video_files.*' => ['nullable', 'file', 'mimes:mp4,webm,mov,m4v,ogg', 'max:51200'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
             'quantity_offers' => ['nullable', 'array'],

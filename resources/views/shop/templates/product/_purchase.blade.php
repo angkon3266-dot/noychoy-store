@@ -138,13 +138,16 @@
 
     {{-- Pre-order banner --}}
     @if($product->isPreorder())
+        @php
+            // Estimated delivery for pre-bookings: 2 weeks from today, unless a manual
+            // "Expected availability date" has been set on the product (manual wins).
+            $preorderEta = $product->preorder_release_date ?: now()->addDays(14);
+        @endphp
         <div class="mt-5 rounded-xl border border-violet-200 bg-violet-50 p-4">
             <p class="text-sm font-semibold text-violet-800 flex items-center gap-1.5">📅 Pre-order item</p>
             <p class="text-sm text-violet-700/80 mt-1">
-                {{ $product->preorder_note ?: 'Reserve yours now — shipped as soon as stock arrives.' }}
-                @if($product->preorder_release_date)
-                    <br>Expected availability: <strong>{{ $product->preorder_release_date->format('d M Y') }}</strong>.
-                @endif
+                {{ $product->preorder_note ?: 'Reserve yours now — booked items ship within about 2 weeks.' }}
+                <br>Estimated delivery: <strong>{{ $preorderEta->format('d M Y') }}</strong>.
             </p>
         </div>
     @endif

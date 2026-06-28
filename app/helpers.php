@@ -12,6 +12,40 @@ if (! function_exists('money')) {
     }
 }
 
+if (! function_exists('upload_limit_mb')) {
+    /**
+     * The real maximum file-upload size this server allows, in whole MB.
+     * It's the smaller of php.ini's upload_max_filesize and post_max_size —
+     * uploads larger than this are silently dropped before Laravel sees them
+     * (the usual cause of "my video won't upload" on shared hosting).
+     */
+    function upload_limit_mb(): int
+    {
+        $toMb = function ($value): int {
+            $value = trim((string) $value);
+            if ($value === '') {
+                return 0;
+            }
+            $unit = strtolower(substr($value, -1));
+            $num = (float) $value;
+
+            return (int) match ($unit) {
+                'g' => $num * 1024,
+                'm' => $num,
+                'k' => ceil($num / 1024),
+                default => ceil($num / 1048576), // bare bytes
+            };
+        };
+
+        $limits = array_filter([
+            $toMb(ini_get('upload_max_filesize')),
+            $toMb(ini_get('post_max_size')),
+        ]);
+
+        return $limits ? max(1, (int) min($limits)) : 8;
+    }
+}
+
 if (! function_exists('theme')) {
     /**
      * Read a theme/appearance setting, falling back to config defaults.
