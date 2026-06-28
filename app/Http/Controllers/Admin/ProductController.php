@@ -35,7 +35,10 @@ class ProductController extends Controller
 
         $bulkCategories = Category::orderBy('name')->get(['id', 'name']);
 
-        return view('admin.products.index', compact('products', 'allTags', 'bulkCategories'));
+        // For the quick-edit "related products" picker.
+        $allProducts = Product::orderBy('name')->get(['id', 'name']);
+
+        return view('admin.products.index', compact('products', 'allTags', 'bulkCategories', 'allProducts'));
     }
 
     public function importForm()
@@ -251,6 +254,10 @@ class ProductController extends Controller
         $data = $request->validate([
             'price' => ['nullable', 'numeric', 'min:0'],
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
+            'tags' => ['nullable', 'string', 'max:255'],
+            'colors' => ['nullable', 'string', 'max:255'],
+            'upsell_ids' => ['nullable', 'array'],
+            'upsell_ids.*' => ['integer', 'exists:products,id'],
             'images' => ['nullable', 'array'],
             'images.*' => ['image', 'max:8192'],
             'video_urls' => ['nullable', 'array'],
@@ -259,6 +266,17 @@ class ProductController extends Controller
 
         if (filled($data['price'] ?? null)) {
             $product->price = $data['price'];
+        }
+        if ($request->has('tags')) {
+            $product->tags = $data['tags'] ?: null;
+        }
+        if ($request->has('colors')) {
+            $product->colors = collect(explode(',', (string) ($data['colors'] ?? '')))
+                ->map(fn ($c) => trim($c))->filter()->unique()->values()->all();
+        }
+        if ($request->has('upsell_ids')) {
+            $product->upsell_ids = collect($data['upsell_ids'] ?? [])->map(fn ($i) => (int) $i)
+                ->reject(fn ($i) => $i === $product->id)->values()->all();
         }
         if (array_key_exists('stock_quantity', $data) && $data['stock_quantity'] !== null) {
             $product->stock_quantity = $data['stock_quantity'];

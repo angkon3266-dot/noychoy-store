@@ -141,6 +141,19 @@
                             <div><label class="label">Stock</label><input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input" @disabled(!$product->manage_stock) placeholder="{{ $product->manage_stock ? '' : 'Not tracked' }}"></div>
                             <div class="lg:col-span-2"><label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images()->count() }} now)</span></label><input type="file" name="images[]" accept="image/*" multiple class="input text-sm"></div>
                             <div class="lg:col-span-2"><label class="label">Add video link</label><input name="video_urls[]" class="input" placeholder="YouTube link or .mp4 URL"></div>
+                            <div><label class="label">Tags</label><input name="tags" value="{{ $product->tags }}" class="input" placeholder="bestseller, eid"></div>
+                            <div><label class="label">Colours</label><input name="colors" value="{{ implode(', ', $product->color_list ?? []) }}" class="input" placeholder="Gold, Silver"></div>
+                            <div class="lg:col-span-2">
+                                <label class="label">Related products</label>
+                                <select name="upsell_ids[]" multiple size="4" class="input text-sm">
+                                    @foreach($allProducts as $rp)
+                                        @if($rp->id !== $product->id)
+                                            <option value="{{ $rp->id }}" @selected(in_array($rp->id, $product->upsell_ids ?? []))>{{ $rp->name }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-ink-700/40 mt-1">Ctrl/Cmd-click to select multiple.</p>
+                            </div>
                             <div class="lg:col-span-2 flex items-center gap-3">
                                 <button class="btn-primary">Save</button>
                                 <a href="{{ route('admin.products.edit', $product) }}" class="text-xs text-ink-700/60 hover:underline">Open full editor (variants, SEO, reorder…)</a>
