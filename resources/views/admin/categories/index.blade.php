@@ -38,39 +38,34 @@
     <div class="lg:col-span-2 card overflow-hidden">
         <table class="w-full text-sm">
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
-                <tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Parent</th><th class="px-4 py-3">Products</th><th class="px-4 py-3">Active</th><th></th></tr>
+                <tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Parent</th><th class="px-4 py-3">Products</th><th class="px-4 py-3">Order</th><th class="px-4 py-3">Active</th><th></th></tr>
             </thead>
             <tbody class="divide-y divide-ink-100">
                 @forelse($categories as $cat)
-                    <tr x-data="{ edit: false }" class="{{ $cat->parent_id ? 'bg-ink-50/40' : '' }}">
+                    <tr class="{{ $cat->parent_id ? 'bg-ink-50/40' : '' }}">
                         <td class="px-4 py-3">
-                            <span x-show="!edit" class="{{ $cat->parent_id ? 'pl-6 text-ink-700/90' : 'font-medium' }}">
+                            <span class="{{ $cat->parent_id ? 'pl-6 text-ink-700/90' : 'font-medium' }}">
                                 @if($cat->parent_id)<span class="text-ink-300 mr-1">└</span>@endif{{ $cat->name }}
                                 @if($cat->product_template)<span class="badge bg-gold-100 text-gold-700 ml-1">{{ config('theme.product_templates.'.$cat->product_template.'.name', $cat->product_template) }}</span>@endif
                             </span>
-                            <form x-show="edit" x-cloak action="{{ route('admin.categories.update', $cat) }}" method="POST" class="flex flex-wrap gap-1 items-center">
-                                @csrf @method('PUT')
-                                <input name="name" value="{{ $cat->name }}" class="input py-1 w-40">
-                                <select name="product_template" class="input py-1 w-44">
-                                    <option value="">Default template</option>
-                                    @foreach(config('theme.product_templates') as $key => $tpl)
-                                        <option value="{{ $key }}" @selected($cat->product_template==$key)>{{ $tpl['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <input type="hidden" name="is_active" value="{{ $cat->is_active ? 1 : 0 }}">
-                                <button class="btn-primary py-1 px-2 text-xs">Save</button>
-                            </form>
                         </td>
                         <td class="px-4 py-3 text-ink-700/70">{{ $cat->parent->name ?? '—' }}</td>
                         <td class="px-4 py-3">{{ $cat->products()->count() }}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-0.5">
+                                <form action="{{ route('admin.categories.move', $cat) }}" method="POST">@csrf<input type="hidden" name="direction" value="up"><button class="px-1.5 py-0.5 text-ink-700/60 hover:text-gold-700 hover:bg-gold-50 rounded" title="Move up">▲</button></form>
+                                <form action="{{ route('admin.categories.move', $cat) }}" method="POST">@csrf<input type="hidden" name="direction" value="down"><button class="px-1.5 py-0.5 text-ink-700/60 hover:text-gold-700 hover:bg-gold-50 rounded" title="Move down">▼</button></form>
+                                <span class="text-xs text-ink-700/40 ml-1">#{{ $cat->position }}</span>
+                            </div>
+                        </td>
                         <td class="px-4 py-3">{!! $cat->is_active ? '<span class="badge bg-green-100 text-green-700">Yes</span>' : '<span class="badge bg-ink-100 text-ink-700">No</span>' !!}</td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <button @click="edit=!edit" class="text-gold-700 hover:underline">Edit</button>
+                            <a href="{{ route('admin.categories.edit', $cat) }}" class="text-gold-700 hover:underline">Edit</a>
                             <form action="{{ route('admin.categories.destroy', $cat) }}" method="POST" class="inline" onsubmit="return confirm('Delete category?')">@csrf @method('DELETE')<button class="text-red-600 hover:underline ml-2">Delete</button></form>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-4 py-10 text-center text-ink-700/50">No categories yet.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-10 text-center text-ink-700/50">No categories yet.</td></tr>
                 @endforelse
             </tbody>
         </table>
