@@ -49,7 +49,7 @@ class ProductController extends Controller
      */
     public function import(Request $request)
     {
-        $request->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:5120']]);
+        $request->validate(['file' => ['required', 'file', 'extensions:csv,txt', 'max:5120']]);
 
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         if (! $handle) {
@@ -60,7 +60,10 @@ class ProductController extends Controller
         if (! $header) {
             return back()->with('error', 'The file appears to be empty.');
         }
+        // Strip a UTF-8 BOM from the first header cell so "name" matches.
+        $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $header[0]);
         $cols = array_map(fn ($h) => strtolower(trim((string) $h)), $header);
+        $colCount = count($cols);
 
         $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
         $created = 0;
@@ -69,7 +72,22 @@ class ProductController extends Controller
 
         while (($line = fgetcsv($handle)) !== false) {
             $row++;
-            $data = array_combine($cols, array_pad($line, count($cols), null));
+
+            // Skip fully blank lines and normalise the row to exactly the header
+            // width (CSV rows with extra/missing commas would otherwise crash
+            // array_combine with a count mismatch → 500).
+            if ($line === [null] || $line === [false]) {
+                continue;
+            }
+            $line = array_slice(array_pad($line, $colCount, null), 0, $colCount);
+
+            try {
+                $data = array_combine($cols, $line);
+            } catch (\Throwable $e) {
+                $skipped++;
+                continue;
+            }
+
             $name = trim((string) ($data['name'] ?? ''));
             if ($name === '') {
                 $skipped++;

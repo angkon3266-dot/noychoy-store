@@ -4,15 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Admin') — {{ config('store.name') }} Admin</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {{-- Alpine is bundled via Vite (resources/js/app.js) — no CDN. --}}
 </head>
 <body class="bg-ink-50 text-ink-800" x-data="{ sidebar: false }">
 <div class="min-h-screen flex">
     <!-- Sidebar -->
-    <aside class="fixed inset-y-0 left-0 z-40 w-60 bg-ink-900 text-gold-100/80 transform transition md:translate-x-0"
+    <aside class="fixed inset-y-0 left-0 z-40 w-60 bg-ink-900 text-gold-100/80 transform transition md:translate-x-0 flex flex-col"
            :class="sidebar ? 'translate-x-0' : '-translate-x-full'">
-        <div class="h-16 flex items-center px-5 border-b border-white/10">
+        <div class="h-16 flex items-center px-5 border-b border-white/10 shrink-0">
             <a href="{{ route('admin.dashboard') }}" class="font-display text-xl font-bold text-gold-300">{{ config('store.name') }}</a>
         </div>
         @php $nav = [
@@ -36,7 +38,7 @@
             ['users.index','Staff & roles','M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z'],
             ['profile','My profile','M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z'],
         ]; @endphp
-        <nav class="p-3 space-y-1">
+        <nav class="p-3 space-y-1 flex-1 overflow-y-auto min-h-0">
             @foreach($nav as [$route, $label, $icon])
                 @continue(! auth()->user()->canAccess(\Illuminate\Support\Str::before($route, '.')))
                 <a href="{{ route('admin.'.$route) }}"
@@ -46,7 +48,7 @@
                 </a>
             @endforeach
         </nav>
-        <div class="absolute bottom-0 inset-x-0 p-3 border-t border-white/10">
+        <div class="shrink-0 p-3 border-t border-white/10">
             <a href="{{ route('home') }}" target="_blank" class="block text-xs text-gold-100/50 hover:text-white px-3 py-1">↗ View store</a>
             <form action="{{ route('admin.logout') }}" method="POST">@csrf<button class="w-full text-left text-sm px-3 py-2 hover:bg-white/5 rounded-lg">Log out</button></form>
         </div>

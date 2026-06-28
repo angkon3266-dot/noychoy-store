@@ -21,7 +21,7 @@
             <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
         @endif
     @endisset
-    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@endif
+    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">@endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
     {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}
