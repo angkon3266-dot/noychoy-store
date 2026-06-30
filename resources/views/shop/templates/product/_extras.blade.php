@@ -1,8 +1,11 @@
 {{-- Description, related & recently-viewed. Not Alpine-dependent. --}}
 @if($product->description)
-    <section class="mt-12 max-w-3xl">
-        <h2 class="font-display text-2xl font-semibold mb-3">Description</h2>
-        <div class="prose prose-sm max-w-none text-ink-700/85">{!! nl2br(e($product->description)) !!}</div>
+    <section class="mt-12 max-w-3xl border-t border-ink-100 pt-8" x-data="{ open: true }">
+        <button type="button" @click="open = !open" class="w-full flex items-center justify-between gap-4 text-left">
+            <h2 class="font-display text-2xl font-semibold">Description</h2>
+            <svg class="w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="prose prose-sm max-w-none text-ink-700/85 mt-3" x-show="open" x-collapse x-cloak>{!! nl2br(e($product->description)) !!}</div>
     </section>
 @endif
 

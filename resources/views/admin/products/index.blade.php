@@ -34,13 +34,14 @@
 @php($pageIds = $products->pluck('id')->values())
 <div x-data="{
         sel: [],
-        catId: '',
+        catIds: [],
         allIds: {{ Js::from($pageIds) }},
         toggleAll(e) { this.sel = e.target.checked ? [...this.allIds] : []; },
         run(action) {
             if (!this.sel.length) return;
             if (action === 'delete' && !confirm('Delete ' + this.sel.length + ' product(s)? This cannot be undone.')) return;
-            if (action === 'category' && !this.catId) { alert('Pick a category first.'); return; }
+            if (action === 'category' && !this.catIds.length) { alert('Pick at least one category first.'); return; }
+            if (action === 'category' && !confirm('This will REPLACE the categories of ' + this.sel.length + ' product(s) with the ' + this.catIds.length + ' selected. Continue?')) return;
             this.$refs.act.value = action;
             this.$refs.bulk.submit();
         }
@@ -55,11 +56,11 @@
         <button type="button" @click="run('feature')" class="text-gold-700 hover:underline">Feature</button>
         <button type="button" @click="run('unfeature')" class="text-gold-700 hover:underline">Unfeature</button>
         <span class="text-ink-300">|</span>
-        <select x-model="catId" class="input py-1 text-xs w-40">
-            <option value="">Move to category…</option>
+        <select x-model="catIds" multiple size="1" class="input py-1 text-xs w-44 h-auto max-h-24" title="Ctrl/Cmd-click to pick several">
             @foreach($bulkCategories as $cat)<option value="{{ $cat->id }}">{{ $cat->name }}</option>@endforeach
         </select>
-        <button type="button" @click="run('category')" class="text-gold-700 hover:underline">Apply</button>
+        <button type="button" @click="run('category')" class="text-gold-700 hover:underline">Set categories (<span x-text="catIds.length"></span>)</button>
+        <span class="text-[11px] text-ink-700/40">replaces existing · Ctrl/Cmd-click for several</span>
         <button type="button" @click="run('delete')" class="text-red-600 hover:underline ml-auto">Delete</button>
     </div>
 
@@ -67,7 +68,7 @@
     <form x-ref="bulk" action="{{ route('admin.products.bulk') }}" method="POST" class="hidden">
         @csrf
         <input type="hidden" name="action" x-ref="act">
-        <input type="hidden" name="category_id" :value="catId">
+        <template x-for="cid in catIds" :key="cid"><input type="hidden" name="category_ids[]" :value="cid"></template>
         <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
     </form>
 
@@ -139,6 +140,9 @@
                             @csrf
                             <div><label class="label">Selling price (৳)</label><input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input"></div>
                             <div><label class="label">Stock</label><input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input" @disabled(!$product->manage_stock) placeholder="{{ $product->manage_stock ? '' : 'Not tracked' }}"></div>
+                            <div><label class="label">Product cost (৳)</label><input name="cost_price" type="number" step="0.01" value="{{ $product->cost_price }}" class="input" placeholder="Supplier cost"></div>
+                            <div><label class="label">Transport / packaging (৳)</label><input name="transport_cost" type="number" step="0.01" value="{{ $product->transport_cost }}" class="input" placeholder="Per unit"></div>
+                            <div class="lg:col-span-4"><label class="label">Meta description <span class="text-ink-700/40 font-normal">(SEO)</span></label><textarea name="meta_description" rows="2" class="input" placeholder="Short summary shown in Google results">{{ $product->meta_description }}</textarea></div>
                             <div class="lg:col-span-2"><label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images()->count() }} now)</span></label><input type="file" name="images[]" accept="image/*" multiple class="input text-sm"></div>
                             <div class="lg:col-span-2"><label class="label">Add video link</label><input name="video_urls[]" class="input" placeholder="YouTube link or .mp4 URL"></div>
                             <div class="lg:col-span-2"><label class="label">Upload video <span class="text-ink-700/40 font-normal">(MP4/WebM/MOV, max {{ upload_limit_mb() }} MB)</span></label><input type="file" name="video_files[]" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" multiple class="input text-sm"></div>

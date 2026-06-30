@@ -64,7 +64,7 @@
                 </form>
             </div>
         </div>
-        <p class="text-xs text-ink-700/50 mt-2">Tip: for big savings, drag <strong>Max width</strong> down to ~800px and <strong>Quality</strong> to ~60% for product photos.</p>
+        <p class="text-xs text-ink-700/50 mt-2">Tip: for big savings, drag <strong>Max width</strong> down to ~800px and <strong>Quality</strong> to ~60% for product photos. <strong>Videos</strong> can be selected and deleted here, but not compressed on this server — compress them before uploading (e.g. HandBrake, or export at 720p).</p>
     </div>
 
     @if($view === 'list')

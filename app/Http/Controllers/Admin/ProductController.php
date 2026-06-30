@@ -255,7 +255,10 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'price' => ['nullable', 'numeric', 'min:0'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'transport_cost' => ['nullable', 'numeric', 'min:0'],
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
+            'meta_description' => ['nullable', 'string', 'max:300'],
             'tags' => ['nullable', 'string', 'max:255'],
             'colors' => ['nullable', 'string', 'max:255'],
             'upsell_ids' => ['nullable', 'array'],
@@ -270,6 +273,15 @@ class ProductController extends Controller
 
         if (filled($data['price'] ?? null)) {
             $product->price = $data['price'];
+        }
+        if ($request->has('cost_price')) {
+            $product->cost_price = $data['cost_price'];
+        }
+        if ($request->has('transport_cost')) {
+            $product->transport_cost = $data['transport_cost'];
+        }
+        if ($request->has('meta_description')) {
+            $product->meta_description = $data['meta_description'] ?: null;
         }
         if ($request->has('tags')) {
             $product->tags = $data['tags'] ?: null;
@@ -311,9 +323,11 @@ class ProductController extends Controller
             'action' => ['required', 'in:publish,draft,feature,unfeature,delete,category'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'category_id' => ['nullable', 'exists:categories,id', 'required_if:action,category'],
+            'category_ids' => ['nullable', 'array', 'required_if:action,category'],
+            'category_ids.*' => ['integer', 'exists:categories,id'],
         ]);
 
+        $catIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
         $query = Product::whereIn('id', $data['ids']);
         $count = (clone $query)->count();
 
@@ -323,14 +337,16 @@ class ProductController extends Controller
             'feature' => $query->update(['is_featured' => true]),
             'unfeature' => $query->update(['is_featured' => false]),
             'delete' => $query->get()->each->delete(),
-            'category' => $query->get()->each(function ($p) use ($data) {
-                $p->update(['category_id' => $data['category_id']]);   // set primary
-                $p->categories()->syncWithoutDetaching([$data['category_id']]); // add to pivot
+            // Replace all: set the product's categories to exactly the chosen set,
+            // primary = the first selected category.
+            'category' => $query->get()->each(function ($p) use ($catIds) {
+                $p->update(['category_id' => $catIds[0] ?? null]);
+                $p->categories()->sync($catIds);
             }),
         };
 
         $msg = $data['action'] === 'category'
-            ? "$count product(s) moved to the selected category."
+            ? "$count product(s) set to ".count($catIds)." selected category(ies)."
             : "$count product(s) updated.";
 
         return back()->with('success', $msg);
@@ -384,7 +400,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:200'],
-            'slug' => ['nullable', 'string', 'max:200', 'alpha_dash'],
+            'slug' => ['nullable', 'string', 'max:200'],
             'sku' => ['nullable', 'string', 'max:80'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'category_ids' => ['nullable', 'array'],
@@ -509,8 +525,12 @@ class ProductController extends Controller
         $validated['_category_ids'] = $catIds;          // consumed by syncCategories
         unset($validated['category_ids']);
 
+        // Slug: sanitise whatever was typed into a clean, unique slug so editing it
+        // never fails on odd characters or a collision with another product.
         if (blank($validated['slug'] ?? null)) {
             unset($validated['slug']);                  // let the model auto-generate
+        } else {
+            $validated['slug'] = Product::uniqueSlug($validated['slug'], $product?->id);
         }
 
         return $validated;

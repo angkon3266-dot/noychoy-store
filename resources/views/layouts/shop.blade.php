@@ -206,11 +206,19 @@
                         @else
                             <div class="{{ $mtype === 'mega' ? 'static' : 'relative' }}" x-data="{ o: false }"
                                  @if($menuTrigger === 'hover') @mouseenter="o=true" @mouseleave="o=false" @endif>
-                                <button type="button" @if($menuTrigger === 'click') @click="o=!o" @endif class="flex items-center gap-1 hover:text-gold-700">
-                                    {{ $item['label'] }}
-                                    @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
-                                    <svg class="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
-                                </button>
+                                <div class="flex items-center gap-0.5 hover:text-gold-700">
+                                    @if(!empty($item['url']))
+                                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-1">
+                                            {{ $item['label'] }}
+                                            @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
+                                        </a>
+                                    @else
+                                        <span class="flex items-center gap-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</span>
+                                    @endif
+                                    <button type="button" @click="o=!o" aria-label="Toggle {{ $item['label'] }} menu" class="p-1 -ml-0.5">
+                                        <svg class="w-3.5 h-3.5 opacity-60 transition-transform" :class="o && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
+                                    </button>
+                                </div>
                                 @if($mtype === 'mega')
                                     {{-- Full-width mega panel --}}
                                     <div x-show="o" x-cloak @click.outside="o=false" x-transition.opacity
@@ -324,12 +332,18 @@
                             @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
                         </a>
                     @else
-                        {{-- Parent is an accordion toggle (no navigation), per spec --}}
+                        {{-- Parent label navigates to its own page; the caret expands children --}}
                         <div x-data="{ sub: false }" class="border-b border-gold-100">
-                            <button type="button" @click="sub=!sub" class="w-full flex items-center justify-between py-2 text-left">
-                                <span class="flex items-center gap-2">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</span>
-                                <svg class="w-4 h-4 transition" :class="sub && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
+                            <div class="w-full flex items-center justify-between">
+                                @if(!empty($item['url']))
+                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-2 flex-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</a>
+                                @else
+                                    <button type="button" @click="sub=!sub" class="flex items-center gap-2 py-2 flex-1 text-left">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</button>
+                                @endif
+                                <button type="button" @click="sub=!sub" class="p-2 -mr-1" aria-label="Toggle {{ $item['label'] }}">
+                                    <svg class="w-4 h-4 transition" :class="sub && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                            </div>
                             <div x-show="sub" x-cloak class="pb-2 pl-3 space-y-1">
                                 @if($mtype === 'mega')
                                     @foreach($item['columns'] ?? [] as $col)
