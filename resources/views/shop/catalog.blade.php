@@ -62,7 +62,14 @@
 
         {{-- Products --}}
         <div>
-            <div class="flex items-center justify-end mb-4">
+            <div class="flex flex-wrap items-center justify-end gap-2 mb-4">
+                <label class="flex items-center gap-1 text-sm text-ink-700/60">Show
+                    <select name="per_page" onchange="this.form.submit()" class="input py-2 w-auto">
+                        @foreach(\App\Http\Controllers\Shop\CatalogController::PER_PAGE_OPTIONS as $pp)
+                            <option value="{{ $pp }}" @selected((int) request('per_page', 24) === $pp)>{{ $pp }}</option>
+                        @endforeach
+                    </select>
+                </label>
                 <select name="sort" onchange="this.form.submit()" class="input py-2 w-auto">
                     <option value="">Newest</option>
                     <option value="popular" @selected(request('sort')=='popular')>Most popular</option>

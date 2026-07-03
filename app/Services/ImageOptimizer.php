@@ -11,6 +11,9 @@ use Illuminate\Support\Str;
  * Resizes and converts uploaded images to WebP using PHP-GD (no Composer dep,
  * works on shared cPanel). Falls back to storing the original if GD/WebP is
  * unavailable or the source isn't a supported raster image.
+ *
+ * Transparency is preserved (logos on PNG keep their see-through background),
+ * and high-quality resampling is used so downscaled art stays crisp.
  */
 class ImageOptimizer
 {
@@ -30,13 +33,7 @@ class ImageOptimizer
                 return $file->store($dir, 'public');
             }
 
-            $src = $this->downscale($src, $maxWidth);
-
-            // Flatten transparency onto white so JPEG-style sources stay clean,
-            // while preserving alpha for PNGs converted to WebP.
-            imagepalettetotruecolor($src);
-            imagealphablending($src, true);
-            imagesavealpha($src, true);
+            $src = $this->prepare($src, $maxWidth);
 
             $path = $dir.'/'.Str::uuid()->toString().'.webp';
 
@@ -79,10 +76,7 @@ class ImageOptimizer
                 return $url;
             }
 
-            $src = $this->downscale($src, $maxWidth);
-            imagepalettetotruecolor($src);
-            imagealphablending($src, true);
-            imagesavealpha($src, true);
+            $src = $this->prepare($src, $maxWidth);
 
             $path = $dir.'/'.Str::uuid()->toString().'.webp';
             ob_start();
@@ -124,10 +118,7 @@ class ImageOptimizer
                 return null;
             }
 
-            $src = $this->downscale($src, $maxWidth);
-            imagepalettetotruecolor($src);
-            imagealphablending($src, true);
-            imagesavealpha($src, true);
+            $src = $this->prepare($src, $maxWidth);
             $w = imagesx($src);
             $h = imagesy($src);
 
@@ -161,6 +152,28 @@ class ImageOptimizer
         return function_exists('imagewebp') && function_exists('imagecreatefromstring');
     }
 
+    /**
+     * Convert to truecolor (so palette/indexed PNGs downscale cleanly), resize
+     * with high-quality resampling if needed, and flag the image so its alpha
+     * channel is written out — keeping transparent backgrounds transparent.
+     *
+     * @param  \GdImage  $img
+     * @return \GdImage
+     */
+    protected function prepare($img, int $maxWidth)
+    {
+        // Palette → truecolor BEFORE resizing, or indexed logos come out blocky.
+        imagepalettetotruecolor($img);
+
+        $img = $this->downscale($img, $maxWidth);
+
+        // Write the alpha channel as-is (no compositing onto a black canvas).
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+
+        return $img;
+    }
+
     /** @param \GdImage $img */
     protected function downscale($img, int $maxWidth)
     {
@@ -171,13 +184,17 @@ class ImageOptimizer
         }
 
         $newW = $maxWidth;
-        $newH = (int) round($h * ($maxWidth / $w));
-        $resized = imagescale($img, $newW, $newH);
-        if ($resized !== false) {
-            imagedestroy($img);
-            return $resized;
-        }
+        $newH = max(1, (int) round($h * ($maxWidth / $w)));
 
-        return $img;
+        // Transparent destination + resampled copy = sharp, alpha-preserving resize.
+        $dst = imagecreatetruecolor($newW, $newH);
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+        imagefilledrectangle($dst, 0, 0, $newW, $newH, $transparent);
+        imagecopyresampled($dst, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
+        imagedestroy($img);
+
+        return $dst;
     }
 }

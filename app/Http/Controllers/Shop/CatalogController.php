@@ -27,6 +27,9 @@ class CatalogController extends Controller
         ]);
     }
 
+    /** Products-per-page options offered on the storefront. */
+    public const PER_PAGE_OPTIONS = [12, 24, 48, 96];
+
     /** Apply filters + sort to a base query and paginate. */
     protected function paginate(Builder $base, Request $request)
     {
@@ -34,7 +37,12 @@ class CatalogController extends Controller
         $this->filters->apply($query, $request);
         $this->applySort($query, $request);
 
-        return $query->paginate(24)->withQueryString();
+        $perPage = (int) $request->query('per_page', 24);
+        if (! in_array($perPage, self::PER_PAGE_OPTIONS, true)) {
+            $perPage = 24;
+        }
+
+        return $query->paginate($perPage)->withQueryString();
     }
 
     protected function applySort($query, Request $request): void

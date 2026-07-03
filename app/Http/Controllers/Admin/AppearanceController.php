@@ -132,13 +132,14 @@ class AppearanceController extends Controller
         // Files (images) — upload replaces, or "remove" checkbox clears.
         // Branding art is downscaled + converted to small WebP so pages load fast
         // (important for ad traffic). Caps are ~2× the largest display size.
-        $brandingMax = ['logo' => 600, 'logo_mobile' => 480, 'header_center_image' => 480, 'menu_icon' => 160, 'favicon' => 128];
+        // Higher caps + quality for the logo so it stays crisp on hi-dpi screens.
+        $brandingMax = ['logo' => 1200, 'logo_mobile' => 800, 'header_center_image' => 800, 'menu_icon' => 200, 'favicon' => 128];
         foreach (['logo', 'logo_mobile', 'header_center_image', 'menu_icon', 'favicon'] as $file) {
             if ($request->hasFile($file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
                 }
-                $current[$file] = $optimizer->storeWebp($request->file($file), 'branding', $brandingMax[$file], 90);
+                $current[$file] = $optimizer->storeWebp($request->file($file), 'branding', $brandingMax[$file], 92);
             } elseif ($request->boolean('remove_'.$file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
