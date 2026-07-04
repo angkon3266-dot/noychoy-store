@@ -25,9 +25,15 @@ class ProductController extends Controller
                 ->where('custom_value', 'like', "%{$c}%")
                 ->orWhere('custom_label', 'like', "%{$c}%")
                 ->orWhere('custom_fields', 'like', "%{$c}%")))
-            ->latest()
-            ->paginate(20)
-            ->withQueryString();
+            ->latest();
+
+        // Per-page: lets the admin show more rows to select many at once.
+        $perPage = $request->query('per_page', 20);
+        $perPage = $perPage === 'all'
+            ? max(1, (clone $products)->count())
+            : (in_array((int) $perPage, [20, 50, 100, 200], true) ? (int) $perPage : 20);
+
+        $products = $products->paginate($perPage)->withQueryString();
 
         // Tag suggestions for the filter dropdown.
         $allTags = Product::whereNotNull('tags')->where('tags', '!=', '')->pluck('tags')
@@ -35,8 +41,8 @@ class ProductController extends Controller
 
         $bulkCategories = Category::orderBy('name')->get(['id', 'name']);
 
-        // For the quick-edit "related products" picker.
-        $allProducts = Product::orderBy('name')->get(['id', 'name']);
+        // For the quick-edit "related products" picker (name + thumbnail).
+        $allProducts = Product::with('primaryImage')->orderBy('name')->get(['id', 'name']);
 
         return view('admin.products.index', compact('products', 'allTags', 'bulkCategories', 'allProducts'));
     }

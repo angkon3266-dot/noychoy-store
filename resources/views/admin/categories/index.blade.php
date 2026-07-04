@@ -45,7 +45,7 @@
                     <tr class="{{ $cat->parent_id ? 'bg-ink-50/40' : '' }}">
                         <td class="px-4 py-3">
                             <span class="{{ $cat->parent_id ? 'pl-6 text-ink-700/90' : 'font-medium' }}">
-                                @if($cat->parent_id)<span class="text-ink-300 mr-1">└</span>@endif{{ $cat->name }}
+                                @if($cat->parent_id)<span class="text-ink-300 mr-1">└</span>@endif<a href="{{ route('category.show', $cat->slug) }}" target="_blank" rel="noopener" class="hover:text-gold-700 hover:underline" title="Open {{ $cat->name }} on the storefront">{{ $cat->name }}</a>
                                 @if($cat->product_template)<span class="badge bg-gold-100 text-gold-700 ml-1">{{ config('theme.product_templates.'.$cat->product_template.'.name', $cat->product_template) }}</span>@endif
                             </span>
                         </td>

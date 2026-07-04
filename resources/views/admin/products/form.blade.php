@@ -211,7 +211,7 @@
 
             <!-- Upsell / cross-sell -->
             @php
-                $allProductsJs = $allProducts->map(fn($p)=>['id'=>$p->id,'name'=>$p->name])->values();
+                $allProductsJs = $allProducts->map(fn($p)=>['id'=>$p->id,'name'=>$p->name,'thumb'=>$p->thumbnail])->values();
                 $selUp = collect(old('upsell_ids', $product->upsell_ids ?? []))->map(fn($i)=>(int)$i)->values();
                 $selCross = collect(old('cross_sell_ids', $product->cross_sell_ids ?? []))->map(fn($i)=>(int)$i)->values();
             @endphp
@@ -225,13 +225,17 @@
                                 <input x-model="q" @focus="open=true" @input="open=true" placeholder="Search products…" class="input py-2" autocomplete="off">
                                 <div x-show="open && results.length" x-cloak class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-ink-100 bg-white shadow-lg">
                                     <template x-for="p in results" :key="p.id">
-                                        <button type="button" @click="add(p.id)" class="block w-full text-left px-3 py-2 text-sm hover:bg-gold-50" x-text="p.name"></button>
+                                        <button type="button" @click="add(p.id)" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-gold-50">
+                                            <img :src="p.thumb" x-show="p.thumb" class="w-8 h-8 rounded object-cover bg-ink-100 shrink-0" alt="">
+                                            <span x-text="p.name"></span>
+                                        </button>
                                     </template>
                                 </div>
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1.5">
                                 <template x-for="p in chosen" :key="p.id">
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-gold-100 text-gold-800 text-xs px-2 py-1">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-gold-100 text-gold-800 text-xs pl-1 pr-2 py-1">
+                                        <img :src="p.thumb" x-show="p.thumb" class="w-5 h-5 rounded-full object-cover shrink-0" alt="">
                                         <span x-text="p.name"></span>
                                         <button type="button" @click="remove(p.id)" class="text-gold-700 hover:text-red-600">×</button>
                                         <input type="hidden" :name="field + '[]'" :value="p.id">

@@ -23,6 +23,11 @@
             @endforeach
         </select>
         <input name="custom" value="{{ request('custom') }}" placeholder="Custom field value…" class="input py-2 w-40">
+        <select name="per_page" onchange="this.form.submit()" class="input py-2" title="Products per page">
+            @foreach(['20','50','100','200','all'] as $pp)
+                <option value="{{ $pp }}" @selected((string) request('per_page', '20') === $pp)>{{ $pp === 'all' ? 'Show all' : $pp.' / page' }}</option>
+            @endforeach
+        </select>
         <button class="btn-outline">Filter</button>
     </form>
     <div class="flex gap-2">
