@@ -1,6 +1,6 @@
 {{-- Description, related & recently-viewed. Not Alpine-dependent. --}}
 @if($product->description)
-    <section class="mt-12 max-w-3xl border-t border-ink-100 pt-8" x-data="{ open: true }">
+    <section class="mt-12 max-w-3xl border-t border-ink-100 pt-8" x-data="{ open: false }">
         <button type="button" @click="open = !open" class="w-full flex items-center justify-between gap-4 text-left">
             <h2 class="font-display text-2xl font-semibold">Description</h2>
             <svg class="w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -161,14 +161,19 @@
             <div class="card p-5">
                 <p class="text-sm text-ink-700/70">Total for selected</p>
                 <p class="text-2xl font-semibold text-gold-700" x-text="fmt(total)"></p>
-                <form action="{{ route('cart.add-many') }}" method="POST" class="mt-3">
+                <form action="{{ route('cart.add-many') }}" method="POST" class="mt-3 space-y-2"
+                      x-data="{ none() { return !Object.values(sel).some(Boolean); } }">
                     @csrf
                     @foreach($fbtItems as $p)
                         @if($p->isAvailable() && !$p->has_variants)
                             <input type="checkbox" name="product_ids[]" value="{{ $p->id }}" x-model="sel[{{ $p->id }}]" class="hidden">
                         @endif
                     @endforeach
-                    <button class="btn-primary w-full">Add selected to cart</button>
+                    <input type="hidden" name="redirect" x-ref="redirect">
+                    <button type="submit" class="btn-primary w-full" :disabled="none()"
+                            @click="$refs.redirect.value = 'checkout'">Buy now</button>
+                    <button type="submit" class="btn-outline w-full" :disabled="none()"
+                            @click="$refs.redirect.value = ''">Add selected to cart</button>
                 </form>
             </div>
         </div>

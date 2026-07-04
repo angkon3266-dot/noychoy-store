@@ -5,10 +5,7 @@
 @endphp
 
 <div>
-    <p class="text-xs uppercase tracking-wide text-ink-700/50">
-        Product ID #{{ $product->serial }}@if($product->sku) · SKU {{ $product->sku }}@endif
-    </p>
-    <h1 class="font-display text-3xl font-semibold mt-1">{{ $product->name }}</h1>
+    <h1 class="font-display text-3xl font-semibold">{{ $product->name }}</h1>
 
     {{-- Rating summary (display) --}}
     @php

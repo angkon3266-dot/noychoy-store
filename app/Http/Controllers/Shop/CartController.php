@@ -97,6 +97,7 @@ class CartController extends Controller
         $data = $request->validate([
             'product_ids' => ['required', 'array', 'min:1'],
             'product_ids.*' => ['integer'],
+            'redirect' => ['nullable', 'in:checkout'],
         ]);
 
         $products = Product::published()->whereIn('id', $data['product_ids'])->get();
@@ -107,6 +108,11 @@ class CartController extends Controller
             }
             $this->cart->add($product, null, 1);
             $added++;
+        }
+
+        // "Buy now" sends the shopper straight to checkout with the selected items.
+        if ($added && ($data['redirect'] ?? null) === 'checkout') {
+            return redirect()->route('checkout');
         }
 
         return back()->with($added ? 'success' : 'error',

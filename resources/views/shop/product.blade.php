@@ -42,7 +42,6 @@
         <!-- Info -->
         <div>
             <h1 class="font-display text-3xl font-semibold">{{ $product->name }}</h1>
-            @if($product->sku)<p class="text-xs text-ink-700/50 mt-1">SKU: {{ $product->sku }}</p>@endif
 
             <div class="mt-4 flex items-baseline gap-3">
                 <template x-if="variant && variant!=='none'">
