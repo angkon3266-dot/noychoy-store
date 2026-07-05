@@ -232,7 +232,7 @@ document.addEventListener('alpine:init', () => {
             return this.all
                 .filter(p => !this.selected.includes(p.id))
                 .filter(p => term === '' || p.name.toLowerCase().includes(term))
-                .slice(0, 8);
+                .slice(0, 50);
         },
         get chosen() {
             return this.selected.map(id => this.all.find(p => p.id === id)).filter(Boolean);

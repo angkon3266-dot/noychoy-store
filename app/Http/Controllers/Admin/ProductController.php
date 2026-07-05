@@ -145,7 +145,7 @@ class ProductController extends Controller
         return view('admin.products.form', [
             'product' => new Product(['status' => 'published', 'manage_stock' => true, 'in_stock' => true]),
             'categories' => Category::orderBy('name')->get(),
-            'allProducts' => Product::orderBy('name')->get(['id', 'name']),
+            'allProducts' => Product::with('primaryImage')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -170,7 +170,7 @@ class ProductController extends Controller
         return view('admin.products.form', [
             'product' => $product,
             'categories' => Category::orderBy('name')->get(),
-            'allProducts' => Product::where('id', '!=', $product->id)->orderBy('name')->get(['id', 'name']),
+            'allProducts' => Product::with('primaryImage')->where('id', '!=', $product->id)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
