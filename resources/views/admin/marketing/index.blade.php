@@ -42,8 +42,11 @@
         @endforeach
     </div>
 
-    <div class="mt-5 text-sm">
+    <div class="mt-5 text-sm flex flex-wrap gap-x-6 gap-y-2">
         <a href="{{ route('admin.system-config.index') }}" class="text-gold-700 hover:underline">Settings &amp; credentials (System Config) →</a>
+        @if(config('meta.debug') || app()->environment(['local', 'development']))
+            <a href="{{ route('admin.meta.debug') }}" class="text-amber-700 hover:underline">🐞 Meta Debug (diagnostics) →</a>
+        @endif
     </div>
 </div>
 @endsection

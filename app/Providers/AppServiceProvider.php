@@ -27,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Shared config store (memoises reads for the request/worker lifecycle).
         $this->app->singleton(SystemConfigRepository::class);
+
+        // Meta Debug Mode — one instance per request so the Request ID is stable.
+        $this->app->singleton(\App\Modules\Meta\Services\MetaDebug::class);
     }
 
     public function boot(): void

@@ -47,6 +47,10 @@ return [
     // Webhook verify token (also pasted into the Meta App webhook configuration).
     'webhook_verify_token' => env('META_WEBHOOK_VERIFY_TOKEN'),
 
+    // Meta Integration Debug Mode — verbose Graph API logging + the admin debug
+    // page. Always on locally; elsewhere only when META_DEBUG=true.
+    'debug' => filter_var(env('META_DEBUG', false), FILTER_VALIDATE_BOOL),
+
     // Sync tuning.
     'sync' => [
         'batch_size' => (int) env('META_SYNC_BATCH_SIZE', 50),

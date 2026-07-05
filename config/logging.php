@@ -65,6 +65,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Meta Integration Debug Mode — kept separate from laravel.log.
+        'meta-debug' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/meta-debug.log'),
+            'level' => 'debug',
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

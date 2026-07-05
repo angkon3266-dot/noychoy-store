@@ -55,6 +55,7 @@ class MetaGraphClient
 
         $url = $this->base().'/'.ltrim($path, '/');
 
+        $started = microtime(true);
         try {
             $http = Http::timeout(30)->acceptJson();
 
@@ -62,6 +63,7 @@ class MetaGraphClient
                 ? $http->get($url, $params)
                 : $http->asForm()->post($url, $params);
         } catch (ConnectionException $e) {
+            $this->debugRecord($method, $path, $url, $params, null, $started, $e);
             throw new MetaApiException(
                 'Could not reach the Meta Graph API: '.$e->getMessage(),
                 MetaApiException::NETWORK,
@@ -69,7 +71,43 @@ class MetaGraphClient
             );
         }
 
+        // Meta Debug Mode: record every Graph call (no-op unless debug is enabled).
+        $this->debugRecord($method, $path, $url, $params, $response, $started);
+
         return $this->decode($response);
+    }
+
+    /** Feed a Graph call into the Meta Debug buffer/log (no-op when disabled). */
+    private function debugRecord(string $method, string $path, string $url, array $params, ?Response $response, float $started, ?\Throwable $e = null): void
+    {
+        $debug = app(\App\Modules\Meta\Services\MetaDebug::class);
+        if (! $debug->enabled()) {
+            return;
+        }
+
+        $params = collect($params)->except(['access_token', 'appsecret_proof'])->all();
+        $body = $response?->json();
+        $error = is_array($body) ? ($body['error'] ?? null) : null;
+
+        $debug->record([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'request_id' => $debug->requestId(),
+            'at' => now()->toIso8601String(),
+            'type' => 'graph',
+            'source' => 'MetaGraphClient (sync path)',
+            'method' => strtoupper($method),
+            'endpoint' => $path,
+            'url' => $url,
+            'query' => $params,
+            'http_status' => $response?->status() ?? 0,
+            'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+            'response_headers' => $response?->headers() ?? [],
+            'response' => $body,
+            'graph_error' => $e ? ['message' => $e->getMessage(), 'type' => 'exception'] : $error,
+            'exception' => $e ? ['class' => $e::class, 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString()] : null,
+            'retry' => 0,
+            'is_error' => $e !== null || ($response?->failed() ?? true) || $error !== null,
+        ]);
     }
 
     /** @throws MetaApiException */

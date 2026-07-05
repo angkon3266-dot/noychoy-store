@@ -171,6 +171,14 @@ Route::middleware('admin')->group(function () {
         Route::post('sync/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncSingle'])->name('sync-single');
         Route::post('remove/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'removeSingle'])->name('remove-single');
 
+        // ── Meta Debug Mode (temporary) ────────────────────────────────────────
+        // Outside the password wall so it can diagnose gate/OAuth issues; the
+        // controller itself 404s unless Debug Mode is enabled (META_DEBUG=true /
+        // local) and 403s without Meta access.
+        Route::get('debug', [\App\Http\Controllers\Admin\MetaDebugController::class, 'index'])->name('debug');
+        Route::post('debug/test/{what}', [\App\Http\Controllers\Admin\MetaDebugController::class, 'test'])->name('debug.test')->where('what', '[a-z_]+');
+        Route::post('debug/clear', [\App\Http\Controllers\Admin\MetaDebugController::class, 'clear'])->name('debug.clear');
+
         Route::middleware('meta.gate')->group(function () {
             // Meta Connection hub (Token Manager + modular per-module OAuth).
             Route::get('connection', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'index'])->name('connection');
