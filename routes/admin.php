@@ -229,6 +229,13 @@ Route::middleware('admin')->group(function () {
         Route::post('{section}/test', [\App\Http\Controllers\Admin\SystemConfigController::class, 'test'])->name('test')->where('section', '[a-z-]+');
     });
 
+    // Content pages (footer legal pages) + contact-message inbox
+    Route::get('pages', [\App\Http\Controllers\Admin\PageController::class, 'edit'])->name('pages');
+    Route::post('pages', [\App\Http\Controllers\Admin\PageController::class, 'update'])->name('pages.update');
+    Route::get('messages', [\App\Http\Controllers\Admin\PageController::class, 'messages'])->name('messages');
+    Route::post('messages/{message}/read', [\App\Http\Controllers\Admin\PageController::class, 'markRead'])->name('messages.read');
+    Route::delete('messages/{message}', [\App\Http\Controllers\Admin\PageController::class, 'destroyMessage'])->name('messages.destroy');
+
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');

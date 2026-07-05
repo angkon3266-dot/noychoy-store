@@ -107,6 +107,13 @@ Route::middleware('auth:customer')->group(function () {
 
 Route::get('/discover', [\App\Http\Controllers\Shop\DiscoverController::class, 'index'])->name('discover');
 
+// Footer content pages (privacy / terms / refund) + contact.
+Route::get('/privacy-policy', [\App\Http\Controllers\Shop\PageController::class, 'legal'])->defaults('page', 'privacy')->name('page.privacy');
+Route::get('/terms-and-conditions', [\App\Http\Controllers\Shop\PageController::class, 'legal'])->defaults('page', 'terms')->name('page.terms');
+Route::get('/refund-policy', [\App\Http\Controllers\Shop\PageController::class, 'legal'])->defaults('page', 'refund')->name('page.refund');
+Route::get('/contact', [\App\Http\Controllers\Shop\PageController::class, 'contact'])->name('page.contact');
+Route::post('/contact', [\App\Http\Controllers\Shop\PageController::class, 'submitContact'])->name('page.contact.submit');
+
 // Catalog (slug routes last so they don't shadow the above)
 Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');
 Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->name('product.show');

@@ -229,10 +229,11 @@ document.addEventListener('alpine:init', () => {
         open: false,
         get results() {
             const term = this.q.trim().toLowerCase();
-            return this.all
+            const matches = this.all
                 .filter(p => !this.selected.includes(p.id))
-                .filter(p => term === '' || p.name.toLowerCase().includes(term))
-                .slice(0, 50);
+                .filter(p => term === '' || p.name.toLowerCase().includes(term));
+            // Show everything while searching; cap only the initial (no-term) list.
+            return term === '' ? matches.slice(0, 100) : matches;
         },
         get chosen() {
             return this.selected.map(id => this.all.find(p => p.id === id)).filter(Boolean);

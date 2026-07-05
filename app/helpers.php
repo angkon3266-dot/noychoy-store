@@ -76,6 +76,34 @@ if (! function_exists('theme_asset')) {
     }
 }
 
+if (! function_exists('page_content')) {
+    /**
+     * Editable footer-page content (privacy/terms/refund/contact), stored in the
+     * `pages` setting and falling back to config/pages.php defaults.
+     *
+     * page_content('privacy') → ['title'=>..,'body'=>..]
+     * page_content('privacy', 'title') → the title string
+     */
+    function page_content(string $page, ?string $field = null)
+    {
+        $saved = Setting::get('pages', []);
+        $saved = is_array($saved) ? $saved : [];
+
+        $merged = array_merge(
+            (array) config('pages.'.$page, []),
+            (array) ($saved[$page] ?? []),
+        );
+
+        if ($field === null) {
+            return $merged;
+        }
+
+        $value = $merged[$field] ?? null;
+
+        return ($value === null || $value === '') ? config('pages.'.$page.'.'.$field) : $value;
+    }
+}
+
 if (! function_exists('home_content')) {
     /**
      * Read an editable homepage-content value, falling back to config defaults.

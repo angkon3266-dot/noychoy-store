@@ -499,7 +499,10 @@
                 <h3 class="text-sm font-semibold uppercase tracking-wide text-gold-300">Help</h3>
                 <ul class="mt-3 space-y-2 text-sm text-gold-100/80">
                     <li><a href="{{ route('track') }}" class="hover:text-white">Track your order</a></li>
-                    <li><a href="{{ route('cart') }}" class="hover:text-white">Cart</a></li>
+                    <li><a href="{{ route('page.contact') }}" class="hover:text-white">Contact us</a></li>
+                    <li><a href="{{ route('page.privacy') }}" class="hover:text-white">Privacy Policy</a></li>
+                    <li><a href="{{ route('page.terms') }}" class="hover:text-white">Terms &amp; Conditions</a></li>
+                    <li><a href="{{ route('page.refund') }}" class="hover:text-white">Refund Policy</a></li>
                     @guest('customer')<li><a href="{{ route('customer.login') }}" class="hover:text-white">Login / Register</a></li>@endguest
                 </ul>
             </div>
