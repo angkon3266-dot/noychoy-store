@@ -104,26 +104,49 @@ token field blank on save keeps the previously-stored token.
 
 ### Production Mode (OAuth)
 
-Requires `META_APP_ID` / `META_APP_SECRET`. Click **Connect with Facebook**,
-authenticate, grant `catalog_management`, and choose your Business + Catalog.
-Automatic sync turns on. Use **Reconnect** to refresh the token, **Disconnect**
-to clear credentials (sync history is preserved).
+Requires `META_APP_ID` / `META_APP_SECRET` **and** a **Facebook Login for
+Business** configuration (`META_LOGIN_CONFIG_ID`). Click **Connect with
+Facebook**, authenticate, choose your Business + Catalog. Automatic sync turns
+on. Use **Reconnect** to refresh the token, **Disconnect** to clear credentials
+(sync history is preserved).
+
+> **Why Login for Business?** `catalog_management` / `business_management` are
+> **not** valid *standard* Facebook Login scopes — passing them in the OAuth
+> `scope` parameter returns **"Invalid Scopes"**. In Meta's current flow those
+> asset permissions are granted through a **Login-for-Business configuration**
+> (referenced by `config_id`), not the `scope` param. This integration sends
+> `config_id` and **no** `scope` when it is set; without it, the standard-login
+> fallback requests only `public_profile` (which cannot read catalogs — use
+> Development Mode, or configure Login for Business).
 
 ---
 
 ## 4. Meta App setup (Production Mode)
 
 1. Go to <https://developers.facebook.com/apps> → **Create App** → *Business*.
-2. Add the **Facebook Login** (or *Facebook Login for Business*) product.
-3. In Login settings, add the **Valid OAuth Redirect URI**:
+2. Add the **Facebook Login for Business** product.
+3. In its settings, add the **Valid OAuth Redirect URI**:
    `https://YOUR-DOMAIN/admin/meta/oauth/callback`
-4. Request the **`catalog_management`** and **`business_management`**
-   permissions. These need **App Review + Business Verification** before they
-   work for accounts other than your own developers/testers.
-5. Put the App ID / Secret into `.env` as above.
+4. Create a **Login configuration** with the **Token type = System User** and the
+   assets/permissions **`business_management`** and **`catalog_management`**.
+   Copy its **Configuration ID**.
+5. Set env: `META_APP_ID`, `META_APP_SECRET`, and
+   **`META_LOGIN_CONFIG_ID`** = the configuration ID.
+   (`business_management` / `catalog_management` still need **App Review +
+   Business Verification** to work for accounts other than your app's own
+   admins/developers/testers.)
 
-> Until App Review is granted you can still use **Development Mode** with a
-> System User token, which needs no app review.
+You can set all three under **Admin → System Config → Meta** instead of `.env`.
+
+> Don't have a configuration yet? Use **Development Mode** with a System User
+> token — it needs no app review and works today.
+
+### Advanced: standard-login scopes
+
+If you deliberately run without a `config_id`, set `META_OAUTH_SCOPES`
+(comma-separated) to the standard scopes your app supports. Default is
+`public_profile`. Do **not** put `catalog_management` / `business_management`
+here — they are not valid standard-login scopes.
 
 ---
 

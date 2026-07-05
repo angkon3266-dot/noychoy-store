@@ -55,12 +55,25 @@ class MetaOAuthController extends Controller
             'redirect_uri' => $this->redirectUri(),
             'state' => $state,
             'response_type' => 'code',
-            'scope' => implode(',', config('meta.oauth.scopes', ['catalog_management', 'business_management'])),
         ];
 
-        // Facebook Login for Business (preferred) when a config id is provided.
         if ($configId = config('meta.oauth.config_id')) {
+            // ── Facebook Login for Business (recommended) ────────────────────
+            // Asset permissions (business_management, catalog_management) are
+            // defined in the login *configuration*, NOT passed as `scope`.
+            // Passing `scope` here is what triggers Meta's "Invalid Scopes"
+            // error, so we deliberately omit it.
             $params['config_id'] = $configId;
+            $params['override_default_response_type'] = 'true';
+        } else {
+            // ── Standard Facebook Login (fallback) ───────────────────────────
+            // Only request scopes the login dialog universally accepts. We never
+            // request Commerce Manager / Marketing permissions here — those must
+            // come through a Login-for-Business configuration (config_id above).
+            $scopes = array_values(array_filter((array) config('meta.oauth.scopes', ['public_profile'])));
+            if ($scopes) {
+                $params['scope'] = implode(',', $scopes);
+            }
         }
 
         $dialog = 'https://www.facebook.com/'.config('meta.graph_version').'/dialog/oauth?'.http_build_query($params);
@@ -117,8 +130,9 @@ class MetaOAuthController extends Controller
         $catalogs = $this->discoverCatalogs($token);
 
         if (empty($catalogs)) {
-            return redirect()->route('admin.meta.index')
-                ->with('error', 'Connected, but no Commerce Catalogs were found for this account. Create one in Commerce Manager, then reconnect.');
+            return redirect()->route('admin.meta.index')->with('error', config('meta.oauth.config_id')
+                ? 'Connected, but no Commerce Catalogs were found. Make sure you granted access to a Business and its Catalog, and that a catalog exists in Commerce Manager, then reconnect.'
+                : 'Signed in, but this app can only read your catalogs once Facebook Login for Business is configured. Set META_LOGIN_CONFIG_ID (a Login-for-Business configuration granting business_management + catalog_management), or use Development Mode with a System User token.');
         }
 
         // Auto-select when there is exactly one; otherwise show the picker.

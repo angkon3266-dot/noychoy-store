@@ -159,6 +159,7 @@ class ConfigSchema
                 'fields' => [
                     ['key' => 'meta.app_id', 'label' => 'App ID', 'type' => 'text', 'config' => 'meta.oauth.app_id', 'env' => 'META_APP_ID'],
                     ['key' => 'meta.app_secret', 'label' => 'App Secret', 'type' => 'password', 'config' => 'meta.oauth.app_secret', 'env' => 'META_APP_SECRET', 'sensitive' => true],
+                    ['key' => 'meta.login_config_id', 'label' => 'Login for Business Config ID', 'type' => 'text', 'config' => 'meta.oauth.config_id', 'env' => 'META_LOGIN_CONFIG_ID'],
                     ['key' => 'meta.webhook_secret', 'label' => 'Webhook Verify Token', 'type' => 'password', 'config' => 'meta.webhook_verify_token', 'env' => 'META_WEBHOOK_VERIFY_TOKEN', 'sensitive' => true],
                 ],
             ],

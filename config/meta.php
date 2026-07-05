@@ -27,14 +27,21 @@ return [
 
     // OAuth ("Connect with Facebook") — the vendor's Meta App credentials.
     // Leave blank to offer Development Mode (manual token) only.
+    //
+    // Catalog/Business permissions are granted through a *Facebook Login for
+    // Business* configuration (config_id) — NOT via the `scope` param, which
+    // only accepts standard Login permissions. Requesting catalog_management /
+    // business_management as raw scopes triggers Meta's "Invalid Scopes" error,
+    // so the standard-login fallback below requests only public_profile.
     'oauth' => [
         'app_id' => env('META_APP_ID'),
         'app_secret' => env('META_APP_SECRET'),
-        'config_id' => env('META_LOGIN_CONFIG_ID'), // optional: Facebook Login for Business
-        'scopes' => [
-            'catalog_management',
-            'business_management',
-        ],
+        'config_id' => env('META_LOGIN_CONFIG_ID'), // Facebook Login for Business config
+        // Comma-separated valid standard-login scopes (fallback when no config_id).
+        'scopes' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('META_OAUTH_SCOPES', 'public_profile')),
+        ))),
     ],
 
     // Webhook verify token (also pasted into the Meta App webhook configuration).
