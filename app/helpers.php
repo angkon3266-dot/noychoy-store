@@ -335,3 +335,57 @@ if (! function_exists('video_meta')) {
         return ['type' => 'file', 'embed' => null, 'thumb' => null, 'src' => $src];
     }
 }
+
+if (! function_exists('resolve_media')) {
+    /**
+     * Resolve an image posted by <x-media-field> into a stored public-disk path.
+     * Device upload wins; otherwise a companion "{field}_url" (media-library pick
+     * or remote URL) is imported. Library picks that already live on our public
+     * disk are reused in place (no wasteful re-copy). Returns null if neither.
+     */
+    function resolve_media(\Illuminate\Http\Request $request, string $field, string $dir = 'uploads'): ?string
+    {
+        if ($request->hasFile($field)) {
+            return app(\App\Services\ImageOptimizer::class)->storeWebp($request->file($field), $dir);
+        }
+
+        $url = trim((string) $request->input($field.'_url', ''));
+        if ($url === '') {
+            return null;
+        }
+
+        // A pick from our own library — map the public URL back to its stored path.
+        if ($existing = public_url_to_path($url)) {
+            return $existing;
+        }
+
+        // A remote URL (e.g. pasted from elsewhere) — download & optimise a copy.
+        return app(\App\Services\ImageOptimizer::class)->storeWebpFromUrl($url, $dir);
+    }
+}
+
+if (! function_exists('public_url_to_path')) {
+    /**
+     * If a URL points at a file on our own "public" disk, return its relative
+     * storage path (so it can be reused without copying); otherwise null.
+     */
+    function public_url_to_path(string $url): ?string
+    {
+        $base = rtrim(Storage::disk('public')->url(''), '/').'/';
+        $path = null;
+
+        if (Str::startsWith($url, $base)) {
+            $path = Str::after($url, $base);
+        } elseif (Str::startsWith($url, '/storage/')) {
+            $path = Str::after($url, '/storage/');
+        }
+
+        if ($path === null) {
+            return null;
+        }
+
+        $path = urldecode($path);
+
+        return Storage::disk('public')->exists($path) ? $path : null;
+    }
+}

@@ -30,7 +30,7 @@
                 <div><label class="label">Position</label><input name="position" type="number" value="0" class="input"></div>
                 <label class="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" name="is_active" value="1" checked> Active</label>
             </div>
-            <div><label class="label">Image</label><input type="file" name="image" accept="image/*" class="input text-sm"></div>
+            <div><x-media-field name="image" folder="categories" label="Image" /></div>
             <button class="btn-primary w-full">Create</button>
         </form>
     </div>

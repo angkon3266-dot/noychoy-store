@@ -70,6 +70,7 @@
         <main class="p-4 sm:p-6">@yield('content')</main>
     </div>
 </div>
+@include('admin.partials.media-picker')
 <style>[x-cloak]{display:none!important}</style>
 </body>
 </html>

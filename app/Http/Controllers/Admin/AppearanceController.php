@@ -135,12 +135,20 @@ class AppearanceController extends Controller
         // Higher caps + quality for the logo so it stays crisp on hi-dpi screens.
         $brandingMax = ['logo' => 1200, 'logo_mobile' => 800, 'header_center_image' => 800, 'menu_icon' => 200, 'favicon' => 128];
         foreach (['logo', 'logo_mobile', 'header_center_image', 'menu_icon', 'favicon'] as $file) {
+            $urlPick = trim((string) $request->input($file.'_url', ''));
             if ($request->hasFile($file)) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
                 }
                 $current[$file] = $optimizer->storeWebp($request->file($file), 'branding', $brandingMax[$file], 92);
-            } elseif ($request->boolean('remove_'.$file)) {
+            } elseif ($urlPick !== '') {
+                // Media-library pick (reused in place) or a remote URL (imported).
+                $path = public_url_to_path($urlPick) ?: $optimizer->storeWebpFromUrl($urlPick, 'branding', $brandingMax[$file], 92);
+                if (! empty($current[$file]) && $current[$file] !== $path && ! str_starts_with($current[$file], 'http')) {
+                    Storage::disk('public')->delete($current[$file]);
+                }
+                $current[$file] = $path;
+            } elseif ($request->boolean('remove_'.$file) || $request->boolean($file.'_cleared')) {
                 if (! empty($current[$file]) && ! str_starts_with($current[$file], 'http')) {
                     Storage::disk('public')->delete($current[$file]);
                 }
@@ -166,13 +174,19 @@ class AppearanceController extends Controller
                 $home[$key] = is_string($value) ? trim($value) : $value;
             }
         }
+        $heroPick = trim((string) $request->input('hero_image_url', ''));
         if ($request->hasFile('hero_image')) {
             if (! empty($home['hero_image']) && ! str_starts_with($home['hero_image'], 'http')) {
                 Storage::disk('public')->delete($home['hero_image']);
             }
-            $home['hero_image'] = $request->file('hero_image')->store('branding', 'public');
-        }
-        if ($request->boolean('remove_hero_image') && ! empty($home['hero_image'])) {
+            $home['hero_image'] = $optimizer->storeWebp($request->file('hero_image'), 'branding', 1600, 85);
+        } elseif ($heroPick !== '') {
+            $path = public_url_to_path($heroPick) ?: $optimizer->storeWebpFromUrl($heroPick, 'branding', 1600, 85);
+            if (! empty($home['hero_image']) && $home['hero_image'] !== $path && ! str_starts_with($home['hero_image'], 'http')) {
+                Storage::disk('public')->delete($home['hero_image']);
+            }
+            $home['hero_image'] = $path;
+        } elseif (($request->boolean('remove_hero_image') || $request->boolean('hero_image_cleared')) && ! empty($home['hero_image'])) {
             if (! str_starts_with($home['hero_image'], 'http')) {
                 Storage::disk('public')->delete($home['hero_image']);
             }

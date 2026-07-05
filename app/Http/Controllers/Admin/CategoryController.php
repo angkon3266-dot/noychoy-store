@@ -54,8 +54,8 @@ class CategoryController extends Controller
     public function store(Request $request, \App\Services\ImageOptimizer $optimizer)
     {
         $data = $this->validateData($request);
-        if ($request->hasFile('image')) {
-            $data['image'] = $optimizer->storeWebp($request->file('image'), 'categories', 1200, 85);
+        if ($path = resolve_media($request, 'image', 'categories')) {
+            $data['image'] = $path;
         }
         Category::create($data);
 
@@ -71,12 +71,14 @@ class CategoryController extends Controller
             return back()->withInput()->withErrors(['parent_id' => 'A category cannot be placed under itself or its own sub-category.']);
         }
 
-        if ($request->hasFile('image')) {
-            if ($category->image && ! str_starts_with($category->image, 'http')) {
+        if ($path = resolve_media($request, 'image', 'categories')) {
+            // Delete the previous file only if it was a distinct stored upload
+            // (not a re-picked library image that maps to the same path).
+            if ($category->image && $category->image !== $path && ! str_starts_with($category->image, 'http')) {
                 Storage::disk('public')->delete($category->image);
             }
-            $data['image'] = $optimizer->storeWebp($request->file('image'), 'categories', 1200, 85);
-        } elseif ($request->boolean('remove_image') && $category->image) {
+            $data['image'] = $path;
+        } elseif (($request->boolean('remove_image') || $request->boolean('image_cleared')) && $category->image) {
             if (! str_starts_with($category->image, 'http')) {
                 Storage::disk('public')->delete($category->image);
             }

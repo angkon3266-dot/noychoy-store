@@ -272,6 +272,10 @@ document.addEventListener('alpine:init', () => {
             } catch (_) { alert('Image upload failed.'); }
             e.target.value = '';
         },
+        // Pick this section's image from the shared media library instead of uploading.
+        pickLibrary(i) {
+            this.$store.mediaLib.openWith((url) => { this.sections[i].image = url; }, 'sections');
+        },
         applyTemplate(e) {
             const raw = e.target.selectedOptions[0] && e.target.selectedOptions[0].dataset.sections;
             if (raw && confirm('Replace the current sections with this template?')) {
@@ -293,6 +297,100 @@ document.addEventListener('alpine:init', () => {
             } catch (_) { alert('Could not save template.'); }
         },
         get json() { return JSON.stringify(this.sections); },
+    }));
+
+    // ── Shared media picker ──────────────────────────────────────────────────
+    // One global modal (included in the admin layout) lets any field pick an
+    // existing image from the library or upload a new one from the device.
+    // window.MEDIA = { picker, upload, csrf } is set by the modal partial.
+    window.Alpine.store('mediaLib', {
+        open: false,
+        loading: false,
+        uploading: false,
+        tab: 'library',        // 'library' | 'device'
+        items: [],
+        folders: [],
+        q: '',
+        folder: '',
+        _cb: null,
+        openWith(cb, folder) {
+            this._cb = cb;
+            this.folder = folder || '';
+            this.tab = 'library';
+            this.q = '';
+            this.open = true;
+            this.load();
+        },
+        close() { this.open = false; this._cb = null; },
+        async load() {
+            if (!window.MEDIA) return;
+            this.loading = true;
+            try {
+                const url = new URL(window.MEDIA.picker, window.location.origin);
+                if (this.q) url.searchParams.set('q', this.q);
+                if (this.folder) url.searchParams.set('folder', this.folder);
+                const r = await fetch(url, { headers: { Accept: 'application/json' } });
+                const d = await r.json();
+                this.items = d.items || [];
+                this.folders = d.folders || [];
+            } catch (_) { this.items = []; }
+            this.loading = false;
+        },
+        choose(url) { if (this._cb) this._cb(url); this.close(); },
+        async uploadDevice(e) {
+            const file = e.target.files[0];
+            if (!file || !window.MEDIA) return;
+            this.uploading = true;
+            const fd = new FormData();
+            fd.append('image', file);
+            fd.append('_token', window.MEDIA.csrf);
+            if (this.folder) fd.append('folder', this.folder);
+            try {
+                const r = await fetch(window.MEDIA.upload, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+                const d = await r.json();
+                if (d.url) this.choose(d.url);
+                else alert('Upload failed.');
+            } catch (_) { alert('Upload failed.'); }
+            this.uploading = false;
+            e.target.value = '';
+        },
+    });
+
+    // Reusable single-image field: device upload OR media-library pick. Backend
+    // reads an uploaded file `name` first, else the picked/remote URL `name_url`
+    // (see resolve_media()). Rendered by the <x-media-field> Blade component.
+    window.Alpine.data('mediaField', (initial, folder) => ({
+        value: initial || '',   // library / remote URL (posted as name_url)
+        deviceName: '',         // filename chosen from device (file posts via name)
+        cleared: false,         // user removed an existing image (posted as name_cleared)
+        folder: folder || 'uploads',
+        _localPreview: '',
+        get preview() { return this.value || this._localPreview || ''; },
+        pickLibrary() {
+            this.$store.mediaLib.openWith((url) => {
+                this.value = url;
+                this.deviceName = '';
+                this._localPreview = '';
+                this.cleared = false;
+                this.$refs.file.value = '';       // library pick wins over any stale file
+            }, this.folder);
+        },
+        chooseDevice() { this.$refs.file.click(); },
+        onDevice(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            this.value = '';                       // device upload wins; clear the URL
+            this.deviceName = file.name;
+            this._localPreview = URL.createObjectURL(file);
+            this.cleared = false;
+        },
+        clear() {
+            this.value = '';
+            this.deviceName = '';
+            this._localPreview = '';
+            this.cleared = true;
+            this.$refs.file.value = '';
+        },
     }));
 
     window.Alpine.data('productPage', (config) => ({

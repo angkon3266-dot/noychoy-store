@@ -148,7 +148,20 @@
                             <div><label class="label">Product cost (৳)</label><input name="cost_price" type="number" step="0.01" value="{{ $product->cost_price }}" class="input" placeholder="Supplier cost"></div>
                             <div><label class="label">Transport / packaging (৳)</label><input name="transport_cost" type="number" step="0.01" value="{{ $product->transport_cost }}" class="input" placeholder="Per unit"></div>
                             <div class="lg:col-span-4"><label class="label">Meta description <span class="text-ink-700/40 font-normal">(SEO)</span></label><textarea name="meta_description" rows="2" class="input" placeholder="Short summary shown in Google results">{{ $product->meta_description }}</textarea></div>
-                            <div class="lg:col-span-2"><label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images()->count() }} now)</span></label><input type="file" name="images[]" accept="image/*" multiple class="input text-sm"></div>
+                            <div class="lg:col-span-2" x-data="{ picks: [] }">
+                                <label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images()->count() }} now)</span></label>
+                                <input type="file" name="images[]" accept="image/*" multiple class="input text-sm">
+                                <button type="button" @click="$store.mediaLib.openWith(u => { if(!picks.includes(u)) picks.push(u) }, 'products')" class="btn-outline text-xs py-1 mt-1">+ From library</button>
+                                <div class="flex flex-wrap gap-1 mt-1" x-show="picks.length" x-cloak>
+                                    <template x-for="(u, i) in picks" :key="i">
+                                        <div class="relative">
+                                            <img :src="u" class="w-10 h-10 object-cover rounded" alt="">
+                                            <button type="button" @click="picks.splice(i, 1)" class="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 text-[10px] leading-none">&times;</button>
+                                            <input type="hidden" name="image_urls[]" :value="u">
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                             <div class="lg:col-span-2"><label class="label">Add video link</label><input name="video_urls[]" class="input" placeholder="YouTube link or .mp4 URL"></div>
                             <div class="lg:col-span-2"><label class="label">Upload video <span class="text-ink-700/40 font-normal">(MP4/WebM/MOV, max {{ upload_limit_mb() }} MB)</span></label><input type="file" name="video_files[]" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" multiple class="input text-sm"></div>
                             <div><label class="label">Tags</label><input name="tags" value="{{ $product->tags }}" class="input" placeholder="bestseller, eid"></div>

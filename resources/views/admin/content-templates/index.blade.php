@@ -36,6 +36,7 @@
                             <label class="btn-outline text-xs py-1 w-full text-center cursor-pointer block">Upload
                                 <input type="file" accept="image/*" class="hidden" @change="upload(i, $event)">
                             </label>
+                            <button type="button" @click="pickLibrary(i)" class="btn-outline text-xs py-1 w-full text-center mt-1">Library</button>
                         </div>
                         <div class="flex-1 space-y-2">
                             <input x-model="s.heading" placeholder="Heading" class="input py-2">

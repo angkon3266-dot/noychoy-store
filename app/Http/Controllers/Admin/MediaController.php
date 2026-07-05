@@ -77,6 +77,66 @@ class MediaController extends Controller
         ]);
     }
 
+    /**
+     * JSON feed for the reusable media picker modal (used by <x-media-field> and
+     * the story-section / content-template builders). Images only, newest first.
+     */
+    public function picker(Request $request)
+    {
+        $disk = Storage::disk('public');
+        $q = trim((string) $request->query('q', ''));
+        $folder = $request->query('folder');
+
+        $productByPath = ProductImage::with('product:id,name')->get()
+            ->filter(fn ($pi) => $pi->product)
+            ->mapWithKeys(fn ($pi) => [$pi->path => $pi->product->name]);
+
+        $items = collect($disk->allFiles())
+            ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+            ->filter(fn ($p) => in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), $this->imageExt, true))
+            ->map(fn ($p) => [
+                'path' => $p,
+                'url' => $disk->url($p),
+                'folder' => str_contains($p, '/') ? explode('/', $p)[0] : '(root)',
+                'name' => $productByPath[$p] ?? basename($p),
+                'mtime' => $disk->lastModified($p),
+            ])
+            ->when($folder, fn ($c) => $c->where('folder', $folder))
+            ->when($q !== '', fn ($c) => $c->filter(fn ($m) => str_contains(strtolower((string) $m['name']), strtolower($q))
+                || str_contains(strtolower(basename($m['path'])), strtolower($q))))
+            ->sortByDesc('mtime')
+            ->values()
+            ->take(300);
+
+        $folders = collect($disk->allFiles())
+            ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+            ->filter(fn ($p) => in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), $this->imageExt, true))
+            ->map(fn ($p) => str_contains($p, '/') ? explode('/', $p)[0] : '(root)')
+            ->unique()->sort()->values();
+
+        return response()->json(['items' => $items, 'folders' => $folders]);
+    }
+
+    /**
+     * Upload a file straight into the library from the picker modal's "device" tab.
+     * Returns the stored URL so the caller can select it immediately.
+     */
+    public function upload(Request $request, ImageOptimizer $optimizer)
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'max:12288'],
+            'folder' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $folder = preg_replace('/[^a-z0-9\-]/', '', strtolower((string) $request->input('folder', 'uploads'))) ?: 'uploads';
+        $path = $optimizer->storeWebp($request->file('image'), $folder, 1600, 82);
+
+        return response()->json([
+            'path' => $path,
+            'url' => Storage::disk('public')->url($path),
+        ]);
+    }
+
     /** Optimize one or many files (slider-driven max width + quality). */
     public function optimize(Request $request, ImageOptimizer $optimizer)
     {

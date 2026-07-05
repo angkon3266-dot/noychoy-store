@@ -25,15 +25,10 @@
             <div><label class="label">Description</label><textarea name="description" rows="3" class="input">{{ old('description', $category->description) }}</textarea></div>
 
             <div class="border-t border-ink-100 pt-4">
-                <label class="label">Category image</label>
-                @if($category->image)
-                    <div class="flex items-center gap-3 mb-2">
-                        <img src="{{ \Illuminate\Support\Str::startsWith($category->image,['http','/']) ? $category->image : \Illuminate\Support\Facades\Storage::disk('public')->url($category->image) }}" class="w-20 h-20 rounded object-cover" alt="">
-                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_image" value="1"> Remove current image</label>
-                    </div>
-                @endif
-                <input type="file" name="image" accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-1">Shown on category tiles / Discover. Auto-optimized to WebP.</p>
+                @php $catImg = $category->image ? (\Illuminate\Support\Str::startsWith($category->image,['http','/']) ? $category->image : \Illuminate\Support\Facades\Storage::disk('public')->url($category->image)) : ''; @endphp
+                <x-media-field name="image" :value="$catImg" folder="categories"
+                    label="Category image"
+                    help="Shown on category tiles / Discover. Auto-optimized to WebP." />
             </div>
 
             <div class="border-t border-ink-100 pt-4 grid sm:grid-cols-2 gap-3">

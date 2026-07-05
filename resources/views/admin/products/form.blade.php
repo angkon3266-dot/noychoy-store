@@ -321,6 +321,7 @@
                                 <label class="btn-outline text-xs py-1 w-full text-center cursor-pointer block">Upload
                                     <input type="file" accept="image/*" class="hidden" @change="upload(i, $event)">
                                 </label>
+                                <button type="button" @click="pickLibrary(i)" class="btn-outline text-xs py-1 w-full text-center mt-1">Library</button>
                             </div>
                             <div class="flex-1 space-y-2">
                                 <input x-model="s.heading" placeholder="Heading (e.g. Grace In Bloom)" class="input py-2">
@@ -446,7 +447,21 @@
                     <div id="imgOrderInputs"></div>
                 @endif
                 <input type="file" name="images[]" multiple accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-2">Upload JPG/PNG/WebP. First uploaded becomes primary if none set.</p>
+                <p class="text-xs text-ink-700/50 mt-2">Upload JPG/PNG/WebP from your device. First uploaded becomes primary if none set.</p>
+
+                {{-- …or pick existing images from the media library. --}}
+                <div class="mt-3" x-data="{ picks: [] }">
+                    <button type="button" @click="$store.mediaLib.openWith(u => { if(!picks.includes(u)) picks.push(u) }, 'products')" class="btn-outline text-sm">+ Add from media library</button>
+                    <div class="grid grid-cols-3 gap-2 mt-2" x-show="picks.length" x-cloak>
+                        <template x-for="(u, i) in picks" :key="i">
+                            <div class="relative">
+                                <img :src="u" class="aspect-square w-full object-cover rounded-lg" alt="">
+                                <button type="button" @click="picks.splice(i, 1)" class="absolute top-1 right-1 bg-red-600 text-white rounded px-1.5 text-xs leading-none">&times;</button>
+                                <input type="hidden" name="image_urls[]" :value="u">
+                            </div>
+                        </template>
+                    </div>
+                </div>
 
                 {{-- Gallery videos (YouTube/Vimeo link or uploaded MP4) --}}
                 <div class="border-t border-ink-100 mt-4 pt-4" x-data="{ vids: @js(array_values(old('video_urls', $product->video_urls ?? []))) }">

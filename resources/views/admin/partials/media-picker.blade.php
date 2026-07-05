@@ -1,0 +1,58 @@
+{{-- Global media-picker modal — one per admin page, driven by $store.mediaLib. --}}
+<script>window.MEDIA = {
+    picker: @json(route('admin.media.picker')),
+    upload: @json(route('admin.media.upload')),
+    csrf: @json(csrf_token()),
+};</script>
+
+<div x-cloak x-show="$store.mediaLib.open" @keydown.escape.window="$store.mediaLib.close()"
+     class="fixed inset-0 z-[70] flex items-center justify-center p-4" style="display:none">
+    <div class="absolute inset-0 bg-black/50" @click="$store.mediaLib.close()"></div>
+
+    <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-ink-100">
+            <h3 class="font-semibold">Select media</h3>
+            <button type="button" @click="$store.mediaLib.close()" class="text-ink-700/50 hover:text-ink-900 text-xl leading-none">&times;</button>
+        </div>
+
+        {{-- Tabs --}}
+        <div class="flex gap-1 px-5 pt-3">
+            <button type="button" @click="$store.mediaLib.tab='library'"
+                    :class="$store.mediaLib.tab==='library' ? 'bg-ink-900 text-white' : 'text-ink-700 hover:bg-ink-50'"
+                    class="px-3 py-1.5 rounded-lg text-sm">Media library</button>
+            <button type="button" @click="$store.mediaLib.tab='device'"
+                    :class="$store.mediaLib.tab==='device' ? 'bg-ink-900 text-white' : 'text-ink-700 hover:bg-ink-50'"
+                    class="px-3 py-1.5 rounded-lg text-sm">Upload from device</button>
+        </div>
+
+        {{-- Library tab --}}
+        <div x-show="$store.mediaLib.tab==='library'" class="flex-1 min-h-0 flex flex-col p-5 pt-3">
+            <input x-model="$store.mediaLib.q" @input.debounce.300ms="$store.mediaLib.load()"
+                   placeholder="Search by product or file name…" class="input text-sm mb-3">
+            <div class="flex-1 overflow-y-auto">
+                <p x-show="$store.mediaLib.loading" class="text-sm text-ink-700/50 py-6 text-center">Loading…</p>
+                <p x-show="!$store.mediaLib.loading && $store.mediaLib.items.length===0" class="text-sm text-ink-700/50 py-6 text-center">No images found.</p>
+                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    <template x-for="m in $store.mediaLib.items" :key="m.path">
+                        <button type="button" @click="$store.mediaLib.choose(m.url)"
+                                class="group relative aspect-square rounded-lg overflow-hidden border border-ink-100 hover:border-gold-400 hover:ring-2 hover:ring-gold-200">
+                            <img :src="m.url" loading="lazy" class="w-full h-full object-cover" alt="">
+                            <span class="absolute inset-x-0 bottom-0 bg-black/55 text-white text-[10px] px-1 py-0.5 truncate opacity-0 group-hover:opacity-100" x-text="m.name"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        {{-- Device tab --}}
+        <div x-show="$store.mediaLib.tab==='device'" class="p-5 pt-4">
+            <label class="block border-2 border-dashed border-ink-200 rounded-xl p-8 text-center cursor-pointer hover:border-gold-400">
+                <span x-show="!$store.mediaLib.uploading" class="text-sm text-ink-700/70">Click to choose an image from your computer</span>
+                <span x-show="$store.mediaLib.uploading" class="text-sm text-gold-700">Uploading…</span>
+                <input type="file" accept="image/*" class="hidden"
+                       :disabled="$store.mediaLib.uploading" @change="$store.mediaLib.uploadDevice($event)">
+            </label>
+            <p class="text-xs text-ink-700/50 mt-2">The image is added to your library and selected automatically.</p>
+        </div>
+    </div>
+</div>

@@ -23,25 +23,15 @@
         <h2 class="font-semibold mb-4">Branding</h2>
         <div class="grid sm:grid-cols-2 gap-6">
             <div>
-                <label class="label">Logo</label>
-                @if($logo = theme_asset($theme['logo']))
-                    <div class="flex items-center gap-3 mb-2">
-                        <img src="{{ $logo }}" class="h-12 bg-ink-900 rounded p-1" alt="logo">
-                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_logo" value="1"> Remove</label>
-                    </div>
-                @endif
-                <input type="file" name="logo" accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-1">Desktop logo. PNG with transparent background recommended. Leave empty to use the text logo.</p>
+                <x-media-field name="logo" :value="theme_asset($theme['logo']) ?: ''" folder="branding"
+                    label="Logo"
+                    help="Desktop logo. PNG with transparent background recommended. Leave empty to use the text logo." />
 
-                <label class="label mt-3">Mobile logo</label>
-                @if($logoM = theme_asset($theme['logo_mobile'] ?? null))
-                    <div class="flex items-center gap-3 mb-2">
-                        <img src="{{ $logoM }}" class="h-10 bg-ink-900 rounded p-1" alt="mobile logo">
-                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_logo_mobile" value="1"> Remove</label>
-                    </div>
-                @endif
-                <input type="file" name="logo_mobile" accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-1">Optional. When set, this is used <strong>instead of</strong> the desktop logo on phones. If left empty, the desktop logo is used on mobile too.</p>
+                <div class="mt-3">
+                    <x-media-field name="logo_mobile" :value="theme_asset($theme['logo_mobile'] ?? null) ?: ''" folder="branding"
+                        label="Mobile logo"
+                        help="Optional. When set, this is used instead of the desktop logo on phones." />
+                </div>
 
                 <div class="grid grid-cols-3 gap-3 mt-3">
                     <div><label class="label text-xs">Logo height — desktop (px)</label><input type="number" name="logo_height_desktop" value="{{ $theme['logo_height_desktop'] ?? 40 }}" min="16" max="120" class="input text-sm"></div>
@@ -56,28 +46,20 @@
                     </div>
                 </div>
 
-                <label class="label mt-4">Mobile center image (optional)</label>
-                @if($hc = theme_asset($theme['header_center_image'] ?? null))
-                    <div class="flex items-center gap-3 mb-2">
-                        <img src="{{ $hc }}" class="h-10 bg-ink-900 rounded p-1" alt="center">
-                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_header_center_image" value="1"> Remove</label>
-                    </div>
-                @endif
-                <input type="file" name="header_center_image" accept="image/*" class="input text-sm">
+                <div class="mt-4">
+                    <x-media-field name="header_center_image" :value="theme_asset($theme['header_center_image'] ?? null) ?: ''" folder="branding"
+                        label="Mobile center image (optional)" />
+                </div>
                 <div class="grid grid-cols-2 gap-3 mt-2">
                     <div><label class="label text-xs">Center image link</label><input name="header_center_link" value="{{ $theme['header_center_link'] ?? '' }}" class="input text-sm" placeholder="(optional)"></div>
                     <div><label class="label text-xs">Center image height (px)</label><input type="number" name="header_center_height" value="{{ $theme['header_center_height'] ?? 32 }}" min="16" max="100" class="input text-sm"></div>
                 </div>
                 <p class="text-xs text-ink-700/50 mt-1">Shows centered in the mobile header (e.g. a badge or campaign mark).</p>
 
-                <label class="label mt-4">Mobile menu icon</label>
-                @if($mi = theme_asset($theme['menu_icon'] ?? null))
-                    <div class="flex items-center gap-3 mb-2">
-                        <img src="{{ $mi }}" class="h-9 bg-ink-900 rounded p-1" alt="menu icon">
-                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_menu_icon" value="1"> Remove</label>
-                    </div>
-                @endif
-                <input type="file" name="menu_icon" accept="image/*" class="input text-sm">
+                <div class="mt-4">
+                    <x-media-field name="menu_icon" :value="theme_asset($theme['menu_icon'] ?? null) ?: ''" folder="branding"
+                        label="Mobile menu icon" />
+                </div>
                 <div class="grid grid-cols-2 gap-3 mt-2">
                     <div><label class="label text-xs">Rotation when menu opens (°)</label><input type="number" name="menu_icon_rotation" value="{{ $theme['menu_icon_rotation'] ?? 45 }}" min="0" max="360" class="input text-sm"></div>
                     <div><label class="label text-xs">Icon size (px)</label><input type="number" name="menu_icon_height" value="{{ $theme['menu_icon_height'] ?? 28 }}" min="16" max="80" class="input text-sm"></div>
@@ -85,14 +67,8 @@
                 <p class="text-xs text-ink-700/50 mt-1">Used as the mobile menu toggle (e.g. your "M" mark). Tapping opens the menu and rotates the icon by this angle over 300ms; tapping again closes &amp; rotates back. Mobile only.</p>
             </div>
             <div>
-                <label class="label">Favicon</label>
-                @if($fav = theme_asset($theme['favicon']))
-                    <div class="flex items-center gap-3 mb-2">
-                        <img src="{{ $fav }}" class="h-8" alt="favicon">
-                        <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_favicon" value="1"> Remove</label>
-                    </div>
-                @endif
-                <input type="file" name="favicon" accept="image/*" class="input text-sm">
+                <x-media-field name="favicon" :value="theme_asset($theme['favicon']) ?: ''" folder="branding"
+                    label="Favicon" />
             </div>
             @php
                 $colorRoles = [
@@ -240,15 +216,9 @@
             <div><label class="label">Secondary button link</label><input name="home[hero_secondary_link]" value="{{ $home['hero_secondary_link'] }}" class="input" placeholder="(defaults to Track page)"></div>
         </div>
         <div class="mt-4">
-            <label class="label">Hero background image (optional)</label>
-            @if($heroImg = theme_asset($home['hero_image']))
-                <div class="flex items-center gap-3 mb-2">
-                    <img src="{{ $heroImg }}" class="h-16 w-28 object-cover rounded border border-ink-100" alt="hero">
-                    <label class="flex items-center gap-1.5 text-xs text-red-600"><input type="checkbox" name="remove_hero_image" value="1"> Remove current image</label>
-                </div>
-            @endif
-            <input type="file" name="hero_image" accept="image/*" class="input text-sm">
-            <p class="text-xs text-ink-700/50 mt-1">Used as the hero background on Aurelia / Maison and the side image on Lumière. Wide image (e.g. 1600×900) recommended.</p>
+            <x-media-field name="hero_image" :value="theme_asset($home['hero_image']) ?: ''" folder="branding"
+                label="Hero background image (optional)"
+                help="Used as the hero background on Aurelia / Maison and the side image on Lumière. Wide image (e.g. 1600×900) recommended." />
         </div>
 
         <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-3">Section titles</h3>

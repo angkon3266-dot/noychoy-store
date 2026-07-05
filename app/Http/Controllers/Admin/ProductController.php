@@ -627,16 +627,33 @@ class ProductController extends Controller
 
     protected function syncImages(Request $request, Product $product): void
     {
-        if (! $request->hasFile('images')) {
+        // Paths from device uploads and from media-library / remote picks.
+        $paths = [];
+
+        if ($request->hasFile('images')) {
+            $optimizer = app(ImageOptimizer::class);
+            foreach ($request->file('images') as $file) {
+                $paths[] = $optimizer->storeWebp($file, 'products');
+            }
+        }
+
+        foreach ((array) $request->input('image_urls', []) as $url) {
+            $url = trim((string) $url);
+            if ($url === '') {
+                continue;
+            }
+            // Reuse an existing library file in place; download+optimise a remote one.
+            $paths[] = public_url_to_path($url) ?: app(ImageOptimizer::class)->storeWebpFromUrl($url, 'products');
+        }
+
+        if (empty($paths)) {
             return;
         }
 
-        $optimizer = app(ImageOptimizer::class);
         $hasPrimary = $product->images()->where('is_primary', true)->exists();
         $position = (int) $product->images()->max('position');
 
-        foreach ($request->file('images') as $file) {
-            $path = $optimizer->storeWebp($file, 'products');
+        foreach ($paths as $path) {
             $product->images()->create([
                 'path' => $path,
                 'alt' => $product->name,
