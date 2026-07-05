@@ -153,9 +153,8 @@ Route::middleware('admin')->group(function () {
     // ── Meta Integration (Super Admin only) ────────────────────────────────
     // The unlock/security routes are reachable without the secondary password;
     // everything else sits behind the `meta.gate` wall.
-    // Marketing Center hub (channel cards; Meta functional, others "coming soon").
+    // Marketing Center hub (module cards from the registry).
     Route::get('marketing', [\App\Http\Controllers\Admin\MarketingController::class, 'index'])->name('marketing.index');
-    Route::get('marketing/{channel}', [\App\Http\Controllers\Admin\MarketingController::class, 'channel'])->name('marketing.channel');
 
     Route::prefix('meta')->name('meta.')->group(function () {
         // Security wall (reachable without the secondary password).
@@ -171,6 +170,12 @@ Route::middleware('admin')->group(function () {
         Route::post('remove/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'removeSingle'])->name('remove-single');
 
         Route::middleware('meta.gate')->group(function () {
+            // Meta Connection hub (Token Manager + modular per-module OAuth).
+            Route::get('connection', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'index'])->name('connection');
+            Route::get('connection/authorize/{module}', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'authorize'])->name('connection.authorize');
+            Route::get('connection/callback', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'callback'])->name('connection.callback');
+            Route::post('connection/disconnect', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'disconnect'])->name('connection.disconnect');
+
             Route::get('/', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'index'])->name('index');
             Route::post('save', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'save'])->name('save');
             Route::post('test', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'testConnection'])->name('test');
