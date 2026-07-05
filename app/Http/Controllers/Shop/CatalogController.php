@@ -27,9 +27,6 @@ class CatalogController extends Controller
         ]);
     }
 
-    /** Products-per-page options offered on the storefront. */
-    public const PER_PAGE_OPTIONS = [12, 24, 48, 96];
-
     /** Apply filters + sort to a base query and paginate. */
     protected function paginate(Builder $base, Request $request)
     {
@@ -37,9 +34,10 @@ class CatalogController extends Controller
         $this->filters->apply($query, $request);
         $this->applySort($query, $request);
 
-        $perPage = (int) $request->query('per_page', 24);
-        if (! in_array($perPage, self::PER_PAGE_OPTIONS, true)) {
-            $perPage = 24;
+        // Fixed by the admin (Appearance → Catalog). No visitor override.
+        $perPage = (int) theme('products_per_page', 20);
+        if ($perPage < 1) {
+            $perPage = 20;
         }
 
         return $query->paginate($perPage)->withQueryString();
@@ -102,7 +100,7 @@ class CatalogController extends Controller
     {
         abort_unless($product->status === 'published', 404);
 
-        $product->load(['images', 'variants' => fn ($q) => $q->where('is_active', true), 'category', 'approvedReviews']);
+        $product->load(['images', 'variants' => fn ($q) => $q->where('is_active', true), 'category', 'categories', 'approvedReviews']);
         $product->increment('views');
 
         // "Frequently bought together": real co-purchase pairs from past orders,

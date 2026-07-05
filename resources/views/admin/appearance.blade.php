@@ -487,6 +487,24 @@
         <h2 class="font-semibold mb-1">Storefront filters</h2>
         <p class="text-xs text-ink-700/60 mb-4">Choose which filters appear in the shop sidebar. Values are pulled automatically from your products. "Color" attributes show colour swatches.</p>
 
+        <div class="mb-4 max-w-xs">
+            <label class="label">Products per page</label>
+            <input type="number" name="products_per_page" min="1" max="200" value="{{ $theme['products_per_page'] ?? 20 }}" class="input">
+            <p class="text-xs text-ink-700/50 mt-1">How many products show per page on the shop &amp; category pages. Default 20.</p>
+        </div>
+
+        <label class="label">Categories to show as a filter</label>
+        <p class="text-xs text-ink-700/50 mb-1">Pick which categories appear in the sidebar "Category" filter. Leave all unchecked to show every active category.</p>
+        @if($allCategories->isEmpty())
+            <p class="text-xs text-ink-700/50 mb-4">No categories yet.</p>
+        @else
+            <div class="grid sm:grid-cols-3 gap-2 text-sm mb-4">
+                @foreach($allCategories as $cat)
+                    <label class="flex items-center gap-2"><input type="checkbox" name="filter_categories[]" value="{{ $cat->id }}" @checked(in_array($cat->id, $filterConfig['categories'] ?? []))> {{ $cat->name }}</label>
+                @endforeach
+            </div>
+        @endif
+
         <div class="grid sm:grid-cols-3 gap-2 text-sm mb-4">
             <label class="flex items-center gap-2"><input type="checkbox" name="filter_price" value="1" @checked($filterConfig['price'] ?? true)> Price ranges</label>
             <label class="flex items-center gap-2"><input type="checkbox" name="filter_in_stock" value="1" @checked($filterConfig['in_stock'] ?? true)> In-stock</label>

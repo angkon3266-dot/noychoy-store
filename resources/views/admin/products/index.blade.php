@@ -22,6 +22,12 @@
                 <option value="{{ $tag }}" @selected(request('tag')==$tag)>{{ $tag }}</option>
             @endforeach
         </select>
+        <select name="category" onchange="this.form.submit()" class="input py-2" title="Filter by category">
+            <option value="">All categories</option>
+            @foreach($bulkCategories as $cat)
+                <option value="{{ $cat->id }}" @selected((string) request('category') === (string) $cat->id)>{{ $cat->name }}</option>
+            @endforeach
+        </select>
         <input name="custom" value="{{ request('custom') }}" placeholder="Custom field value…" class="input py-2 w-40">
         <select name="per_page" onchange="this.form.submit()" class="input py-2" title="Products per page">
             @foreach(['20','50','100','200','all'] as $pp)
@@ -110,7 +116,10 @@
                             </div>
                         </div>
                     </td>
-                    <td class="px-4 py-3 text-ink-700/70">{{ $product->category->name ?? '—' }}</td>
+                    <td class="px-4 py-3 text-ink-700/70">
+                        @php $rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter(); @endphp
+                        {{ $rowCats->isNotEmpty() ? $rowCats->implode(', ') : '—' }}
+                    </td>
                     <td class="px-4 py-3">
                         <form action="{{ route('admin.products.quick', $product) }}" method="POST" class="flex items-center gap-1.5">
                             @csrf @method('PATCH')

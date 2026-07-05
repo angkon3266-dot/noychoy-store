@@ -175,7 +175,8 @@ Route::middleware('admin')->group(function () {
             // Meta Connection hub (Token Manager + modular per-module OAuth).
             Route::get('connection', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'index'])->name('connection');
             Route::get('connection/authorize/{module}', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'authorize'])->name('connection.authorize');
-            Route::get('connection/callback', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'callback'])->name('connection.callback');
+            // Note: no per-module callback route — every flow returns to the single
+            // canonical callback `admin.meta.oauth.callback` (module is in `state`).
             Route::post('connection/disconnect', [\App\Http\Controllers\Admin\MetaConnectionController::class, 'disconnect'])->name('connection.disconnect');
 
             Route::get('/', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'index'])->name('index');

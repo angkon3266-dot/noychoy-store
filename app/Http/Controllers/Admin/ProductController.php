@@ -15,11 +15,15 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with('primaryImage', 'category')
+            ->with('primaryImage', 'category', 'categories')
             ->search($request->query('q'))
             ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
             ->when($request->query('type') === 'simple', fn ($q) => $q->where('has_variants', false))
             ->when($request->query('type') === 'variable', fn ($q) => $q->where('has_variants', true))
+            // Filter by category — matches the primary category or any pivot category.
+            ->when($request->query('category'), fn ($q, $cid) => $q->where(fn ($w) => $w
+                ->where('category_id', (int) $cid)
+                ->orWhereHas('categories', fn ($c) => $c->where('categories.id', (int) $cid))))
             ->when($request->query('tag'), fn ($q, $tag) => $q->where('tags', 'like', "%{$tag}%"))
             ->when($request->query('custom'), fn ($q, $c) => $q->where(fn ($w) => $w
                 ->where('custom_value', 'like', "%{$c}%")

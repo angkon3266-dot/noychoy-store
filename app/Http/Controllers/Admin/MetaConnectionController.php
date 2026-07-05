@@ -21,9 +21,14 @@ class MetaConnectionController extends Controller
         private readonly ModuleRegistry $registry,
     ) {}
 
+    /**
+     * The single canonical Meta OAuth callback — the same URI for every module
+     * and every flow, so the Meta App only ever needs one whitelisted redirect.
+     * The module is carried in the OAuth `state`, not the URL.
+     */
     private function redirectUri(): string
     {
-        return route('admin.meta.connection.callback');
+        return route('admin.meta.oauth.callback');
     }
 
     public function index()
@@ -73,7 +78,11 @@ class MetaConnectionController extends Controller
         return redirect()->away($this->oauth->authorizeUrl($module, $this->redirectUri(), $request));
     }
 
-    public function callback(Request $request)
+    /**
+     * Complete a modular authorization. Called by the canonical OAuth callback
+     * (MetaOAuthController@callback) when the `state` belongs to a module.
+     */
+    public function completeModularCallback(Request $request)
     {
         $result = $this->oauth->handleCallback($request, $this->redirectUri());
 

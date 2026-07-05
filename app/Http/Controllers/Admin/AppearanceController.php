@@ -121,9 +121,14 @@ class AppearanceController extends Controller
             'discover_image' => ['nullable', 'array'],
             'discover_image.*' => ['nullable', 'image', 'max:2048'],
 
+            // Catalog
+            'products_per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+
             // Storefront filters
             'filter_attributes' => ['nullable', 'array'],
             'filter_custom_fields' => ['nullable', 'array'],
+            'filter_categories' => ['nullable', 'array'],
+            'filter_categories.*' => ['integer'],
             'filter_price_ranges' => ['nullable', 'string'],
         ]);
 
@@ -291,7 +296,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }
@@ -304,6 +309,8 @@ class AppearanceController extends Controller
         $sf = is_array($sf) ? $sf : [];
         $sf['attributes'] = array_values(array_filter((array) $request->input('filter_attributes', [])));
         $sf['custom_fields'] = array_values(array_filter((array) $request->input('filter_custom_fields', [])));
+        // Which categories appear as a filter option in the sidebar (admin choice).
+        $sf['categories'] = array_values(array_filter(array_map('intval', (array) $request->input('filter_categories', []))));
         $sf['tags'] = $request->boolean('filter_tags');
         $sf['price'] = $request->boolean('filter_price');
         $sf['in_stock'] = $request->boolean('filter_in_stock');

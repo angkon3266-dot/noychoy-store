@@ -14,7 +14,10 @@
      }">
     <nav class="text-sm text-ink-700/60 mb-6">
         <a href="{{ route('home') }}" class="hover:text-gold-700">Home</a> /
-        @if($product->category)<a href="{{ route('category.show', $product->category) }}" class="hover:text-gold-700">{{ $product->category->name }}</a> /@endif
+        @php $crumbCats = $product->categories->isNotEmpty() ? $product->categories : collect([$product->category])->filter(); @endphp
+        @foreach($crumbCats as $crumbCat)
+            <a href="{{ route('category.show', $crumbCat) }}" class="hover:text-gold-700">{{ $crumbCat->name }}</a> /
+        @endforeach
         <span class="text-ink-800">{{ $product->name }}</span>
     </nav>
 

@@ -12,7 +12,7 @@
             To connect with Facebook, set your <strong>Meta App ID &amp; Secret</strong> in
             <a href="{{ route('admin.system-config.edit', 'meta') }}" class="underline">System Config → Meta</a>,
             and whitelist this OAuth redirect URI in your Meta App:
-            <code class="break-all block mt-1">{{ route('admin.meta.connection.callback') }}</code>
+            <code class="break-all block mt-1">{{ route('admin.meta.oauth.callback') }}</code>
         </div>
     @endunless
 

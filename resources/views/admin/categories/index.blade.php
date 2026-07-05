@@ -50,7 +50,7 @@
                             </span>
                         </td>
                         <td class="px-4 py-3 text-ink-700/70">{{ $cat->parent->name ?? '—' }}</td>
-                        <td class="px-4 py-3">{{ $cat->products()->count() }}</td>
+                        <td class="px-4 py-3">{{ $cat->totalProductCount() }}</td>
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-0.5">
                                 <form action="{{ route('admin.categories.move', $cat) }}" method="POST">@csrf<input type="hidden" name="direction" value="up"><button class="px-1.5 py-0.5 text-ink-700/60 hover:text-gold-700 hover:bg-gold-50 rounded" title="Move up">▲</button></form>

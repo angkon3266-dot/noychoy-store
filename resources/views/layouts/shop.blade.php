@@ -322,51 +322,66 @@
             </div>
             @endif
 
-            {{-- Mobile navigation — inline dropdown below the header --}}
-            <div x-show="open" x-cloak class="md:hidden pb-4 space-y-1">
-                @foreach($siteMenu ?? [] as $item)
-                    @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
-                    @if($mtype === 'link')
-                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-2 border-b border-gold-100">
-                            {{ $item['label'] }}
-                            @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
-                        </a>
-                    @else
-                        {{-- Parent label navigates to its own page; the caret expands children --}}
-                        <div x-data="{ sub: false }" class="border-b border-gold-100">
-                            <div class="w-full flex items-center justify-between">
-                                @if(!empty($item['url']))
-                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-2 flex-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</a>
-                                @else
-                                    <button type="button" @click="sub=!sub" class="flex items-center gap-2 py-2 flex-1 text-left">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</button>
-                                @endif
-                                <button type="button" @click="sub=!sub" class="p-2 -mr-1" aria-label="Toggle {{ $item['label'] }}">
-                                    <svg class="w-4 h-4 transition" :class="sub && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M19 9l-7 7-7-7"/></svg>
-                                </button>
-                            </div>
-                            <div x-show="sub" x-cloak class="pb-2 pl-3 space-y-1">
-                                @if($mtype === 'mega')
-                                    @foreach($item['columns'] ?? [] as $col)
-                                        @if($col['heading'])<p class="pt-1.5 text-sm font-bold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
-                                        @foreach($col['links'] as $l)
-                                            <a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $l['label'] }}</a>
+        </div>
+
+        {{-- Mobile navigation — slide-in drawer from the left --}}
+        <div x-show="open" x-cloak class="md:hidden fixed inset-0 z-[60]" style="display:none">
+            <div class="absolute inset-0 bg-black/40" @click="open=false" x-transition.opacity></div>
+            <div class="absolute inset-y-0 left-0 w-[82%] max-w-xs bg-white shadow-xl flex flex-col"
+                 x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+                 x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full">
+                <div class="flex items-center justify-between h-14 px-4 border-b border-gold-100 shrink-0">
+                    <span class="font-display text-lg text-gold-700">Menu</span>
+                    <button @click="open=false" aria-label="Close menu" class="p-2 -mr-2 text-ink-700/70 hover:text-ink-900">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                    </button>
+                </div>
+                <nav class="flex-1 overflow-y-auto px-4 py-2">
+                    <a href="{{ route('home') }}" class="block py-3 border-b border-gold-50">Home</a>
+                    @foreach($siteMenu ?? [] as $item)
+                        @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
+                        @if($mtype === 'link')
+                            <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-3 border-b border-gold-50">
+                                {{ $item['label'] }}
+                                @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
+                            </a>
+                        @else
+                            {{-- Parent label navigates to its own page; the caret expands children --}}
+                            <div x-data="{ sub: false }" class="border-b border-gold-50">
+                                <div class="w-full flex items-center justify-between">
+                                    @if(!empty($item['url']))
+                                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-3 flex-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</a>
+                                    @else
+                                        <button type="button" @click="sub=!sub" class="flex items-center gap-2 py-3 flex-1 text-left">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</button>
+                                    @endif
+                                    <button type="button" @click="sub=!sub" class="p-2 -mr-1" aria-label="Toggle {{ $item['label'] }}">
+                                        <svg class="w-4 h-4 transition" :class="sub ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
+                                </div>
+                                <div x-show="sub" x-cloak class="pb-2 pl-3 space-y-1">
+                                    @if($mtype === 'mega')
+                                        @foreach($item['columns'] ?? [] as $col)
+                                            @if($col['heading'])<p class="pt-1.5 text-sm font-bold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
+                                            @foreach($col['links'] as $l)
+                                                <a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $l['label'] }}</a>
+                                            @endforeach
                                         @endforeach
-                                    @endforeach
-                                @else
-                                    @foreach($item['children'] ?? [] as $child)
-                                        <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $child['label'] }}</a>
-                                    @endforeach
-                                @endif
-                                @if($item['view_all_mobile'] ?? false)
-                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm font-medium text-gold-700">View all {{ $item['label'] }} →</a>
-                                @endif
+                                    @else
+                                        @foreach($item['children'] ?? [] as $child)
+                                            <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $child['label'] }}</a>
+                                        @endforeach
+                                    @endif
+                                    @if($item['view_all_mobile'] ?? false)
+                                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm font-medium text-gold-700">View all {{ $item['label'] }} →</a>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
+                        @endif
+                    @endforeach
+                    @if($ctaLabel = theme('menu_cta_label'))
+                        <a href="{{ theme('menu_cta_link') ?: route('shop') }}" class="block py-3 mt-1 text-gold-700 font-medium">{{ $ctaLabel }}</a>
                     @endif
-                @endforeach
-                @if($ctaLabel = theme('menu_cta_label'))
-                    <a href="{{ theme('menu_cta_link') ?: route('shop') }}" class="block py-2 mt-1 text-gold-700 font-medium">{{ $ctaLabel }}</a>
-                @endif
+                </nav>
             </div>
         </div>
     </header>

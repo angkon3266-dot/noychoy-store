@@ -41,13 +41,30 @@ class MetaOAuthService
         return array_values(array_diff($this->registry->scopesFor($moduleKey), $this->tokens->scopes()));
     }
 
+    /** Marker separating the module key from the CSRF nonce inside `state`. */
+    private const STATE_SEP = '~';
+
+    /** True when an OAuth `state` belongs to the modular flow (encodes a module). */
+    public function isModularState(?string $state): bool
+    {
+        return is_string($state) && str_contains($state, self::STATE_SEP);
+    }
+
+    /** Extract the module key encoded in a modular OAuth `state`. */
+    public function moduleFromState(?string $state): ?string
+    {
+        return $this->isModularState($state) ? explode(self::STATE_SEP, $state, 2)[0] : null;
+    }
+
     /** Build the Meta dialog URL to authorize a module (incrementally). */
     public function authorizeUrl(string $moduleKey, string $redirectUri, Request $request): string
     {
         $module = $this->registry->get($moduleKey);
-        $state = Str::random(40);
+        // The module is carried IN the state param (not a per-module callback URL),
+        // so every flow can share one canonical redirect URI. The random suffix is
+        // the CSRF nonce we verify on return.
+        $state = $moduleKey.self::STATE_SEP.Str::random(40);
         $request->session()->put('meta_oauth_state', $state);
-        $request->session()->put('meta_oauth_module', $moduleKey);
 
         $params = [
             'client_id' => config('meta.oauth.app_id'),
@@ -81,11 +98,16 @@ class MetaOAuthService
             return ['ok' => false, 'module' => null, 'message' => 'Authorization cancelled: '.$request->query('error_description', $request->query('error'))];
         }
 
-        if (! $request->filled('state') || $request->query('state') !== $request->session()->pull('meta_oauth_state')) {
+        $state = (string) $request->query('state');
+        if (! $request->filled('state') || $state !== $request->session()->pull('meta_oauth_state')) {
             return ['ok' => false, 'module' => null, 'message' => 'Invalid OAuth state. Please try again.'];
         }
 
-        $moduleKey = $request->session()->pull('meta_oauth_module');
+        // Which module initiated the flow is read from the state parameter.
+        $moduleKey = $this->moduleFromState($state);
+        if (! $moduleKey || ! $this->registry->has($moduleKey)) {
+            return ['ok' => false, 'module' => null, 'message' => 'Unknown module in OAuth state.'];
+        }
 
         // Exchange code → short-lived → long-lived token.
         $short = Http::acceptJson()->get($this->graph('oauth/access_token'), [

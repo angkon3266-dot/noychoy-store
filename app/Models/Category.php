@@ -55,6 +55,15 @@ class Category extends Model
         return $this->hasMany(Product::class);
     }
 
+    /** Every product in this category — via its primary category OR the pivot. */
+    public function totalProductCount(): int
+    {
+        return Product::where(fn ($w) => $w
+            ->where('category_id', $this->id)
+            ->orWhereHas('categories', fn ($c) => $c->where('categories.id', $this->id)))
+            ->count();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

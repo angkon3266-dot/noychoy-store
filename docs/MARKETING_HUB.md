@@ -62,8 +62,10 @@ META_LOGIN_CONFIG_ID_ANALYTICS=
 ```
 
 App ID/Secret/Config ID are also editable in **System Config → Meta** (no `.env`
-required). Whitelist the redirect URI `…/admin/meta/connection/callback` in your
-Meta App.
+required). Whitelist the single canonical redirect URI
+`…/admin/meta/oauth/callback` in your Meta App — every module's OAuth flow uses
+it (the initiating module is carried in the OAuth `state`, so there are no
+per-module callback URLs).
 
 ## Migration safety
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +24,7 @@ class StorefrontFilters
         return array_merge([
             'attributes' => [],        // variation attribute names shown as filters
             'custom_fields' => [],     // custom field labels shown as filters
+            'categories' => [],        // category ids offered as a sidebar filter (admin choice)
             'tags' => false,
             'colors' => true,
             'price' => true,
@@ -53,6 +55,15 @@ class StorefrontFilters
     /** Apply the active request filters to a product query. */
     public function apply(Builder $query, Request $request): void
     {
+        // Category filter: category[]=slug — matches the primary or any pivot category.
+        $cats = array_filter((array) $request->query('category', []));
+        if ($cats) {
+            $query->where(function ($w) use ($cats) {
+                $w->whereHas('categories', fn ($c) => $c->whereIn('categories.slug', $cats))
+                  ->orWhereHas('category', fn ($c) => $c->whereIn('slug', $cats));
+            });
+        }
+
         // Price band(s) — checkbox ranges like "301-500".
         $ranges = array_filter((array) $request->query('price_range', []));
         if ($ranges) {
@@ -134,6 +145,24 @@ class StorefrontFilters
         $products = (clone $scope)->get(['id', 'options', 'tags', 'colors', 'custom_label', 'custom_value', 'custom_fields', 'price', 'compare_at_price']);
 
         $groups = [];
+
+        // Category group — the admin picks which categories are offered; if none
+        // are chosen we fall back to all active categories.
+        $catIds = array_values(array_filter(array_map('intval', (array) ($cfg['categories'] ?? []))));
+        $categories = ($catIds
+            ? Category::whereIn('id', $catIds)->where('is_active', true)
+            : Category::where('is_active', true))
+            ->orderBy('name')->get(['slug', 'name']);
+        if ($categories->isNotEmpty()) {
+            $sel = array_filter((array) $request->query('category', []));
+            $groups[] = [
+                'type' => 'checkbox', 'label' => 'Category', 'param' => 'category[]',
+                'options' => $categories->map(fn ($c) => [
+                    'value' => $c->slug, 'label' => $c->name, 'hex' => null,
+                    'checked' => in_array($c->slug, $sel, true),
+                ])->all(),
+            ];
+        }
 
         // Attribute groups
         foreach ($cfg['attributes'] as $name) {

@@ -81,9 +81,19 @@ class MetaOAuthController extends Controller
         return redirect()->away($dialog);
     }
 
-    /** Step 2 — handle the callback: exchange code, then let the admin pick a catalog. */
-    public function callback(Request $request)
+    /**
+     * Step 2 — the single canonical callback for ALL Meta OAuth flows.
+     *
+     * The module that started a modular authorization is encoded in `state`;
+     * when present, we hand off to the Connection hub. Otherwise this is the
+     * legacy Commerce production flow (exchange code, then pick a catalog).
+     */
+    public function callback(Request $request, \App\Modules\Meta\Services\MetaOAuthService $modular)
     {
+        if ($modular->isModularState($request->query('state'))) {
+            return app(MetaConnectionController::class)->completeModularCallback($request);
+        }
+
         $this->ensureConfigured();
 
         if ($request->filled('error')) {
