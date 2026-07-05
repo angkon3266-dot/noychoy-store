@@ -3,7 +3,7 @@
 @section('heading', 'Meta Integration — Debug Mode')
 
 @section('content')
-<div class="max-w-6xl space-y-6" x-data="metaDebugComponent()">
+<div class="max-w-6xl space-y-6" x-data="metaDebug()">
 
     <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm">
         <strong>Debug Mode is ON.</strong> Every Graph call is logged to
@@ -45,6 +45,31 @@
             @empty
                 <span class="text-sm text-ink-700/50">None recorded.</span>
             @endforelse
+        </div>
+    </div>
+
+    {{-- ── Readiness flags (why buttons are / aren't gated) ────────────────── --}}
+    <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">Readiness</h2>
+            <button type="button" @click="copy(@js($readiness))" class="btn-outline text-xs py-1">Copy JSON</button>
+        </div>
+        <p class="text-xs text-ink-700/60 mb-3">The testers only require a token. They are <strong>not</strong> gated by business/catalog selection — buttons are disabled only while a request is in flight.</p>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
+            @foreach($readiness as $k => $v)
+                <div class="flex items-center justify-between gap-2 border-b border-ink-50 py-1">
+                    <span class="text-ink-700/60 font-mono text-xs">{{ $k }}</span>
+                    <span class="font-mono text-xs break-all text-right">
+                        @if(is_bool($v))
+                            <span class="badge {{ $v ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }}">{{ $v ? 'true' : 'false' }}</span>
+                        @elseif(is_array($v))
+                            {{ empty($v) ? '[]' : implode(', ', $v) }}
+                        @else
+                            {{ $v === null || $v === '' ? '—' : $v }}
+                        @endif
+                    </span>
+                </div>
+            @endforeach
         </div>
     </div>
 
@@ -166,30 +191,4 @@
         </div>
     </div>
 </div>
-
-<script>
-    window.metaDebugComponent = () => ({
-        running: '',
-        result: null,
-        graphPath: 'me',
-        csrf: document.querySelector('meta[name="csrf-token"]').content,
-        async run(what, extra = {}) {
-            this.running = what;
-            this.result = null;
-            try {
-                const res = await fetch(@js(url('admin/meta/debug/test')) + '/' + what, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf, 'Accept': 'application/json' },
-                    body: JSON.stringify(extra),
-                });
-                this.result = await res.json();
-            } catch (e) {
-                this.result = { ok: false, what, notes: ['Request failed: ' + e.message], calls: [] };
-            }
-            this.running = '';
-        },
-        pretty(o) { try { return JSON.stringify(o, null, 2); } catch (_) { return String(o); } },
-        copy(o) { navigator.clipboard.writeText(typeof o === 'string' ? o : this.pretty(o)); },
-    });
-</script>
 @endsection

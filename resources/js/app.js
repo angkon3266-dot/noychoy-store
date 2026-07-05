@@ -393,6 +393,32 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // Meta Integration Debug page — runs the independent Graph API testers.
+    // Registered here (not inline) so it's guaranteed available at alpine:init.
+    window.Alpine.data('metaDebug', () => ({
+        running: '',
+        result: null,
+        graphPath: 'me',
+        get csrf() { return document.querySelector('meta[name="csrf-token"]')?.content || ''; },
+        async run(what, extra = {}) {
+            this.running = what;
+            this.result = null;
+            try {
+                const res = await fetch('/admin/meta/debug/test/' + what, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrf, Accept: 'application/json' },
+                    body: JSON.stringify(extra),
+                });
+                this.result = await res.json();
+            } catch (e) {
+                this.result = { ok: false, what, notes: ['Request failed: ' + e.message], calls: [] };
+            }
+            this.running = '';
+        },
+        pretty(o) { try { return JSON.stringify(o, null, 2); } catch (_) { return String(o); } },
+        copy(o) { navigator.clipboard.writeText(typeof o === 'string' ? o : this.pretty(o)); },
+    }));
+
     window.Alpine.data('productPage', (config) => ({
         img: config.image || '',
         qty: 1,

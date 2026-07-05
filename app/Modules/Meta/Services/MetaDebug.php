@@ -82,6 +82,36 @@ class MetaDebug
         return ($selected['id'] ?? null) ?: $this->legacy->catalogId();
     }
 
+    /**
+     * Readiness flags — every boolean the debug page / a caller might gate on.
+     * NOTE: the debug testers do NOT gate on any of these; they only need a
+     * token. This is surfaced so it's obvious there is no hidden gating and no
+     * circular "discover-before-you-can-discover" dependency.
+     */
+    public function readiness(): array
+    {
+        $conn = $this->tokens->existing();
+
+        return [
+            'debug_enabled' => $this->enabled(),
+            'hasConnection' => $conn !== null,
+            'hasToken' => filled($this->token()),
+            'tokenSource' => $this->tokenSource(),
+            'hasBusinessId' => filled($this->businessId()),
+            'hasCatalog' => filled($this->catalogId()),
+            'hasSelectedBusiness' => filled($this->tokens->businessId()),
+            'hasSelectedCatalog' => $this->tokens->selectedAsset('catalog') !== null,
+            'hasLoginConfigId' => filled(config('meta.oauth.config_id')),
+            'loginConfigId' => config('meta.oauth.config_id'),
+            'grantedScopes' => $this->tokens->scopes(),
+            'tokenExpiration' => optional($conn?->token_expires_at)->toIso8601String()
+                ?: $this->legacy->get('token_expires_at'),
+            // The ONLY thing that disables a debug button is an in-flight request
+            // (client-side `running`). No readiness/business/catalog gate exists.
+            'buttons_gated_by_readiness' => false,
+        ];
+    }
+
     /** The full per-request context block the spec asks to log on every request. */
     public function context(): array
     {
