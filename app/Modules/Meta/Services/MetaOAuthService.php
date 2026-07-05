@@ -2,9 +2,11 @@
 
 namespace App\Modules\Meta\Services;
 
+use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -33,6 +35,29 @@ class MetaOAuthService
     public function isConfigured(): bool
     {
         return filled(config('meta.oauth.app_id')) && filled(config('meta.oauth.app_secret'));
+    }
+
+    /**
+     * The Facebook Login-for-Business configuration id to use for a module.
+     *
+     * Resolved LIVE from config at call time — NOT from the module manifest.
+     * Manifests are built during the service-provider register() phase, before
+     * the System Config runtime overrides are applied in boot(), so a manifest
+     * can freeze a stale/null config_id. A module may still declare its own id;
+     * otherwise we use the shared `meta.oauth.config_id` (env META_LOGIN_CONFIG_ID
+     * or the System Config override).
+     */
+    public function loginConfigId(?ModuleManifest $module = null): ?string
+    {
+        $fromModule = $module?->configId();
+
+        return filled($fromModule) ? $fromModule : config('meta.oauth.config_id');
+    }
+
+    /** True when a Login-for-Business config id is available (any module). */
+    public function hasLoginConfig(): bool
+    {
+        return filled($this->loginConfigId());
     }
 
     /** Scopes a module still needs (empty = already satisfied). */
@@ -73,16 +98,32 @@ class MetaOAuthService
             'response_type' => 'code',
         ];
 
-        $configId = $module?->configId();
-        if ($configId) {
-            $params['config_id'] = $configId;
-            $params['override_default_response_type'] = 'true';
-        } else {
-            // No Login-for-Business config → only standard scopes are valid here.
-            $params['scope'] = 'public_profile';
+        // Facebook Login for Business: the requested permissions come from the
+        // login *configuration* (config_id), never the `scope` param. Passing
+        // `scope=public_profile` here is exactly what makes Meta reject the app
+        // with "This app needs at least one supported permission".
+        $configId = $this->loginConfigId($module);
+        if (! filled($configId)) {
+            throw new \RuntimeException(
+                'Meta Login for Business is not configured. Set the Login Config ID '.
+                '(META_LOGIN_CONFIG_ID or System Config → Meta) before authorizing.'
+            );
         }
 
-        return 'https://www.facebook.com/'.config('meta.graph_version').'/dialog/oauth?'.http_build_query($params);
+        $params['config_id'] = $configId;
+        $params['override_default_response_type'] = 'true';
+
+        $url = 'https://www.facebook.com/'.config('meta.graph_version').'/dialog/oauth?'.http_build_query($params);
+
+        // Requirement: log the final authorization URL before redirecting.
+        Log::info('Meta OAuth authorize URL generated', [
+            'module' => $moduleKey,
+            'config_id' => $configId,
+            'redirect_uri' => $redirectUri,
+            'url' => $url,
+        ]);
+
+        return $url;
     }
 
     /**

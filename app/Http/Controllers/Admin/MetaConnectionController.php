@@ -75,6 +75,12 @@ class MetaConnectionController extends Controller
             return back()->with('error', 'This module needs no Meta authorization.');
         }
 
+        // Login for Business is mandatory — asset permissions come from the login
+        // config, not raw scopes. Without it we would generate a broken URL.
+        if (! $this->oauth->hasLoginConfig()) {
+            return back()->with('error', 'Set your Meta Login for Business Config ID first (System Config → Meta).');
+        }
+
         return redirect()->away($this->oauth->authorizeUrl($module, $this->redirectUri(), $request));
     }
 

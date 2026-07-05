@@ -78,6 +78,12 @@ class MetaOAuthController extends Controller
 
         $dialog = 'https://www.facebook.com/'.config('meta.graph_version').'/dialog/oauth?'.http_build_query($params);
 
+        \Illuminate\Support\Facades\Log::info('Meta OAuth authorize URL generated (legacy Commerce flow)', [
+            'config_id' => config('meta.oauth.config_id'),
+            'redirect_uri' => $this->redirectUri(),
+            'url' => $dialog,
+        ]);
+
         return redirect()->away($dialog);
     }
 
