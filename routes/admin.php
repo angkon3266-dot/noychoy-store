@@ -149,11 +149,22 @@ Route::middleware('admin')->group(function () {
     // ── Meta Integration (Super Admin only) ────────────────────────────────
     // The unlock/security routes are reachable without the secondary password;
     // everything else sits behind the `meta.gate` wall.
+    // Marketing Center hub (channel cards; Meta functional, others "coming soon").
+    Route::get('marketing', [\App\Http\Controllers\Admin\MarketingController::class, 'index'])->name('marketing.index');
+    Route::get('marketing/{channel}', [\App\Http\Controllers\Admin\MarketingController::class, 'channel'])->name('marketing.channel');
+
     Route::prefix('meta')->name('meta.')->group(function () {
+        // Security wall (reachable without the secondary password).
         Route::get('unlock', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'show'])->name('unlock');
         Route::post('unlock', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'unlock'])->name('unlock.submit');
         Route::post('security-password', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'updatePassword'])->name('password.update');
         Route::post('lock', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'lock'])->name('lock');
+
+        // Single-product actions triggered from the product edit page — admin-only
+        // but outside the password wall so they work inline (they only queue a
+        // job, never expose credentials).
+        Route::post('sync/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncSingle'])->name('sync-single');
+        Route::post('remove/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'removeSingle'])->name('remove-single');
 
         Route::middleware('meta.gate')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'index'])->name('index');
@@ -161,18 +172,29 @@ Route::middleware('admin')->group(function () {
             Route::post('test', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'testConnection'])->name('test');
             Route::post('mode', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'switchMode'])->name('mode');
             Route::post('disconnect', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'disconnect'])->name('disconnect');
+            Route::post('refresh-catalog', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'refreshCatalog'])->name('refresh-catalog');
 
-            // Sync actions.
+            // Bulk sync actions.
             Route::post('sync-all', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncAll'])->name('sync-all');
             Route::post('sync-refresh', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'fullRefresh'])->name('sync-refresh');
             Route::post('sync-selected', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncSelected'])->name('sync-selected');
-            Route::post('sync/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncSingle'])->name('sync-single');
-            Route::post('remove/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'removeSingle'])->name('remove-single');
             Route::get('batch-status', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'batchStatus'])->name('batch-status');
 
             // Sync logs.
             Route::get('logs', [\App\Http\Controllers\Admin\MetaSyncLogController::class, 'index'])->name('logs');
+            Route::get('logs/export', [\App\Http\Controllers\Admin\MetaSyncLogController::class, 'export'])->name('logs.export');
             Route::post('logs/retry-failed', [\App\Http\Controllers\Admin\MetaSyncLogController::class, 'retryFailed'])->name('logs.retry');
+            Route::post('logs/retry-selected', [\App\Http\Controllers\Admin\MetaSyncLogController::class, 'retrySelected'])->name('logs.retry-selected');
+
+            // Queue monitor.
+            Route::get('queue', [\App\Http\Controllers\Admin\MetaQueueController::class, 'index'])->name('queue');
+            Route::get('queue/status', [\App\Http\Controllers\Admin\MetaQueueController::class, 'status'])->name('queue.status');
+            Route::post('queue/pause', [\App\Http\Controllers\Admin\MetaQueueController::class, 'pause'])->name('queue.pause');
+            Route::post('queue/resume', [\App\Http\Controllers\Admin\MetaQueueController::class, 'resume'])->name('queue.resume');
+            Route::post('queue/retry', [\App\Http\Controllers\Admin\MetaQueueController::class, 'retry'])->name('queue.retry');
+
+            // Webhook page.
+            Route::get('webhook', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'webhook'])->name('webhook');
 
             // Production Mode OAuth ("Connect with Facebook").
             Route::get('oauth/redirect', [\App\Http\Controllers\Admin\MetaOAuthController::class, 'redirect'])->name('oauth.redirect');

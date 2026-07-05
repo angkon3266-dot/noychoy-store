@@ -37,10 +37,17 @@ class MetaSettings
         // Connection metadata (populated after a successful test / OAuth).
         'connected_business_name' => null,
         'connected_catalog_name' => null,
+        'connected_since' => null,       // ISO string — first successful connect
         'token_expires_at' => null,      // ISO string or null (never = long-lived)
         'last_connection_ok' => null,    // bool
         'last_connection_at' => null,
         'last_sync_at' => null,
+
+        // Queue + webhook operational state.
+        'queue_paused' => false,
+        'webhook_verified_at' => null,   // ISO string of last successful handshake
+        'last_webhook_event' => null,    // ['at' => ISO, 'summary' => string]
+        'sync_batch_id' => null,
 
         // Sync behaviour toggles.
         'auto_sync' => true,

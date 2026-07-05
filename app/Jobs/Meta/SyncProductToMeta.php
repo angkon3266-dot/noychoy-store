@@ -4,6 +4,7 @@ namespace App\Jobs\Meta;
 
 use App\Models\Product;
 use App\Services\Meta\MetaCatalogService;
+use App\Services\Meta\MetaSettings;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -41,9 +42,17 @@ class SyncProductToMeta implements ShouldQueue
         return 'meta-sync-'.$this->productId;
     }
 
-    public function handle(MetaCatalogService $service): void
+    public function handle(MetaCatalogService $service, MetaSettings $settings): void
     {
         if ($this->batch()?->cancelled()) {
+            return;
+        }
+
+        // Soft pause: hold the job on the queue without failing it. The worker
+        // keeps running; jobs simply wait until an admin resumes.
+        if ($settings->get('queue_paused')) {
+            $this->release(60);
+
             return;
         }
 

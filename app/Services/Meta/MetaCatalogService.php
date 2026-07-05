@@ -104,6 +104,7 @@ class MetaCatalogService
             $this->settings->update([
                 'connected_business_name' => $business['name'] ?? null,
                 'connected_catalog_name' => $catalog['name'] ?? null,
+                'connected_since' => $this->settings->get('connected_since') ?? now()->toIso8601String(),
                 'token_expires_at' => $expiresAt === 0 ? null : date('c', $expiresAt),
                 'last_connection_ok' => true,
                 'last_connection_at' => now()->toIso8601String(),

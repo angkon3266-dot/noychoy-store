@@ -10,6 +10,7 @@ use App\Models\MetaSyncLog;
 use App\Models\Product;
 use App\Services\Meta\MetaCatalogService;
 use App\Services\Meta\MetaSettings;
+use App\Services\Meta\MetaStats;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 
@@ -24,6 +25,7 @@ class MetaIntegrationController extends Controller
     public function __construct(
         private readonly MetaSettings $settings,
         private readonly MetaCatalogService $catalog,
+        private readonly MetaStats $stats,
     ) {}
 
     public function index(Request $request)
@@ -36,6 +38,33 @@ class MetaIntegrationController extends Controller
             'eligibleCount' => $this->settings->isConfigured() ? $this->catalog->eligibleQuery()->count() : 0,
             'batch' => $this->currentBatch(),
             'connectionResult' => $request->session()->get('meta_connection'),
+            'stats' => $this->stats->overview(),
+            'health' => $this->stats->health(),
+            'commerceManagerUrl' => $this->commerceManagerUrl(),
+        ]);
+    }
+
+    /** Re-pull catalog metadata (name + product count) without a full sync. */
+    public function refreshCatalog()
+    {
+        if (! $this->settings->isConfigured()) {
+            return back()->with('error', 'Configure Meta Integration first.');
+        }
+
+        $result = $this->catalog->testConnection(); // refreshes stored business/catalog metadata
+
+        return back()->with($result->ok ? 'success' : 'error',
+            $result->ok ? 'Catalog refreshed.' : $result->message);
+    }
+
+    /** Dedicated webhook status page. */
+    public function webhook()
+    {
+        return view('admin.meta.webhook', [
+            'settings' => $this->settings,
+            'snapshot' => $this->settings->safeSnapshot(),
+            'webhookUrl' => route('meta.webhook'),
+            'verifyTokenSet' => filled(config('meta.webhook_verify_token')),
         ]);
     }
 
@@ -169,6 +198,16 @@ class MetaIntegrationController extends Controller
         $this->settings->update(['sync_batch_id' => $batch->id]);
 
         return back()->with('success', $ids->count().' products queued ('.$name.'). Progress is shown below.');
+    }
+
+    /** Deep link to this catalog in Meta Commerce Manager. */
+    private function commerceManagerUrl(): ?string
+    {
+        $catalogId = $this->settings->catalogId();
+
+        return $catalogId
+            ? "https://business.facebook.com/commerce/catalogs/{$catalogId}/products"
+            : 'https://business.facebook.com/commerce/';
     }
 
     /** Normalised progress of the last dispatched batch, or null. */

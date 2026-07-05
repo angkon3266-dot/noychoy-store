@@ -152,6 +152,7 @@ class MetaOAuthController extends Controller
             'catalog_id' => $catalog['catalog_id'] ?? null,
             'connected_business_name' => $catalog['business_name'] ?? null,
             'connected_catalog_name' => $catalog['catalog_name'] ?? null,
+            'connected_since' => $this->settings->get('connected_since') ?? now()->toIso8601String(),
             'last_connection_ok' => true,
             'last_connection_at' => now()->toIso8601String(),
         ]);

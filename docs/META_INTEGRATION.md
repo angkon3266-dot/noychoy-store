@@ -71,10 +71,25 @@ META_GOOGLE_CATEGORY=            # optional default google_product_category
 
 ## 3. Configuration (admin)
 
-Open **Admin → Meta Integration**. On first entry you'll be asked to **set a
-security password** (separate from your login). After that, the module is locked
-behind that password (auto-locks after inactivity; 5 wrong tries = 15-min
-lockout).
+Open **Admin → Marketing → Meta**. (The Marketing Center hub lists every
+channel; Meta is live, the others show "Coming soon".) On first entry you'll be
+asked to **set a security password** (separate from your login). After that, the
+module is locked behind that password (auto-locks after inactivity; 5 wrong
+tries = 15-min lockout).
+
+The Meta module has four tabs:
+
+- **Dashboard** — connection status + health (token / Graph API / webhook /
+  queue), stat cards (synced / pending / failed / never synced / success rate /
+  today / last sync / avg API response), the OAuth wizard, settings and sync
+  buttons.
+- **Sync Logs** — search + status/action/date/product filters, row-level retry,
+  retry-all-failed, and CSV export.
+- **Queue** — live waiting/running/completed/failed counts, pause/resume, retry.
+- **Webhook** — callback URL, verify-token + verification status, last event.
+
+Single products can also be synced/removed and their log viewed directly from
+the **product edit page** (Meta status card).
 
 ### Development Mode
 

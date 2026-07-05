@@ -25,5 +25,16 @@
     @if($failedState && $failedState->last_error)
         <p class="text-xs text-red-600 mt-1">{{ \Illuminate\Support\Str::limit($failedState->last_error, 160) }}</p>
     @endif
-    <p class="text-xs text-ink-700/40 mt-2">Sync is managed from <a href="{{ route('admin.meta.index') }}" class="text-gold-700 hover:underline">Meta Integration</a>.</p>
+
+    <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-ink-100">
+        <form action="{{ route('admin.meta.sync-single', $product) }}" method="POST">@csrf
+            <button class="btn-outline text-xs py-1.5">Sync now</button>
+        </form>
+        @if($status !== 'never' && $status !== 'removed')
+            <form action="{{ route('admin.meta.remove-single', $product) }}" method="POST" onsubmit="return confirm('Remove this product from the Meta catalog?')">@csrf
+                <button class="btn-outline text-xs py-1.5 text-red-600">Remove from catalog</button>
+            </form>
+        @endif
+        <a href="{{ route('admin.meta.logs', ['product_id' => $product->id]) }}" class="btn-outline text-xs py-1.5">View log</a>
+    </div>
 </div>

@@ -45,4 +45,19 @@ class MetaSyncLog extends Model
             ->orWhere('retailer_id', 'like', "%{$term}%")
             ->orWhere('api_error', 'like', "%{$term}%")));
     }
+
+    public function scopeProduct(Builder $q, $productId): Builder
+    {
+        return $q->when($productId, fn ($w) => $w->where('product_id', $productId));
+    }
+
+    public function scopeDateFrom(Builder $q, ?string $date): Builder
+    {
+        return $q->when($date, fn ($w) => $w->whereDate('created_at', '>=', $date));
+    }
+
+    public function scopeDateTo(Builder $q, ?string $date): Builder
+    {
+        return $q->when($date, fn ($w) => $w->whereDate('created_at', '<=', $date));
+    }
 }

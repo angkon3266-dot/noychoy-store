@@ -28,6 +28,8 @@ class MetaWebhookController extends Controller
         $challenge = $request->query('hub_challenge');
 
         if ($mode === 'subscribe' && $token && hash_equals((string) config('meta.webhook_verify_token'), (string) $token)) {
+            $this->settings->update(['webhook_verified_at' => now()->toIso8601String()]);
+
             return response($challenge, 200)->header('Content-Type', 'text/plain');
         }
 
@@ -48,6 +50,11 @@ class MetaWebhookController extends Controller
         }
 
         Log::info('Meta webhook received', ['payload' => $request->all()]);
+
+        $this->settings->update(['last_webhook_event' => [
+            'at' => now()->toIso8601String(),
+            'summary' => (string) ($request->input('object', 'event')).' · '.substr(json_encode($request->input('entry', [])), 0, 200),
+        ]]);
 
         // Meta requires a fast 200 acknowledgement; heavy handling should queue.
         return response()->json(['received' => true]);
