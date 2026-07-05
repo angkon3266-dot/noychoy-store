@@ -53,21 +53,83 @@ class MetaDebug
 
     // ── Token (prefer the modular connection, fall back to legacy Commerce) ────
 
+    /**
+     * Token precedence: the modular OAuth connection ALWAYS wins when a
+     * meta_connections row exists — we only fall back to legacy when there is
+     * genuinely no modular connection at all. This prevents a silent downgrade
+     * to the legacy MetaSettings token when the modular token is momentarily
+     * empty/unreadable (which just hides the real modular problem).
+     */
     public function token(): ?string
     {
-        return $this->tokens->token() ?: $this->legacy->token();
+        if ($this->tokens->existing() !== null) {
+            return $this->modularToken();
+        }
+
+        return $this->legacy->token();
     }
 
     public function tokenSource(): ?string
     {
-        if ($this->tokens->token()) {
-            return 'modular (MetaTokenManager / meta_connections)';
+        if ($this->tokens->existing() !== null) {
+            return $this->modularToken()
+                ? 'modular (MetaTokenManager / meta_connections)'
+                : 'modular connection present but token missing/unreadable — reconnect via Marketing → Meta Connection';
         }
         if ($this->legacy->token()) {
             return 'legacy (MetaSettings / meta_integration)';
         }
 
         return null;
+    }
+
+    /** The legacy MetaSettings token (for the diagnostic comparison panel). */
+    public function legacyToken(): ?string
+    {
+        return $this->legacy->token();
+    }
+
+    /** Read the modular token, swallowing a decrypt failure (APP_KEY mismatch). */
+    private function modularToken(): ?string
+    {
+        try {
+            return $this->tokens->token() ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Raw dump of every meta_connections row for diagnosis — reads the stored
+     * (encrypted) column WITHOUT decrypting so a key mismatch can't throw, then
+     * reports separately whether it decrypts. Answers "does the modular
+     * connection still exist and does its token work?".
+     */
+    public function connectionDump(): array
+    {
+        return \App\Models\MetaConnection::query()->orderBy('id')->get()->map(function ($c) {
+            $rawToken = $c->getRawOriginal('access_token');
+
+            try {
+                $decrypted = $c->access_token; // triggers the `encrypted` cast
+                $decryptState = filled($decrypted) ? 'decrypts OK (non-empty)' : 'decrypts to empty';
+            } catch (\Throwable $e) {
+                $decryptState = 'DECRYPT FAILED — '.$e->getMessage().' (APP_KEY changed since the token was stored?)';
+            }
+
+            return [
+                'id' => $c->id,
+                'provider' => $c->provider,
+                'access_token_column' => $rawToken ? 'present ('.strlen((string) $rawToken).' chars, encrypted)' : 'NULL / empty',
+                'access_token_decrypt' => $decryptState,
+                'granted_scopes' => $c->granted_scopes ?? [],
+                'business_id' => $c->business_id,
+                'business_name' => $c->business_name,
+                'health_status' => $c->health_status,
+                'token_expires_at' => optional($c->token_expires_at)->toIso8601String(),
+                'updated_at' => optional($c->updated_at)->toIso8601String(),
+            ];
+        })->all();
     }
 
     public function businessId(): ?string

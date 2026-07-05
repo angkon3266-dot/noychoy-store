@@ -32,6 +32,8 @@ class MetaDebugController extends Controller
         return view('admin.meta.debug', [
             'context' => $this->debug->context(),
             'readiness' => $this->debug->readiness(),
+            'connections' => $this->debug->connectionDump(),
+            'legacyHasToken' => filled($this->debug->legacyToken()),
             'recent' => $this->debug->recent(null, 40),
             'errors' => $this->debug->recent('error', 20),
         ]);

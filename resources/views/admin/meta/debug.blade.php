@@ -73,6 +73,37 @@
         </div>
     </div>
 
+    {{-- ── Raw connection records (source-of-truth from the DB) ────────────── --}}
+    <div class="card p-5">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="font-semibold">Connection records — <code>meta_connections</code></h2>
+            <button type="button" @click="copy(@js($connections))" class="btn-outline text-xs py-1">Copy JSON</button>
+        </div>
+        <p class="text-xs text-ink-700/60 mb-3">
+            Read straight from the DB. The token column is read <strong>without decrypting</strong> (so an APP_KEY mismatch can't crash the page), then a separate decrypt check is shown.
+            Precedence: the modular connection is used whenever a row exists; legacy is used only when there is no modular row.
+        </p>
+        @if(empty($connections))
+            <div class="rounded-md bg-red-50 border border-red-200 text-red-800 px-3 py-2 text-sm">
+                No <code>meta_connections</code> rows exist. The modular connection is missing — reconnect via Marketing → Meta Connection.
+            </div>
+        @else
+            @foreach($connections as $c)
+                <div class="rounded-lg border border-ink-100 mb-2 p-3 text-sm">
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 font-mono text-xs">
+                        @foreach($c as $k => $v)
+                            <div class="flex justify-between gap-2 border-b border-ink-50 py-0.5">
+                                <span class="text-ink-700/50">{{ $k }}</span>
+                                <span class="text-right break-all {{ (str_contains($k,'decrypt') && str_contains(strtolower((string)$v),'fail')) || (str_contains($k,'column') && str_contains((string)$v,'NULL')) ? 'text-red-600' : '' }}">{{ is_array($v) ? (empty($v) ? '[]' : implode(', ', $v)) : ($v === null || $v === '' ? '—' : $v) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        @endif
+        <p class="text-xs mt-2">Legacy <code>MetaSettings</code> token present: <strong class="{{ $legacyHasToken ? 'text-amber-700' : 'text-ink-700/50' }}">{{ $legacyHasToken ? 'yes' : 'no' }}</strong></p>
+    </div>
+
     {{-- ── Discovery tester ────────────────────────────────────────────────── --}}
     <div class="card p-5">
         <h2 class="font-semibold mb-1">Discovery tester</h2>
