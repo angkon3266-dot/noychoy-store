@@ -242,6 +242,59 @@ document.addEventListener('alpine:init', () => {
         remove(id) { this.selected = this.selected.filter(x => x !== id); },
     }));
 
+    // Editorial "story sections" builder — used on the product form and in the
+    // content-template manager. Manages an array of {image,heading,body,layout}.
+    window.Alpine.data('sectionBuilder', (initial, opts) => ({
+        sections: Array.isArray(initial) ? initial : [],
+        uploadUrl: opts.uploadUrl,
+        saveUrl: opts.saveUrl || null,
+        csrf: opts.csrf,
+        add() {
+            this.sections.push({ image: '', heading: '', body: '', layout: this.sections.length % 2 ? 'left' : 'right' });
+        },
+        remove(i) { this.sections.splice(i, 1); },
+        move(i, dir) {
+            const j = i + dir;
+            if (j < 0 || j >= this.sections.length) return;
+            const s = this.sections;
+            [s[i], s[j]] = [s[j], s[i]];
+        },
+        async upload(i, e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const fd = new FormData();
+            fd.append('image', file);
+            fd.append('_token', this.csrf);
+            try {
+                const r = await fetch(this.uploadUrl, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+                const d = await r.json();
+                if (d.url) this.sections[i].image = d.url;
+            } catch (_) { alert('Image upload failed.'); }
+            e.target.value = '';
+        },
+        applyTemplate(e) {
+            const raw = e.target.selectedOptions[0] && e.target.selectedOptions[0].dataset.sections;
+            if (raw && confirm('Replace the current sections with this template?')) {
+                this.sections = JSON.parse(raw);
+            }
+            e.target.value = '';
+        },
+        async saveAsTemplate() {
+            if (!this.saveUrl) return;
+            const name = prompt('Save these sections as a template. Name:');
+            if (!name) return;
+            const fd = new FormData();
+            fd.append('_token', this.csrf);
+            fd.append('name', name);
+            fd.append('content_sections_json', this.json);
+            try {
+                const r = await fetch(this.saveUrl, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+                alert(r.ok ? 'Saved as template.' : 'Could not save template.');
+            } catch (_) { alert('Could not save template.'); }
+        },
+        get json() { return JSON.stringify(this.sections); },
+    }));
+
     window.Alpine.data('productPage', (config) => ({
         img: config.image || '',
         qty: 1,

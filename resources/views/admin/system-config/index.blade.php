@@ -12,6 +12,16 @@
     </div>
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {{-- Integrations: SMS (KhudeBarta), Steadfast courier, Google OAuth --}}
+        <a href="{{ route('admin.system-config.integrations') }}" class="card p-5 hover:border-gold-300 transition">
+            <div class="flex items-center justify-between">
+                <h3 class="font-semibold">Integrations</h3>
+                <span class="badge bg-ink-100 text-ink-700 text-[10px]">SMS · Courier · Login</span>
+            </div>
+            <p class="text-sm text-ink-700/60 mt-2">KhudeBarta SMS + templates, Steadfast courier, and Google login credentials.</p>
+            <p class="text-xs text-gold-700 mt-3">Edit →</p>
+        </a>
+
         @foreach($sections as $key => $section)
             <a href="{{ route('admin.system-config.edit', $key) }}" class="card p-5 hover:border-gold-300 transition">
                 <div class="flex items-center justify-between">

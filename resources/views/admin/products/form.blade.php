@@ -279,6 +279,71 @@
                     <textarea name="meta_description" x-model="md" maxlength="160" rows="2" class="input" placeholder="A short, enticing summary for search results"></textarea>
                 </div>
             </div>
+
+            <!-- Story sections (editorial image + text blocks shown on the product page) -->
+            <div class="card p-6 space-y-4"
+                 x-data="sectionBuilder(@js($product->content_sections ?? []), {
+                     uploadUrl: '{{ route('admin.products.section-image') }}',
+                     csrf: '{{ csrf_token() }}',
+                     @if($product->exists) saveUrl: '{{ route('admin.products.save-template', $product) }}', @endif
+                 })">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="font-semibold">Story sections</h2>
+                        <p class="text-xs text-ink-700/60">Editorial image + text blocks shown down the product page.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select @change="applyTemplate($event)" class="input py-1.5 text-sm w-auto">
+                            <option value="">Apply a template…</option>
+                            @foreach($contentTemplates ?? [] as $t)
+                                <option value="{{ $t->id }}" data-sections='@json($t->sections)'>{{ $t->name }}</option>
+                            @endforeach
+                        </select>
+                        <a href="{{ route('admin.content-templates.index') }}" target="_blank" class="btn-outline text-sm py-1.5">Manage</a>
+                    </div>
+                </div>
+
+                <template x-for="(s, i) in sections" :key="i">
+                    <div class="rounded-lg border border-ink-100 p-3">
+                        <div class="flex items-center justify-between text-xs text-ink-700/50 mb-2">
+                            <span>Section <span x-text="i + 1"></span></span>
+                            <div class="flex gap-2">
+                                <button type="button" @click="move(i, -1)" class="hover:text-gold-700">↑</button>
+                                <button type="button" @click="move(i, 1)" class="hover:text-gold-700">↓</button>
+                                <button type="button" @click="remove(i)" class="text-red-600 hover:underline">Remove</button>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="w-28 shrink-0">
+                                <div class="aspect-square rounded bg-ink-100 overflow-hidden mb-1">
+                                    <template x-if="s.image"><img :src="s.image" class="w-full h-full object-cover" alt=""></template>
+                                </div>
+                                <label class="btn-outline text-xs py-1 w-full text-center cursor-pointer block">Upload
+                                    <input type="file" accept="image/*" class="hidden" @change="upload(i, $event)">
+                                </label>
+                            </div>
+                            <div class="flex-1 space-y-2">
+                                <input x-model="s.heading" placeholder="Heading (e.g. Grace In Bloom)" class="input py-2">
+                                <textarea x-model="s.body" rows="3" placeholder="Description" class="input"></textarea>
+                                <div class="flex flex-wrap items-center gap-3 text-sm">
+                                    <label class="flex items-center gap-1"><input type="radio" value="right" x-model="s.layout"> Image right</label>
+                                    <label class="flex items-center gap-1"><input type="radio" value="left" x-model="s.layout"> Image left</label>
+                                    <input x-model="s.image" placeholder="or paste image URL" class="input py-1 text-xs flex-1 min-w-40">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="!sections.length"><p class="text-sm text-ink-700/40">No sections yet.</p></template>
+
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" @click="add()" class="btn-outline text-sm">+ Add section</button>
+                    @if($product->exists)<button type="button" @click="saveAsTemplate()" class="btn-outline text-sm">Save as template</button>@endif
+                </div>
+
+                <input type="hidden" name="content_sections_json" :value="json">
+            </div>
         </div>
 
         <!-- sidebar -->

@@ -76,6 +76,18 @@ if (! function_exists('theme_asset')) {
     }
 }
 
+if (! function_exists('store_name')) {
+    /**
+     * The store's display name. Prefers the admin-editable `store_name` setting,
+     * falling back to config (env). Used for both storefront and admin branding
+     * so a deployment never shows "Laravel".
+     */
+    function store_name(): string
+    {
+        return (string) (Setting::get('store_name') ?: config('store.name') ?: config('app.name'));
+    }
+}
+
 if (! function_exists('page_content')) {
     /**
      * Editable footer-page content (privacy/terms/refund/contact), stored in the

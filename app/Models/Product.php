@@ -23,7 +23,7 @@ class Product extends Model
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
         'is_preorder', 'preorder_release_date', 'preorder_note', 'tags', 'colors',
         'custom_label', 'custom_value', 'custom_show', 'custom_fields', 'loves_count',
-        'is_bestseller', 'video_urls',
+        'is_bestseller', 'video_urls', 'content_sections',
     ];
 
     protected $casts = [
@@ -49,6 +49,7 @@ class Product extends Model
         'loves_count' => 'integer',
         'is_bestseller' => 'boolean',
         'video_urls' => 'array',
+        'content_sections' => 'array',
     ];
 
     public function scopeBestsellers(Builder $query): Builder

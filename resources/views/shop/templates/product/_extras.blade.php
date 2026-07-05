@@ -1,3 +1,6 @@
+{{-- Editorial story sections (per-product / template-driven). --}}
+@include('shop.templates.product._sections')
+
 {{-- Description, related & recently-viewed. Not Alpine-dependent. --}}
 @if($product->description)
     <section class="mt-12 max-w-3xl border-t border-ink-100 pt-8" x-data="{ open: false }">

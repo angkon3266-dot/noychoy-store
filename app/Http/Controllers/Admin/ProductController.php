@@ -146,6 +146,7 @@ class ProductController extends Controller
             'product' => new Product(['status' => 'published', 'manage_stock' => true, 'in_stock' => true]),
             'categories' => Category::orderBy('name')->get(),
             'allProducts' => Product::with('primaryImage')->orderBy('name')->get(['id', 'name']),
+            'contentTemplates' => \App\Models\ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
         ]);
     }
 
@@ -158,6 +159,7 @@ class ProductController extends Controller
         $this->syncImages($request, $product);
         $this->syncVideos($request, $product);
         $this->syncVariants($request, $product);
+        $this->syncContentSections($request, $product);
 
         return redirect()->route('admin.products.edit', $product)
             ->with('success', 'Product created.');
@@ -171,6 +173,7 @@ class ProductController extends Controller
             'product' => $product,
             'categories' => Category::orderBy('name')->get(),
             'allProducts' => Product::with('primaryImage')->where('id', '!=', $product->id)->orderBy('name')->get(['id', 'name']),
+            'contentTemplates' => \App\Models\ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
         ]);
     }
 
@@ -184,6 +187,7 @@ class ProductController extends Controller
         $this->applyImageOrder($request, $product);
         $this->syncVideos($request, $product);
         $this->syncVariants($request, $product);
+        $this->syncContentSections($request, $product);
 
         return redirect()->route('admin.products.edit', $product)
             ->with('success', 'Product updated.');
@@ -194,6 +198,46 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
+    }
+
+    /** Persist the product's editorial "story sections" from the JSON builder. */
+    protected function syncContentSections(Request $request, Product $product): void
+    {
+        if (! $request->has('content_sections_json')) {
+            return;
+        }
+
+        $raw = json_decode((string) $request->input('content_sections_json'), true);
+        $product->content_sections = \App\Models\ContentTemplate::cleanSections($raw);
+        $product->save();
+    }
+
+    /** AJAX: upload one section image, return its stored URL (used by the builder). */
+    public function uploadSectionImage(Request $request)
+    {
+        $request->validate(['image' => ['required', 'image', 'max:8192']]);
+
+        $path = app(\App\Services\ImageOptimizer::class)->storeWebp($request->file('image'), 'sections', 1600, 82);
+
+        return response()->json(['url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path)]);
+    }
+
+    /** Save a product's current sections as a reusable content template. */
+    public function saveAsTemplate(Request $request, Product $product)
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:120']]);
+
+        $sections = \App\Models\ContentTemplate::cleanSections(
+            json_decode((string) $request->input('content_sections_json'), true)
+        );
+
+        if (empty($sections)) {
+            return back()->with('error', 'Add at least one section before saving it as a template.');
+        }
+
+        \App\Models\ContentTemplate::create(['name' => $data['name'], 'sections' => $sections]);
+
+        return back()->with('success', 'Saved as template “'.$data['name'].'”.');
     }
 
     /** Clone a product (with images & variants) as a new draft. */

@@ -39,6 +39,14 @@ Route::middleware('admin')->group(function () {
     Route::delete('product-images/{image}', [ProductController::class, 'deleteImage'])->name('products.images.delete');
     Route::post('product-images/{image}/primary', [ProductController::class, 'setPrimaryImage'])->name('products.images.primary');
 
+    // Product-page story sections (builder helpers) + reusable template library
+    Route::post('products/section-image', [ProductController::class, 'uploadSectionImage'])->name('products.section-image');
+    Route::post('products/{product}/save-template', [ProductController::class, 'saveAsTemplate'])->name('products.save-template');
+    Route::get('content-templates', [\App\Http\Controllers\Admin\ContentTemplateController::class, 'index'])->name('content-templates.index');
+    Route::post('content-templates', [\App\Http\Controllers\Admin\ContentTemplateController::class, 'store'])->name('content-templates.store');
+    Route::put('content-templates/{template}', [\App\Http\Controllers\Admin\ContentTemplateController::class, 'update'])->name('content-templates.update');
+    Route::delete('content-templates/{template}', [\App\Http\Controllers\Admin\ContentTemplateController::class, 'destroy'])->name('content-templates.destroy');
+
     // Categories
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create');
@@ -131,10 +139,6 @@ Route::middleware('admin')->group(function () {
     Route::get('menu', [MenuController::class, 'index'])->name('menu');
     Route::post('menu', [MenuController::class, 'update'])->name('menu.update');
 
-    // Integrations (Steadfast, SMS) + templates
-    Route::get('integrations', [IntegrationController::class, 'index'])->name('integrations');
-    Route::post('integrations', [IntegrationController::class, 'update'])->name('integrations.update');
-    Route::post('integrations/test-sms', [IntegrationController::class, 'testSms'])->name('integrations.test-sms');
 
     // Staff accounts & roles (admin only)
     Route::get('users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
@@ -222,6 +226,12 @@ Route::middleware('admin')->group(function () {
         Route::get('export', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'export'])->name('export');
         Route::post('import/preview', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'importPreview'])->name('import.preview');
         Route::post('import', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'import'])->name('import');
+
+        // Integrations (Steadfast courier, KhudeBarta SMS + templates, Google OAuth).
+        // Consolidated here so every integration is configured in one place.
+        Route::get('integrations', [IntegrationController::class, 'index'])->name('integrations');
+        Route::post('integrations', [IntegrationController::class, 'update'])->name('integrations.update');
+        Route::post('integrations/test-sms', [IntegrationController::class, 'testSms'])->name('integrations.test-sms');
 
         // Section edit/save/test (catch-all — keep last).
         Route::get('{section}', [\App\Http\Controllers\Admin\SystemConfigController::class, 'edit'])->name('edit')->where('section', '[a-z-]+');

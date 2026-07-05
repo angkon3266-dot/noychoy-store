@@ -100,17 +100,9 @@ class ConfigSchema
                 ],
             ],
 
-            'sms' => [
-                'label' => 'SMS (KhudeBarta)',
-                'description' => 'SMS gateway credentials. Also editable under Integrations.',
-                'test' => 'sms',
-                'fields' => [
-                    ['key' => 'sms.api_key', 'label' => 'API key', 'type' => 'password', 'config' => 'sms.api_key', 'env' => 'KHUDEBARTA_API_KEY', 'sensitive' => true],
-                    ['key' => 'sms.secret_key', 'label' => 'Secret key', 'type' => 'password', 'config' => 'sms.secret_key', 'env' => 'KHUDEBARTA_SECRET_KEY', 'sensitive' => true],
-                    ['key' => 'sms.sender_id', 'label' => 'Sender ID', 'type' => 'text', 'config' => 'sms.sender_id', 'env' => 'KHUDEBARTA_CALLER_ID'],
-                    ['key' => 'sms.base_url', 'label' => 'Base URL', 'type' => 'text', 'config' => 'sms.base_url', 'env' => 'KHUDEBARTA_BASE_URL'],
-                ],
-            ],
+            // SMS (KhudeBarta), Steadfast courier and Google OAuth are managed on
+            // the dedicated Integrations page (System Config → Integrations) so
+            // they write to the store the SMS/courier services already read.
 
             'payment' => [
                 'label' => 'Payment',

@@ -4,7 +4,8 @@
 
 @section('content')
 <div class="max-w-4xl space-y-6">
-    <form action="{{ route('admin.integrations.update') }}" method="POST" class="space-y-6">
+    <a href="{{ route('admin.system-config.index') }}" class="text-sm text-gold-700 hover:underline">← System Configuration</a>
+    <form action="{{ route('admin.system-config.integrations.update') }}" method="POST" class="space-y-6">
         @csrf
 
         {{-- Steadfast --}}
@@ -84,7 +85,7 @@
     {{-- Test SMS --}}
     <div class="card p-6">
         <h2 class="font-semibold mb-3">Send a test SMS</h2>
-        <form action="{{ route('admin.integrations.test-sms') }}" method="POST" class="flex gap-2 max-w-md">
+        <form action="{{ route('admin.system-config.integrations.test-sms') }}" method="POST" class="flex gap-2 max-w-md">
             @csrf
             <input name="phone" placeholder="01XXXXXXXXX" class="input" required>
             <button class="btn-outline whitespace-nowrap">Send test</button>
