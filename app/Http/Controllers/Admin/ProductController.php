@@ -165,7 +165,7 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        $product->load('images', 'variants', 'categories');
+        $product->load('images', 'variants', 'categories', 'metaSyncStates');
 
         return view('admin.products.form', [
             'product' => $product,

@@ -148,6 +148,44 @@ class Product extends Model
         return $this->hasMany(Review::class);
     }
 
+    /** Meta catalog sync state rows (one per synced item — product + variants). */
+    public function metaSyncStates(): HasMany
+    {
+        return $this->hasMany(MetaSyncState::class);
+    }
+
+    /**
+     * Aggregate Meta status for the product page badge:
+     * synced (all items synced) | pending | failed | never.
+     */
+    public function metaStatus(): string
+    {
+        $states = $this->relationLoaded('metaSyncStates') ? $this->metaSyncStates : $this->metaSyncStates()->get();
+
+        if ($states->isEmpty()) {
+            return MetaSyncState::STATUS_NEVER;
+        }
+        if ($states->contains('status', MetaSyncState::STATUS_FAILED)) {
+            return MetaSyncState::STATUS_FAILED;
+        }
+        if ($states->contains('status', MetaSyncState::STATUS_PENDING)) {
+            return MetaSyncState::STATUS_PENDING;
+        }
+        if ($states->every(fn ($s) => $s->status === MetaSyncState::STATUS_SYNCED)) {
+            return MetaSyncState::STATUS_SYNCED;
+        }
+
+        return MetaSyncState::STATUS_PENDING;
+    }
+
+    /** Most recent Meta sync timestamp, or null. */
+    public function metaLastSyncedAt(): ?\Illuminate\Support\Carbon
+    {
+        $states = $this->relationLoaded('metaSyncStates') ? $this->metaSyncStates : $this->metaSyncStates()->get();
+
+        return $states->max('last_synced_at') ? \Illuminate\Support\Carbon::parse($states->max('last_synced_at')) : null;
+    }
+
     public function approvedReviews(): HasMany
     {
         return $this->hasMany(Review::class)->where('status', 'approved')->latest();

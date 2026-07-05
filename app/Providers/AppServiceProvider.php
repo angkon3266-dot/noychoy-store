@@ -3,7 +3,13 @@
 namespace App\Providers;
 
 use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Observers\MetaProductObserver;
+use App\Observers\MetaVariantObserver;
+use App\Policies\MetaPolicy;
 use App\Services\CartService;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -16,6 +22,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Authorization for the Meta Integration module (Super Admin only).
+        Gate::define('meta.access', [MetaPolicy::class, 'access']);
+
+        // Automatic Meta catalog sync on product / variant lifecycle changes.
+        Product::observe(MetaProductObserver::class);
+        ProductVariant::observe(MetaVariantObserver::class);
+
         // Apply admin-managed SMTP settings to the live mailer (overrides .env / cached config).
         app(\App\Services\MailConfigurator::class)->apply();
 

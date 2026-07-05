@@ -146,6 +146,41 @@ Route::middleware('admin')->group(function () {
     Route::get('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'edit'])->name('profile');
     Route::put('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'update'])->name('profile.update');
 
+    // ── Meta Integration (Super Admin only) ────────────────────────────────
+    // The unlock/security routes are reachable without the secondary password;
+    // everything else sits behind the `meta.gate` wall.
+    Route::prefix('meta')->name('meta.')->group(function () {
+        Route::get('unlock', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'show'])->name('unlock');
+        Route::post('unlock', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'unlock'])->name('unlock.submit');
+        Route::post('security-password', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'updatePassword'])->name('password.update');
+        Route::post('lock', [\App\Http\Controllers\Admin\MetaSecurityController::class, 'lock'])->name('lock');
+
+        Route::middleware('meta.gate')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'index'])->name('index');
+            Route::post('save', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'save'])->name('save');
+            Route::post('test', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'testConnection'])->name('test');
+            Route::post('mode', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'switchMode'])->name('mode');
+            Route::post('disconnect', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'disconnect'])->name('disconnect');
+
+            // Sync actions.
+            Route::post('sync-all', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncAll'])->name('sync-all');
+            Route::post('sync-refresh', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'fullRefresh'])->name('sync-refresh');
+            Route::post('sync-selected', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncSelected'])->name('sync-selected');
+            Route::post('sync/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'syncSingle'])->name('sync-single');
+            Route::post('remove/{product}', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'removeSingle'])->name('remove-single');
+            Route::get('batch-status', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'batchStatus'])->name('batch-status');
+
+            // Sync logs.
+            Route::get('logs', [\App\Http\Controllers\Admin\MetaSyncLogController::class, 'index'])->name('logs');
+            Route::post('logs/retry-failed', [\App\Http\Controllers\Admin\MetaSyncLogController::class, 'retryFailed'])->name('logs.retry');
+
+            // Production Mode OAuth ("Connect with Facebook").
+            Route::get('oauth/redirect', [\App\Http\Controllers\Admin\MetaOAuthController::class, 'redirect'])->name('oauth.redirect');
+            Route::get('oauth/callback', [\App\Http\Controllers\Admin\MetaOAuthController::class, 'callback'])->name('oauth.callback');
+            Route::post('oauth/select-catalog', [\App\Http\Controllers\Admin\MetaOAuthController::class, 'selectCatalog'])->name('oauth.select-catalog');
+        });
+    });
+
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');

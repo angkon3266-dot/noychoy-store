@@ -283,6 +283,9 @@
 
         <!-- sidebar -->
         <div class="space-y-6">
+            @if($product->exists && auth()->user()->can('meta.access'))
+                @include('admin.meta._product-status')
+            @endif
             <div class="card p-6 space-y-4">
                 <div>
                     <label class="label">Status</label>

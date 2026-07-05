@@ -6,11 +6,16 @@ use App\Http\Controllers\Shop\CartController;
 use App\Http\Controllers\Shop\CatalogController;
 use App\Http\Controllers\Shop\CheckoutController;
 use App\Http\Controllers\Shop\HomeController;
+use App\Http\Controllers\MetaWebhookController;
 use App\Http\Controllers\SteadfastWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Steadfast delivery-status webhook (register at steadfast.com.bd/user/webhook/add)
 Route::post('/webhooks/steadfast', [SteadfastWebhookController::class, 'handle'])->name('steadfast.webhook');
+
+// Meta (Facebook) webhook — subscription verification (GET) + event delivery (POST).
+Route::get('/webhooks/meta', [MetaWebhookController::class, 'verify'])->name('meta.webhook.verify');
+Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('meta.webhook');
 
 // ── Storefront ──────────────────────────────────────────────────────────────
 Route::get('/', [HomeController::class, 'index'])->name('home');
