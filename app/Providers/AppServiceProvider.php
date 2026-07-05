@@ -5,10 +5,16 @@ namespace App\Providers;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Events\ConfigurationRestored;
+use App\Listeners\RebuildConfigurationCache;
 use App\Observers\MetaProductObserver;
 use App\Observers\MetaVariantObserver;
 use App\Policies\MetaPolicy;
+use App\Policies\SystemConfigPolicy;
 use App\Services\CartService;
+use App\Services\SystemConfig\ConfigApplier;
+use App\Services\SystemConfig\SystemConfigRepository;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -18,19 +24,29 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(CartService::class);
+
+        // Shared config store (memoises reads for the request/worker lifecycle).
+        $this->app->singleton(SystemConfigRepository::class);
     }
 
     public function boot(): void
     {
-        // Authorization for the Meta Integration module (Super Admin only).
+        // Authorization: Super-Admin-only modules.
         Gate::define('meta.access', [MetaPolicy::class, 'access']);
+        Gate::define('system-config.access', [SystemConfigPolicy::class, 'access']);
 
         // Automatic Meta catalog sync on product / variant lifecycle changes.
         Product::observe(MetaProductObserver::class);
         ProductVariant::observe(MetaVariantObserver::class);
 
+        // Rebuild caches after a configuration restore/import.
+        Event::listen(ConfigurationRestored::class, RebuildConfigurationCache::class);
+
         // Apply admin-managed SMTP settings to the live mailer (overrides .env / cached config).
         app(\App\Services\MailConfigurator::class)->apply();
+
+        // Apply DB-stored System Configuration as runtime overrides (fails safe).
+        app(ConfigApplier::class)->apply();
 
         // Shared data for the storefront layout (nav menu + cart badge).
         View::composer(['shop.*', 'components.shop.*', 'layouts.shop'], function ($view) {

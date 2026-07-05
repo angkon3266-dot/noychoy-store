@@ -203,6 +203,32 @@ Route::middleware('admin')->group(function () {
         });
     });
 
+    // ── System Configuration Manager (Super Admin only) ────────────────────
+    Route::prefix('system-config')->name('system-config.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\SystemConfigController::class, 'index'])->name('index');
+        Route::get('audit', [\App\Http\Controllers\Admin\SystemConfigController::class, 'audit'])->name('audit');
+
+        // History.
+        Route::get('history', [\App\Http\Controllers\Admin\ConfigHistoryController::class, 'index'])->name('history');
+        Route::get('history/compare', [\App\Http\Controllers\Admin\ConfigHistoryController::class, 'compare'])->name('history.compare');
+        Route::get('history/download', [\App\Http\Controllers\Admin\ConfigHistoryController::class, 'download'])->name('history.download');
+        Route::get('history/{version}', [\App\Http\Controllers\Admin\ConfigHistoryController::class, 'show'])->name('history.show');
+
+        // Backups + import/export.
+        Route::get('backups', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'index'])->name('backups');
+        Route::post('backups', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'store'])->name('backups.store');
+        Route::get('backups/{backup}/restore', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'restorePreview'])->name('backups.restore-preview');
+        Route::post('backups/{backup}/restore', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'restore'])->name('backups.restore');
+        Route::get('export', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'export'])->name('export');
+        Route::post('import/preview', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'importPreview'])->name('import.preview');
+        Route::post('import', [\App\Http\Controllers\Admin\ConfigBackupController::class, 'import'])->name('import');
+
+        // Section edit/save/test (catch-all — keep last).
+        Route::get('{section}', [\App\Http\Controllers\Admin\SystemConfigController::class, 'edit'])->name('edit')->where('section', '[a-z-]+');
+        Route::post('{section}', [\App\Http\Controllers\Admin\SystemConfigController::class, 'save'])->name('save')->where('section', '[a-z-]+');
+        Route::post('{section}/test', [\App\Http\Controllers\Admin\SystemConfigController::class, 'test'])->name('test')->where('section', '[a-z-]+');
+    });
+
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
