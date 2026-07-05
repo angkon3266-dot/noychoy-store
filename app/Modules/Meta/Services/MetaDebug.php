@@ -109,6 +109,7 @@ class MetaDebug
     {
         return \App\Models\MetaConnection::query()->orderBy('id')->get()->map(function ($c) {
             $rawToken = $c->getRawOriginal('access_token');
+            $rawRefresh = $c->getRawOriginal('refresh_token');
 
             try {
                 $decrypted = $c->access_token; // triggers the `encrypted` cast
@@ -117,19 +118,49 @@ class MetaDebug
                 $decryptState = 'DECRYPT FAILED — '.$e->getMessage().' (APP_KEY changed since the token was stored?)';
             }
 
+            $selectedCatalog = $c->assets()->where('type', 'catalog')->where('is_selected', true)->first();
+
             return [
-                'id' => $c->id,
+                'connection_id' => $c->id,
                 'provider' => $c->provider,
-                'access_token_column' => $rawToken ? 'present ('.strlen((string) $rawToken).' chars, encrypted)' : 'NULL / empty',
+                // No user_id column: one connection per install, keyed by unique provider.
+                'user_id' => 'n/a — meta_connections is per-install (no user_id column)',
+                // No "active" column either; derived: has a token AND not disconnected.
+                'active' => filled($rawToken) && $c->health_status !== 'disconnected',
+                'access_token_exists' => (bool) filled($rawToken),
                 'access_token_decrypt' => $decryptState,
-                'granted_scopes' => $c->granted_scopes ?? [],
+                'access_token_column' => $rawToken ? 'present ('.strlen((string) $rawToken).' chars, encrypted)' : 'NULL / empty',
+                'refresh_token_exists' => (bool) filled($rawRefresh),
+                'expires_at' => optional($c->token_expires_at)->toIso8601String(),
+                'scopes' => $c->granted_scopes ?? [],
                 'business_id' => $c->business_id,
+                // business_id IS the selected business in this schema (single connection).
+                'selected_business_id' => $c->business_id,
                 'business_name' => $c->business_name,
+                'selected_catalog_id' => $selectedCatalog?->external_id,
+                'selected_catalog_name' => $selectedCatalog?->name,
                 'health_status' => $c->health_status,
-                'token_expires_at' => optional($c->token_expires_at)->toIso8601String(),
+                'created_at' => optional($c->created_at)->toIso8601String(),
                 'updated_at' => optional($c->updated_at)->toIso8601String(),
             ];
         })->all();
+    }
+
+    /**
+     * The exact query used to resolve the active modular connection
+     * (MetaTokenManager::existing()), so the lookup logic can be verified.
+     */
+    public function lookupQuery(): array
+    {
+        $query = \App\Models\MetaConnection::query()->where('provider', 'meta');
+
+        return [
+            'method' => 'MetaTokenManager::existing()',
+            'eloquent' => "MetaConnection::where('provider', 'meta')->first()",
+            'sql' => $query->toSql().' limit 1',
+            'bindings' => $query->getBindings(),
+            'note' => 'No "active"/"user_id" filter — `provider` is UNIQUE, so this returns the single install connection (or null).',
+        ];
     }
 
     public function businessId(): ?string

@@ -94,7 +94,15 @@
                         @foreach($c as $k => $v)
                             <div class="flex justify-between gap-2 border-b border-ink-50 py-0.5">
                                 <span class="text-ink-700/50">{{ $k }}</span>
-                                <span class="text-right break-all {{ (str_contains($k,'decrypt') && str_contains(strtolower((string)$v),'fail')) || (str_contains($k,'column') && str_contains((string)$v,'NULL')) ? 'text-red-600' : '' }}">{{ is_array($v) ? (empty($v) ? '[]' : implode(', ', $v)) : ($v === null || $v === '' ? '—' : $v) }}</span>
+                                <span class="text-right break-all {{ (str_contains($k,'decrypt') && str_contains(strtolower((string)$v),'fail')) || (str_contains($k,'column') && str_contains((string)$v,'NULL')) || ($k==='access_token_exists' && $v===false) ? 'text-red-600' : '' }}">
+                                    @if(is_bool($v))
+                                        <span class="badge {{ $v ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">{{ $v ? 'true' : 'false' }}</span>
+                                    @elseif(is_array($v))
+                                        {{ empty($v) ? '[]' : implode(', ', $v) }}
+                                    @else
+                                        {{ $v === null || $v === '' ? '—' : $v }}
+                                    @endif
+                                </span>
                             </div>
                         @endforeach
                     </div>
@@ -102,6 +110,18 @@
             @endforeach
         @endif
         <p class="text-xs mt-2">Legacy <code>MetaSettings</code> token present: <strong class="{{ $legacyHasToken ? 'text-amber-700' : 'text-ink-700/50' }}">{{ $legacyHasToken ? 'yes' : 'no' }}</strong></p>
+
+        {{-- Exact lookup query used to resolve the active modular connection --}}
+        <div class="mt-3 pt-3 border-t border-ink-100">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-semibold">Lookup query — {{ $lookupQuery['method'] }}</h3>
+                <button type="button" @click="copy(@js($lookupQuery))" class="text-xs text-gold-700 hover:underline">Copy</button>
+            </div>
+            <pre class="bg-ink-900 text-ink-100 text-[11px] rounded p-2 overflow-x-auto">Eloquent: {{ $lookupQuery['eloquent'] }}
+SQL:      {{ $lookupQuery['sql'] }}
+Bindings: {{ json_encode($lookupQuery['bindings']) }}</pre>
+            <p class="text-[11px] text-ink-700/50 mt-1">{{ $lookupQuery['note'] }}</p>
+        </div>
     </div>
 
     {{-- ── Discovery tester ────────────────────────────────────────────────── --}}

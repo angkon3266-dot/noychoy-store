@@ -33,6 +33,7 @@ class MetaDebugController extends Controller
             'context' => $this->debug->context(),
             'readiness' => $this->debug->readiness(),
             'connections' => $this->debug->connectionDump(),
+            'lookupQuery' => $this->debug->lookupQuery(),
             'legacyHasToken' => filled($this->debug->legacyToken()),
             'recent' => $this->debug->recent(null, 40),
             'errors' => $this->debug->recent('error', 20),
