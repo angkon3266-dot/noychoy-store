@@ -117,7 +117,7 @@
                         </div>
                     </td>
                     <td class="px-4 py-3 text-ink-700/70">
-                        @php $rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter(); @endphp
+                        @php($rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter())
                         {{ $rowCats->isNotEmpty() ? $rowCats->implode(', ') : '—' }}
                     </td>
                     <td class="px-4 py-3">

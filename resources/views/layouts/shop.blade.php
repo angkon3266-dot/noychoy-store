@@ -440,8 +440,10 @@
             </nav>
 
             {{-- Footer with social icons --}}
-            @php($fbDrawer = theme('footer_facebook'))
-            @php($igDrawer = theme('footer_instagram'))
+            @php
+                $fbDrawer = theme('footer_facebook');
+                $igDrawer = theme('footer_instagram');
+            @endphp
             <div class="shrink-0 border-t border-ink-100 px-4 py-3 flex items-center justify-between" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom))">
                 <span class="text-xs text-ink-700/50">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
                 <div class="flex items-center gap-2">

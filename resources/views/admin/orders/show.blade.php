@@ -20,7 +20,8 @@
                             <td class="px-5 py-3">{{ $item->name }}
                                 @if($item->attributes)<span class="text-xs text-ink-700/50">({{ collect($item->attributes)->implode(', ') }})</span>@endif
                                 <div class="text-xs text-ink-700/40">
-                                    @if($item->product)Product ID #{{ $item->product->serial }}@endif@if($item->sku) · SKU {{ $item->sku }}@endif
+                                    @if($item->product)Product ID #{{ $item->product->serial }}@endif
+                                    @if($item->sku) · SKU {{ $item->sku }}@endif
                                 </div>
                             </td>
                             <td class="px-5 py-3 text-ink-700/70">{{ money($item->price) }} × {{ $item->quantity }}</td>
