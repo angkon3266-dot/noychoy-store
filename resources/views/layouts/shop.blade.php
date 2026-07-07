@@ -163,17 +163,17 @@
         .logo-center { height: {{ $centerH }}px; width: auto; }
         .menu-ico { height: {{ $menuIconH }}px; width: {{ $menuIconH }}px; }
     </style>
-    <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ open: false, msearch: false, rot: {{ $menuRot }} }">
+    <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ msearch: false, rot: {{ $menuRot }} }">
         <div class="mx-auto max-w-7xl px-4">
             <div class="relative flex h-16 items-center gap-2">
-                {{-- Mobile menu toggle (far left) — uses the uploaded icon, rotating when open --}}
-                <button @click="open = !open" class="md:hidden p-2 -ml-1" aria-label="Menu" :aria-expanded="open">
+                {{-- Mobile menu toggle (far left) — opens the off-canvas drawer --}}
+                <button @click="$store.mobileNav.toggle()" class="md:hidden p-2 -ml-1" aria-label="Menu" :aria-expanded="$store.mobileNav.open">
                     @if($menuIcon)
                         <img src="{{ $menuIcon }}" alt="Menu" width="{{ $menuIconH }}" height="{{ $menuIconH }}" decoding="async"
                              class="menu-ico object-contain transition-transform duration-300"
-                             :style="`transform: rotate(${open ? rot : 0}deg)`">
+                             :style="`transform: rotate(${$store.mobileNav.open ? rot : 0}deg)`">
                     @else
-                        <svg class="w-6 h-6 transition-transform duration-300" :style="`transform: rotate(${open ? rot : 0}deg)`" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+                        <svg class="w-6 h-6 transition-transform duration-300" :style="`transform: rotate(${$store.mobileNav.open ? rot : 0}deg)`" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
                     @endif
                 </button>
 
@@ -324,67 +324,141 @@
 
         </div>
 
-        {{-- Mobile navigation — slide-in drawer from the left --}}
-        <div x-show="open" x-cloak class="md:hidden fixed inset-0 z-[60]" style="display:none">
-            <div class="absolute inset-0 bg-black/40" @click="open=false" x-transition.opacity></div>
-            <div class="absolute inset-y-0 left-0 w-[82%] max-w-xs bg-white shadow-xl flex flex-col"
-                 x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
-                 x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full">
-                <div class="flex items-center justify-between h-14 px-4 border-b border-gold-100 shrink-0">
-                    <span class="font-display text-lg text-gold-700">Menu</span>
-                    <button @click="open=false" aria-label="Close menu" class="p-2 -mr-2 text-ink-700/70 hover:text-ink-900">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-                    </button>
-                </div>
-                <nav class="flex-1 overflow-y-auto px-4 py-2">
-                    <a href="{{ route('home') }}" class="block py-3 border-b border-gold-50">Home</a>
-                    @foreach($siteMenu ?? [] as $item)
-                        @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
-                        @if($mtype === 'link')
-                            <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-3 border-b border-gold-50">
-                                {{ $item['label'] }}
-                                @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
-                            </a>
-                        @else
-                            {{-- Parent label navigates to its own page; the caret expands children --}}
-                            <div x-data="{ sub: false }" class="border-b border-gold-50">
-                                <div class="w-full flex items-center justify-between">
-                                    @if(!empty($item['url']))
-                                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="flex items-center gap-2 py-3 flex-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</a>
-                                    @else
-                                        <button type="button" @click="sub=!sub" class="flex items-center gap-2 py-3 flex-1 text-left">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</button>
-                                    @endif
-                                    <button type="button" @click="sub=!sub" class="p-2 -mr-1" aria-label="Toggle {{ $item['label'] }}">
-                                        <svg class="w-4 h-4 transition" :class="sub ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                                    </button>
-                                </div>
-                                <div x-show="sub" x-cloak class="pb-2 pl-3 space-y-1">
-                                    @if($mtype === 'mega')
-                                        @foreach($item['columns'] ?? [] as $col)
-                                            @if($col['heading'])<p class="pt-1.5 text-sm font-bold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
-                                            @foreach($col['links'] as $l)
-                                                <a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $l['label'] }}</a>
-                                            @endforeach
-                                        @endforeach
-                                    @else
-                                        @foreach($item['children'] ?? [] as $child)
-                                            <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm text-ink-700/80">{{ $child['label'] }}</a>
-                                        @endforeach
-                                    @endif
-                                    @if($item['view_all_mobile'] ?? false)
-                                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif class="block py-1.5 text-sm font-medium text-gold-700">View all {{ $item['label'] }} →</a>
-                                    @endif
-                                </div>
-                            </div>
-                        @endif
-                    @endforeach
-                    @if($ctaLabel = theme('menu_cta_label'))
-                        <a href="{{ theme('menu_cta_link') ?: route('shop') }}" class="block py-3 mt-1 text-gold-700 font-medium">{{ $ctaLabel }}</a>
-                    @endif
-                </nav>
-            </div>
-        </div>
     </header>
+
+    {{-- ── Mobile off-canvas drawer (premium left slide-in) ──────────────────
+         Lives at the top level of the layout — NOT inside the sticky header
+         (whose backdrop-blur would otherwise trap position:fixed to the header).
+         State + body scroll-lock live in the `mobileNav` store. --}}
+    <div x-data="mobileDrawer()" x-cloak
+         class="md:hidden fixed inset-0 z-[100]"
+         :class="$store.mobileNav.open ? '' : 'pointer-events-none'"
+         role="dialog" aria-modal="true" aria-label="Menu"
+         @keydown.escape.window="$store.mobileNav.close()">
+
+        {{-- Dim overlay --}}
+        <div class="absolute inset-0 transition-opacity duration-300"
+             style="background: rgba(0,0,0,.45)"
+             :class="$store.mobileNav.open ? 'opacity-100' : 'opacity-0'"
+             @click="$store.mobileNav.close()"></div>
+
+        {{-- Panel --}}
+        <aside x-ref="panel" tabindex="-1"
+               class="absolute top-0 left-0 h-[100dvh] w-[85%] max-w-[360px] bg-white flex flex-col shadow-2xl outline-none will-change-transform"
+               :class="$store.mobileNav.open ? 'translate-x-0' : '-translate-x-full'"
+               style="transition: transform .3s cubic-bezier(.22,.61,.36,1)"
+               @touchstart.passive="onStart($event)" @touchmove.passive="onMove($event)" @touchend="onEnd()"
+               @keydown="trap($event)">
+
+            {{-- Logo + close --}}
+            <div class="flex items-center justify-between h-16 px-4 border-b border-gold-100 shrink-0">
+                <a href="{{ route('home') }}" @click="$store.mobileNav.close()" class="shrink-0">
+                    @if($logoMobile || $logoDesktop)
+                        <img src="{{ $logoMobile ?: $logoDesktop }}" alt="{{ config('store.name') }}" height="{{ $logoHM }}" class="w-auto" style="height: {{ $logoHM }}px">
+                    @else
+                        <span class="font-display text-xl font-bold text-gold-700">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                    @endif
+                </a>
+                <button @click="$store.mobileNav.close()" aria-label="Close menu" class="p-2 -mr-2 text-ink-700/70 hover:text-ink-900">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+
+            {{-- Search --}}
+            <div class="px-4 py-3 border-b border-gold-50 shrink-0">
+                <form action="{{ route('shop') }}" method="GET" class="relative">
+                    <input name="q" value="{{ request('q') }}" placeholder="Search jewelry…" autocomplete="off"
+                           class="w-full rounded-full border border-ink-100 bg-ink-50/60 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/50">
+                    <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-700/40" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.3-4.3m1.55-5.2a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z"/></svg>
+                </form>
+            </div>
+
+            {{-- Navigation --}}
+            <nav class="flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+                <a href="{{ route('home') }}" @click="$store.mobileNav.close()" class="block px-2 py-3 rounded-lg hover:bg-gold-50 border-b border-gold-50">Home</a>
+                @foreach($siteMenu ?? [] as $item)
+                    @php $mtype = $item['type'] ?? (! empty($item['columns']) ? 'mega' : (! empty($item['children']) ? 'dropdown' : 'link')); @endphp
+                    @if($mtype === 'link')
+                        <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="flex items-center gap-2 px-2 py-3 rounded-lg hover:bg-gold-50 border-b border-gold-50">
+                            {{ $item['label'] }}
+                            @if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif
+                        </a>
+                    @else
+                        {{-- Expandable category --}}
+                        <div x-data="{ sub: false }" class="border-b border-gold-50">
+                            <div class="w-full flex items-center justify-between">
+                                @if(!empty($item['url']))
+                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="flex items-center gap-2 px-2 py-3 flex-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</a>
+                                @else
+                                    <button type="button" @click="sub=!sub" class="flex items-center gap-2 px-2 py-3 flex-1 text-left">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</button>
+                                @endif
+                                <button type="button" @click="sub=!sub" class="p-2" :aria-expanded="sub" aria-label="Toggle {{ $item['label'] }}">
+                                    <svg class="w-4 h-4 transition-transform duration-200" :class="sub ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                            </div>
+                            <div x-show="sub" x-collapse x-cloak class="pb-2 pl-4 space-y-0.5">
+                                @if($mtype === 'mega')
+                                    @foreach($item['columns'] ?? [] as $col)
+                                        @if($col['heading'])<p class="pt-1.5 text-xs font-bold text-gold-700 uppercase tracking-wide">{{ $col['heading'] }}</p>@endif
+                                        @foreach($col['links'] as $l)
+                                            <a href="{{ $l['url'] }}" @if($l['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="block py-2 text-sm text-ink-700/80">{{ $l['label'] }}</a>
+                                        @endforeach
+                                    @endforeach
+                                @else
+                                    @foreach($item['children'] ?? [] as $child)
+                                        <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="block py-2 text-sm text-ink-700/80">{{ $child['label'] }}</a>
+                                    @endforeach
+                                @endif
+                                @if($item['view_all_mobile'] ?? false)
+                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="block py-2 text-sm font-medium text-gold-700">View all {{ $item['label'] }} →</a>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                @endforeach
+                @if($ctaLabel = theme('menu_cta_label'))
+                    <a href="{{ theme('menu_cta_link') ?: route('shop') }}" @click="$store.mobileNav.close()" class="block mt-2 rounded-full bg-gold-600 text-white text-center px-4 py-2.5 font-medium">{{ $ctaLabel }}</a>
+                @endif
+
+                {{-- Account / Wishlist / Orders / Contact --}}
+                <div class="mt-3 pt-3 border-t border-ink-100">
+                    <p class="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-700/40">Your account</p>
+                    @php $acctLinks = [
+                        [auth('customer')->check() ? route('account') : route('customer.login'), auth('customer')->check() ? 'My account' : 'Sign in / Register', 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.1a7.5 7.5 0 0115 0A17.9 17.9 0 0112 21.75c-2.68 0-5.22-.58-7.5-1.65z'],
+                        [route('account.loved'), 'Wishlist', 'M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z'],
+                        [route('account.orders'), 'My orders', 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.36-1.99l1.26 12A1.13 1.13 0 0119.75 21H4.25a1.13 1.13 0 01-1.12-1.24l1.26-12A1.13 1.13 0 015.51 8.25h12.98c.58 0 1.06.44 1.12 1.01z'],
+                        [route('track'), 'Track order', 'M9 6.75V15m6-6v8.25m.5-13.36l3.5 2.02a1 1 0 01.5.87v9.44a1 1 0 01-1.5.87L15 18.75l-6 3.19-4.5-2.6a1 1 0 01-.5-.86V9.05a1 1 0 011.5-.87L9 5.25z'],
+                        [route('page.contact'), 'Contact us', 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5H4.5a2.25 2.25 0 00-2.25 2.25m19.5 0v.24a2.25 2.25 0 01-1.07 1.91l-7.5 4.62a2.25 2.25 0 01-2.36 0L3.32 8.9A2.25 2.25 0 012.25 6.99v-.24'],
+                    ]; @endphp
+                    @foreach($acctLinks as [$href, $label, $icon])
+                        <a href="{{ $href }}" @click="$store.mobileNav.close()" class="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-gold-50 text-sm">
+                            <svg class="w-5 h-5 text-ink-700/60" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon }}"/></svg>
+                            {{ $label }}
+                        </a>
+                    @endforeach
+                </div>
+            </nav>
+
+            {{-- Footer with social icons --}}
+            @php($fbDrawer = theme('footer_facebook'))
+            @php($igDrawer = theme('footer_instagram'))
+            <div class="shrink-0 border-t border-ink-100 px-4 py-3 flex items-center justify-between" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom))">
+                <span class="text-xs text-ink-700/50">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                <div class="flex items-center gap-2">
+                    @if($fbDrawer)
+                        <a href="{{ $fbDrawer }}" target="_blank" rel="noopener" aria-label="Facebook" class="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
+                            <svg class="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987H7.898v-2.89h2.54V9.797c0-2.507 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
+                        </a>
+                    @endif
+                    @if($igDrawer)
+                        <a href="{{ $igDrawer }}" target="_blank" rel="noopener" aria-label="Instagram" class="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
+                            <svg class="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                        </a>
+                    @endif
+                </div>
+            </div>
+        </aside>
+    </div>
 
     {{-- Registered-customer personalised offer bar (logged-in customers only) --}}
     @auth('customer')

@@ -393,6 +393,52 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Mobile off-canvas drawer ─────────────────────────────────────────────
+    // Global open state + body scroll-lock (compensating scrollbar width so
+    // there is no layout shift). The header trigger and the drawer (which lives
+    // at the top level of the layout, outside any backdrop-filter ancestor) both
+    // talk to this store.
+    window.Alpine.store('mobileNav', {
+        open: false,
+        show() {
+            this.open = true;
+            const sw = window.innerWidth - document.documentElement.clientWidth;
+            document.body.style.overflow = 'hidden';
+            if (sw > 0) document.body.style.paddingRight = sw + 'px';
+        },
+        close() {
+            this.open = false;
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        },
+        toggle() { this.open ? this.close() : this.show(); },
+    });
+
+    // Drawer behaviour: swipe-left to close + a lightweight focus trap.
+    window.Alpine.data('mobileDrawer', () => ({
+        _x: null,
+        init() {
+            // Move focus into the panel when it opens (accessibility).
+            this.$watch('$store.mobileNav.open', (v) => {
+                if (v) this.$nextTick(() => this.$refs.panel?.focus());
+            });
+        },
+        onStart(e) { this._x = e.changedTouches[0].clientX; },
+        onMove(e) {
+            if (this._x === null) return;
+            if (e.changedTouches[0].clientX - this._x < -60) { this.$store.mobileNav.close(); this._x = null; }
+        },
+        onEnd() { this._x = null; },
+        trap(e) {
+            if (e.key !== 'Tab') return;
+            const f = this.$refs.panel.querySelectorAll('a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])');
+            if (!f.length) return;
+            const first = f[0], last = f[f.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        },
+    }));
+
     // Meta Integration Debug page — runs the independent Graph API testers.
     // Registered here (not inline) so it's guaranteed available at alpine:init.
     window.Alpine.data('metaDebug', () => ({
