@@ -32,6 +32,12 @@ class MetaOAuthService
         return rtrim((string) config('meta.graph_url'), '/').'/'.config('meta.graph_version').'/'.ltrim($path, '/');
     }
 
+    /** Meta Debug logger (no-op unless META_DEBUG / local). */
+    private function debug(): MetaDebug
+    {
+        return app(MetaDebug::class);
+    }
+
     public function isConfigured(): bool
     {
         return filled(config('meta.oauth.app_id')) && filled(config('meta.oauth.app_secret'));
@@ -188,11 +194,59 @@ class MetaOAuthService
     {
         switch ($moduleKey) {
             case 'commerce':
-                foreach ($this->businesses($token) as $business) {
+                // (1) Enumerate businesses. business_id is ONLY ever written inside
+                // this loop (setBusiness). If /me/businesses returns no data, the
+                // loop body never runs and business_id stays NULL — this is the
+                // first point at which discovery silently produces nothing.
+                $bizResp = Http::acceptJson()->get($this->graph('me/businesses'), [
+                    'access_token' => $token, 'fields' => 'id,name,verification_status', 'limit' => 50,
+                ]);
+                $businesses = $bizResp->json('data', []);
+                $this->debug()->event('discovery', 'GET /me/businesses', [
+                    'status' => $bizResp->status(),
+                    'count' => count($businesses),
+                    'error' => $bizResp->json('error'),
+                    'response' => $bizResp->json(),
+                ]);
+
+                if (empty($businesses)) {
+                    $this->debug()->event('discovery', 'business_id LEFT NULL — /me/businesses returned 0 businesses, so setBusiness() is never called', [
+                        'status' => $bizResp->status(),
+                        'error' => $bizResp->json('error'),
+                    ]);
+                }
+
+                foreach ($businesses as $business) {
+                    // (2) THE update() that writes business_id.
                     $this->tokens->setBusiness((string) $business['id'], $business['name'] ?? null);
-                    $catalogs = Http::acceptJson()->get($this->graph($business['id'].'/owned_product_catalogs'), [
-                        'access_token' => $token, 'fields' => 'id,name', 'limit' => 100,
-                    ])->json('data', []);
+                    $this->debug()->event('discovery', 'setBusiness() wrote business_id', [
+                        'business_id' => $business['id'] ?? null,
+                        'business_name' => $business['name'] ?? null,
+                    ]);
+
+                    $ownedResp = Http::acceptJson()->get($this->graph($business['id'].'/owned_product_catalogs'), [
+                        'access_token' => $token, 'fields' => 'id,name,product_count', 'limit' => 100,
+                    ]);
+                    $catalogs = $ownedResp->json('data', []);
+                    $this->debug()->event('discovery', "GET /{$business['id']}/owned_product_catalogs", [
+                        'status' => $ownedResp->status(),
+                        'count' => count($catalogs),
+                        'error' => $ownedResp->json('error'),
+                        'response' => $ownedResp->json(),
+                    ]);
+
+                    // Diagnostic only (NOT persisted): catalogs the business can access
+                    // but does not own (client/shared) — surfaces the owned-vs-shared case.
+                    $accResp = Http::acceptJson()->get($this->graph($business['id'].'/product_catalogs'), [
+                        'access_token' => $token, 'fields' => 'id,name,product_count', 'limit' => 100,
+                    ]);
+                    $this->debug()->event('discovery', "GET /{$business['id']}/product_catalogs (diagnostic, not persisted)", [
+                        'status' => $accResp->status(),
+                        'count' => count($accResp->json('data', [])),
+                        'error' => $accResp->json('error'),
+                        'response' => $accResp->json(),
+                    ]);
+
                     foreach ($catalogs as $c) {
                         $this->tokens->putAsset('catalog', (string) $c['id'], $c['name'] ?? null);
                     }
@@ -224,10 +278,4 @@ class MetaOAuthService
         }
     }
 
-    private function businesses(string $token): array
-    {
-        return Http::acceptJson()->get($this->graph('me/businesses'), [
-            'access_token' => $token, 'fields' => 'id,name', 'limit' => 50,
-        ])->json('data', []);
-    }
 }
