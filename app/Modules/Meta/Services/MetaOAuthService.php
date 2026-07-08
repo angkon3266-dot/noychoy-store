@@ -38,6 +38,54 @@ class MetaOAuthService
         return app(MetaDebug::class);
     }
 
+    /**
+     * Instrumented Graph GET — logs BEFORE (method/url/headers/redacted params)
+     * and AFTER (status/response headers/raw body/decoded JSON), catches and logs
+     * any exception. Unconditional (→ laravel.log). Returns the Response, or null
+     * if the request threw.
+     */
+    private function traceGet(string $label, string $path, array $params): ?\Illuminate\Http\Client\Response
+    {
+        $url = $this->graph($path);
+        $safe = $params;
+        foreach (['access_token', 'appsecret_proof', 'client_secret', 'fb_exchange_token'] as $k) {
+            if (isset($safe[$k])) {
+                $safe[$k] = '***redacted***';
+            }
+        }
+
+        Log::info("[meta-oauth] BEFORE {$label}", [
+            'method' => 'GET',
+            'url' => $url,
+            'params' => $safe,
+            'request_headers' => ['Accept' => 'application/json', 'Authorization' => '(none — access_token sent as query param, redacted)'],
+        ]);
+
+        try {
+            $resp = Http::acceptJson()->get($url, $params);
+        } catch (\Throwable $e) {
+            Log::error("[meta-oauth] EXCEPTION during {$label}", [
+                'url' => $url,
+                'class' => $e::class,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return null;
+        }
+
+        Log::info("[meta-oauth] AFTER {$label}", [
+            'http_status' => $resp->status(),
+            'response_headers' => $resp->headers(),
+            'raw_body' => $resp->body(),
+            'decoded_json' => $resp->json(),
+        ]);
+
+        // Also feed the debug-page buffer (no-op unless enabled).
+        $this->debug()->event('discovery', $label, ['status' => $resp->status(), 'body' => $resp->json()]);
+
+        return $resp;
+    }
+
     public function isConfigured(): bool
     {
         return filled(config('meta.oauth.app_id')) && filled(config('meta.oauth.app_secret'));
@@ -141,30 +189,56 @@ class MetaOAuthService
      */
     public function handleCallback(Request $request, string $redirectUri): array
     {
+        Log::info('[meta-oauth] handleCallback ENTER', [
+            'query_keys' => array_keys($request->query()),
+            'has_code' => $request->filled('code'),
+            'has_state' => $request->filled('state'),
+            'redirect_uri' => $redirectUri,
+        ]);
+
         if ($request->filled('error')) {
+            Log::warning('[meta-oauth] EARLY RETURN — Facebook returned error', [
+                'error' => $request->query('error'),
+                'error_description' => $request->query('error_description'),
+            ]);
             return ['ok' => false, 'module' => null, 'message' => 'Authorization cancelled: '.$request->query('error_description', $request->query('error'))];
         }
 
         $state = (string) $request->query('state');
-        if (! $request->filled('state') || $state !== $request->session()->pull('meta_oauth_state')) {
+        $sessionState = $request->session()->pull('meta_oauth_state');
+        if (! $request->filled('state') || $state !== $sessionState) {
+            Log::warning('[meta-oauth] EARLY RETURN — state mismatch', [
+                'returned_state' => $state,
+                'session_state' => $sessionState,
+                'session_id' => $request->session()->getId(),
+            ]);
             return ['ok' => false, 'module' => null, 'message' => 'Invalid OAuth state. Please try again.'];
         }
 
         // Which module initiated the flow is read from the state parameter.
         $moduleKey = $this->moduleFromState($state);
         if (! $moduleKey || ! $this->registry->has($moduleKey)) {
+            Log::warning('[meta-oauth] EARLY RETURN — unknown module in state', ['module' => $moduleKey, 'state' => $state]);
             return ['ok' => false, 'module' => null, 'message' => 'Unknown module in OAuth state.'];
         }
+        Log::info('[meta-oauth] state OK, module resolved', ['module' => $moduleKey]);
 
         // Exchange code → short-lived → long-lived token.
+        Log::info('[meta-oauth] BEFORE token exchange (code → short-lived)', ['redirect_uri' => $redirectUri, 'has_code' => $request->filled('code')]);
         $short = Http::acceptJson()->get($this->graph('oauth/access_token'), [
             'client_id' => config('meta.oauth.app_id'),
             'client_secret' => config('meta.oauth.app_secret'),
             'redirect_uri' => $redirectUri,
             'code' => $request->query('code'),
         ]);
+        Log::info('[meta-oauth] AFTER token exchange (short-lived)', [
+            'http_status' => $short->status(),
+            'has_access_token' => (bool) $short->json('access_token'),
+            'raw_body' => $short->body(),
+        ]);
 
         if ($short->failed() || ! $short->json('access_token')) {
+            Log::error('[meta-oauth] EARLY RETURN — token exchange failed', ['http_status' => $short->status(), 'raw_body' => $short->body()]);
             return ['ok' => false, 'module' => $moduleKey, 'message' => 'Failed to obtain access token: '.$short->json('error.message', 'unknown error')];
         }
 
@@ -214,80 +288,64 @@ class MetaOAuthService
         switch ($moduleKey) {
             case 'commerce':
                 // (1) Enumerate businesses. business_id is ONLY ever written inside
-                // this loop (setBusiness). If /me/businesses returns no data, the
-                // loop body never runs and business_id stays NULL — this is the
-                // first point at which discovery silently produces nothing.
-                $bizResp = Http::acceptJson()->get($this->graph('me/businesses'), [
+                // the loop below (setBusiness). If /me/businesses returns no data,
+                // the loop body never runs and business_id stays NULL.
+                $bizResp = $this->traceGet('GET /me/businesses', 'me/businesses', [
                     'access_token' => $token, 'fields' => 'id,name,verification_status', 'limit' => 50,
                 ]);
-                $businesses = $bizResp->json('data', []);
-                Log::info('[meta-oauth] GET /me/businesses', [
-                    'url' => $this->graph('me/businesses'),
-                    'http_status' => $bizResp->status(),
-                    'count' => count($businesses),
-                    'raw' => $bizResp->body(),
-                ]);
-                $this->debug()->event('discovery', 'GET /me/businesses', [
-                    'status' => $bizResp->status(),
-                    'count' => count($businesses),
-                    'error' => $bizResp->json('error'),
-                    'response' => $bizResp->json(),
-                ]);
+                $businesses = $bizResp?->json('data', []) ?? [];
+                Log::info('[meta-oauth] /me/businesses parsed', ['count' => count($businesses)]);
 
                 if (empty($businesses)) {
-                    $this->debug()->event('discovery', 'business_id LEFT NULL — /me/businesses returned 0 businesses, so setBusiness() is never called', [
-                        'status' => $bizResp->status(),
-                        'error' => $bizResp->json('error'),
+                    Log::warning('[meta-oauth] /me/businesses returned EMPTY (or request failed) — setBusiness() will NOT run; business_id stays NULL', [
+                        'http_status' => $bizResp?->status(),
+                        'graph_error' => $bizResp?->json('error'),
                     ]);
                 }
 
-                foreach ($businesses as $business) {
-                    // (2) THE update() that writes business_id.
-                    $this->tokens->setBusiness((string) $business['id'], $business['name'] ?? null);
-                    $this->debug()->event('discovery', 'setBusiness() wrote business_id', [
-                        'business_id' => $business['id'] ?? null,
-                        'business_name' => $business['name'] ?? null,
-                    ]);
+                foreach ($businesses as $i => $business) {
+                    Log::info('[meta-oauth] business loop iteration', ['index' => $i, 'business' => $business]);
 
-                    $ownedResp = Http::acceptJson()->get($this->graph($business['id'].'/owned_product_catalogs'), [
+                    if (empty($business['id'])) {
+                        Log::warning('[meta-oauth] BEFORE continue — business has no id, skipping', ['index' => $i, 'business' => $business]);
+                        continue;
+                    }
+
+                    Log::info('[meta-oauth] BEFORE setBusiness', ['id' => $business['id'], 'name' => $business['name'] ?? null]);
+                    $this->tokens->setBusiness((string) $business['id'], $business['name'] ?? null);
+                    Log::info('[meta-oauth] AFTER setBusiness', ['persisted_business_id' => $this->tokens->businessId()]);
+
+                    $ownedResp = $this->traceGet("GET /{$business['id']}/owned_product_catalogs", $business['id'].'/owned_product_catalogs', [
                         'access_token' => $token, 'fields' => 'id,name,product_count', 'limit' => 100,
                     ]);
-                    $catalogs = $ownedResp->json('data', []);
-                    Log::info("[meta-oauth] GET /{$business['id']}/owned_product_catalogs", [
-                        'url' => $this->graph($business['id'].'/owned_product_catalogs'),
-                        'http_status' => $ownedResp->status(),
-                        'count' => count($catalogs),
-                        'raw' => $ownedResp->body(),
-                    ]);
-                    $this->debug()->event('discovery', "GET /{$business['id']}/owned_product_catalogs", [
-                        'status' => $ownedResp->status(),
-                        'count' => count($catalogs),
-                        'error' => $ownedResp->json('error'),
-                        'response' => $ownedResp->json(),
-                    ]);
+                    $catalogs = $ownedResp?->json('data', []) ?? [];
+                    Log::info('[meta-oauth] owned_product_catalogs parsed', ['business_id' => $business['id'], 'count' => count($catalogs)]);
 
                     // Diagnostic only (NOT persisted): catalogs the business can access
                     // but does not own (client/shared) — surfaces the owned-vs-shared case.
-                    $accResp = Http::acceptJson()->get($this->graph($business['id'].'/product_catalogs'), [
+                    $this->traceGet("GET /{$business['id']}/product_catalogs", $business['id'].'/product_catalogs', [
                         'access_token' => $token, 'fields' => 'id,name,product_count', 'limit' => 100,
                     ]);
-                    Log::info("[meta-oauth] GET /{$business['id']}/product_catalogs", [
-                        'url' => $this->graph($business['id'].'/product_catalogs'),
-                        'http_status' => $accResp->status(),
-                        'count' => count($accResp->json('data', [])),
-                        'raw' => $accResp->body(),
-                    ]);
-                    $this->debug()->event('discovery', "GET /{$business['id']}/product_catalogs (diagnostic, not persisted)", [
-                        'status' => $accResp->status(),
-                        'count' => count($accResp->json('data', [])),
-                        'error' => $accResp->json('error'),
-                        'response' => $accResp->json(),
-                    ]);
+
+                    if (empty($catalogs)) {
+                        Log::warning('[meta-oauth] owned_product_catalogs EMPTY — no catalog written for this business', ['business_id' => $business['id']]);
+                    }
 
                     foreach ($catalogs as $c) {
+                        if (empty($c['id'])) {
+                            Log::warning('[meta-oauth] BEFORE continue — catalog has no id, skipping', ['catalog' => $c]);
+                            continue;
+                        }
+                        Log::info('[meta-oauth] BEFORE setCatalog (putAsset)', ['catalog_id' => $c['id'], 'name' => $c['name'] ?? null]);
                         $this->tokens->putAsset('catalog', (string) $c['id'], $c['name'] ?? null);
+                        Log::info('[meta-oauth] AFTER setCatalog (putAsset)', ['catalog_id' => $c['id']]);
                     }
                 }
+
+                Log::info('[meta-oauth] BEFORE break — commerce discovery complete', [
+                    'final_business_id' => $this->tokens->businessId(),
+                    'catalog_count' => count($this->tokens->assets('catalog')),
+                ]);
                 break;
 
             case 'publishing':
@@ -312,7 +370,17 @@ class MetaOAuthService
                     $this->tokens->putAsset('ad_account', (string) $a['id'], $a['name'] ?? null);
                 }
                 break;
+
+            default:
+                Log::warning('[meta-oauth] discoverAssets — NO matching switch case (business/catalog NOT discovered)', ['module' => $moduleKey]);
+                break;
         }
+
+        Log::info('[meta-oauth] discoverAssets EXIT', [
+            'module' => $moduleKey,
+            'business_id' => $this->tokens->businessId(),
+            'catalog_count' => count($this->tokens->assets('catalog')),
+        ]);
     }
 
 }
