@@ -182,7 +182,23 @@ class MetaOAuthService
         $this->tokens->grantScopes($this->registry->scopesFor($moduleKey));
         $this->tokens->setHealth('ok');
 
-        $this->discoverAssets($moduleKey, $token);
+        // TEMP TRACE (unconditional → laravel.log; independent of META_DEBUG/cache).
+        Log::info('[meta-oauth] BEFORE discoverAssets', ['module' => $moduleKey, 'has_token' => filled($token)]);
+        try {
+            $this->discoverAssets($moduleKey, $token);
+        } catch (\Throwable $e) {
+            Log::error('[meta-oauth] discoverAssets THREW before saving', [
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+        Log::info('[meta-oauth] AFTER discoverAssets', [
+            'module' => $moduleKey,
+            'business_id' => $this->tokens->businessId(),
+            'catalogs' => count($this->tokens->assets('catalog')),
+        ]);
 
         $name = $this->registry->get($moduleKey)?->name() ?? 'Module';
 
@@ -192,6 +208,9 @@ class MetaOAuthService
     /** Pull the assets relevant to a module into the Token Manager. */
     private function discoverAssets(?string $moduleKey, string $token): void
     {
+        // TEMP TRACE: proves entry + which switch branch runs.
+        Log::info('[meta-oauth] discoverAssets ENTER', ['module' => $moduleKey]);
+
         switch ($moduleKey) {
             case 'commerce':
                 // (1) Enumerate businesses. business_id is ONLY ever written inside
@@ -202,6 +221,12 @@ class MetaOAuthService
                     'access_token' => $token, 'fields' => 'id,name,verification_status', 'limit' => 50,
                 ]);
                 $businesses = $bizResp->json('data', []);
+                Log::info('[meta-oauth] GET /me/businesses', [
+                    'url' => $this->graph('me/businesses'),
+                    'http_status' => $bizResp->status(),
+                    'count' => count($businesses),
+                    'raw' => $bizResp->body(),
+                ]);
                 $this->debug()->event('discovery', 'GET /me/businesses', [
                     'status' => $bizResp->status(),
                     'count' => count($businesses),
@@ -228,6 +253,12 @@ class MetaOAuthService
                         'access_token' => $token, 'fields' => 'id,name,product_count', 'limit' => 100,
                     ]);
                     $catalogs = $ownedResp->json('data', []);
+                    Log::info("[meta-oauth] GET /{$business['id']}/owned_product_catalogs", [
+                        'url' => $this->graph($business['id'].'/owned_product_catalogs'),
+                        'http_status' => $ownedResp->status(),
+                        'count' => count($catalogs),
+                        'raw' => $ownedResp->body(),
+                    ]);
                     $this->debug()->event('discovery', "GET /{$business['id']}/owned_product_catalogs", [
                         'status' => $ownedResp->status(),
                         'count' => count($catalogs),
@@ -239,6 +270,12 @@ class MetaOAuthService
                     // but does not own (client/shared) — surfaces the owned-vs-shared case.
                     $accResp = Http::acceptJson()->get($this->graph($business['id'].'/product_catalogs'), [
                         'access_token' => $token, 'fields' => 'id,name,product_count', 'limit' => 100,
+                    ]);
+                    Log::info("[meta-oauth] GET /{$business['id']}/product_catalogs", [
+                        'url' => $this->graph($business['id'].'/product_catalogs'),
+                        'http_status' => $accResp->status(),
+                        'count' => count($accResp->json('data', [])),
+                        'raw' => $accResp->body(),
                     ]);
                     $this->debug()->event('discovery', "GET /{$business['id']}/product_catalogs (diagnostic, not persisted)", [
                         'status' => $accResp->status(),
