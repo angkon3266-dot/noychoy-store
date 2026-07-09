@@ -96,6 +96,13 @@ class MetaOAuthController extends Controller
      */
     public function callback(Request $request, \App\Modules\Meta\Services\MetaOAuthService $modular)
     {
+        \Illuminate\Support\Facades\Log::info('[meta-oauth] MetaOAuthController::callback ENTER', [
+            'path' => $request->path(),
+            'has_code' => $request->filled('code'),
+            'has_state' => $request->filled('state'),
+            'is_modular_state' => $modular->isModularState($request->query('state')),
+        ]);
+
         if ($modular->isModularState($request->query('state'))) {
             return app(MetaConnectionController::class)->completeModularCallback($request);
         }

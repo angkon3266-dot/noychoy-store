@@ -24,13 +24,21 @@ class MetaSecurityGate
     {
         $user = $request->user();
 
+        \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate ENTER', [
+            'path' => $request->path(),
+            'user_role' => $user?->role,
+            'session_id' => $request->session()->getId(),
+        ]);
+
         // Only the Super Admin role may access this module at all.
         if (! $user || $user->role !== 'admin') {
+            \Illuminate\Support\Facades\Log::warning('[meta-oauth] meta.gate ABORT 403 (not super admin) — controller NOT reached', ['path' => $request->path(), 'role' => $user?->role]);
             abort(403, 'Only the Super Admin can access Meta Integration.');
         }
 
         // First run: no security password set yet → force the user to create one.
         if (! $this->settings->hasSecurityPassword()) {
+            \Illuminate\Support\Facades\Log::warning('[meta-oauth] meta.gate REDIRECT to unlock (no security password set) — controller NOT reached', ['path' => $request->path()]);
             return redirect()->route('admin.meta.unlock')
                 ->with('meta_setup', true);
         }
@@ -41,10 +49,18 @@ class MetaSecurityGate
         $unlocked = $unlockedAt && now()->diffInMinutes(\Illuminate\Support\Carbon::parse($unlockedAt)) < $ttl;
 
         if (! $unlocked) {
+            \Illuminate\Support\Facades\Log::warning('[meta-oauth] meta.gate REDIRECT to unlock (session not unlocked) — controller NOT reached', [
+                'path' => $request->path(),
+                'unlocked_at' => $unlockedAt,
+                'ttl_minutes' => $ttl,
+                'session_id' => $request->session()->getId(),
+            ]);
             $request->session()->put('meta_intended_url', $request->fullUrl());
 
             return redirect()->route('admin.meta.unlock');
         }
+
+        \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate PASS → controller', ['path' => $request->path()]);
 
         return $next($request);
     }

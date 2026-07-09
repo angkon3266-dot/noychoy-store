@@ -90,6 +90,11 @@ class MetaConnectionController extends Controller
      */
     public function completeModularCallback(Request $request)
     {
+        \Illuminate\Support\Facades\Log::info('[meta-oauth] MetaConnectionController::completeModularCallback ENTER', [
+            'path' => $request->path(),
+            'has_state' => $request->filled('state'),
+        ]);
+
         $result = $this->oauth->handleCallback($request, $this->redirectUri());
 
         return redirect()->route('admin.meta.connection')
