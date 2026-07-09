@@ -506,6 +506,8 @@
         @endif
 
         <div class="grid sm:grid-cols-3 gap-2 text-sm mb-4">
+            <label class="flex items-center gap-2"><input type="checkbox" name="filter_category" value="1" @checked($filterConfig['category'] ?? true)> Category</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="filter_colors" value="1" @checked($filterConfig['colors'] ?? true)> Colours</label>
             <label class="flex items-center gap-2"><input type="checkbox" name="filter_price" value="1" @checked($filterConfig['price'] ?? true)> Price ranges</label>
             <label class="flex items-center gap-2"><input type="checkbox" name="filter_in_stock" value="1" @checked($filterConfig['in_stock'] ?? true)> In-stock</label>
             <label class="flex items-center gap-2"><input type="checkbox" name="filter_on_sale" value="1" @checked($filterConfig['on_sale'] ?? true)> On-sale</label>
@@ -535,6 +537,116 @@
         <label class="label mt-4">Price ranges (one per line, "min-max")</label>
         <textarea name="filter_price_ranges" rows="4" class="input font-mono text-sm">{{ collect($filterConfig['price_ranges'] ?? [])->map(fn($r) => $r[0].'-'.$r[1])->implode("\n") }}</textarea>
     </div>
+
+    <!-- Per-page filter overrides -->
+    <div class="card p-6"
+         x-data="filterOverrides(@js($overridablePages), @js((object) $filterOverrides), @js($allCategories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values()), @js($filterAttributes->values()), @js($filterCustomFields->values()))">
+        <h2 class="font-semibold mb-1">Per-page filter overrides</h2>
+        <p class="text-xs text-ink-700/60 mb-4">By default every shop &amp; category page uses the filters above. Pick a page here to give it its own set of filters — which facets show <em>and</em> which categories are listed. Pages you don't override keep the global default.</p>
+
+        <label class="label">Page</label>
+        <select x-model="activeKey" class="input max-w-md">
+            <option value="">— Choose a page to customise —</option>
+            <template x-for="p in pages" :key="p.key">
+                <option :value="p.key" x-text="p.label + (isOn(p.key) ? '   ●' : '')"></option>
+            </template>
+        </select>
+        <p class="text-xs text-ink-700/50 mt-1">A ● marks pages that already have a custom filter set.</p>
+
+        <template x-if="activeKey">
+            <div class="mt-4 border-t border-gold-100 pt-4">
+                <label class="flex items-center gap-2 font-medium">
+                    <input type="checkbox" x-model="cur().enabled">
+                    Give this page its own filters (otherwise it uses the global default above)
+                </label>
+
+                <div x-show="cur().enabled" x-cloak class="mt-4 space-y-4">
+                    <div>
+                        <label class="label">Facets to show on this page</label>
+                        <div class="grid sm:grid-cols-3 gap-2 text-sm">
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="cur().category"> Category</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="cur().colors"> Colours</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="cur().price"> Price ranges</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="cur().in_stock"> In-stock</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="cur().on_sale"> On-sale</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="cur().tags"> Tags</label>
+                        </div>
+                    </div>
+
+                    <div x-show="cur().category">
+                        <label class="label">Categories listed in the "Category" filter</label>
+                        <p class="text-xs text-ink-700/50 mb-1">Leave all unchecked to list every active category.</p>
+                        <div class="grid sm:grid-cols-3 gap-2 text-sm">
+                            <template x-for="c in categories" :key="c.id">
+                                <label class="flex items-center gap-2"><input type="checkbox" :value="c.id" x-model="cur().categories"> <span x-text="c.name"></span></label>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="attributes.length">
+                        <label class="label">Variation attributes to show</label>
+                        <div class="grid sm:grid-cols-3 gap-2 text-sm">
+                            <template x-for="a in attributes" :key="a">
+                                <label class="flex items-center gap-2"><input type="checkbox" :value="a" x-model="cur().attributes"> <span x-text="a"></span></label>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="customFields.length">
+                        <label class="label">Custom fields to show</label>
+                        <div class="grid sm:grid-cols-3 gap-2 text-sm">
+                            <template x-for="f in customFields" :key="f">
+                                <label class="flex items-center gap-2"><input type="checkbox" :value="f" x-model="cur().custom_fields"> <span x-text="f"></span></label>
+                            </template>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-ink-700/50">Price ranges are inherited from the global default.</p>
+                </div>
+            </div>
+        </template>
+
+        <input type="hidden" name="filter_overrides_json" :value="JSON.stringify(payload())">
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('filterOverrides', (pages, saved, categories, attributes, customFields) => ({
+                pages,
+                categories,
+                attributes,
+                customFields,
+                data: saved && typeof saved === 'object' ? saved : {},
+                activeKey: '',
+                blank() {
+                    return { enabled: false, category: true, colors: true, price: true, in_stock: true, on_sale: true, tags: false, categories: [], attributes: [], custom_fields: [] };
+                },
+                cur() {
+                    // Must return the SAME stored object so x-model mutations persist.
+                    if (!this.data[this.activeKey]) {
+                        this.data[this.activeKey] = this.blank();
+                    } else {
+                        // Backfill any keys missing on legacy saved entries (once).
+                        const b = this.blank();
+                        for (const k in b) {
+                            if (!(k in this.data[this.activeKey])) this.data[this.activeKey][k] = b[k];
+                        }
+                    }
+                    return this.data[this.activeKey];
+                },
+                isOn(key) {
+                    return !!(this.data[key] && this.data[key].enabled);
+                },
+                payload() {
+                    const out = {};
+                    for (const k in this.data) {
+                        if (this.data[k] && this.data[k].enabled) out[k] = this.data[k];
+                    }
+                    return out;
+                },
+            }));
+        });
+    </script>
 
     <!-- Marketing -->
     <div class="card p-6">

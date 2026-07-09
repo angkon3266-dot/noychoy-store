@@ -386,16 +386,16 @@
                     @else
                         {{-- Expandable category --}}
                         <div x-data="{ sub: false }" class="border-b border-gold-50">
-                            <div class="w-full flex items-center justify-between">
-                                @if(!empty($item['url']))
-                                    <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="flex items-center gap-2 px-2 py-3 flex-1">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</a>
-                                @else
-                                    <button type="button" @click="sub=!sub" class="flex items-center gap-2 px-2 py-3 flex-1 text-left">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</button>
-                                @endif
-                                <button type="button" @click="sub=!sub" class="p-2" :aria-expanded="sub" aria-label="Toggle {{ $item['label'] }}">
+                            {{-- On mobile, tapping a parent category EXPANDS its submenu (Apple/Zara/H&M
+                                 pattern) instead of navigating away. The category page is reached via the
+                                 "View all …" link rendered at the bottom of the panel below. --}}
+                            <button type="button" @click="sub=!sub" :aria-expanded="sub" aria-label="Toggle {{ $item['label'] }}"
+                                    class="w-full flex items-center justify-between text-left">
+                                <span class="flex items-center gap-2 px-2 py-3">{{ $item['label'] }}@if($item['badge'] ?? false)<span class="badge bg-gold-600 text-white text-[9px]">{{ $item['badge'] }}</span>@endif</span>
+                                <span class="p-2">
                                     <svg class="w-4 h-4 transition-transform duration-200" :class="sub ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                                </button>
-                            </div>
+                                </span>
+                            </button>
                             <div x-show="sub" x-collapse x-cloak class="pb-2 pl-4 space-y-0.5">
                                 @if($mtype === 'mega')
                                     @foreach($item['columns'] ?? [] as $col)
@@ -409,7 +409,7 @@
                                         <a href="{{ $child['url'] }}" @if($child['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="block py-2 text-sm text-ink-700/80">{{ $child['label'] }}</a>
                                     @endforeach
                                 @endif
-                                @if($item['view_all_mobile'] ?? false)
+                                @if(!empty($item['url']))
                                     <a href="{{ $item['url'] }}" @if($item['new_tab']) target="_blank" rel="noopener" @endif @click="$store.mobileNav.close()" class="block py-2 text-sm font-medium text-gold-700">View all {{ $item['label'] }} →</a>
                                 @endif
                             </div>

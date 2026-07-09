@@ -22,7 +22,7 @@ class CatalogController extends Controller
 
         return view('shop.catalog', [
             'products' => $this->paginate($base, $request),
-            'filters' => $this->filters->groups($request, Product::published()->search($request->query('q'))),
+            'filters' => $this->filters->groups($request, Product::published()->search($request->query('q')), 'shop'),
             'title' => $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry',
         ]);
     }
@@ -90,7 +90,7 @@ class CatalogController extends Controller
 
         return view('shop.catalog', [
             'products' => $this->paginate($base, $request),
-            'filters' => $this->filters->groups($request, clone $base),
+            'filters' => $this->filters->groups($request, clone $base, 'category:'.$category->id),
             'title' => $category->name,
             'category' => $category,
         ]);

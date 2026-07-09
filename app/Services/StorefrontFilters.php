@@ -16,7 +16,38 @@ use Illuminate\Support\Collection;
  */
 class StorefrontFilters
 {
-    public function config(): array
+    /**
+     * The resolved filter config for a page.
+     *
+     * With no $pageKey (or a page that has no override) this returns the global
+     * default. When a page has an *enabled* override (Appearance → Storefront
+     * filters → per-page), that override is layered on top of the global default
+     * so the admin can show a different set of facets / categories per page.
+     *
+     * Page keys: 'shop' (the /shop all page) and 'category:{id}' (a category page).
+     */
+    public function config(?string $pageKey = null): array
+    {
+        $global = $this->globalConfig();
+
+        if ($pageKey === null) {
+            return $global;
+        }
+
+        $override = $this->overrides()[$pageKey] ?? null;
+        if (! is_array($override) || empty($override['enabled'])) {
+            return $global;
+        }
+
+        // Layer the override over the default. String keys replace (attributes,
+        // categories, booleans), so unset keys transparently inherit the default.
+        unset($override['enabled']);
+
+        return array_merge($global, $override);
+    }
+
+    /** The store-wide default filter config (Appearance → Storefront filters). */
+    public function globalConfig(): array
     {
         $saved = Setting::get('storefront_filters', []);
         $saved = is_array($saved) ? $saved : [];
@@ -25,6 +56,7 @@ class StorefrontFilters
             'attributes' => [],        // variation attribute names shown as filters
             'custom_fields' => [],     // custom field labels shown as filters
             'categories' => [],        // category ids offered as a sidebar filter (admin choice)
+            'category' => true,        // show the "Category" filter group at all
             'tags' => false,
             'colors' => true,
             'price' => true,
@@ -32,6 +64,31 @@ class StorefrontFilters
             'on_sale' => true,
             'price_ranges' => [[100, 300], [301, 500], [501, 1000], [1001, 2500], [2501, 5000], [5001, 10000]],
         ], $saved);
+    }
+
+    /** Per-page override configs, keyed by page ('shop', 'category:{id}'). */
+    public function overrides(): array
+    {
+        $saved = Setting::get('storefront_filter_overrides', []);
+
+        return is_array($saved) ? $saved : [];
+    }
+
+    /**
+     * The pages an admin can define a filter override for: the Shop-all page and
+     * every active category page. Used to build the Appearance override UI.
+     *
+     * @return array<int, array{key:string, label:string}>
+     */
+    public function overridablePages(): array
+    {
+        $pages = [['key' => 'shop', 'label' => 'Shop — All Jewelry  ·  /shop']];
+
+        foreach (Category::where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug']) as $c) {
+            $pages[] = ['key' => 'category:'.$c->id, 'label' => $c->name.'  ·  /category/'.$c->slug];
+        }
+
+        return $pages;
     }
 
     /** Distinct variation-attribute names across published products (for the admin picker). */
@@ -138,22 +195,23 @@ class StorefrontFilters
      * $scope is a query of the products being browsed (e.g. a category) used to
      * derive available values; falls back to all published products.
      */
-    public function groups(Request $request, ?Builder $scope = null): array
+    public function groups(Request $request, ?Builder $scope = null, ?string $pageKey = null): array
     {
-        $cfg = $this->config();
+        $cfg = $this->config($pageKey);
         $scope ??= Product::published();
         $products = (clone $scope)->get(['id', 'options', 'tags', 'colors', 'custom_label', 'custom_value', 'custom_fields', 'price', 'compare_at_price']);
 
         $groups = [];
 
         // Category group — the admin picks which categories are offered; if none
-        // are chosen we fall back to all active categories.
+        // are chosen we fall back to all active categories. The whole group can be
+        // hidden per page via the 'category' flag.
         $catIds = array_values(array_filter(array_map('intval', (array) ($cfg['categories'] ?? []))));
         $categories = ($catIds
             ? Category::whereIn('id', $catIds)->where('is_active', true)
             : Category::where('is_active', true))
             ->orderBy('name')->get(['slug', 'name']);
-        if ($categories->isNotEmpty()) {
+        if (($cfg['category'] ?? true) && $categories->isNotEmpty()) {
             $sel = array_filter((array) $request->query('category', []));
             $groups[] = [
                 'type' => 'checkbox', 'label' => 'Category', 'param' => 'category[]',

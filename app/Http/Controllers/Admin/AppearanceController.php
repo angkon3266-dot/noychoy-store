@@ -20,6 +20,8 @@ class AppearanceController extends Controller
             'filterConfig' => $filters->config(),
             'filterAttributes' => $filters->discoverAttributes(),
             'filterCustomFields' => $filters->discoverCustomFields(),
+            'filterOverrides' => $filters->overrides(),
+            'overridablePages' => $filters->overridablePages(),
             'discoverTiles' => Setting::get('discover_tiles', []),
         ]);
     }
@@ -311,6 +313,8 @@ class AppearanceController extends Controller
         $sf['custom_fields'] = array_values(array_filter((array) $request->input('filter_custom_fields', [])));
         // Which categories appear as a filter option in the sidebar (admin choice).
         $sf['categories'] = array_values(array_filter(array_map('intval', (array) $request->input('filter_categories', []))));
+        $sf['category'] = $request->boolean('filter_category');
+        $sf['colors'] = $request->boolean('filter_colors');
         $sf['tags'] = $request->boolean('filter_tags');
         $sf['price'] = $request->boolean('filter_price');
         $sf['in_stock'] = $request->boolean('filter_in_stock');
@@ -323,6 +327,32 @@ class AppearanceController extends Controller
             $sf['price_ranges'] = $ranges;
         }
         Setting::put('storefront_filters', $sf);
+
+        // ---- Per-page filter overrides (global default + per-page overrides) ----
+        // The Appearance UI submits a JSON map { "<pageKey>": { enabled, ...cfg } }.
+        // Only enabled pages are kept; everything else inherits the global default.
+        $overrides = json_decode((string) $request->input('filter_overrides_json', ''), true);
+        if (is_array($overrides)) {
+            $clean = [];
+            foreach ($overrides as $pageKey => $ov) {
+                if (! is_array($ov) || empty($ov['enabled'])) {
+                    continue;
+                }
+                $clean[$pageKey] = [
+                    'enabled' => true,
+                    'categories' => array_values(array_filter(array_map('intval', (array) ($ov['categories'] ?? [])))),
+                    'attributes' => array_values(array_filter((array) ($ov['attributes'] ?? []))),
+                    'custom_fields' => array_values(array_filter((array) ($ov['custom_fields'] ?? []))),
+                    'category' => ! empty($ov['category']),
+                    'colors' => ! empty($ov['colors']),
+                    'tags' => ! empty($ov['tags']),
+                    'price' => ! empty($ov['price']),
+                    'in_stock' => ! empty($ov['in_stock']),
+                    'on_sale' => ! empty($ov['on_sale']),
+                ];
+            }
+            Setting::put('storefront_filter_overrides', $clean);
+        }
 
         // ---- Discover page tiles (image + name + link) ----
         $tiles = json_decode((string) $request->input('discover_tiles_json', ''), true);
