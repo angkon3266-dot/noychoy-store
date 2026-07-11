@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductLove;
+use App\Services\Meta\MetaTrackingService;
 use App\Services\StorefrontFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -14,7 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class CatalogController extends Controller
 {
-    public function __construct(protected StorefrontFilters $filters) {}
+    public function __construct(
+        protected StorefrontFilters $filters,
+        protected MetaTrackingService $tracking,
+    ) {}
 
     public function index(Request $request)
     {
@@ -131,6 +135,12 @@ class CatalogController extends Controller
             ->take(8)->values()->all();
         session(['recently_viewed' => $recent]);
 
+        // ViewContent — fire server-side (CAPI) and hand the SAME event id to the
+        // Blade so the browser Pixel dedups against it. content_ids match the
+        // catalog retailer_id via meta_content_id().
+        $vcEventId = MetaTrackingService::newEventId('ViewContent');
+        $this->tracking->viewContent($product, $vcEventId, $this->trackingUser($request));
+
         // Shared Alpine config for the product page (built once, used by every template).
         $pp = [
             'id' => $product->id,
@@ -155,7 +165,21 @@ class CatalogController extends Controller
             $view = 'shop.templates.product.showcase';
         }
 
-        return view($view, compact('product', 'related', 'crossSells', 'pp', 'lovesCount', 'loved'));
+        return view($view, compact('product', 'related', 'crossSells', 'pp', 'lovesCount', 'loved', 'vcEventId'));
+    }
+
+    /**
+     * Identifiable fields for CAPI user_data, taken from the logged-in customer
+     * when present. Hashing happens inside MetaTrackingService; guests just yield
+     * an empty array (IP / user-agent / fbp still provide match quality).
+     *
+     * @return array<string,?string>
+     */
+    protected function trackingUser(Request $request): array
+    {
+        $c = $request->user('customer') ?? auth('customer')->user();
+
+        return $c ? ['em' => $c->email, 'ph' => $c->phone, 'fn' => $c->name] : [];
     }
 
     /**

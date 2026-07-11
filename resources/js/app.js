@@ -473,7 +473,9 @@ document.addEventListener('alpine:init', () => {
         variantList: config.variants || [],       // [{id, attrs:{}, price, stock}]
         selected: {},                              // {Size:'7', Color:'Gold'}
         basePrice: config.price || 0,
-        contentId: String(config.id || ''),
+        // Catalog retailer_id ("prod-{id}") so Pixel/CAPI events link to catalog
+        // products — must match MetaProductMapper::retailerId on the server.
+        contentId: 'prod-' + (config.id || ''),
         name: config.name || '',
         offers: (config.offers || []).map(o => ({ min_qty: Number(o.min_qty), percent: Number(o.percent) })),
 
@@ -535,15 +537,38 @@ document.addEventListener('alpine:init', () => {
         inc() { this.qty++; },
         dec() { this.qty = Math.max(1, this.qty - 1); },
 
-        fireAddToCart() {
+        fireAddToCart(form) {
+            // Variant-aware content id (matches the catalog retailer_id).
+            const cid = (this.hasVariants && this.matched)
+                ? (this.contentId + '-var-' + this.matched.id)
+                : this.contentId;
+
+            // One event id shared by the browser Pixel and the server CAPI call.
+            const eventId = 'AddToCart.' + ((self.crypto && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : (Date.now() + '-' + Math.random().toString(16).slice(2)));
+
+            // Hand the id to the cart POST so the server fires the matching,
+            // deduplicated CAPI AddToCart (CartController@add reads `event_id`).
+            if (form) {
+                let input = form.querySelector('input[name="event_id"]');
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'event_id';
+                    form.appendChild(input);
+                }
+                input.value = eventId;
+            }
+
             if (window.track) {
                 window.track('AddToCart', {
-                    content_ids: [this.contentId],
+                    content_ids: [cid],
                     content_name: this.name,
                     content_type: 'product',
                     value: this.price * this.qty,
                     currency: 'BDT',
-                });
+                }, { eventID: eventId });
             }
         },
     }));

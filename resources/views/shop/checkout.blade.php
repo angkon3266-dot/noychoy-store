@@ -161,6 +161,6 @@
 </div>
 
 @push('meta-events')
-<script>track('InitiateCheckout', {value: {{ $cart->subtotal() - $cart->discount() }}, currency: 'BDT', num_items: {{ $cart->count() }}});</script>
+<script>track('InitiateCheckout', {content_ids:@json($icContentIds ?? []), content_type:'product', value: {{ $cart->subtotal() - $cart->discount() }}, currency: 'BDT', num_items: {{ $cart->count() }}}, { eventID:@json($icEventId ?? '') });</script>
 @endpush
 @endsection

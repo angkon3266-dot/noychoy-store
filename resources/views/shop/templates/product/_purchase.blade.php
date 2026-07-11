@@ -154,7 +154,7 @@
     @if($product->isAvailable() || $preorder)
         @php($bookLabel = $preorder ? 'Book now (Pre-order)' : 'Buy now')
         <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <form action="{{ route('cart.add', $product) }}" method="POST" @submit.prevent="fireAddToCart(); $store.cart.add($event.target)">
+            <form action="{{ route('cart.add', $product) }}" method="POST" @submit.prevent="fireAddToCart($event.target); $store.cart.add($event.target)">
                 @csrf
                 <input type="hidden" name="variant_id" :value="variant==='none' ? '' : variant">
                 <input type="hidden" name="qty" :value="qty">
@@ -187,5 +187,7 @@
 </div>
 
 @push('meta-events')
-<script>track('ViewContent', {content_ids:['{{ $product->id }}'], content_name:@json($product->name), content_type:'product', value:{{ (float) $product->price }}, currency:'BDT'});</script>
+{{-- content_ids use the catalog retailer_id (meta_content_id) so events link to
+     catalog products; eventID matches the server-side CAPI ViewContent for dedup. --}}
+<script>track('ViewContent', {content_ids:@json([meta_content_id($product)]), content_name:@json($product->name), content_type:'product', value:{{ (float) $product->price }}, currency:'BDT'}, { eventID:@json($vcEventId ?? '') });</script>
 @endpush

@@ -212,6 +212,118 @@ class MetaCatalogService
         $this->log($product, $action, 'success', $started, $response, null);
     }
 
+    /**
+     * Sync a whole chunk of products in ONE items_batch call — create/update the
+     * eligible ones and delete the no-longer-eligible ones together. This is the
+     * bulk path ("Sync all" / "Full refresh"): far fewer Graph round-trips than
+     * one call per product, while preserving the exact same per-product state,
+     * hashing/skip and logging behaviour as {@see syncProduct()}.
+     *
+     * Throws only when the single batch call hits a *retryable* transport error,
+     * so the queue can retry the whole chunk. Terminal errors are recorded.
+     *
+     * @param  array<int,int>  $productIds
+     * @throws MetaApiException on retryable failures (rate limit / network)
+     */
+    public function syncChunk(array $productIds, bool $force = false): void
+    {
+        if (empty($productIds) || ! $this->settings->isConfigured()) {
+            return;
+        }
+
+        $started = microtime(true);
+
+        $products = Product::withTrashed()
+            ->with(['images', 'variants', 'category'])
+            ->whereIn('id', $productIds)
+            ->get();
+
+        $requests = [];          // combined UPDATE + DELETE requests for one call
+        $toMarkSynced = [];      // [product_id => ['product'=>P, 'items'=>[], 'hash'=>h]]
+        $toMarkRemoved = [];     // [product_id => P]
+
+        // Pre-load existing sync states for the whole chunk (avoids N queries).
+        $statesByProduct = MetaSyncState::whereIn('product_id', $products->pluck('id'))
+            ->where('status', '!=', MetaSyncState::STATUS_REMOVED)
+            ->get()
+            ->groupBy('product_id');
+
+        foreach ($products as $product) {
+            if ($this->shouldSync($product)) {
+                $items = $this->mapper->items($product);
+                $hash = hash('sha256', json_encode($items));
+
+                if (! $force && $this->isUpToDate($product, $hash)) {
+                    $this->log($product, 'sync_all', 'skipped', $started, null, null);
+
+                    continue;
+                }
+
+                foreach ($items as $item) {
+                    $requests[] = [
+                        'method' => 'UPDATE',
+                        'retailer_id' => $item['retailer_id'],
+                        'data' => $item['data'],
+                    ];
+                }
+
+                $toMarkSynced[$product->id] = ['product' => $product, 'items' => $items, 'hash' => $hash];
+            } else {
+                // No longer eligible → delete whatever we previously synced.
+                $states = $statesByProduct->get($product->id, collect());
+                if ($states->isEmpty()) {
+                    continue;
+                }
+
+                foreach ($states as $state) {
+                    $requests[] = ['method' => 'DELETE', 'retailer_id' => $state->retailer_id];
+                }
+
+                $toMarkRemoved[$product->id] = $product;
+            }
+        }
+
+        if (empty($requests)) {
+            return; // everything was already up to date / nothing to remove
+        }
+
+        try {
+            $response = $this->client->itemsBatch($this->settings->catalogId(), $requests);
+        } catch (MetaApiException $e) {
+            // Record the failure against every product in the chunk.
+            foreach ($toMarkSynced as $entry) {
+                $this->markFailed($entry['product'], $e->getMessage());
+                $this->log($entry['product'], 'sync_all', 'failed', $started, null, $e->getMessage());
+            }
+            foreach ($toMarkRemoved as $product) {
+                $this->log($product, 'delete', 'failed', $started, null, $e->getMessage());
+            }
+
+            if ($e->isRetryable()) {
+                throw $e; // let the chunk job retry the whole batch
+            }
+
+            return; // terminal error — recorded, do not crash the worker
+        }
+
+        // Success — persist per-product state + logs.
+        foreach ($toMarkSynced as $entry) {
+            $this->markSynced($entry['product'], $entry['items'], $entry['hash']);
+            $this->log($entry['product'], 'sync_all', 'success', $started, $response, null);
+        }
+
+        foreach ($toMarkRemoved as $product) {
+            MetaSyncState::where('product_id', $product->id)
+                ->where('status', '!=', MetaSyncState::STATUS_REMOVED)
+                ->update(['status' => MetaSyncState::STATUS_REMOVED, 'last_error' => null]);
+            $this->log($product, 'delete', 'success', $started, $response, null);
+        }
+
+        if (! empty($toMarkSynced)) {
+            $this->settings->markSyncedNow();
+        }
+    }
+
     /** Remove a product's items from the catalog. */
     public function removeProduct(Product $product, string $action = 'delete'): void
     {

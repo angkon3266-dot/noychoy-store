@@ -27,6 +27,12 @@ class MetaSettingsRequest extends FormRequest
             'access_token' => ['nullable', 'string', 'max:1000'],
             'pixel_id' => ['nullable', 'string', 'max:64', 'regex:/^\d*$/'],
 
+            // Conversions API (server-side). Token optional — blank reuses the
+            // system-user token above; a blank field also leaves any stored
+            // dedicated token untouched.
+            'capi_enabled' => ['nullable', 'boolean'],
+            'capi_token' => ['nullable', 'string', 'max:1000'],
+
             // Behaviour toggles.
             'auto_sync' => ['nullable', 'boolean'],
             'sync_draft' => ['nullable', 'boolean'],
@@ -44,7 +50,7 @@ class MetaSettingsRequest extends FormRequest
     public function booleanFlags(): array
     {
         $flags = [
-            'enabled', 'auto_sync', 'sync_draft', 'sync_out_of_stock', 'sync_hidden',
+            'enabled', 'capi_enabled', 'auto_sync', 'sync_draft', 'sync_out_of_stock', 'sync_hidden',
             'sync_images', 'sync_variations', 'sync_inventory', 'sync_price', 'sync_categories',
         ];
 

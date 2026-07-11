@@ -57,6 +57,10 @@ return [
         'queue' => env('META_SYNC_QUEUE', 'default'),
         'tries' => (int) env('META_SYNC_TRIES', 5),
         'backoff' => [60, 300, 900, 1800], // seconds between retries
+        // Optional path to a PHP *CLI* binary for the instant background worker
+        // (MetaQueueRunner). Leave null to use `php` on the PATH. Only needed if
+        // the host's default `php` isn't the right CLI version.
+        'worker_php' => env('META_SYNC_WORKER_PHP'),
     ],
 
     // Secondary security gate (extra password wall on the Meta menu).

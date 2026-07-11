@@ -34,6 +34,11 @@ class MetaSettings
         'token_encrypted' => null,
         'pixel_id' => null,
 
+        // Conversions API (server-side). Enabled per store; the token is optional
+        // — when blank the system-user token above is reused (no duplicate cred).
+        'capi_enabled' => false,
+        'capi_token_encrypted' => null,
+
         // Connection metadata (populated after a successful test / OAuth).
         'connected_business_name' => null,
         'connected_catalog_name' => null,
@@ -136,6 +141,47 @@ class MetaSettings
         return $this->get('pixel_id') ?: null;
     }
 
+    /** Whether server-side Conversions API sending is turned on and usable. */
+    public function capiEnabled(): bool
+    {
+        return (bool) $this->get('capi_enabled')
+            && filled($this->pixelId())
+            && filled($this->capiToken());
+    }
+
+    /**
+     * The Conversions API access token, read from the database. Prefers a
+     * dedicated CAPI token (Events Manager) when the merchant set one, else
+     * reuses the system-user token — so no duplicate credential is required and
+     * nothing lives in .env.
+     */
+    public function capiToken(): ?string
+    {
+        $enc = $this->get('capi_token_encrypted');
+        if ($enc) {
+            try {
+                return Crypt::decryptString($enc);
+            } catch (DecryptException) {
+                // Fall through to the system-user token.
+            }
+        }
+
+        return $this->token();
+    }
+
+    /** Store (encrypt) an optional dedicated CAPI token. Pass null/'' to clear. */
+    public function setCapiToken(?string $token): void
+    {
+        $this->update([
+            'capi_token_encrypted' => filled($token) ? Crypt::encryptString($token) : null,
+        ]);
+    }
+
+    public function hasCapiToken(): bool
+    {
+        return filled($this->get('capi_token_encrypted'));
+    }
+
     /** Decrypted access token, or null if none stored. */
     public function token(): ?string
     {
@@ -235,8 +281,9 @@ class MetaSettings
     public function safeSnapshot(): array
     {
         $all = $this->all();
-        unset($all['token_encrypted'], $all['security_password']);
+        unset($all['token_encrypted'], $all['security_password'], $all['capi_token_encrypted']);
         $all['has_token'] = $this->hasToken();
+        $all['has_capi_token'] = $this->hasCapiToken();
 
         return $all;
     }

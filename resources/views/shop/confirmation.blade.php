@@ -38,7 +38,7 @@ track('Purchase', {
     value: {{ (float) $order->total }},
     currency: 'BDT',
     content_type: 'product',
-    content_ids: {{ Js::from($order->items->pluck('product_id')->map(fn($id) => (string) $id)) }},
+    content_ids: {{ Js::from($order->items->map(fn($i) => $i->variant_id ? "prod-{$i->product_id}-var-{$i->variant_id}" : "prod-{$i->product_id}")->values()) }},
     num_items: {{ (int) $order->items->sum('quantity') }}
 }, { eventID: '{{ $order->order_number }}' });
 </script>

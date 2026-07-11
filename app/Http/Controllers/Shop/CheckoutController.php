@@ -6,13 +6,14 @@ use App\Actions\PlaceOrder;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\CartService;
+use App\Services\Meta\MetaTrackingService;
 use Illuminate\Http\Request;
 
 class CheckoutController extends Controller
 {
     public function __construct(protected CartService $cart) {}
 
-    public function show()
+    public function show(MetaTrackingService $tracking)
     {
         if ($this->cart->isEmpty()) {
             return redirect()->route('cart')->with('error', 'Your cart is empty.');
@@ -21,7 +22,23 @@ class CheckoutController extends Controller
         $customer = auth('customer')->user();
         $address = $customer?->defaultAddress;
 
-        return view('shop.checkout', ['cart' => $this->cart, 'customer' => $customer, 'address' => $address]);
+        // InitiateCheckout — server-side (CAPI) + shared event id for the browser
+        // Pixel. content_ids match the catalog retailer_id.
+        $icEventId = MetaTrackingService::newEventId('InitiateCheckout');
+        $icContentIds = $this->cart->items()->map(fn ($i) => $i['variant_id']
+            ? "prod-{$i['product_id']}-var-{$i['variant_id']}"
+            : "prod-{$i['product_id']}")->values()->all();
+        $icValue = (float) ($this->cart->subtotal() - $this->cart->discount());
+        $user = $customer ? ['em' => $customer->email, 'ph' => $customer->phone, 'fn' => $customer->name] : [];
+        $tracking->initiateCheckout($icContentIds, $icValue, (int) $this->cart->count(), $icEventId, $user);
+
+        return view('shop.checkout', [
+            'cart' => $this->cart,
+            'customer' => $customer,
+            'address' => $address,
+            'icEventId' => $icEventId,
+            'icContentIds' => $icContentIds,
+        ]);
     }
 
     public function store(Request $request, PlaceOrder $placeOrder)

@@ -12,7 +12,7 @@
                     <div class="text-xs text-ink-700/50">Total</div>
                     <div class="font-semibold text-gold-700" x-text="'৳'+Number(price*qty).toLocaleString()"></div>
                 </div>
-                <form action="{{ route('cart.add', $product) }}" method="POST" class="hidden sm:block" @submit.prevent="fireAddToCart(); $store.cart.add($event.target)">
+                <form action="{{ route('cart.add', $product) }}" method="POST" class="hidden sm:block" @submit.prevent="fireAddToCart($event.target); $store.cart.add($event.target)">
                     @csrf
                     <input type="hidden" name="variant_id" :value="variant==='none' ? '' : variant">
                     <input type="hidden" name="qty" :value="qty">

@@ -655,7 +655,7 @@
             <div><label class="label">Meta Pixel ID</label><input name="meta_pixel_id" value="{{ $theme['meta_pixel_id'] }}" class="input" placeholder="123456789012345"></div>
             <div><label class="label">WhatsApp number (with country code)</label><input name="whatsapp_number" value="{{ $theme['whatsapp_number'] }}" class="input" placeholder="8801XXXXXXXXX"></div>
         </div>
-        <p class="text-xs text-ink-700/50 mt-2">Conversions API token is set in the server <code>.env</code> (META_CAPI_TOKEN) for security. Pixel fires PageView, ViewContent, AddToCart, InitiateCheckout &amp; Purchase automatically.</p>
+        <p class="text-xs text-ink-700/50 mt-2">The server-side Conversions API (token + enable) is configured under <strong>Meta Integration → Settings</strong> and stored encrypted in the database. Pixel fires PageView, ViewContent, AddToCart, InitiateCheckout &amp; Purchase automatically, deduplicated with the server events.</p>
     </div>
 
     <!-- Conversion features -->

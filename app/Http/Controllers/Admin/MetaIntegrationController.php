@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Meta\MetaSettingsRequest;
 use App\Jobs\Meta\RemoveProductFromMeta;
+use App\Jobs\Meta\SyncCatalogChunkToMeta;
 use App\Jobs\Meta\SyncProductToMeta;
 use App\Models\MetaSyncLog;
 use App\Models\Product;
 use App\Services\Meta\MetaCatalogService;
+use App\Services\Meta\MetaQueueRunner;
 use App\Services\Meta\MetaSettings;
 use App\Services\Meta\MetaStats;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ class MetaIntegrationController extends Controller
         private readonly MetaSettings $settings,
         private readonly MetaCatalogService $catalog,
         private readonly MetaStats $stats,
+        private readonly MetaQueueRunner $runner,
     ) {}
 
     public function index(Request $request)
@@ -86,6 +89,11 @@ class MetaIntegrationController extends Controller
         // Only overwrite the token when a new one is actually supplied.
         if (filled($data['access_token'] ?? null)) {
             $this->settings->setToken($data['access_token']);
+        }
+
+        // Optional dedicated CAPI token — only overwrite when supplied.
+        if (filled($data['capi_token'] ?? null)) {
+            $this->settings->setCapiToken($data['capi_token']);
         }
 
         return back()->with('success', 'Meta settings saved.');
@@ -149,12 +157,16 @@ class MetaIntegrationController extends Controller
             SyncProductToMeta::dispatch((int) $id, 'update', true);
         }
 
+        $this->runner->kick();
+
         return back()->with('success', count($data['ids']).' product(s) queued for sync.');
     }
 
     public function syncSingle(Product $product)
     {
         SyncProductToMeta::dispatch($product->id, 'update', true);
+
+        $this->runner->kick();
 
         return back()->with('success', 'Queued “'.$product->name.'” for Meta sync.');
     }
@@ -187,7 +199,15 @@ class MetaIntegrationController extends Controller
             return back()->with('error', 'No eligible products to sync.');
         }
 
-        $jobs = $ids->map(fn ($id) => new SyncProductToMeta((int) $id, 'sync_all', $force))->all();
+        // Chunk the catalog so each job pushes many products in a single Batch
+        // API call instead of one call per product. Fewer jobs, far fewer Graph
+        // round-trips — while the Bus::batch progress the dashboard polls is
+        // unchanged (it just tracks fewer, larger jobs).
+        $chunkSize = max(1, (int) config('meta.sync.batch_size', 50));
+        $jobs = $ids->chunk($chunkSize)
+            ->map(fn ($chunk) => new SyncCatalogChunkToMeta($chunk->values()->all(), $force))
+            ->values()
+            ->all();
 
         $batch = Bus::batch($jobs)
             ->name($name)
@@ -197,7 +217,11 @@ class MetaIntegrationController extends Controller
 
         $this->settings->update(['sync_batch_id' => $batch->id]);
 
-        return back()->with('success', $ids->count().' products queued ('.$name.'). Progress is shown below.');
+        // Start draining immediately (best-effort); the every-minute scheduled
+        // worker is the guaranteed fallback if a background process can't spawn.
+        $this->runner->kick();
+
+        return back()->with('success', $ids->count().' products queued ('.$name.') in '.count($jobs).' batch(es). Progress is shown below.');
     }
 
     /** Deep link to this catalog in Meta Commerce Manager. */

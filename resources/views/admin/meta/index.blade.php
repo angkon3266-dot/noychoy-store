@@ -156,6 +156,13 @@
                     <p class="text-xs text-ink-700/50 mt-1">Stored encrypted (AES-256). Never a short-lived user token.</p>
                 </div>
                 <div><label class="label">Pixel ID <span class="text-ink-700/40">(optional)</span></label><input name="pixel_id" value="{{ old('pixel_id', $snapshot['pixel_id']) }}" class="input" placeholder="e.g. 1111111111"></div>
+                <div class="sm:col-span-2 rounded-lg border border-ink-100 p-3 space-y-2">
+                    <label class="flex items-center gap-2 font-medium"><input type="checkbox" name="capi_enabled" value="1" @checked($snapshot['capi_enabled'] ?? false)> Enable Conversions API (server-side events)</label>
+                    <p class="text-xs text-ink-700/50">Sends ViewContent, AddToCart, InitiateCheckout &amp; Purchase server-side, deduplicated with the browser Pixel. Requires a Pixel ID above.</p>
+                    <label class="label">CAPI Access Token <span class="text-ink-700/40">(optional)</span></label>
+                    <input type="password" name="capi_token" class="input" autocomplete="off" placeholder="{{ ($snapshot['has_capi_token'] ?? false) ? '•••••••• (saved — leave blank to keep)' : 'Leave blank to reuse the System User token above' }}">
+                    <p class="text-xs text-ink-700/50">Stored encrypted. Leave blank to reuse the System User token — no separate credential needed unless you use a dedicated Events Manager token.</p>
+                </div>
             </div>
             @include('admin.meta._toggles', ['snapshot' => $snapshot])
             <div class="flex flex-wrap gap-2 pt-2 border-t border-ink-100">

@@ -278,10 +278,28 @@ if (! function_exists('color_hex')) {
 }
 
 if (! function_exists('meta_pixel_id')) {
-    /** Pixel ID from Appearance settings, falling back to .env. */
+    /**
+     * Pixel ID, resolved from the database first: the Meta Integration settings
+     * (MetaSettings->pixel_id) win, then the Appearance/theme setting, then the
+     * .env fallback — so the admin's per-store value drives both Pixel & CAPI.
+     */
     function meta_pixel_id(): ?string
     {
-        return theme('meta_pixel_id') ?: config('meta.pixel_id');
+        return app(\App\Services\Meta\MetaSettings::class)->pixelId()
+            ?: (theme('meta_pixel_id') ?: config('meta.pixel_id'));
+    }
+}
+
+if (! function_exists('meta_content_id')) {
+    /**
+     * The Meta content id for a product (optionally a variant). This MUST equal
+     * the catalog item's retailer_id so Pixel/CAPI events link to catalog
+     * products (retargeting / Advantage+). Delegates to MetaProductMapper so
+     * there is a single source of truth: "prod-{id}" / "prod-{id}-var-{vid}".
+     */
+    function meta_content_id(\App\Models\Product $product, ?\App\Models\ProductVariant $variant = null): string
+    {
+        return app(\App\Services\Meta\MetaProductMapper::class)->retailerId($product, $variant);
     }
 }
 
