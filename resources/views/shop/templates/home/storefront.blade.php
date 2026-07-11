@@ -55,13 +55,6 @@
 </section>
 @endif
 
-{{-- ── Custom section blocks (page builder) take over the middle when present ── --}}
-@if(($sections ?? collect())->isNotEmpty())
-    @foreach($sections as $block)
-        <x-home-block :block="$block" />
-    @endforeach
-@else
-
 {{-- ── Browse categories (scroller) ──────────────────────────────────── --}}
 @if(home_content('show_categories') && $categories->isNotEmpty())
 <x-section-heading :title="home_content('categories_title') ?: 'Browse Our Categories'" />
@@ -120,7 +113,8 @@
 </section>
 @endif
 
-@endif {{-- end custom-sections fallback --}}
+{{-- ── Custom Section Builder blocks (added below the default sections) ── --}}
+@include('shop._builder-sections')
 
 {{-- ── Trust strip ───────────────────────────────────────────────────── --}}
 <section class="mx-auto max-w-5xl px-4 pb-16">

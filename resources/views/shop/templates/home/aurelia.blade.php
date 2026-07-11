@@ -56,4 +56,6 @@
             <div><div class="font-display text-lg font-semibold text-gold-700">{{ home_content('badge3_title') }}</div><p class="text-sm text-ink-700/70 mt-1">{{ home_content('badge3_text') }}</p></div>
         </div>
     </section>
+{{-- Custom Section Builder blocks (universal — added below this design) --}}
+@include('shop._builder-sections')
 @endsection

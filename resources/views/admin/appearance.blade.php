@@ -294,7 +294,21 @@
         @endif
         <label class="label">Add slide images</label>
         @php $existingSlides = $slides->count(); @endphp
-        <div x-data="{ rows: 1, max: Math.max(1, 10 - {{ $existingSlides }}) }">
+        <div x-data="{ rows: 1, max: Math.max(1, 10 - {{ $existingSlides }}), picks: [] }">
+            {{-- Media-library picks (added as new slides on Save) --}}
+            <div class="flex flex-wrap gap-2 mb-2" x-show="picks.length" x-cloak>
+                <template x-for="(u, i) in picks" :key="i">
+                    <div class="relative">
+                        <img :src="u.startsWith('http') || u.startsWith('/') ? u : '/storage/'+u" class="w-20 h-12 object-cover rounded border border-ink-100">
+                        <input type="hidden" name="hero_slide_urls[]" :value="u">
+                        <button type="button" @click="picks.splice(i,1)" class="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-4 h-4 text-[10px] leading-none">&times;</button>
+                    </div>
+                </template>
+            </div>
+            <button type="button" @click="$store.mediaLib.openWith(sel => (Array.isArray(sel) ? sel : [sel]).forEach(u => picks.push(u)), 'hero', { multi: true })"
+                    class="btn-outline text-sm mb-3">🖼 Add from media library</button>
+
+            <p class="text-xs text-ink-700/50 mb-1">…or upload from your device:</p>
             <template x-for="r in rows" :key="r">
                 <div class="flex items-center gap-2 mb-2">
                     <input type="file" name="hero_slide_images[]" accept="image/*" multiple class="input text-sm flex-1">
@@ -305,7 +319,7 @@
                     class="mt-1 inline-flex items-center gap-1 text-sm text-gold-700 font-medium hover:text-gold-800">
                 <span class="text-lg leading-none">＋</span> Add another image <span class="text-ink-700/40" x-text="'(' + rows + '/' + max + ')'"></span>
             </button>
-            <p class="text-xs text-ink-700/50 mt-2">Add up to 10 slides total. Wide images work best (e.g. 1920×800). You can also select multiple files in one row. Links are editable after saving.</p>
+            <p class="text-xs text-ink-700/50 mt-2">Add up to 10 slides total. Wide images work best (e.g. 1920×800). Links are editable after saving.</p>
         </div>
 
         {{-- Feature strip --}}
@@ -365,9 +379,13 @@
                     </select>
                     <template x-for="(im, ii) in b.images" :key="ii">
                         <div class="flex gap-2 items-center">
+                            <template x-if="im.image">
+                                <img :src="im.image.startsWith('http') || im.image.startsWith('/') ? im.image : '/storage/'+im.image" class="w-10 h-10 object-cover rounded border border-ink-100 shrink-0">
+                            </template>
                             <input x-model="im.image" class="input py-1.5 text-sm flex-1" placeholder="image path or URL">
-                            <input type="file" :name="`block_image[${bi}][${ii}]`" accept="image/*" class="text-xs w-40">
-                            <input x-model="im.link" class="input py-1.5 text-sm w-40" placeholder="link">
+                            <button type="button" @click="$store.mediaLib.openWith(u => im.image = u, 'sections')" class="btn-outline py-1 text-xs shrink-0">Library</button>
+                            <input type="file" :name="`block_image[${bi}][${ii}]`" accept="image/*" class="text-xs w-32">
+                            <input x-model="im.link" class="input py-1.5 text-sm w-36" placeholder="link">
                             <button type="button" @click="b.images.splice(ii,1)" class="text-red-500 px-1">&times;</button>
                         </div>
                     </template>
@@ -395,8 +413,9 @@
                 {{-- Banner image for banner_carousel --}}
                 <div x-show="b.type==='banner_carousel'" class="flex gap-2 items-center mt-2">
                     <input x-model="b.banner.image" class="input py-1.5 text-sm flex-1" placeholder="side banner image path/URL">
-                    <input type="file" :name="`block_banner[${bi}]`" accept="image/*" class="text-xs w-40">
-                    <input x-model="b.banner.link" class="input py-1.5 text-sm w-40" placeholder="link">
+                    <button type="button" @click="$store.mediaLib.openWith(u => b.banner.image = u, 'sections')" class="btn-outline py-1 text-xs shrink-0">Library</button>
+                    <input type="file" :name="`block_banner[${bi}]`" accept="image/*" class="text-xs w-32">
+                    <input x-model="b.banner.link" class="input py-1.5 text-sm w-36" placeholder="link">
                 </div>
 
                 {{-- Video --}}

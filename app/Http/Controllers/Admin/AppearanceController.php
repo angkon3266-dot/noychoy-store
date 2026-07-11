@@ -104,6 +104,8 @@ class AppearanceController extends Controller
             'hero_slides' => ['nullable', 'array'],
             'hero_slide_images' => ['nullable', 'array'],
             'hero_slide_images.*' => ['nullable', 'image', 'max:4096'],
+            'hero_slide_urls' => ['nullable', 'array'],
+            'hero_slide_urls.*' => ['nullable', 'string', 'max:500'],
 
             // Section builder
             'home_sections_json' => ['nullable', 'string'],
@@ -236,6 +238,13 @@ class AppearanceController extends Controller
                 if ($file && $file->isValid()) {
                     $slides->push(['image' => $file->store('hero', 'public'), 'link' => '']);
                 }
+            }
+        }
+        // Media-library picks → new slides (store the disk path, or keep a remote URL).
+        foreach ((array) $request->input('hero_slide_urls', []) as $url) {
+            $url = trim((string) $url);
+            if ($url !== '') {
+                $slides->push(['image' => public_url_to_path($url) ?: $url, 'link' => '']);
             }
         }
         $home['hero_slides'] = $slides->values()->all();

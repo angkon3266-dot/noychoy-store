@@ -45,4 +45,6 @@
         </div>
     </section>
     @endif
+{{-- Custom Section Builder blocks (universal — added below this design) --}}
+@include('shop._builder-sections')
 @endsection
