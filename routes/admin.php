@@ -216,6 +216,13 @@ Route::middleware('admin')->group(function () {
             // Webhook page.
             Route::get('webhook', [\App\Http\Controllers\Admin\MetaIntegrationController::class, 'webhook'])->name('webhook');
 
+            // Tracking dashboard (Pixel + Conversions API + Test panel + Diagnostics).
+            Route::get('tracking', [\App\Http\Controllers\Admin\MetaTrackingController::class, 'index'])->name('tracking');
+            Route::post('tracking/save', [\App\Http\Controllers\Admin\MetaTrackingController::class, 'save'])->name('tracking.save');
+            Route::post('tracking/test/{event}', [\App\Http\Controllers\Admin\MetaTrackingController::class, 'test'])->name('tracking.test')->where('event', '[A-Za-z]+');
+            Route::get('tracking/diagnostics', [\App\Http\Controllers\Admin\MetaTrackingController::class, 'diagnostics'])->name('tracking.diagnostics');
+            Route::get('tracking/validate-token', [\App\Http\Controllers\Admin\MetaTrackingController::class, 'validateToken'])->name('tracking.validate-token');
+
             // Production Mode OAuth ("Connect with Facebook").
             Route::get('oauth/redirect', [\App\Http\Controllers\Admin\MetaOAuthController::class, 'redirect'])->name('oauth.redirect');
             Route::get('oauth/callback', [\App\Http\Controllers\Admin\MetaOAuthController::class, 'callback'])->name('oauth.callback');

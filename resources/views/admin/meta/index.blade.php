@@ -80,6 +80,42 @@
         @endforeach
     </div>
 
+    {{-- ── Integration status + quick actions (Part 2) ───────────────────── --}}
+    @php
+        $track = app(\App\Services\Meta\MetaTrackingService::class);
+        $b = fn ($on) => $on ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700';
+        $statusCards = [
+            ['OAuth', $oauthConfigured ? 'Configured' : 'Manual token', $b($oauthConfigured)],
+            ['Catalog', $settings->catalogId() ? ($snapshot['connected_catalog_name'] ?? 'Connected') : 'Not set', $b((bool) $settings->catalogId())],
+            ['Pixel', $track->pixelEnabled() ? 'Active' : 'Off', $b($track->pixelEnabled())],
+            ['CAPI', $settings->capiEnabled() ? 'Active' : 'Off', $b($settings->capiEnabled())],
+            ['Queue worker', $health['queue_worker'] === true ? 'Running' : ($health['queue_worker'] === false ? 'Stopped' : 'Idle'), $b($health['queue_worker'] === true)],
+            ['Last event sent', $settings->get('last_event_sent_at') ? \Illuminate\Support\Carbon::parse($settings->get('last_event_sent_at'))->diffForHumans(null, true) : '—', 'bg-ink-100 text-ink-700'],
+        ];
+    @endphp
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        @foreach($statusCards as [$label, $value, $cls])
+            <div class="card p-4 flex items-center justify-between">
+                <span class="text-sm text-ink-700/60">{{ $label }}</span>
+                <span class="badge {{ $cls }}">{{ $value }}</span>
+            </div>
+        @endforeach
+    </div>
+
+    <div class="card p-4">
+        <div class="flex flex-wrap items-center gap-2">
+            @if($settings->isEnabled() && $configured)
+                <form method="POST" action="{{ route('admin.meta.sync-all') }}">@csrf<button class="btn-primary text-sm">Sync All Products</button></form>
+                <form method="POST" action="{{ route('admin.meta.sync-refresh') }}">@csrf<button class="btn-outline text-sm">Full Catalog Refresh</button></form>
+                <form method="POST" action="{{ route('admin.meta.logs.retry') }}">@csrf<button class="btn-outline text-sm">Retry Failed Products</button></form>
+            @endif
+            <a href="{{ route('admin.meta.tracking') }}" class="btn-outline text-sm">Send Test Event</a>
+            <a href="{{ route('admin.meta.tracking') }}" class="btn-outline text-sm">Run Diagnostics</a>
+            <a href="{{ route('feed.meta') }}" target="_blank" rel="noopener" class="btn-outline text-sm">Open Feed</a>
+            <a href="{{ $commerceManagerUrl }}" target="_blank" rel="noopener" class="btn-outline text-sm">Open Commerce Manager</a>
+        </div>
+    </div>
+
     {{-- ── Connection panel (Part 1) ─────────────────────────────────────── --}}
     <div class="card p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">

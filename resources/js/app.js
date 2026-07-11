@@ -312,16 +312,32 @@ document.addEventListener('alpine:init', () => {
         folders: [],
         q: '',
         folder: '',
+        multi: false,          // multi-select mode (add several at once)
+        selected: [],          // chosen urls while in multi mode
         _cb: null,
-        openWith(cb, folder) {
+        openWith(cb, folder, opts) {
             this._cb = cb;
             this.folder = folder || '';
+            this.multi = !!(opts && opts.multi);
+            this.selected = [];
             this.tab = 'library';
             this.q = '';
             this.open = true;
             this.load();
         },
-        close() { this.open = false; this._cb = null; },
+        close() { this.open = false; this._cb = null; this.multi = false; this.selected = []; },
+        isSelected(url) { return this.selected.includes(url); },
+        toggle(url) {
+            const i = this.selected.indexOf(url);
+            if (i === -1) this.selected.push(url); else this.selected.splice(i, 1);
+        },
+        // Tile click: toggle in multi mode, pick-and-close in single mode.
+        pick(url) { if (this.multi) this.toggle(url); else this.choose(url); },
+        // Confirm a multi selection: hand the whole array to the callback once.
+        confirm() {
+            if (this._cb && this.selected.length) this._cb(this.selected.slice());
+            this.close();
+        },
         async load() {
             if (!window.MEDIA) return;
             this.loading = true;
@@ -338,21 +354,34 @@ document.addEventListener('alpine:init', () => {
         },
         choose(url) { if (this._cb) this._cb(url); this.close(); },
         async uploadDevice(e) {
-            const file = e.target.files[0];
-            if (!file || !window.MEDIA) return;
+            const files = Array.from(e.target.files || []);
+            if (!files.length || !window.MEDIA) return;
             this.uploading = true;
-            const fd = new FormData();
-            fd.append('image', file);
-            fd.append('_token', window.MEDIA.csrf);
-            if (this.folder) fd.append('folder', this.folder);
-            try {
-                const r = await fetch(window.MEDIA.upload, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
-                const d = await r.json();
-                if (d.url) this.choose(d.url);
-                else alert('Upload failed.');
-            } catch (_) { alert('Upload failed.'); }
+            const urls = [];
+            for (const file of files) {
+                const fd = new FormData();
+                fd.append('image', file);
+                fd.append('_token', window.MEDIA.csrf);
+                if (this.folder) fd.append('folder', this.folder);
+                try {
+                    const r = await fetch(window.MEDIA.upload, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+                    const d = await r.json();
+                    if (d.url) urls.push(d.url);
+                } catch (_) { /* keep going with the rest */ }
+            }
             this.uploading = false;
             e.target.value = '';
+
+            if (!urls.length) { alert('Upload failed.'); return; }
+
+            if (this.multi) {
+                // Add the uploads to the selection and return to the library grid.
+                urls.forEach((u) => { if (!this.selected.includes(u)) this.selected.push(u); });
+                this.tab = 'library';
+                this.load();
+            } else {
+                this.choose(urls[0]);
+            }
         },
     });
 

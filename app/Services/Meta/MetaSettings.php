@@ -38,6 +38,18 @@ class MetaSettings
         // — when blank the system-user token above is reused (no duplicate cred).
         'capi_enabled' => false,
         'capi_token_encrypted' => null,
+        'test_event_code' => null,       // Events Manager "Test events" code
+
+        // Browser Pixel + per-event tracking toggles (all default on).
+        'pixel_enabled' => true,
+        'advanced_matching' => true,
+        'track_pageview' => true,
+        'track_viewcontent' => true,
+        'track_search' => true,
+        'track_addtocart' => true,
+        'track_initiatecheckout' => true,
+        'track_purchase' => true,
+        'last_event_sent_at' => null,    // ISO string — last Pixel/CAPI event sent
 
         // Connection metadata (populated after a successful test / OAuth).
         'connected_business_name' => null,

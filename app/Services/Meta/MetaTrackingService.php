@@ -28,12 +28,51 @@ class MetaTrackingService
     public function __construct(
         private readonly MetaSettings $settings,
         private readonly MetaProductMapper $mapper,
+        private readonly MetaGraphClient $client,
     ) {}
 
     /** Whether server-side CAPI sending is enabled and fully configured (DB). */
     public function enabled(): bool
     {
         return $this->settings->capiEnabled();
+    }
+
+    /** Whether the browser Pixel is enabled and has an id. */
+    public function pixelEnabled(): bool
+    {
+        return (bool) $this->settings->get('pixel_enabled', true) && filled($this->settings->pixelId());
+    }
+
+    public function advancedMatching(): bool
+    {
+        return (bool) $this->settings->get('advanced_matching', true);
+    }
+
+    /** Whether a given standard event is enabled by the per-event toggles. */
+    public function eventEnabled(string $event): bool
+    {
+        return (bool) match ($event) {
+            'PageView' => $this->settings->get('track_pageview', true),
+            'ViewContent' => $this->settings->get('track_viewcontent', true),
+            'Search' => $this->settings->get('track_search', true),
+            'AddToCart' => $this->settings->get('track_addtocart', true),
+            'InitiateCheckout' => $this->settings->get('track_initiatecheckout', true),
+            'Purchase' => $this->settings->get('track_purchase', true),
+            default => true,
+        };
+    }
+
+    /** Per-event enabled map for the browser Pixel (window.META_TRACK.events). */
+    public function enabledEventsMap(): array
+    {
+        return [
+            'PageView' => $this->eventEnabled('PageView'),
+            'ViewContent' => $this->eventEnabled('ViewContent'),
+            'Search' => $this->eventEnabled('Search'),
+            'AddToCart' => $this->eventEnabled('AddToCart'),
+            'InitiateCheckout' => $this->eventEnabled('InitiateCheckout'),
+            'Purchase' => $this->eventEnabled('Purchase'),
+        ];
     }
 
     /**
@@ -124,19 +163,31 @@ class MetaTrackingService
     /**
      * POST a single server event to the Graph /events endpoint. Reads the Pixel
      * ID and access token from the database. Never throws into the caller.
+     *
+     * Real events are gated by the per-event toggle + the CAPI enable flag; a
+     * test send ($test = true) bypasses those flags but still needs the Pixel ID
+     * and a token to be configured. Returns a structured result for the Test
+     * panel / Event debugger.
+     *
+     * @return array{ok:bool,status:int,body:mixed,error:?string,ms:int}
      */
-    protected function send(string $eventName, array $userData, array $customData, string $eventId): void
+    protected function send(string $eventName, array $userData, array $customData, string $eventId, bool $test = false): array
     {
-        if (! $this->enabled()) {
-            return;
+        $skip = ['ok' => false, 'status' => 0, 'body' => null, 'error' => null, 'ms' => 0];
+
+        if (! $test) {
+            if (! $this->eventEnabled($eventName) || ! $this->enabled()) {
+                return $skip;
+            }
         }
 
         $pixelId = $this->settings->pixelId();
         $token = $this->settings->capiToken();
         if (! $pixelId || ! $token) {
-            return;
+            return ['ok' => false, 'status' => 0, 'body' => null, 'error' => 'Pixel ID or CAPI token is not configured.', 'ms' => 0];
         }
 
+        $started = microtime(true);
         try {
             $payload = [
                 'data' => [[
@@ -155,7 +206,7 @@ class MetaTrackingService
                 ]],
             ];
 
-            if ($code = config('meta.test_event_code')) {
+            if ($code = $this->testEventCode()) {
                 $payload['test_event_code'] = $code;
             }
 
@@ -166,13 +217,82 @@ class MetaTrackingService
             );
 
             $res = Http::timeout(10)->post($url.'?access_token='.urlencode($token), $payload);
+            $ms = (int) round((microtime(true) - $started) * 1000);
 
             if ($res->failed()) {
                 Log::warning('Meta CAPI event failed', ['event' => $eventName, 'body' => $res->body()]);
+
+                return ['ok' => false, 'status' => $res->status(), 'body' => $res->json() ?? $res->body(),
+                    'error' => $res->json('error.message') ?? 'HTTP '.$res->status(), 'ms' => $ms];
             }
+
+            $this->settings->update(['last_event_sent_at' => now()->toIso8601String()]);
+
+            return ['ok' => true, 'status' => $res->status(), 'body' => $res->json(), 'error' => null, 'ms' => $ms];
         } catch (\Throwable $e) {
             Log::error('Meta CAPI error', ['event' => $eventName, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'status' => 0, 'body' => null, 'error' => $e->getMessage(),
+                'ms' => (int) round((microtime(true) - $started) * 1000)];
         }
+    }
+
+    /** Test-event code from the database, falling back to config (env). */
+    public function testEventCode(): ?string
+    {
+        return $this->settings->get('test_event_code') ?: config('meta.test_event_code');
+    }
+
+    // ── Diagnostics / test panel support ─────────────────────────────────────
+
+    /**
+     * Validate the CAPI access token via Graph debug_token.
+     *
+     * @return array{valid:bool,expires_at:?int,scopes:array,error:?string}
+     */
+    public function validateToken(): array
+    {
+        if (! filled($this->settings->capiToken())) {
+            return ['valid' => false, 'expires_at' => null, 'scopes' => [], 'error' => 'No token configured.'];
+        }
+
+        try {
+            $data = $this->client->debugToken($this->settings->capiToken());
+
+            return [
+                'valid' => ($data['is_valid'] ?? false) === true,
+                'expires_at' => isset($data['expires_at']) ? (int) $data['expires_at'] : null,
+                'scopes' => $data['scopes'] ?? [],
+                'error' => $data['is_valid'] ?? false ? null : 'Token reported invalid.',
+            ];
+        } catch (\Throwable $e) {
+            return ['valid' => false, 'expires_at' => null, 'scopes' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Fire one real test event through the CAPI with a sample payload and the
+     * configured Test Event Code. The browser fires the matching Pixel event with
+     * the SAME $eventId (passed from JS) so Events Manager shows them deduplicated.
+     *
+     * @return array{ok:bool,status:int,body:mixed,error:?string,ms:int,event_id:string,event:string,test_event_code:?string}
+     */
+    public function sendTest(string $event, ?string $eventId = null): array
+    {
+        $eventId ??= self::newEventId($event);
+
+        $custom = match ($event) {
+            'ViewContent', 'AddToCart' => ['content_type' => 'product', 'content_ids' => ['prod-test'], 'content_name' => 'Test product', 'currency' => $this->currency(), 'value' => 1.0],
+            'InitiateCheckout', 'Purchase' => ['content_type' => 'product', 'content_ids' => ['prod-test'], 'currency' => $this->currency(), 'value' => 1.0, 'num_items' => 1],
+            default => [], // PageView / Search
+        };
+
+        $result = $this->send($event, [], $custom, $eventId, test: true);
+        $result['event_id'] = $eventId;
+        $result['event'] = $event;
+        $result['test_event_code'] = $this->testEventCode();
+
+        return $result;
     }
 
     // ── Hashing / normalisation ──────────────────────────────────────────────

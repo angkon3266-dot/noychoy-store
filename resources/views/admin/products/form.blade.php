@@ -451,7 +451,7 @@
 
                 {{-- …or pick existing images from the media library. --}}
                 <div class="mt-3" x-data="{ picks: [] }">
-                    <button type="button" @click="$store.mediaLib.openWith(u => { if(!picks.includes(u)) picks.push(u) }, 'products')" class="btn-outline text-sm">+ Add from media library</button>
+                    <button type="button" @click="$store.mediaLib.openWith(sel => { (Array.isArray(sel) ? sel : [sel]).forEach(u => { if(!picks.includes(u)) picks.push(u) }) }, 'products', { multi: true })" class="btn-outline text-sm">+ Add from media library</button>
                     <div class="grid grid-cols-3 gap-2 mt-2" x-show="picks.length" x-cloak>
                         <template x-for="(u, i) in picks" :key="i">
                             <div class="relative">

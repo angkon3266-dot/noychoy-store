@@ -2,6 +2,7 @@
 @php
     $tabs = [
         ['admin.meta.index', 'Dashboard'],
+        ['admin.meta.tracking', 'Tracking'],
         ['admin.meta.logs', 'Sync Logs'],
         ['admin.meta.queue', 'Queue'],
         ['admin.meta.webhook', 'Webhook'],

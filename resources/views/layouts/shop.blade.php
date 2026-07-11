@@ -166,15 +166,20 @@
     <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ msearch: false, rot: {{ $menuRot }} }">
         <div class="mx-auto max-w-7xl px-4">
             <div class="relative flex h-16 items-center gap-2">
-                {{-- Mobile menu toggle (far left) — opens the off-canvas drawer --}}
-                <button @click="$store.mobileNav.toggle()" class="md:hidden p-2 -ml-1" aria-label="Menu" :aria-expanded="$store.mobileNav.open">
+                {{-- Mobile menu toggle (far left) — opens the off-canvas drawer.
+                     A custom icon image can silently fail on some devices (404,
+                     mixed-content http:// blocked on Android, decode error), which
+                     left the toggle invisible. We now always keep the SVG hamburger
+                     as a guaranteed-visible fallback and only show the custom image
+                     while it loads successfully (@error → revert to the SVG). --}}
+                <button @click="$store.mobileNav.toggle()" class="md:hidden p-2 -ml-1 text-ink-900" aria-label="Menu"
+                        x-data="{ imgok: {{ $menuIcon ? 'true' : 'false' }} }" :aria-expanded="$store.mobileNav.open">
                     @if($menuIcon)
-                        <img src="{{ $menuIcon }}" alt="Menu" width="{{ $menuIconH }}" height="{{ $menuIconH }}" decoding="async"
-                             class="menu-ico object-contain transition-transform duration-300"
+                        <img x-show="imgok" src="{{ $menuIcon }}" alt="Menu" width="{{ $menuIconH }}" height="{{ $menuIconH }}" decoding="async"
+                             class="menu-ico object-contain transition-transform duration-300" x-on:error="imgok = false"
                              :style="`transform: rotate(${$store.mobileNav.open ? rot : 0}deg)`">
-                    @else
-                        <svg class="w-6 h-6 transition-transform duration-300" :style="`transform: rotate(${$store.mobileNav.open ? rot : 0}deg)`" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
                     @endif
+                    <svg x-show="!imgok" @if($menuIcon) x-cloak @endif class="w-7 h-7 transition-transform duration-300" :style="`transform: rotate(${$store.mobileNav.open ? rot : 0}deg)`" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
                 </button>
 
                 {{-- Logo. Separate image for desktop & mobile; placement configurable. --}}
