@@ -64,8 +64,10 @@
         <span class="text-ink-300">|</span>
         <button type="button" @click="run('publish')" class="text-gold-700 hover:underline">Publish</button>
         <button type="button" @click="run('draft')" class="text-gold-700 hover:underline">Set draft</button>
-        <button type="button" @click="run('feature')" class="text-gold-700 hover:underline">Feature</button>
+        <button type="button" @click="run('feature')" class="text-gold-700 hover:underline">Feature on home</button>
         <button type="button" @click="run('unfeature')" class="text-gold-700 hover:underline">Unfeature</button>
+        <button type="button" @click="run('bestseller')" class="text-gold-700 hover:underline">Mark bestseller</button>
+        <button type="button" @click="run('unbestseller')" class="text-gold-700 hover:underline">Unmark bestseller</button>
         <span class="text-ink-300">|</span>
         <select x-model="catIds" multiple size="1" class="input py-1 text-xs w-44 h-auto max-h-24" title="Ctrl/Cmd-click to pick several">
             @foreach($bulkCategories as $cat)<option value="{{ $cat->id }}">{{ $cat->name }}</option>@endforeach

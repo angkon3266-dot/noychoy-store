@@ -27,8 +27,14 @@
 
         {{-- Library tab --}}
         <div x-show="$store.mediaLib.tab==='library'" class="flex-1 min-h-0 flex flex-col p-5 pt-3">
-            <input x-model="$store.mediaLib.q" @input.debounce.300ms="$store.mediaLib.load()"
-                   placeholder="Search by product or file name…" class="input text-sm mb-3">
+            <div class="flex gap-2 mb-3">
+                <input x-model="$store.mediaLib.q" @input.debounce.300ms="$store.mediaLib.load()"
+                       placeholder="Search by product or file name…" class="input text-sm flex-1">
+                <select x-model="$store.mediaLib.browseFolder" @change="$store.mediaLib.load()" class="input text-sm w-40">
+                    <option value="">All folders</option>
+                    <template x-for="f in $store.mediaLib.folders" :key="f"><option :value="f" x-text="f"></option></template>
+                </select>
+            </div>
             <div class="flex-1 overflow-y-auto">
                 <p x-show="$store.mediaLib.loading" class="text-sm text-ink-700/50 py-6 text-center">Loading…</p>
                 <p x-show="!$store.mediaLib.loading && $store.mediaLib.items.length===0" class="text-sm text-ink-700/50 py-6 text-center">No images found.</p>

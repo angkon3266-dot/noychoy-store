@@ -374,7 +374,7 @@ class ProductController extends Controller
     public function bulk(Request $request)
     {
         $data = $request->validate([
-            'action' => ['required', 'in:publish,draft,feature,unfeature,delete,category'],
+            'action' => ['required', 'in:publish,draft,feature,unfeature,bestseller,unbestseller,delete,category'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
             'category_ids' => ['nullable', 'array', 'required_if:action,category'],
@@ -390,6 +390,8 @@ class ProductController extends Controller
             'draft' => $query->update(['status' => 'draft']),
             'feature' => $query->update(['is_featured' => true]),
             'unfeature' => $query->update(['is_featured' => false]),
+            'bestseller' => $query->update(['is_bestseller' => true]),
+            'unbestseller' => $query->update(['is_bestseller' => false]),
             'delete' => $query->get()->each->delete(),
             // Replace all: set the product's categories to exactly the chosen set,
             // primary = the first selected category.

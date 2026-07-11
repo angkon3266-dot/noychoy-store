@@ -311,13 +311,15 @@ document.addEventListener('alpine:init', () => {
         items: [],
         folders: [],
         q: '',
-        folder: '',
+        folder: '',            // upload target folder (where new uploads go)
+        browseFolder: '',      // library filter ('' = show ALL folders)
         multi: false,          // multi-select mode (add several at once)
         selected: [],          // chosen urls while in multi mode
         _cb: null,
         openWith(cb, folder, opts) {
             this._cb = cb;
             this.folder = folder || '';
+            this.browseFolder = '';        // browse everything by default
             this.multi = !!(opts && opts.multi);
             this.selected = [];
             this.tab = 'library';
@@ -344,7 +346,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 const url = new URL(window.MEDIA.picker, window.location.origin);
                 if (this.q) url.searchParams.set('q', this.q);
-                if (this.folder) url.searchParams.set('folder', this.folder);
+                if (this.browseFolder) url.searchParams.set('folder', this.browseFolder);
                 const r = await fetch(url, { headers: { Accept: 'application/json' } });
                 const d = await r.json();
                 this.items = d.items || [];

@@ -29,14 +29,7 @@ class FraudCheckerService
      */
     public function normalizePhone(?string $phone): ?string
     {
-        $digits = preg_replace('/\D/', '', (string) $phone) ?? '';
-
-        if (str_starts_with($digits, '880')) {
-            $digits = substr($digits, 3);
-        }
-        if (strlen($digits) === 10 && str_starts_with($digits, '1')) {
-            $digits = '0'.$digits;
-        }
+        $digits = bd_phone($phone);
 
         return preg_match('/^01[3-9]\d{8}$/', $digits) ? $digits : null;
     }

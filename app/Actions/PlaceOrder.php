@@ -23,6 +23,10 @@ class PlaceOrder
      */
     public function handle(array $data): Order
     {
+        // Store the phone in one canonical form: "01XXXXXXXXX" (no spaces / +880),
+        // so the order, the customer record and lookups all match.
+        $data['phone'] = bd_phone($data['phone']);
+
         $insideDhaka = (bool) ($data['is_inside_dhaka'] ?? false);
 
         // Enforce per-customer coupon limit now that we know the phone.

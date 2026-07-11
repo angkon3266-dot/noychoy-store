@@ -290,6 +290,27 @@ if (! function_exists('meta_pixel_id')) {
     }
 }
 
+if (! function_exists('bd_phone')) {
+    /**
+     * Normalise any Bangladeshi mobile number to the bare local 11-digit form
+     * "01XXXXXXXXX" — strips spaces, dashes, and a +880 / 880 country prefix.
+     * Best-effort: returns the cleaned digits even if not a perfect match.
+     */
+    function bd_phone(?string $phone): string
+    {
+        $d = preg_replace('/\D/', '', (string) $phone) ?? '';
+
+        if (str_starts_with($d, '880')) {
+            $d = substr($d, 3);
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '1')) {
+            $d = '0'.$d; // 1XXXXXXXXX → 01XXXXXXXXX
+        }
+
+        return $d;
+    }
+}
+
 if (! function_exists('meta_content_id')) {
     /**
      * The Meta content id for a product (optionally a variant). This MUST equal

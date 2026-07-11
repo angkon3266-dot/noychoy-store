@@ -106,7 +106,7 @@ class MediaController extends Controller
                 || str_contains(strtolower(basename($m['path'])), strtolower($q))))
             ->sortByDesc('mtime')
             ->values()
-            ->take(300);
+            ->take(500);
 
         $folders = collect($disk->allFiles())
             ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
