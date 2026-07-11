@@ -18,7 +18,13 @@ class HomeController extends Controller
         $featured = Product::published()->featured()->with($with)->latest()->take(8)->get();
         $newArrivals = Product::published()->with($with)->latest()->take(8)->get();
         $bestSellers = $this->bestSellers($with, 8);
-        $categories = Category::active()->whereNull('parent_id')->orderBy('position')->take(10)->get();
+
+        // Category scroller — admin-chosen categories in order, else auto (top parents).
+        $scrollerIds = collect(home_content('category_scroller_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
+        $categories = $scrollerIds->isNotEmpty()
+            ? Category::active()->whereIn('id', $scrollerIds)->get()
+                ->sortBy(fn ($c) => $scrollerIds->search($c->id))->values()
+            : Category::active()->whereNull('parent_id')->orderBy('position')->take(10)->get();
 
         // Highlighted categories (large editorial tiles), in the admin-chosen order.
         $highlightIds = collect(home_content('highlight_category_ids') ?? [])->map(fn ($i) => (int) $i)->filter();

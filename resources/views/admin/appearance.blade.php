@@ -3,7 +3,9 @@
 @section('heading', 'Appearance & Theme')
 
 @section('content')
-<form action="{{ route('admin.appearance.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6 max-w-4xl pb-24">
+<form action="{{ route('admin.appearance.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6 max-w-4xl pb-24"
+      x-data="{ tab: localStorage.getItem('appearanceTab') || 'branding' }"
+      x-init="$watch('tab', v => localStorage.setItem('appearanceTab', v))">
     @csrf
 
     @if($errors->any())
@@ -18,8 +20,17 @@
         <div class="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-700">{{ session('success') }}</div>
     @endif
 
+    {{-- ── Appearance tabs ──────────────────────────────────────────────── --}}
+    <div class="flex flex-wrap gap-1 bg-ink-50 rounded-lg p-1 sticky top-2 z-30 text-sm">
+        @foreach(['branding'=>'Branding','homepage'=>'Homepage','sections'=>'Section Builder','filters'=>'Filters'] as $t => $lbl)
+            <button type="button" @click="tab='{{ $t }}'"
+                    :class="tab==='{{ $t }}' ? 'bg-white shadow-sm text-gold-800 font-medium' : 'text-ink-700/60 hover:text-ink-700'"
+                    class="px-4 py-2 rounded-md">{{ $lbl }}</button>
+        @endforeach
+    </div>
+
     <!-- Branding -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-4">Branding</h2>
         <div class="grid sm:grid-cols-2 gap-6">
             <div>
@@ -113,7 +124,7 @@
     </div>
 
     {{-- Fonts --}}
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-1">Fonts</h2>
         <p class="text-xs text-ink-700/60 mb-4">Pick a Google font, or upload your own brand font file (.woff2/.woff/.ttf/.otf) — e.g. <strong>Blore</strong> for headings.</p>
         <div class="grid sm:grid-cols-2 gap-6">
@@ -147,7 +158,7 @@
     </div>
 
     <!-- Announcement bar -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold">Announcement top bar</h2>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="announcement_enabled" value="1" @checked($theme['announcement_enabled'])> Enabled</label>
@@ -164,7 +175,7 @@
     </div>
 
     <!-- Templates -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='homepage'">
         <h2 class="font-semibold mb-1">Homepage template</h2>
         <p class="text-xs text-ink-700/60 mb-4">Pick a brand-inspired layout, then <strong>Save</strong> to apply. You can change anytime.</p>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" x-data="{ sel: '{{ $theme['homepage_template'] }}' }">
@@ -200,7 +211,7 @@
     </div>
 
     <!-- Homepage content -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='homepage'">
         <h2 class="font-semibold mb-1">Homepage content</h2>
         <p class="text-xs text-ink-700/60 mb-4">Edit the text, links and image shown on your homepage hero &amp; sections. Applies to whichever homepage template is active. Leave a field empty to use the default.</p>
 
@@ -240,7 +251,7 @@
     </div>
 
     <!-- Homepage sections (Storefront template) -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='homepage'">
         <h2 class="font-semibold mb-1">Homepage sections</h2>
         <p class="text-xs text-ink-700/60 mb-4">Build the storefront homepage — hero slider, feature strip, best sellers, new arrivals, highlighted categories and videos. Toggle each section on/off.</p>
 
@@ -249,6 +260,18 @@
             @foreach(['show_feature_strip'=>'Feature strip','show_categories'=>'Category scroller','show_best_selling'=>'Best selling','show_new_arrivals'=>'New arrivals','show_highlights'=>'Highlighted categories','show_videos'=>'Video sections'] as $k => $lbl)
                 <label class="flex items-center gap-2"><input type="checkbox" name="home_{{ $k }}" value="1" @checked($home[$k] ?? true)> {{ $lbl }}</label>
             @endforeach
+        </div>
+
+        {{-- Category scroller (ordered pick) --}}
+        <div class="mb-6">
+            <h3 class="text-sm font-semibold text-ink-700 mb-2">Category scroller</h3>
+            @include('admin.partials._category-picker', [
+                'field' => 'category_scroller_ids',
+                'label' => '',
+                'help' => 'Which categories appear in the homepage category scroller, in this order. Leave empty to auto-show your top categories.',
+                'selectedIds' => $home['category_scroller_ids'] ?? [],
+                'allCategories' => $allCategories,
+            ])
         </div>
 
         {{-- Best-selling title --}}
@@ -298,15 +321,15 @@
             <button type="button" @click="rows.push({icon:'✓',title:''})" class="btn-outline text-sm">+ Add feature</button>
         </div>
 
-        {{-- Highlighted categories --}}
+        {{-- Highlighted categories (ordered) --}}
         <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Highlighted categories</h3>
-        <p class="text-xs text-ink-700/50 mb-2">Pick categories to feature as large editorial banners.</p>
-        @php $hl = collect($home['highlight_category_ids'] ?? [])->map(fn($i)=>(int)$i); @endphp
-        <div class="grid sm:grid-cols-3 gap-2 text-sm">
-            @foreach($allCategories as $cat)
-                <label class="flex items-center gap-2"><input type="checkbox" name="highlight_category_ids[]" value="{{ $cat->id }}" @checked($hl->contains($cat->id))> {{ $cat->name }}</label>
-            @endforeach
-        </div>
+        @include('admin.partials._category-picker', [
+            'field' => 'highlight_category_ids',
+            'label' => '',
+            'help' => 'Featured as large editorial banners, in the order below. Add the ones you want and drag with ↑/↓.',
+            'selectedIds' => $home['highlight_category_ids'] ?? [],
+            'allCategories' => $allCategories,
+        ])
 
         {{-- Video sections --}}
         <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Video sections</h3>
@@ -324,7 +347,7 @@
     </div>
 
     <!-- Section builder -->
-    <div class="card p-6" x-data="homeBuilder({ blocks: @js(array_values($home['sections'] ?? [])) })">
+    <div class="card p-6" x-show="tab==='sections'" x-data="homeBuilder({ blocks: @js(array_values($home['sections'] ?? [])) })">
         <h2 class="font-semibold mb-1">Section builder</h2>
         <p class="text-xs text-ink-700/60 mb-4">Build the middle of your homepage from blocks. Drag order with ↑/↓. When you add blocks here they replace the default sections above (hero &amp; feature strip stay on top).</p>
         <input type="hidden" name="home_sections_json" :value="JSON.stringify(blocks)">
@@ -423,7 +446,7 @@
     </div>
 
     <!-- Registered-customer offer bar -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <div class="flex items-center justify-between mb-1">
             <h2 class="font-semibold">Registered-customer offer bar</h2>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="cbar_enabled" value="1" @checked($theme['cbar_enabled'] ?? false)> Enabled</label>
@@ -445,7 +468,7 @@
     </div>
 
     <!-- Discover page tiles (mobile bottom-nav "Discover") -->
-    <div class="card p-6" x-data="discoverBuilder({ tiles: @js(array_values($discoverTiles ?? [])) })">
+    <div class="card p-6" x-show="tab==='homepage'" x-data="discoverBuilder({ tiles: @js(array_values($discoverTiles ?? [])) })">
         <h2 class="font-semibold mb-1">Discover page</h2>
         <p class="text-xs text-ink-700/60 mb-4">The tiles shown on the mobile <strong>Discover</strong> tab. Each tile has an image, a name and a link (a category, a product, or any URL). Leave it empty to fall back to your top categories.</p>
         <input type="hidden" name="discover_tiles_json" :value="JSON.stringify(tiles)">
@@ -471,7 +494,7 @@
     </div>
 
     <!-- Floating contact buttons -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-1">Floating contact buttons</h2>
         <p class="text-xs text-ink-700/60 mb-4">Sticky buttons bottom-right of the storefront. The Call button dials your <a href="{{ route('admin.settings') }}" class="text-gold-700 underline">store phone</a>; on mobile it opens the dialer.</p>
         <div class="grid sm:grid-cols-3 gap-2 text-sm mb-4">
@@ -483,7 +506,7 @@
     </div>
 
     <!-- Storefront filters -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='filters'">
         <h2 class="font-semibold mb-1">Storefront filters</h2>
         <p class="text-xs text-ink-700/60 mb-4">Choose which filters appear in the shop sidebar. Values are pulled automatically from your products. "Color" attributes show colour swatches.</p>
 
@@ -539,7 +562,7 @@
     </div>
 
     <!-- Per-page filter overrides -->
-    <div class="card p-6"
+    <div class="card p-6" x-show="tab==='filters'"
          x-data="filterOverrides(@js($overridablePages), @js((object) $filterOverrides), @js($allCategories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values()), @js($filterAttributes->values()), @js($filterCustomFields->values()))">
         <h2 class="font-semibold mb-1">Per-page filter overrides</h2>
         <p class="text-xs text-ink-700/60 mb-4">By default every shop &amp; category page uses the filters above. Pick a page here to give it its own set of filters — which facets show <em>and</em> which categories are listed. Pages you don't override keep the global default.</p>
@@ -645,11 +668,31 @@
                     return out;
                 },
             }));
+
+            // Ordered category picker (Highlighted categories + Category scroller).
+            Alpine.data('catPicker', (all, initialIds) => ({
+                all,
+                selected: (initialIds || []).map((id) => all.find((c) => c.id === id)).filter(Boolean),
+                addId: '',
+                get available() { return this.all.filter((c) => !this.selected.some((s) => s.id === c.id)); },
+                add() {
+                    const id = parseInt(this.addId, 10);
+                    const c = this.all.find((x) => x.id === id);
+                    if (c && !this.selected.some((s) => s.id === id)) this.selected.push(c);
+                    this.addId = '';
+                },
+                remove(i) { this.selected.splice(i, 1); },
+                move(i, d) {
+                    const j = i + d;
+                    if (j < 0 || j >= this.selected.length) return;
+                    const t = this.selected[i]; this.selected[i] = this.selected[j]; this.selected[j] = t;
+                },
+            }));
         });
     </script>
 
     <!-- Marketing -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-4">Marketing &amp; tracking</h2>
         <div class="grid sm:grid-cols-2 gap-4">
             <div><label class="label">Meta Pixel ID</label><input name="meta_pixel_id" value="{{ $theme['meta_pixel_id'] }}" class="input" placeholder="123456789012345"></div>
@@ -659,7 +702,7 @@
     </div>
 
     <!-- Conversion features -->
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='homepage'">
         <h2 class="font-semibold mb-4">Conversion features</h2>
         <div class="grid sm:grid-cols-2 gap-3 text-sm">
             @php $toggles = [
@@ -684,7 +727,7 @@
     </div>
 
     {{-- Footer --}}
-    <div class="card p-6">
+    <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-1">Footer</h2>
         <p class="text-xs text-ink-700/60 mb-4">The Shop / Help / Contact columns fill automatically from your categories &amp; store details. Customise the rest here.</p>
         <div class="space-y-4">
@@ -709,7 +752,7 @@
     </div>
 
     {{-- Trust badges --}}
-    <div class="card p-6" x-data="{ badges: @js(array_values($theme['trust_badges'] ?? config('theme.defaults.trust_badges', []))) }">
+    <div class="card p-6" x-show="tab==='branding'" x-data="{ badges: @js(array_values($theme['trust_badges'] ?? config('theme.defaults.trust_badges', []))) }">
         <h2 class="font-semibold mb-1">Trust badges</h2>
         <p class="text-xs text-ink-700/60 mb-4">The reassurance strip shown on product &amp; checkout pages. Add, remove or reorder freely — each badge has an icon (emoji), a title and an optional line of text.</p>
         <div class="space-y-3">

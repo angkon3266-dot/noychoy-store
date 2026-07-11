@@ -99,6 +99,8 @@ class AppearanceController extends Controller
             'feature_strip.*.title' => ['nullable', 'string', 'max:60'],
             'highlight_category_ids' => ['nullable', 'array'],
             'highlight_category_ids.*' => ['integer'],
+            'category_scroller_ids' => ['nullable', 'array'],
+            'category_scroller_ids.*' => ['integer'],
             'home_videos' => ['nullable', 'array'],
             'home_videos.*.title' => ['nullable', 'string', 'max:120'],
             'home_videos.*.url' => ['nullable', 'string', 'max:255'],
@@ -213,9 +215,14 @@ class AppearanceController extends Controller
                 ->filter(fn ($f) => $f['title'] !== '')->values()->all();
         }
 
-        // Highlighted categories
-        if ($request->has('highlight_category_ids')) {
+        // Highlighted categories + Category scroller (ordered). The _present marker
+        // lets an empty selection clear the list rather than being ignored.
+        if ($request->has('highlight_category_ids_present')) {
             $home['highlight_category_ids'] = collect($request->input('highlight_category_ids', []))
+                ->map(fn ($i) => (int) $i)->filter()->values()->all();
+        }
+        if ($request->has('category_scroller_ids_present')) {
+            $home['category_scroller_ids'] = collect($request->input('category_scroller_ids', []))
                 ->map(fn ($i) => (int) $i)->filter()->values()->all();
         }
 
