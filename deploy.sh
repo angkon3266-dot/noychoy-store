@@ -19,12 +19,28 @@ composer install --no-dev --optimize-autoloader
 # Front-end assets (public/build) are committed to the repo — no npm step here.
 # If you change CSS/JS, run `npm run build` on your PC, commit public/build, push.
 
+# Clear caches FIRST, before anything that could fail (migrations). This way a
+# failure never leaves the site loading a stale/half-written config or route
+# cache — the app just runs uncached, which still works.
+echo "→ Clearing caches…"
+php artisan optimize:clear
+
 echo "→ Running database migrations…"
 php artisan migrate --force
 
-echo "→ Clearing & rebuilding caches (config / routes / views / app cache)…"
-php artisan optimize:clear
-php artisan optimize
+# Re-cache for performance. If caching fails for ANY reason, fall back to the
+# cleared (uncached) state so the site keeps serving instead of loading a
+# corrupt cache and 404-ing every route.
+echo "→ Rebuilding caches (config / routes / views / events)…"
+if ! php artisan optimize; then
+    echo "⚠ optimize failed — reverting to uncached state so the site stays up."
+    php artisan optimize:clear
+fi
 
 echo "✓ Deploy complete."
-echo "  If styling/layout still looks stale, flush LiteSpeed Cache in cPanel."
+echo
+echo "IMPORTANT — the CLI steps above do NOT clear the LiteSpeed page cache or the"
+echo "web (lsphp) OPcache. If the site looks stale or returns 404/500 after a deploy:"
+echo "  1. cPanel → LiteSpeed Web Cache Manager → Flush All."
+echo "  2. cPanel → MultiPHP Manager (or Select PHP Version) → toggle the PHP"
+echo "     version to restart lsphp and reset its OPcache."
