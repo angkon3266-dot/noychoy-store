@@ -4,8 +4,78 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "36793882908b6cbdd344b5a4840231db",
+    "content-hash": "0e46c0e2b15e8da77b2d80edccc3f749",
     "packages": [
+        {
+            "name": "azmolla/fraud-checker-bd-courier",
+            "version": "v2.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/AbiruzzamanMolla/Fraud-Checker-BD-Courier.git",
+                "reference": "4d0ad8300f99d8d7f8801458364cde75c47f5005"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/AbiruzzamanMolla/Fraud-Checker-BD-Courier/zipball/4d0ad8300f99d8d7f8801458364cde75c47f5005",
+                "reference": "4d0ad8300f99d8d7f8801458364cde75c47f5005",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.8",
+                "php": "^8.2.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^8.0|^9.0|^10.0",
+                "phpunit/phpunit": "^10.5|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "FraudCheckerBdCourier": "Azmolla\\FraudCheckerBdCourier\\Facade\\FraudCheckerBdCourierFacade"
+                    },
+                    "providers": [
+                        "Azmolla\\FraudCheckerBdCourier\\FraudCheckerBdCourierServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Azmolla\\FraudCheckerBdCourier\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-3.0"
+            ],
+            "authors": [
+                {
+                    "name": "Abiruzzaman Molla",
+                    "email": "abiruzzaman.molla@gmail.com",
+                    "role": "Backend Developer"
+                }
+            ],
+            "description": "A fraud detection tool for e-commerce platforms to analyze customer order behavior across Steadfast, RedX and Pathao couriers.",
+            "homepage": "https://github.com/AbiruzzamanMolla/Fraud-Checker-BD-Courier",
+            "keywords": [
+                "Order Status",
+                "api integration",
+                "courier bangladesh",
+                "e-commerce fraud",
+                "fraud checker",
+                "fraud detection",
+                "fraud prevention",
+                "pathao",
+                "redx",
+                "steadfast courier"
+            ],
+            "support": {
+                "issues": "https://github.com/AbiruzzamanMolla/Fraud-Checker-BD-Courier/issues",
+                "source": "https://github.com/AbiruzzamanMolla/Fraud-Checker-BD-Courier/tree/v2.0.2"
+            },
+            "abandoned": true,
+            "time": "2026-03-17T03:10:04+00:00"
+        },
         {
             "name": "brick/math",
             "version": "0.14.8",

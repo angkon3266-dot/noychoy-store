@@ -51,6 +51,21 @@ class AppServiceProvider extends ServiceProvider
         // Apply DB-stored System Configuration as runtime overrides (fails safe).
         app(ConfigApplier::class)->apply();
 
+        // Map admin-managed courier logins onto the fraud-checker package config
+        // so it uses DB credentials instead of .env. Fails safe (e.g. during
+        // migrations, before the settings table exists).
+        try {
+            foreach (app(\App\Services\FraudChecker\FraudCheckerSettings::class)->credentials() as $courier => $fields) {
+                foreach ($fields as $key => $value) {
+                    if (filled($value)) {
+                        config()->set("fraud-checker-bd-courier.{$courier}.{$key}", $value);
+                    }
+                }
+            }
+        } catch (\Throwable) {
+            // Settings unavailable — the package simply falls back to its defaults.
+        }
+
         // Shared data for the storefront layout (nav menu + cart badge).
         View::composer(['shop.*', 'components.shop.*', 'layouts.shop'], function ($view) {
             $view->with('navCategories', Category::active()->whereNull('parent_id')

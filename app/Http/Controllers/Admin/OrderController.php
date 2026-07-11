@@ -14,9 +14,12 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, \App\Services\FraudChecker\FraudCheckerService $fraud)
     {
+        $trashed = $request->boolean('trashed');
+
         $orders = Order::query()
+            ->when($trashed, fn ($q) => $q->onlyTrashed())
             ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
             ->when($request->query('q'), function ($q, $term) {
                 $q->where(fn ($w) => $w->where('order_number', 'like', "%{$term}%")
@@ -37,6 +40,26 @@ class OrderController extends Controller
             ->groupBy('customer_phone')
             ->pluck('c', 'customer_phone');
 
+        // Fraud-risk map (raw phone → risky) from previously cached fraud reports,
+        // so risky customers' rows can be flagged yellow. No live lookups here.
+        $normToRaw = [];
+        foreach ($phones as $ph) {
+            if ($n = $fraud->normalizePhone($ph)) {
+                $normToRaw[$n][] = $ph;
+            }
+        }
+        $fraudRisky = [];
+        if ($normToRaw) {
+            \App\Models\FraudReport::whereIn('phone', array_keys($normToRaw))
+                ->where('is_risky', true)
+                ->pluck('phone')
+                ->each(function ($n) use (&$fraudRisky, $normToRaw) {
+                    foreach ($normToRaw[$n] ?? [] as $raw) {
+                        $fraudRisky[$raw] = true;
+                    }
+                });
+        }
+
         // Fulfilment queue: products inside "processing" orders (qty to prepare + product ID/serial).
         $processingItems = OrderItem::query()
             ->whereHas('order', fn ($q) => $q->where('status', 'processing'))
@@ -56,10 +79,13 @@ class OrderController extends Controller
             'processingItems' => $processingItems,
             'processingSerials' => $processingSerials,
             'processingImages' => $processingImages,
+            'trashed' => $trashed,
+            'trashCount' => Order::onlyTrashed()->count(),
+            'fraudRisky' => $fraudRisky,
         ]);
     }
 
-    public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast)
+    public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast, \App\Services\FraudChecker\FraudCheckerService $fraud)
     {
         $order->load('items', 'history', 'shipment', 'customer');
 
@@ -116,7 +142,18 @@ class OrderController extends Controller
             'insight' => $insight->forPhone($order->customer_phone, $order->id),
             'courier' => $courier,
             'balance' => $balance,
+            'fraudReport' => $fraud->cachedFor($order->customer_phone),
+            'fraudConfigured' => $fraud->isConfigured(),
         ]);
+    }
+
+    /** Run (or refresh) the courier fraud check for this order's customer. */
+    public function checkFraud(Order $order, \App\Services\FraudChecker\FraudCheckerService $fraud)
+    {
+        [$report, $error] = $fraud->check($order->customer_phone);
+
+        return back()->with($error ? 'error' : 'success',
+            $error ?? 'Fraud check complete for '.$order->customer_phone.'.');
     }
 
     /** Print-ready shipping labels (A4, 14 per page) for orders with a consignment. */
@@ -258,12 +295,18 @@ class OrderController extends Controller
             'notify' => ['nullable', 'boolean'],
         ]);
 
+        $previousStatus = $order->status;
         $order->update(['status' => $data['status']]);
         $order->history()->create([
             'status' => $data['status'],
             'note' => $data['note'] ?? null,
             'created_by' => auth()->user()->name,
         ]);
+
+        // Return stock to inventory when an order is cancelled (and re-deduct if
+        // it is later moved back to an active status). Idempotent via the
+        // stock_restored flag, so repeated saves never double-count.
+        $this->syncStockForStatus($order, $previousStatus, $data['status']);
 
         // Award loyalty points once the order is delivered (idempotent).
         if ($data['status'] === 'delivered') {
@@ -284,6 +327,153 @@ class OrderController extends Controller
         }
 
         return back()->with('success', 'Order status updated.');
+    }
+
+    /**
+     * Release stock back to inventory when an order enters "cancelled", and
+     * re-deduct it if the order is moved back out of "cancelled". The
+     * stock_restored flag makes both directions idempotent.
+     */
+    protected function syncStockForStatus(Order $order, string $from, string $to): void
+    {
+        // Statuses that free the reserved stock. Returned goods are intentionally
+        // NOT auto-restocked (they may be damaged / need inspection).
+        $releaseStatuses = ['cancelled'];
+
+        $wasReleased = in_array($from, $releaseStatuses, true);
+        $nowReleased = in_array($to, $releaseStatuses, true);
+
+        if ($nowReleased && ! $wasReleased && ! $order->stock_restored) {
+            $this->adjustStock($order, +1); // return to inventory
+            $order->update(['stock_restored' => true]);
+        } elseif (! $nowReleased && $wasReleased && $order->stock_restored) {
+            $this->adjustStock($order, -1); // re-reserve (moved back to active)
+            $order->update(['stock_restored' => false]);
+        }
+    }
+
+    /** Add ($sign=+1) or remove ($sign=-1) this order's line quantities from stock. */
+    protected function adjustStock(Order $order, int $sign): void
+    {
+        $order->loadMissing('items');
+
+        foreach ($order->items as $item) {
+            if (! $item->product_id) {
+                continue; // deleted product — nothing to adjust
+            }
+
+            $delta = $sign * (int) $item->quantity;
+
+            if ($item->variant_id) {
+                \App\Models\ProductVariant::where('id', $item->variant_id)->increment('stock_quantity', $delta);
+            }
+
+            $product = Product::find($item->product_id);
+            if ($product && $product->manage_stock) {
+                $product->increment('stock_quantity', $delta);
+                $product->refresh();
+                $product->update(['in_stock' => $product->stock_quantity > 0]);
+            }
+        }
+    }
+
+    // ── Delete / restore (soft delete) ──────────────────────────────────────
+
+    /** Move a single order to Trash (recoverable), returning any reserved stock. */
+    public function destroy(Order $order)
+    {
+        DB::transaction(function () use ($order) {
+            $this->releaseStockOnDelete($order);
+            $customer = $order->customer;
+            $order->delete();
+            $this->recomputeCustomer($customer);
+        });
+
+        return back()->with('success', "Order {$order->order_number} moved to Trash.");
+    }
+
+    /** Move several selected orders to Trash at once. */
+    public function bulkDelete(Request $request)
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        $orders = Order::with('items', 'customer')->whereIn('id', $ids)->get();
+        $customers = collect();
+
+        DB::transaction(function () use ($orders, $customers) {
+            foreach ($orders as $order) {
+                $this->releaseStockOnDelete($order);
+                if ($order->customer) {
+                    $customers->put($order->customer_id, $order->customer);
+                }
+                $order->delete();
+            }
+        });
+
+        $customers->each(fn ($c) => $this->recomputeCustomer($c));
+
+        return back()->with('success', $orders->count().' order(s) moved to Trash.');
+    }
+
+    /** Restore a soft-deleted order (re-reserving stock if it is still active). */
+    public function restore(Order $order)
+    {
+        DB::transaction(function () use ($order) {
+            $order->restore();
+
+            // If deleting released this order's stock and it's back as an active
+            // order, re-reserve it. (Cancelled/returned orders keep stock freed.)
+            if ($order->stock_restored && ! in_array($order->status, ['cancelled', 'returned'], true)) {
+                $this->adjustStock($order, -1);
+                $order->update(['stock_restored' => false]);
+            }
+
+            $this->recomputeCustomer($order->customer);
+        });
+
+        return back()->with('success', "Order {$order->order_number} restored.");
+    }
+
+    /** Permanently delete a trashed order (and its items/history). */
+    public function forceDelete(Order $order)
+    {
+        $number = $order->order_number;
+        DB::transaction(function () use ($order) {
+            $order->history()->delete();
+            $order->items()->delete();
+            $order->forceDelete();
+        });
+
+        return back()->with('success', "Order {$number} permanently deleted.");
+    }
+
+    /**
+     * Return an order's stock to inventory when deleting it — but only if the
+     * stock is still reserved (not already freed by a cancel/return). Idempotent
+     * via the stock_restored flag.
+     */
+    protected function releaseStockOnDelete(Order $order): void
+    {
+        if (! $order->stock_restored && ! in_array($order->status, ['cancelled', 'returned'], true)) {
+            $this->adjustStock($order, +1);
+            $order->update(['stock_restored' => true]);
+        }
+    }
+
+    /** Recompute a customer's order/spend rollups from their remaining orders. */
+    protected function recomputeCustomer(?\App\Models\Customer $customer): void
+    {
+        if (! $customer) {
+            return;
+        }
+
+        $customer->update([
+            'total_orders' => $customer->orders()->count(),
+            'total_spent' => (float) $customer->orders()->sum('total'),
+        ]);
     }
 
     public function pushToSteadfast(Order $order, SteadfastService $steadfast)

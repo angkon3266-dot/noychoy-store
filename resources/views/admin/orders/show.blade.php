@@ -192,6 +192,55 @@
             @endif
         </div>
 
+        <!-- Courier fraud report (Steadfast + Pathao + RedX) -->
+        <div class="card p-5 {{ $fraudReport && $fraudReport->is_risky ? 'border-2 border-yellow-400 bg-yellow-50' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="font-semibold">Courier fraud report</h2>
+                @if($fraudReport && $fraudReport->is_risky)<span class="badge bg-yellow-200 text-yellow-900">⚠ High risk</span>@endif
+            </div>
+
+            @if(! $fraudConfigured)
+                <p class="text-sm text-ink-700/60">Add your courier portal logins in <a href="{{ route('admin.settings') }}" class="text-gold-700 underline">Settings → Fraud Checker</a> to enable fraud reports.</p>
+            @elseif(! $fraudReport)
+                <p class="text-sm text-ink-700/60">No fraud check run yet for {{ $order->customer_phone }}.</p>
+            @else
+                <div class="flex flex-wrap gap-1.5 text-[11px] mb-2">
+                    <span class="badge bg-green-100 text-green-700">{{ $fraudReport->total_success }} delivered</span>
+                    <span class="badge bg-red-100 text-red-700">{{ $fraudReport->total_cancel }} cancelled</span>
+                    <span class="badge bg-ink-100 text-ink-600">{{ $fraudReport->total_deliveries }} total</span>
+                </div>
+                @if($fraudReport->success_ratio !== null)
+                    <div class="mb-2">
+                        <div class="flex justify-between text-xs mb-1"><span>Success ratio</span><span class="font-semibold">{{ $fraudReport->success_ratio }}%</span></div>
+                        <div class="h-2 rounded-full bg-ink-100 overflow-hidden"><div class="h-full {{ $fraudReport->success_ratio >= 70 ? 'bg-green-500' : ($fraudReport->success_ratio >= 50 ? 'bg-amber-500' : 'bg-red-500') }}" style="width: {{ $fraudReport->success_ratio }}%"></div></div>
+                    </div>
+                @endif
+                <div class="grid grid-cols-3 gap-2 text-center text-[11px] mb-2">
+                    @foreach(['steadfast' => 'Steadfast', 'pathao' => 'Pathao', 'redx' => 'RedX'] as $key => $label)
+                        @php $c = $fraudReport->payload[$key] ?? null; @endphp
+                        <div class="rounded-lg border border-ink-100 p-2">
+                            <div class="font-medium">{{ $label }}</div>
+                            @if(is_array($c))
+                                <div class="text-green-700">{{ $c['success'] ?? 0 }} ✓</div>
+                                <div class="text-red-700">{{ $c['cancel'] ?? 0 }} ✗</div>
+                                <div class="text-ink-700/50">{{ $c['success_ratio'] ?? 0 }}%</div>
+                            @else
+                                <div class="text-ink-700/40 mt-1">—</div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-[11px] text-ink-700/40">Checked {{ $fraudReport->checked_at?->diffForHumans() }}.</p>
+            @endif
+
+            @if($fraudConfigured)
+                <form action="{{ route('admin.orders.fraud-check', $order) }}" method="POST" class="mt-3">
+                    @csrf
+                    <button class="btn-outline w-full text-sm">{{ $fraudReport ? '↻ Re-check fraud' : '🔍 Check fraud' }}</button>
+                </form>
+            @endif
+        </div>
+
         <!-- Custom SMS -->
         <div class="card p-5">
             <h2 class="font-semibold mb-3">Send SMS</h2>

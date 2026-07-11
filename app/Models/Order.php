@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends Model
 {
+    use SoftDeletes;
+
     public const STATUSES = [
         'pending' => 'Pending',
         'confirmed' => 'Confirmed',
@@ -25,11 +28,12 @@ class Order extends Model
         'subtotal', 'shipping_cost', 'discount', 'total',
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
-        'notes', 'admin_notes', 'source', 'woo_id',
+        'notes', 'admin_notes', 'source', 'woo_id', 'stock_restored',
     ];
 
     protected $casts = [
         'is_inside_dhaka' => 'boolean',
+        'stock_restored' => 'boolean',
         'subtotal' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'discount' => 'decimal:2',

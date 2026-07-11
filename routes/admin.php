@@ -61,11 +61,16 @@ Route::middleware('admin')->group(function () {
     Route::get('orders/labels', [OrderController::class, 'labels'])->name('orders.labels');
     Route::post('orders/bulk-steadfast', [OrderController::class, 'bulkSteadfast'])->name('orders.bulk-steadfast');
     Route::post('orders/merge', [OrderController::class, 'merge'])->name('orders.merge');
+    Route::post('orders/bulk-delete', [OrderController::class, 'bulkDelete'])->name('orders.bulk-delete');
+    Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
+    Route::post('orders/{order}/restore', [OrderController::class, 'restore'])->name('orders.restore')->withTrashed();
+    Route::delete('orders/{order}/force', [OrderController::class, 'forceDelete'])->name('orders.force-delete')->withTrashed();
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
     Route::post('orders/{order}/sms', [OrderController::class, 'sendSms'])->name('orders.sms');
+    Route::post('orders/{order}/fraud-check', [OrderController::class, 'checkFraud'])->name('orders.fraud-check');
 
     // Customers (CRM, analytics, SMS, import)
     Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
@@ -273,5 +278,6 @@ Route::middleware('admin')->group(function () {
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('settings/mail', [SettingController::class, 'updateMail'])->name('settings.mail');
+    Route::post('settings/fraud-checker', [SettingController::class, 'updateFraudChecker'])->name('settings.fraud-checker');
     Route::post('settings/mail/test', [SettingController::class, 'testMail'])->name('settings.mail.test');
 });
