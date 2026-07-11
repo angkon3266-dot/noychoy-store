@@ -101,11 +101,6 @@ class AppearanceController extends Controller
             'highlight_category_ids.*' => ['integer'],
             'category_scroller_ids' => ['nullable', 'array'],
             'category_scroller_ids.*' => ['integer'],
-            'home_videos' => ['nullable', 'array'],
-            'home_videos.*.title' => ['nullable', 'string', 'max:120'],
-            'home_videos.*.url' => ['nullable', 'string', 'max:255'],
-            'home_video_files' => ['nullable', 'array'],
-            'home_video_files.*' => ['nullable', 'file', 'mimetypes:video/mp4,video/webm', 'max:30720'],
             'hero_slides' => ['nullable', 'array'],
             'hero_slide_images' => ['nullable', 'array'],
             'hero_slide_images.*' => ['nullable', 'image', 'max:4096'],
@@ -204,7 +199,7 @@ class AppearanceController extends Controller
 
         // ---- Storefront homepage builder ----
         // Section toggles
-        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_videos'] as $t) {
+        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights'] as $t) {
             $home[$t] = $request->boolean('home_'.$t);
         }
 
@@ -224,21 +219,6 @@ class AppearanceController extends Controller
         if ($request->has('category_scroller_ids_present')) {
             $home['category_scroller_ids'] = collect($request->input('category_scroller_ids', []))
                 ->map(fn ($i) => (int) $i)->filter()->values()->all();
-        }
-
-        // Video sections (links + uploaded files)
-        if ($request->has('home_videos') || $request->hasFile('home_video_files')) {
-            $videos = collect($request->input('home_videos', []))
-                ->map(fn ($v) => ['title' => trim((string) ($v['title'] ?? '')), 'url' => trim((string) ($v['url'] ?? ''))])
-                ->filter(fn ($v) => $v['url'] !== '')->values();
-            if ($request->hasFile('home_video_files')) {
-                foreach ($request->file('home_video_files') as $file) {
-                    if ($file && $file->isValid()) {
-                        $videos->push(['title' => '', 'url' => $file->store('home-videos', 'public')]);
-                    }
-                }
-            }
-            $home['videos'] = $videos->values()->all();
         }
 
         // Hero slides: edit links / remove existing, then append new uploads

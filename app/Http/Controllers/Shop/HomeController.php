@@ -31,11 +31,6 @@ class HomeController extends Controller
         $highlightCategories = $highlightIds->isEmpty() ? collect() : Category::whereIn('id', $highlightIds)->get()
             ->sortBy(fn ($c) => $highlightIds->search($c->id))->values();
 
-        // Homepage video sections (YouTube / Vimeo / uploaded MP4).
-        $homeVideos = collect(home_content('videos') ?? [])
-            ->map(fn ($v) => ['title' => $v['title'] ?? '', 'meta' => video_meta($v['url'] ?? '')])
-            ->filter(fn ($v) => $v['meta'] !== null)->values();
-
         // Custom section blocks (page builder). Empty = fall back to fixed sections.
         $sections = $this->resolveSections(home_content('sections') ?? [], $with);
 
@@ -52,7 +47,7 @@ class HomeController extends Controller
         }
 
         return view($view, compact(
-            'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'homeVideos', 'sections'
+            'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'sections'
         ));
     }
 

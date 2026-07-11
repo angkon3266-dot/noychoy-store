@@ -120,24 +120,6 @@
 </section>
 @endif
 
-{{-- ── Video sections ────────────────────────────────────────────────── --}}
-@if(home_content('show_videos') && $homeVideos->isNotEmpty())
-<section class="mx-auto max-w-7xl px-4 pb-16 grid gap-6 md:grid-cols-2">
-    @foreach($homeVideos as $v)
-        <div>
-            @if($v['title'])<h3 class="text-sm font-semibold uppercase tracking-wide text-ink-700/70 mb-3">{{ $v['title'] }}</h3>@endif
-            <div class="aspect-video overflow-hidden rounded-xl bg-ink-900">
-                @if($v['meta']['type'] === 'file')
-                    <video src="{{ $v['meta']['src'] }}" controls preload="metadata" class="w-full h-full object-cover"></video>
-                @else
-                    <iframe src="{{ $v['meta']['embed'] }}" title="{{ $v['title'] }}" class="w-full h-full" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                @endif
-            </div>
-        </div>
-    @endforeach
-</section>
-@endif
-
 @endif {{-- end custom-sections fallback --}}
 
 {{-- ── Trust strip ───────────────────────────────────────────────────── --}}

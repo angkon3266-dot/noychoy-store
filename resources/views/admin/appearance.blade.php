@@ -257,7 +257,7 @@
 
         {{-- Toggles --}}
         <div class="grid sm:grid-cols-3 gap-2 mb-6 text-sm">
-            @foreach(['show_feature_strip'=>'Feature strip','show_categories'=>'Category scroller','show_best_selling'=>'Best selling','show_new_arrivals'=>'New arrivals','show_highlights'=>'Highlighted categories','show_videos'=>'Video sections'] as $k => $lbl)
+            @foreach(['show_feature_strip'=>'Feature strip','show_categories'=>'Category scroller','show_best_selling'=>'Best selling','show_new_arrivals'=>'New arrivals','show_highlights'=>'Highlighted categories'] as $k => $lbl)
                 <label class="flex items-center gap-2"><input type="checkbox" name="home_{{ $k }}" value="1" @checked($home[$k] ?? true)> {{ $lbl }}</label>
             @endforeach
         </div>
@@ -331,19 +331,6 @@
             'allCategories' => $allCategories,
         ])
 
-        {{-- Video sections --}}
-        <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Video sections</h3>
-        <div x-data="{ vids: @js(array_values($home['videos'] ?? [])) }">
-            <template x-for="(v, i) in vids" :key="i">
-                <div class="flex gap-2 mb-2">
-                    <input :name="`home_videos[${i}][title]`" x-model="v.title" class="input w-48" placeholder="Title (optional)">
-                    <input :name="`home_videos[${i}][url]`" x-model="v.url" class="input flex-1" placeholder="YouTube link or stored path">
-                    <button type="button" @click="vids.splice(i,1)" class="text-red-500 px-2 text-xl leading-none">&times;</button>
-                </div>
-            </template>
-            <button type="button" @click="vids.push({title:'',url:''})" class="btn-outline text-sm">+ Add video link</button>
-        </div>
-        <div class="mt-3"><label class="label text-xs">Or upload MP4/WebM (max 30 MB each)</label><input type="file" name="home_video_files[]" multiple accept="video/mp4,video/webm" class="input text-sm"></div>
     </div>
 
     <!-- Section builder -->
