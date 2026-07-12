@@ -66,6 +66,14 @@
 
         @if(session('success'))<div class="m-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm">{{ session('success') }}</div>@endif
         @if(session('error'))<div class="m-4 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">{{ session('error') }}</div>@endif
+        @if(session('import_errors') && count(session('import_errors')))
+            <div class="m-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm">
+                <p class="font-medium mb-1">Some rows were skipped:</p>
+                <ul class="list-disc pl-5 space-y-0.5">
+                    @foreach(session('import_errors') as $importError)<li>{{ $importError }}</li>@endforeach
+                </ul>
+            </div>
+        @endif
 
         <main class="p-4 sm:p-6">@yield('content')</main>
     </div>

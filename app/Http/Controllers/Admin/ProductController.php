@@ -9,6 +9,7 @@ use App\Models\ProductImage;
 use App\Services\ImageOptimizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
@@ -65,6 +66,10 @@ class ProductController extends Controller
     {
         $request->validate(['file' => ['required', 'file', 'extensions:csv,txt', 'max:5120']]);
 
+        // Bulk imports can be large; don't let a slow shared host abort the request.
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         if (! $handle) {
             return back()->with('error', 'Could not read the file.');
@@ -82,6 +87,7 @@ class ProductController extends Controller
         $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
         $created = 0;
         $skipped = 0;
+        $errors = [];   // human-readable reasons, capped so the flash stays small
         $row = 1;
 
         while (($line = fgetcsv($handle)) !== false) {
@@ -89,59 +95,83 @@ class ProductController extends Controller
 
             // Skip fully blank lines and normalise the row to exactly the header
             // width (CSV rows with extra/missing commas would otherwise crash
-            // array_combine with a count mismatch → 500).
+            // array_combine with a count mismatch).
             if ($line === [null] || $line === [false]) {
                 continue;
             }
             $line = array_slice(array_pad($line, $colCount, null), 0, $colCount);
 
+            // Isolate every row: a bad row (duplicate SKU, over-long field, bad
+            // encoding, …) is counted and skipped instead of aborting the whole
+            // import with a 500. No wrapping transaction, so good rows persist.
             try {
                 $data = array_combine($cols, $line);
+
+                $name = trim((string) ($data['name'] ?? ''));
+                if ($name === '') {
+                    $skipped++;
+                    continue;
+                }
+
+                $categoryId = null;
+                if (! empty($data['category'])) {
+                    $key = strtolower(trim($data['category']));
+                    $categoryId = $categories->get($key)?->id;
+                    if (! $categoryId) {
+                        $cat = Category::create(['name' => trim($data['category']), 'is_active' => true]);
+                        $categories->put($key, $cat);
+                        $categoryId = $cat->id;
+                    }
+                }
+
+                $product = Product::create([
+                    'name' => $name,
+                    'sku' => $data['sku'] ?? null,
+                    'category_id' => $categoryId,
+                    'short_description' => $data['short_description'] ?? null,
+                    'description' => $data['description'] ?? null,
+                    'meta_description' => $data['meta_description'] ?? null,
+                    'price' => is_numeric($data['price'] ?? null) ? (float) $data['price'] : 0,
+                    'manage_stock' => isset($data['stock']) && $data['stock'] !== '',
+                    'stock_quantity' => (int) ($data['stock'] ?? 0),
+                    'in_stock' => true,
+                    'status' => in_array(strtolower($data['status'] ?? 'published'), ['draft', 'published']) ? strtolower($data['status'] ?? 'published') : 'published',
+                    'tags' => $data['tags'] ?? null,
+                ]);
+                if ($categoryId) {
+                    $product->categories()->sync([$categoryId]);
+                }
+                $created++;
             } catch (\Throwable $e) {
                 $skipped++;
-                continue;
-            }
-
-            $name = trim((string) ($data['name'] ?? ''));
-            if ($name === '') {
-                $skipped++;
-                continue;
-            }
-
-            $categoryId = null;
-            if (! empty($data['category'])) {
-                $key = strtolower(trim($data['category']));
-                $categoryId = $categories->get($key)?->id;
-                if (! $categoryId) {
-                    $cat = Category::create(['name' => trim($data['category']), 'is_active' => true]);
-                    $categories->put($key, $cat);
-                    $categoryId = $cat->id;
+                if (count($errors) < 20) {
+                    $errors[] = "Row {$row}: ".Str::limit($this->cleanImportError($e->getMessage()), 140);
                 }
             }
-
-            $product = Product::create([
-                'name' => $name,
-                'sku' => $data['sku'] ?? null,
-                'category_id' => $categoryId,
-                'short_description' => $data['short_description'] ?? null,
-                'description' => $data['description'] ?? null,
-                'meta_description' => $data['meta_description'] ?? null,
-                'price' => is_numeric($data['price'] ?? null) ? (float) $data['price'] : 0,
-                'manage_stock' => isset($data['stock']) && $data['stock'] !== '',
-                'stock_quantity' => (int) ($data['stock'] ?? 0),
-                'in_stock' => true,
-                'status' => in_array(strtolower($data['status'] ?? 'published'), ['draft', 'published']) ? strtolower($data['status'] ?? 'published') : 'published',
-                'tags' => $data['tags'] ?? null,
-            ]);
-            if ($categoryId) {
-                $product->categories()->sync([$categoryId]);
-            }
-            $created++;
         }
         fclose($handle);
 
+        $message = "Imported {$created} product(s)".($skipped ? ", skipped {$skipped} row(s)." : '.');
+
         return redirect()->route('admin.products.index')
-            ->with('success', "Imported {$created} product(s)".($skipped ? ", skipped {$skipped} row(s) with no name." : '.'));
+            ->with('success', $message)
+            ->with('import_errors', $errors);
+    }
+
+    /** Turn a raw DB/exception message into something an admin can act on. */
+    protected function cleanImportError(string $message): string
+    {
+        if (Str::contains($message, ['Duplicate entry', '1062'])) {
+            return 'Duplicate value (e.g. a SKU that already exists).';
+        }
+        if (Str::contains($message, ['Data too long', '1406'])) {
+            return 'A value is too long for its column.';
+        }
+        if (Str::contains($message, ['Incorrect string value', '1366'])) {
+            return 'Invalid characters (save the CSV as UTF-8).';
+        }
+
+        return $message;
     }
 
     public function create()
