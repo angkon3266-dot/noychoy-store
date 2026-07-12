@@ -11,6 +11,20 @@
     <div class="card p-4"><div class="text-xs text-ink-700/50">Total size (filtered)</div><div class="text-2xl font-semibold">{{ $totalSize >= 1048576 ? round($totalSize/1048576,1).' MB' : round($totalSize/1024).' KB' }}</div></div>
 </div>
 
+@if($convertibleAll > 0)
+    <div class="card p-4 mb-4 flex flex-wrap items-center gap-3 border-gold-200">
+        <div class="text-sm">
+            <span class="font-medium">{{ number_format($convertibleAll) }}</span> JPG/PNG file(s) in the library can be converted to <strong>WebP</strong> for smaller, faster-loading images.
+            <span class="text-ink-700/50">Originals are replaced and every product/page using them is repointed automatically.</span>
+        </div>
+        <form action="{{ route('admin.media.convert') }}" method="POST" class="ml-auto" onsubmit="return confirm('Convert all {{ $convertibleAll }} JPG/PNG file(s) in the library to WebP? This replaces the originals and repoints all products and pages. This can take a moment for large libraries.')">
+            @csrf
+            <input type="hidden" name="all" value="1">
+            <button class="btn-primary text-sm py-2">Convert all to WebP</button>
+        </form>
+    </div>
+@endif
+
 {{-- Filters --}}
 <form method="GET" class="flex flex-wrap items-center gap-2 mb-4">
     <input name="q" value="{{ $q }}" placeholder="Search by product name or filename…" class="input py-2 w-64">
@@ -56,6 +70,11 @@
                     <input type="hidden" name="max_width" :value="maxw">
                     <input type="hidden" name="quality" :value="quality">
                     <button class="btn-primary text-sm py-2" :disabled="!sel.length">Reduce size</button>
+                </form>
+                <form action="{{ route('admin.media.convert') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Convert ' + sel.length + ' selected file(s) to WebP? Originals (JPG/PNG) are replaced and products/pages using them are repointed automatically. Already-WebP, SVG and video files are skipped.')">
+                    @csrf
+                    <template x-for="p in sel" :key="p"><input type="hidden" name="paths[]" :value="p"></template>
+                    <button class="btn-outline text-sm py-2" :disabled="!sel.length">Convert to WebP</button>
                 </form>
                 <form action="{{ route('admin.media.destroy') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Delete ' + sel.length + ' file(s)? Files used by products will be removed from those galleries.')">
                     @csrf @method('DELETE')

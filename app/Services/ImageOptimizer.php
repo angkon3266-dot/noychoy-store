@@ -147,6 +147,60 @@ class ImageOptimizer
         }
     }
 
+    /**
+     * Transcode an existing JPG/PNG on the public disk to a new WebP file
+     * (same folder + basename, .webp extension). Does NOT delete the original or
+     * update any references — the caller repoints DB rows then deletes the source.
+     *
+     * @return array{old_path:string,new_path:string,old_size:int,new_size:int}|null
+     */
+    public function convertToWebp(string $relativePath, int $maxWidth = 1600, int $quality = 82): ?array
+    {
+        $disk = Storage::disk('public');
+        $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        if (! $disk->exists($relativePath) || ! $this->canConvert() || ! in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+            return null;
+        }
+
+        try {
+            $binary = $disk->get($relativePath);
+            $oldSize = strlen((string) $binary);
+
+            $src = @imagecreatefromstring($binary);
+            if ($src === false) {
+                return null;
+            }
+            $src = $this->prepare($src, $maxWidth);
+
+            ob_start();
+            imagewebp($src, null, $quality);
+            $out = ob_get_clean();
+            imagedestroy($src);
+
+            // Target: same directory + filename, .webp extension (de-duplicated).
+            $dir = trim((string) pathinfo($relativePath, PATHINFO_DIRNAME), '.');
+            $name = pathinfo($relativePath, PATHINFO_FILENAME);
+            $newPath = ($dir !== '' ? $dir.'/' : '').$name.'.webp';
+            if ($newPath !== $relativePath && $disk->exists($newPath)) {
+                $newPath = ($dir !== '' ? $dir.'/' : '').$name.'-'.Str::lower(Str::random(6)).'.webp';
+            }
+
+            $disk->put($newPath, $out);
+
+            return [
+                'old_path' => $relativePath,
+                'new_path' => $newPath,
+                'old_size' => $oldSize,
+                'new_size' => strlen((string) $out),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('convertToWebp failed', ['path' => $relativePath, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
     protected function canConvert(): bool
     {
         return function_exists('imagewebp') && function_exists('imagecreatefromstring');

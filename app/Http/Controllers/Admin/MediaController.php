@@ -65,6 +65,12 @@ class MediaController extends Controller
             ->map(fn ($p) => str_contains($p, '/') ? explode('/', $p)[0] : '(root)')
             ->unique()->sort()->values();
 
+        // How many JPG/PNG files across the whole library could still become WebP.
+        $convertibleAll = collect($disk->allFiles())
+            ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+            ->filter(fn ($p) => in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true))
+            ->count();
+
         return view('admin.media.index', [
             'items' => $items,
             'folders' => $folders,
@@ -74,6 +80,7 @@ class MediaController extends Controller
             'view' => $view,
             'totalSize' => $items->sum('size'),
             'count' => $items->count(),
+            'convertibleAll' => $convertibleAll,
         ]);
     }
 
@@ -165,6 +172,78 @@ class MediaController extends Controller
         }
 
         return back()->with('success', "Optimized {$done} file(s) — saved ".$this->human($saved).'.');
+    }
+
+    /**
+     * Convert JPG/PNG files to WebP, repoint every reference to the new path, and
+     * delete the originals. `all=1` sweeps the entire library; otherwise the
+     * posted `paths[]` are converted.
+     */
+    public function convert(Request $request, ImageOptimizer $optimizer)
+    {
+        if ($request->boolean('all')) {
+            $paths = collect(Storage::disk('public')->allFiles())
+                ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+                ->filter(fn ($p) => in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true))
+                ->values()->all();
+        } else {
+            $paths = $request->validate([
+                'paths' => ['required', 'array', 'min:1'],
+                'paths.*' => ['string'],
+            ])['paths'];
+        }
+
+        $done = 0;
+        $skipped = 0;
+        $saved = 0;
+        foreach ($paths as $path) {
+            if (! $this->safePath($path) || ! in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true)) {
+                $skipped++;
+
+                continue;
+            }
+            $res = $optimizer->convertToWebp($path, 1600, 82);
+            if (! $res) {
+                $skipped++;
+
+                continue;
+            }
+            $this->repointReferences($res['old_path'], $res['new_path']);
+            Storage::disk('public')->delete($res['old_path']);
+            $done++;
+            $saved += max(0, $res['old_size'] - $res['new_size']);
+        }
+
+        if ($done === 0) {
+            return back()->with('error', 'Nothing converted — only JPG/PNG files can be converted, and PHP must have WebP (GD) support.');
+        }
+
+        return back()->with('success', "Converted {$done} file(s) to WebP — saved ".$this->human($saved).($skipped ? " ({$skipped} skipped)" : '').'.');
+    }
+
+    /**
+     * Point everything that referenced the old image path at the new WebP path:
+     * product galleries, category images, and settings (hero/banner/branding/home
+     * content store either the relative path or its /storage URL).
+     */
+    protected function repointReferences(string $old, string $new): void
+    {
+        ProductImage::where('path', $old)->update(['path' => $new]);
+        \App\Models\Category::where('image', $old)->update(['image' => $new]);
+
+        $touched = false;
+        foreach (\App\Models\Setting::all() as $setting) {
+            $json = json_encode($setting->value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if ($json === false || ! str_contains($json, $old)) {
+                continue;
+            }
+            $setting->value = json_decode(str_replace($old, $new, $json), true);
+            $setting->save();
+            $touched = true;
+        }
+        if ($touched) {
+            \Illuminate\Support\Facades\Cache::forget('settings.all');
+        }
     }
 
     /** Delete one or many files. */

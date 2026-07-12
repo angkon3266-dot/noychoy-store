@@ -98,6 +98,7 @@ Route::middleware('admin')->group(function () {
     Route::get('media/picker', [\App\Http\Controllers\Admin\MediaController::class, 'picker'])->name('media.picker');
     Route::post('media/upload', [\App\Http\Controllers\Admin\MediaController::class, 'upload'])->name('media.upload');
     Route::post('media/optimize', [\App\Http\Controllers\Admin\MediaController::class, 'optimize'])->name('media.optimize');
+    Route::post('media/convert', [\App\Http\Controllers\Admin\MediaController::class, 'convert'])->name('media.convert');
     Route::delete('media', [\App\Http\Controllers\Admin\MediaController::class, 'destroy'])->name('media.destroy');
 
     // Suppliers & purchase orders (sourcing / procurement)

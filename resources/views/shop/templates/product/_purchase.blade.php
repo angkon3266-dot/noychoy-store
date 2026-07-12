@@ -56,7 +56,9 @@
 
     {{-- Active offers (auto-applied at checkout) --}}
     @php
-        $pdpOffers = \App\Models\Offer::active()->where('show_on_pdp', true)->get();
+        $pdpOffers = \App\Models\Offer::active()->where('show_on_pdp', true)->get()
+            ->filter(fn ($o) => $o->appliesToProduct($product))
+            ->values();
     @endphp
     @if($pdpOffers->isNotEmpty())
         <div class="mt-5 rounded-xl border border-green-200 bg-green-50/70 p-4">

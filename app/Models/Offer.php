@@ -42,6 +42,30 @@ class Offer extends Model
         return $q->where('is_active', true)->orderBy('sort');
     }
 
+    /**
+     * Should this offer be shown on the given product's page? Respects the
+     * offer's scope so category/product-specific offers don't leak onto every
+     * product. Checks the product's primary category AND any pivot categories.
+     */
+    public function appliesToProduct(Product $product): bool
+    {
+        if ($this->applies_to === 'products') {
+            return in_array((int) $product->id, array_map('intval', $this->product_ids ?? []), true);
+        }
+
+        if ($this->applies_to === 'categories') {
+            $wanted = array_map('intval', $this->category_ids ?? []);
+            $productCats = $product->relationLoaded('categories')
+                ? $product->categories->pluck('id')->map(fn ($i) => (int) $i)->all()
+                : $product->categories()->pluck('categories.id')->map(fn ($i) => (int) $i)->all();
+            $productCats[] = (int) $product->category_id;
+
+            return (bool) array_intersect($wanted, array_filter($productCats));
+        }
+
+        return true; // 'all' — whole-order offer, show everywhere
+    }
+
     /** Does a single cart line fall within this offer's scope? */
     public function lineEligible(array $item): bool
     {
