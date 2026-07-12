@@ -9,7 +9,15 @@
      class="fixed inset-0 z-[70] flex items-center justify-center p-4" style="display:none">
     <div class="absolute inset-0 bg-black/50" @click="$store.mediaLib.close()"></div>
 
-    <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+    <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+         @dragover.prevent="$store.mediaLib.dragOver = true" @dragenter.prevent="$store.mediaLib.dragOver = true"
+         @dragleave.prevent="$store.mediaLib.dragOver = false"
+         @drop.prevent="$store.mediaLib.tab='device'; $store.mediaLib.uploadFiles($event.dataTransfer.files)">
+        {{-- Drag-and-drop overlay --}}
+        <div x-show="$store.mediaLib.dragOver" x-cloak
+             class="absolute inset-0 z-20 rounded-xl border-2 border-dashed border-gold-500 bg-gold-50/90 grid place-items-center pointer-events-none">
+            <span class="text-gold-800 font-medium">Drop image(s) to upload</span>
+        </div>
         <div class="flex items-center justify-between px-5 py-3 border-b border-ink-100">
             <h3 class="font-semibold">Select media</h3>
             <button type="button" @click="$store.mediaLib.close()" class="text-ink-700/50 hover:text-ink-900 text-xl leading-none">&times;</button>

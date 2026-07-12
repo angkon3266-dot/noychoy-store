@@ -446,8 +446,21 @@
                     </div>
                     <div id="imgOrderInputs"></div>
                 @endif
-                <input type="file" name="images[]" multiple accept="image/*" class="input text-sm">
-                <p class="text-xs text-ink-700/50 mt-2">Upload JPG/PNG/WebP from your device. First uploaded becomes primary if none set.</p>
+                <div x-data="fileDrop()"
+                     @dragover.prevent="over = true" @dragenter.prevent="over = true"
+                     @dragleave.prevent="over = false" @drop.prevent="drop($event)"
+                     :class="over ? 'border-gold-400 bg-gold-50/50' : 'border-ink-200'"
+                     class="rounded-lg border-2 border-dashed p-3 transition">
+                    <input type="file" name="images[]" multiple accept="image/*" class="input text-sm" x-ref="input" @change="sync()">
+                    <p class="text-xs text-ink-700/50 mt-2">Upload JPG/PNG/WebP from your device, or <strong>drag &amp; drop images here</strong>. First uploaded becomes primary if none set.</p>
+                    <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3" x-show="previews.length" x-cloak>
+                        <template x-for="(p, i) in previews" :key="i">
+                            <div class="relative aspect-square rounded-lg overflow-hidden border border-ink-100 bg-ink-50">
+                                <img :src="p.url" class="w-full h-full object-cover" alt="">
+                            </div>
+                        </template>
+                    </div>
+                </div>
 
                 {{-- …or pick existing images from the media library. --}}
                 <div class="mt-3" x-data="{ picks: [] }">
@@ -476,8 +489,19 @@
                     <button type="button" @click="vids.push('')" class="btn-outline text-sm">+ Add video link</button>
                     <div class="mt-3">
                         <label class="label text-xs">Or upload MP4 / WebM / MOV</label>
-                        <input type="file" name="video_files[]" multiple accept="video/mp4,video/webm,video/quicktime,video/x-m4v" class="input text-sm">
-                        <p class="text-xs text-ink-700/50 mt-1">Max upload on this server: <strong>{{ upload_limit_mb() }} MB</strong> per file. Bigger videos are dropped before upload — compress them first (or paste a YouTube link instead).</p>
+                        <div x-data="fileDrop()"
+                             @dragover.prevent="over = true" @dragenter.prevent="over = true"
+                             @dragleave.prevent="over = false" @drop.prevent="drop($event)"
+                             :class="over ? 'border-gold-400 bg-gold-50/50' : 'border-ink-200'"
+                             class="rounded-lg border-2 border-dashed p-3 transition">
+                            <input type="file" name="video_files[]" multiple accept="video/mp4,video/webm,video/quicktime,video/x-m4v" class="input text-sm" x-ref="input" @change="sync()">
+                            <p class="text-xs text-ink-700/50 mt-1">Drag &amp; drop videos here, or click to choose. Max upload on this server: <strong>{{ upload_limit_mb() }} MB</strong> per file. Bigger videos are dropped before upload — compress them first (or paste a YouTube link instead).</p>
+                            <div class="flex flex-wrap gap-2 mt-2" x-show="previews.length" x-cloak>
+                                <template x-for="(p, i) in previews" :key="i">
+                                    <span class="inline-flex items-center gap-1 text-xs bg-ink-100 rounded px-2 py-1">🎬 <span class="truncate max-w-[160px]" x-text="p.name"></span></span>
+                                </template>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

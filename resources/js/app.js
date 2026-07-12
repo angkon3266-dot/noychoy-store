@@ -7,6 +7,22 @@ import collapse from '@alpinejs/collapse';
 window.Alpine = Alpine;
 Alpine.plugin(collapse);
 
+// Does a dropped File satisfy an input's `accept` attribute? Supports
+// "image/*", "video/mp4,video/webm", ".png,.mp4" and empty (= accept all).
+function fileMatchesAccept(file, accept) {
+    if (!accept) return true;
+    const type = (file.type || '').toLowerCase();
+    const name = (file.name || '').toLowerCase();
+    return accept.split(',').map((s) => s.trim().toLowerCase()).some((a) => {
+        if (!a) return false;
+        if (a === '*/*') return true;
+        if (a.endsWith('/*')) return type.startsWith(a.slice(0, -1)); // "image/*" → "image/"
+        if (a.startsWith('.')) return name.endsWith(a);
+        return type === a;
+    });
+}
+window.fileMatchesAccept = fileMatchesAccept;
+
 // Shared Alpine component for product pages: gallery, variant selection,
 // quantity, and Meta Pixel AddToCart firing. Used by every product template.
 // Prevent double-submits: disable the submit button once a form starts submitting
@@ -315,6 +331,7 @@ document.addEventListener('alpine:init', () => {
         browseFolder: '',      // library filter ('' = show ALL folders)
         multi: false,          // multi-select mode (add several at once)
         selected: [],          // chosen urls while in multi mode
+        dragOver: false,       // a file is being dragged over the modal
         _cb: null,
         openWith(cb, folder, opts) {
             this._cb = cb;
@@ -355,10 +372,21 @@ document.addEventListener('alpine:init', () => {
             this.loading = false;
         },
         choose(url) { if (this._cb) this._cb(url); this.close(); },
-        async uploadDevice(e) {
-            const files = Array.from(e.target.files || []);
+        // File picker <input> change handler — delegates to uploadFiles().
+        uploadDevice(e) {
+            const files = e.target.files;
+            e.target.value = '';
+            return this.uploadFiles(files);
+        },
+        // Upload one or more image files (from the picker OR a drag-and-drop),
+        // add them to the library, then select/return them like a device upload.
+        async uploadFiles(fileList) {
+            let files = Array.from(fileList || []).filter((f) => (f.type || '').startsWith('image/'));
+            if (!this.multi) files = files.slice(0, 1);   // single-pick: first image only
             if (!files.length || !window.MEDIA) return;
+
             this.uploading = true;
+            this.dragOver = false;
             const urls = [];
             for (const file of files) {
                 const fd = new FormData();
@@ -372,7 +400,6 @@ document.addEventListener('alpine:init', () => {
                 } catch (_) { /* keep going with the rest */ }
             }
             this.uploading = false;
-            e.target.value = '';
 
             if (!urls.length) { alert('Upload failed.'); return; }
 
@@ -415,12 +442,62 @@ document.addEventListener('alpine:init', () => {
             this._localPreview = URL.createObjectURL(file);
             this.cleared = false;
         },
+        // Drag-and-drop an image straight onto the field.
+        over: false,
+        onDrop(e) {
+            this.over = false;
+            const file = Array.from(e.dataTransfer?.files || []).find((f) => (f.type || '').startsWith('image/'));
+            if (!file) return;
+            const dt = new DataTransfer();          // route it through the file input so it submits
+            dt.items.add(file);
+            this.$refs.file.files = dt.files;
+            this.value = '';
+            this.deviceName = file.name;
+            this._localPreview = URL.createObjectURL(file);
+            this.cleared = false;
+        },
         clear() {
             this.value = '';
             this.deviceName = '';
             this._localPreview = '';
             this.cleared = true;
             this.$refs.file.value = '';
+        },
+    }));
+
+    // Reusable drag-and-drop for a native <input type="file" x-ref="input">.
+    // Dropped files that match the input's `accept` are assigned to the input
+    // (merged for multiple, replaced for single) and a change event fires, so
+    // they upload with the form exactly like a normal file-picker selection.
+    // Shows instant thumbnails for pending files.
+    window.Alpine.data('fileDrop', () => ({
+        over: false,
+        previews: [],
+        init() { this.sync(); },
+        sync() {
+            const input = this.$refs.input;
+            this.previews = Array.from(input?.files || []).map((f) => ({
+                name: f.name,
+                isImage: (f.type || '').startsWith('image/'),
+                url: (f.type || '').startsWith('image/') ? URL.createObjectURL(f) : '',
+            }));
+        },
+        drop(e) {
+            this.over = false;
+            const input = this.$refs.input;
+            const dropped = Array.from(e.dataTransfer?.files || []).filter((f) => fileMatchesAccept(f, input?.accept));
+            if (!input || !dropped.length) return;
+
+            const dt = new DataTransfer();
+            if (input.multiple) {
+                Array.from(input.files || []).forEach((f) => dt.items.add(f));   // keep existing selection
+                dropped.forEach((f) => dt.items.add(f));
+            } else {
+                dt.items.add(dropped[0]);
+            }
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            this.sync();
         },
     }));
 

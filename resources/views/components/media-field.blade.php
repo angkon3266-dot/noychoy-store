@@ -13,10 +13,13 @@
 --}}
 <div x-data="mediaField(@js($value), @js($folder))" class="space-y-1">
     @if($label)<label class="label">{{ $label }}</label>@endif
-    <div class="flex items-start gap-3">
-        <div class="w-24 h-24 rounded-lg border border-ink-100 bg-ink-50 overflow-hidden shrink-0 grid place-items-center">
-            <template x-if="preview"><img :src="preview" class="w-full h-full object-cover" alt=""></template>
-            <template x-if="!preview"><span class="text-[11px] text-ink-700/40">No image</span></template>
+    <div class="flex items-start gap-3"
+         @dragover.prevent="over = true" @dragenter.prevent="over = true"
+         @dragleave.prevent="over = false" @drop.prevent="onDrop($event)">
+        <div class="w-24 h-24 rounded-lg border-2 border-dashed overflow-hidden shrink-0 grid place-items-center transition"
+             :class="over ? 'border-gold-400 bg-gold-50/60' : 'border-ink-100 bg-ink-50'">
+            <template x-if="preview"><img :src="preview" class="w-full h-full object-cover pointer-events-none" alt=""></template>
+            <template x-if="!preview"><span class="text-[11px] text-center text-ink-700/40 px-1" x-text="over ? 'Drop image' : 'No image'"></span></template>
         </div>
         <div class="min-w-0 space-y-2">
             <div class="flex flex-wrap gap-2">
