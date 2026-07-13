@@ -86,16 +86,19 @@
 </section>
 @endif
 
-{{-- ── Editorial brand band ──────────────────────────────────────────── --}}
+{{-- ── Editorial brand band ("Our promise") ──────────────────────────── --}}
+@if(home_content('show_promise'))
+@php($promiseImg = theme_asset(home_content('promise_image')))
 <section class="mx-auto max-w-7xl px-4 py-16 lg:py-24">
     <div class="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
         <div class="relative aspect-[5/4] rounded-2xl overflow-hidden bg-gold-100">
-            @if($newArrivals->first()?->thumbnail)<img src="{{ $newArrivals->first()->thumbnail }}" alt="" class="w-full h-full object-cover">@endif
+            @if($promiseImg)<img src="{{ $promiseImg }}" alt="" class="w-full h-full object-cover">
+            @elseif($newArrivals->first()?->thumbnail)<img src="{{ $newArrivals->first()->thumbnail }}" alt="" class="w-full h-full object-cover">@endif
         </div>
         <div class="max-w-md">
-            <p class="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-3">Our promise</p>
-            <h2 class="font-display text-3xl sm:text-4xl text-ink-900 leading-tight">Crafted to be treasured</h2>
-            <p class="mt-5 text-ink-700/70 leading-relaxed">{{ home_content('hero_subtitle') ?: 'Every piece is quality-checked and finished by hand. Pay on delivery, return with ease, and wear with confidence.' }}</p>
+            <p class="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-3">{{ home_content('promise_eyebrow') ?: 'Our promise' }}</p>
+            <h2 class="font-display text-3xl sm:text-4xl text-ink-900 leading-tight">{{ home_content('promise_title') ?: 'Crafted to be treasured' }}</h2>
+            <p class="mt-5 text-ink-700/70 leading-relaxed">{{ home_content('promise_text') ?: (home_content('hero_subtitle') ?: 'Every piece is quality-checked and finished by hand. Pay on delivery, return with ease, and wear with confidence.') }}</p>
             <div class="mt-8 grid grid-cols-3 gap-4 text-center">
                 <div><div class="font-display text-lg text-gold-700">{{ home_content('badge1_title') ?: 'COD' }}</div><p class="text-xs text-ink-700/60 mt-1">{{ home_content('badge1_text') ?: 'Pay on delivery' }}</p></div>
                 <div><div class="font-display text-lg text-gold-700">{{ home_content('badge2_title') ?: 'Fast' }}</div><p class="text-xs text-ink-700/60 mt-1">{{ home_content('badge2_text') ?: 'Nationwide' }}</p></div>
@@ -104,6 +107,7 @@
         </div>
     </div>
 </section>
+@endif
 
 {{-- ── New arrivals ──────────────────────────────────────────────────── --}}
 @if(home_content('show_new_arrivals') && $newArrivals->isNotEmpty())

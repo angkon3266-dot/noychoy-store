@@ -92,6 +92,7 @@ class AppearanceController extends Controller
             'home' => ['nullable', 'array'],
             'home.*' => ['nullable', 'string', 'max:500'],
             'hero_image' => ['nullable', 'image', 'max:4096'],
+            'promise_image' => ['nullable', 'image', 'max:4096'],
 
             // Storefront homepage builder
             'feature_strip' => ['nullable', 'array'],
@@ -199,9 +200,29 @@ class AppearanceController extends Controller
             $home['hero_image'] = null;
         }
 
+        // "Our promise" band image (same upload/library/clear flow as the hero).
+        $promisePick = trim((string) $request->input('promise_image_url', ''));
+        if ($request->hasFile('promise_image')) {
+            if (! empty($home['promise_image']) && ! str_starts_with($home['promise_image'], 'http')) {
+                Storage::disk('public')->delete($home['promise_image']);
+            }
+            $home['promise_image'] = $optimizer->storeWebp($request->file('promise_image'), 'branding', 1400, 85);
+        } elseif ($promisePick !== '') {
+            $path = public_url_to_path($promisePick) ?: $optimizer->storeWebpFromUrl($promisePick, 'branding', 1400, 85);
+            if (! empty($home['promise_image']) && $home['promise_image'] !== $path && ! str_starts_with($home['promise_image'], 'http')) {
+                Storage::disk('public')->delete($home['promise_image']);
+            }
+            $home['promise_image'] = $path;
+        } elseif ($request->boolean('promise_image_cleared') && ! empty($home['promise_image'])) {
+            if (! str_starts_with($home['promise_image'], 'http')) {
+                Storage::disk('public')->delete($home['promise_image']);
+            }
+            $home['promise_image'] = null;
+        }
+
         // ---- Storefront homepage builder ----
         // Section toggles
-        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights'] as $t) {
+        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise'] as $t) {
             $home[$t] = $request->boolean('home_'.$t);
         }
 

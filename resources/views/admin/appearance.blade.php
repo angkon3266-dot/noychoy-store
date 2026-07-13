@@ -248,6 +248,21 @@
                 </div>
             @endfor
         </div>
+
+        {{-- "Our promise" editorial brand band (Couture template) --}}
+        <div class="mt-6 border-t border-ink-100 pt-5">
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_promise" value="1" @checked($home['show_promise'] ?? true)> Show the “Our promise” brand band</label>
+            <p class="text-xs text-ink-700/50 mb-3">The image + text band on the Couture homepage. Leave the image empty to auto-use your newest product photo.</p>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="label">Eyebrow (small text)</label><input name="home[promise_eyebrow]" value="{{ $home['promise_eyebrow'] ?? '' }}" class="input" placeholder="Our promise"></div>
+                <div><label class="label">Heading</label><input name="home[promise_title]" value="{{ $home['promise_title'] ?? '' }}" class="input" placeholder="Crafted to be treasured"></div>
+                <div class="sm:col-span-2"><label class="label">Text</label><textarea name="home[promise_text]" rows="2" class="input" placeholder="(defaults to the hero subtitle)">{{ $home['promise_text'] ?? '' }}</textarea></div>
+            </div>
+            <div class="mt-4">
+                <x-media-field name="promise_image" :value="theme_asset($home['promise_image'] ?? null) ?: ''" folder="branding"
+                    label="Band image" help="Square-ish image (e.g. 1000×800) works best. Leave empty to use your newest product photo." />
+            </div>
+        </div>
     </div>
 
     <!-- Homepage sections (Storefront template) -->

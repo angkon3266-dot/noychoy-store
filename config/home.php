@@ -46,6 +46,13 @@ return [
         // Homepage video sections — list of { title, url }. url = YouTube link or uploaded MP4 path.
         'videos' => [],
 
+        // "Our promise" editorial brand band (Couture template)
+        'show_promise' => true,
+        'promise_eyebrow' => 'Our promise',
+        'promise_title' => 'Crafted to be treasured',
+        'promise_text' => null,                 // falls back to hero_subtitle
+        'promise_image' => null,                // falls back to the newest product photo
+
         // Trust badges (bottom strip)
         'badge1_title' => 'Cash on Delivery',
         'badge1_text' => 'Pay when you receive',
