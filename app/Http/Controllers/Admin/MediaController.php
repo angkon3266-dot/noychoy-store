@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProductImage;
+use App\Models\Setting;
 use App\Services\ImageOptimizer;
+use App\Services\WatermarkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -71,6 +73,8 @@ class MediaController extends Controller
             ->filter(fn ($p) => in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true))
             ->count();
 
+        $watermark = app(WatermarkService::class);
+
         return view('admin.media.index', [
             'items' => $items,
             'folders' => $folders,
@@ -81,6 +85,8 @@ class MediaController extends Controller
             'totalSize' => $items->sum('size'),
             'count' => $items->count(),
             'convertibleAll' => $convertibleAll,
+            'watermark' => $watermark->settings(),
+            'watermarkReady' => $watermark->isReady(),
         ]);
     }
 
@@ -244,6 +250,83 @@ class MediaController extends Controller
         if ($touched) {
             \Illuminate\Support\Facades\Cache::forget('settings.all');
         }
+    }
+
+    /** Save the watermark configuration (text/logo, position, opacity, …). */
+    public function watermarkSettings(Request $request, WatermarkService $watermark)
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:text,logo'],
+            'text' => ['nullable', 'string', 'max:60'],
+            'position' => ['required', 'in:top-left,top-right,bottom-left,bottom-right,center'],
+            'opacity' => ['required', 'integer', 'min:5', 'max:100'],
+            'size' => ['required', 'integer', 'min:2', 'max:60'],
+            'color' => ['nullable', 'string', 'max:9'],
+            'margin' => ['required', 'integer', 'min:0', 'max:30'],
+            'font_file' => ['nullable', 'file', 'extensions:ttf,otf', 'max:8192'],
+            'logo_file' => ['nullable', 'image', 'mimes:png,webp', 'max:4096'],
+        ]);
+
+        $cfg = $watermark->settings();
+        $cfg['type'] = $data['type'];
+        $cfg['text'] = $data['text'] ?? $cfg['text'];
+        $cfg['position'] = $data['position'];
+        $cfg['opacity'] = (int) $data['opacity'];
+        $cfg['size'] = (int) $data['size'];
+        $cfg['color'] = $data['color'] ?: '#ffffff';
+        $cfg['margin'] = (int) $data['margin'];
+
+        if ($request->hasFile('font_file')) {
+            if (! empty($cfg['font_path'])) {
+                Storage::disk('public')->delete($cfg['font_path']);
+            }
+            $cfg['font_path'] = $request->file('font_file')->store('watermark', 'public');
+        }
+        if ($request->hasFile('logo_file')) {
+            if (! empty($cfg['logo_path'])) {
+                Storage::disk('public')->delete($cfg['logo_path']);
+            }
+            $cfg['logo_path'] = $request->file('logo_file')->store('watermark', 'public');
+        }
+
+        Setting::put('watermark', $cfg);
+
+        return back()->with('success', 'Watermark settings saved.');
+    }
+
+    /** Stamp the configured watermark onto the selected images, in place. */
+    public function watermark(Request $request, WatermarkService $watermark)
+    {
+        $data = $request->validate([
+            'paths' => ['required', 'array', 'min:1'],
+            'paths.*' => ['string'],
+        ]);
+
+        if (! $watermark->isReady()) {
+            return back()->with('error', $watermark->settings()['type'] === 'logo'
+                ? 'Upload a watermark logo (PNG) in the watermark settings first.'
+                : 'Text watermark needs an uploaded font file (and server FreeType support). Upload a .ttf/.otf, or switch to a logo watermark.');
+        }
+
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
+        $done = 0;
+        $skipped = 0;
+        foreach ($data['paths'] as $path) {
+            if (! $this->safePath($path) || ! in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $skipped++;
+
+                continue;
+            }
+            $watermark->applyToPath($path) ? $done++ : $skipped++;
+        }
+
+        if ($done === 0) {
+            return back()->with('error', 'No images were watermarked (only JPG/PNG/WebP are supported).');
+        }
+
+        return back()->with('success', "Watermarked {$done} image(s)".($skipped ? " ({$skipped} skipped)." : '.'));
     }
 
     /** Delete one or many files. */

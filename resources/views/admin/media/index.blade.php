@@ -25,6 +25,75 @@
     </div>
 @endif
 
+{{-- Watermark settings --}}
+<div class="card p-4 mb-4" x-data="{ open: false, type: '{{ $watermark['type'] }}' }">
+    <button type="button" @click="open = !open" class="w-full flex items-center justify-between text-left">
+        <span class="text-sm font-medium">🖋️ Watermark settings
+            <span class="text-xs font-normal text-ink-700/50">— {{ $watermark['type'] === 'logo' ? 'Logo' : 'Text' }} · {{ str_replace('-', ' ', $watermark['position']) }} · {{ $watermark['opacity'] }}%
+                @unless($watermarkReady)<span class="text-amber-600">· needs a {{ $watermark['type'] === 'logo' ? 'logo' : 'font' }}</span>@endunless
+            </span>
+        </span>
+        <span x-text="open ? '▲' : '▼'" class="text-ink-700/40 text-xs"></span>
+    </button>
+    <form x-show="open" x-cloak action="{{ route('admin.media.watermark-settings') }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-4 border-t border-ink-100 pt-4">
+        @csrf
+        <div class="flex gap-4 text-sm">
+            <label class="flex items-center gap-2"><input type="radio" name="type" value="text" x-model="type"> Text</label>
+            <label class="flex items-center gap-2"><input type="radio" name="type" value="logo" x-model="type"> Logo / image</label>
+        </div>
+
+        {{-- Text options --}}
+        <div x-show="type==='text'" class="grid sm:grid-cols-2 gap-3">
+            <div><label class="label">Watermark text</label><input name="text" value="{{ $watermark['text'] }}" class="input" placeholder="Meridian Éclat"></div>
+            <div><label class="label">Text colour</label><input type="color" name="color" value="{{ $watermark['color'] ?: '#ffffff' }}" class="input h-10 w-20 p-1"></div>
+            <div class="sm:col-span-2">
+                <label class="label">Font file (.ttf / .otf) — required for text</label>
+                <input type="file" name="font_file" accept=".ttf,.otf" class="input text-sm">
+                <p class="text-xs text-ink-700/50 mt-1">
+                    @if(!empty($watermark['font_path']))Current: <strong>{{ basename($watermark['font_path']) }}</strong>. @endif
+                    Upload a serif for the accented “É”. GD FreeType must be available on the server.
+                </p>
+            </div>
+        </div>
+
+        {{-- Logo options --}}
+        <div x-show="type==='logo'">
+            <label class="label">Watermark logo (transparent PNG recommended)</label>
+            <input type="file" name="logo_file" accept="image/png,image/webp" class="input text-sm">
+            <p class="text-xs text-ink-700/50 mt-1">
+                @if(!empty($watermark['logo_path']))Current: <img src="{{ \Storage::disk('public')->url($watermark['logo_path']) }}" class="inline-block h-6 align-middle bg-ink-200 rounded px-1"> @endif
+                A white, transparent wordmark works best on photos.
+            </p>
+        </div>
+
+        {{-- Shared options --}}
+        <div class="grid sm:grid-cols-4 gap-3">
+            <div>
+                <label class="label">Position</label>
+                <select name="position" class="input text-sm">
+                    @foreach(['top-left'=>'Top left','top-right'=>'Top right','bottom-left'=>'Bottom left','bottom-right'=>'Bottom right','center'=>'Center'] as $k=>$lbl)
+                        <option value="{{ $k }}" @selected($watermark['position']===$k)>{{ $lbl }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div x-data="{ v: {{ $watermark['opacity'] }} }">
+                <label class="label">Opacity <span class="font-semibold" x-text="v + '%'"></span></label>
+                <input type="range" name="opacity" min="5" max="100" step="5" x-model="v" class="w-full">
+            </div>
+            <div x-data="{ v: {{ $watermark['size'] }} }">
+                <label class="label">Size <span class="font-semibold" x-text="v + '%'"></span></label>
+                <input type="range" name="size" min="2" max="60" step="1" x-model="v" class="w-full">
+                <p class="text-[11px] text-ink-700/40" x-text="type==='logo' ? 'logo width vs image' : 'font size vs image'"></p>
+            </div>
+            <div x-data="{ v: {{ $watermark['margin'] }} }">
+                <label class="label">Edge margin <span class="font-semibold" x-text="v + '%'"></span></label>
+                <input type="range" name="margin" min="0" max="30" step="1" x-model="v" class="w-full">
+            </div>
+        </div>
+        <button class="btn-primary text-sm py-2">Save watermark settings</button>
+    </form>
+</div>
+
 {{-- Filters --}}
 <form method="GET" class="flex flex-wrap items-center gap-2 mb-4">
     <input name="q" value="{{ $q }}" placeholder="Search by product name or filename…" class="input py-2 w-64">
@@ -75,6 +144,11 @@
                     @csrf
                     <template x-for="p in sel" :key="p"><input type="hidden" name="paths[]" :value="p"></template>
                     <button class="btn-outline text-sm py-2" :disabled="!sel.length">Convert to WebP</button>
+                </form>
+                <form action="{{ route('admin.media.watermark') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Add the watermark to ' + sel.length + ' selected image(s)? This is baked into the file and cannot be undone. Set it up in “Watermark settings” above first.')">
+                    @csrf
+                    <template x-for="p in sel" :key="p"><input type="hidden" name="paths[]" :value="p"></template>
+                    <button class="btn-outline text-sm py-2" :disabled="!sel.length">Watermark</button>
                 </form>
                 <form action="{{ route('admin.media.destroy') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Delete ' + sel.length + ' file(s)? Files used by products will be removed from those galleries.')">
                     @csrf @method('DELETE')
