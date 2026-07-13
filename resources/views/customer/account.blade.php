@@ -50,6 +50,32 @@
                 </a>
             </div>
 
+            {{-- Exclusive offers (always shown, independent of the loyalty program) --}}
+            @if($liveOffers->isNotEmpty())
+                <div class="card p-5 mb-8 border-gold-300">
+                    <h2 class="font-semibold mb-3 flex items-center gap-2">🎁 Your exclusive offers <span class="badge bg-gold-600 text-white text-[10px]">{{ $liveOffers->count() }}</span></h2>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        @foreach($liveOffers as $offer)
+                            <div class="rounded-xl border-2 border-gold-300 bg-gradient-to-r from-gold-100/70 to-white p-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold">{{ $offer->title }}</p>
+                                        <span class="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{{ $offer->rewardText() }}</span>
+                                        @if($offer->applies_to !== 'all')<span class="inline-block text-[10px] text-ink-700/60 ml-1">· {{ $offer->scopeLabel() }}</span>@endif
+                                        @if($offer->message)<p class="text-xs text-ink-700/70 italic mt-1">{{ $offer->message }}</p>@endif
+                                        <p class="text-xs text-green-700 mt-1">✓ Applied automatically at checkout{{ $offer->expires_at ? ' · until '.$offer->expires_at->format('d M') : '' }}</p>
+                                    </div>
+                                    @if($offer->code)
+                                        <span class="shrink-0 font-mono text-xs rounded-full border border-gold-300 px-2.5 py-1 bg-gold-50">{{ $offer->code }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <a href="{{ route('shop') }}" class="btn-primary text-sm mt-4 inline-block">Shop now</a>
+                </div>
+            @endif
+
             {{-- Rewards & offers (collapsible) --}}
             @if($loyaltyEnabled)
                 @php
@@ -139,31 +165,6 @@
                                     <a :href="'https://wa.me/?text=' + encodeURIComponent('Shop at {{ $storeName }} — sign up with my link and we both get rewards! ' + link)" target="_blank" class="shrink-0 rounded-md bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-medium">WhatsApp</a>
                                 </div>
                             </div>
-
-                            {{-- Personalised offers --}}
-                            @if($liveOffers->isNotEmpty())
-                                <div>
-                                    <h3 class="text-sm font-semibold mb-2 flex items-center gap-1.5">🎁 Your exclusive offers <span class="badge bg-gold-600 text-white text-[10px]">{{ $liveOffers->count() }}</span></h3>
-                                    <div class="space-y-2">
-                                        @foreach($liveOffers as $offer)
-                                            <div class="rounded-xl border-2 border-gold-300 bg-gradient-to-r from-gold-100/70 to-white p-3">
-                                                <div class="flex items-start justify-between gap-3">
-                                                    <div class="min-w-0">
-                                                        <p class="text-sm font-semibold">{{ $offer->title }}</p>
-                                                        <span class="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{{ $offer->rewardText() }}</span>
-                                                        @if($offer->applies_to !== 'all')<span class="inline-block text-[10px] text-ink-700/60 ml-1">· {{ $offer->scopeLabel() }}</span>@endif
-                                                        @if($offer->message)<p class="text-xs text-ink-700/70 italic mt-1">{{ $offer->message }}</p>@endif
-                                                        <p class="text-xs text-green-700 mt-1">✓ Applied automatically at checkout{{ $offer->expires_at ? ' · until '.$offer->expires_at->format('d M') : '' }}</p>
-                                                    </div>
-                                                    @if($offer->code)
-                                                        <span class="shrink-0 font-mono text-xs rounded-full border border-gold-300 px-2.5 py-1 bg-gold-50">{{ $offer->code }}</span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
 
                             {{-- Weekly milestones --}}
                             <div>
