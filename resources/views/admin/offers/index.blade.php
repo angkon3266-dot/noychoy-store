@@ -25,7 +25,16 @@
             <label class="label">Nudge text</label>
             <input name="register_offer_text" value="{{ $registerOffer['text'] }}" class="input" placeholder="Create an account for an extra discount + points">
         </div>
+        <div>
+            <label class="label">Max uses</label>
+            <input name="register_offer_max_uses" type="number" min="0" value="{{ $registerOffer['max_uses'] }}" class="input w-28" title="0 = unlimited">
+        </div>
+        <div>
+            <label class="label">Per (days)</label>
+            <input name="register_offer_window_days" type="number" min="1" value="{{ $registerOffer['window_days'] }}" class="input w-24">
+        </div>
         <button class="btn-primary">Save</button>
+        <p class="w-full text-xs text-ink-700/50 mt-1">The member discount applies to at most <strong>Max uses</strong> orders within each rolling window of <strong>Per (days)</strong> days per customer. Set Max uses to 0 for no limit.</p>
     </form>
 </div>
 

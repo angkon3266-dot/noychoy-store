@@ -188,12 +188,17 @@ class CartService
         if ($pct <= 0) {
             return 0.0;
         }
-        // Members may avail this discount at most twice in any 7-day window.
-        $usedThisWeek = Order::where('customer_id', $customer->id)
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-        if ($usedThisWeek >= 2) {
-            return 0.0;
+        // Cap: at most `max_uses` orders in a rolling `window_days` window per
+        // customer (both editable in Admin → Offers). max_uses = 0 → no limit.
+        $maxUses = (int) Setting::get('register_offer_max_uses', 2);
+        if ($maxUses > 0) {
+            $windowDays = max(1, (int) Setting::get('register_offer_window_days', 7));
+            $usedInWindow = Order::where('customer_id', $customer->id)
+                ->where('created_at', '>=', now()->subDays($windowDays))
+                ->count();
+            if ($usedInWindow >= $maxUses) {
+                return 0.0;
+            }
         }
 
         return round($this->promoBase() * $pct / 100, 2);

@@ -20,6 +20,8 @@ class OfferController extends Controller
             'registerOffer' => [
                 'percent' => \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3)),
                 'text' => \App\Models\Setting::get('register_offer_text', 'Get an extra discount plus loyalty points on every order.'),
+                'max_uses' => (int) \App\Models\Setting::get('register_offer_max_uses', 2),
+                'window_days' => (int) \App\Models\Setting::get('register_offer_window_days', 7),
             ],
             'loyalty' => [
                 'enabled' => (bool) \App\Models\Setting::get('loyalty_enabled', config('loyalty.enabled', true)),
@@ -65,10 +67,14 @@ class OfferController extends Controller
         $data = $request->validate([
             'register_offer_percent' => ['nullable', 'numeric', 'min:0', 'max:90'],
             'register_offer_text' => ['nullable', 'string', 'max:200'],
+            'register_offer_max_uses' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'register_offer_window_days' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
         \App\Models\Setting::put('register_offer_percent', (float) ($data['register_offer_percent'] ?? 0));
         \App\Models\Setting::put('register_offer_text', $data['register_offer_text'] ?? null);
+        \App\Models\Setting::put('register_offer_max_uses', (int) ($data['register_offer_max_uses'] ?? 0));
+        \App\Models\Setting::put('register_offer_window_days', (int) ($data['register_offer_window_days'] ?? 7));
 
         return back()->with('success', 'Registration offer saved.');
     }

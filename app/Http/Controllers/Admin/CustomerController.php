@@ -143,6 +143,7 @@ class CustomerController extends Controller
             'product_ids.*' => ['integer', 'exists:products,id'],
             'min_subtotal' => ['nullable', 'numeric', 'min:0'],
             'expires_at' => ['nullable', 'date'],
+            'max_redemptions' => ['nullable', 'integer', 'min:1', 'max:1000'],
         ]);
 
         // Keep only the scope list that matches the chosen target.

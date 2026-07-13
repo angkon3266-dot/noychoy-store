@@ -112,9 +112,13 @@ class PlaceOrder
                 $coupon->increment('used_count');
             }
 
-            // Mark the customer's personalized offer as used (single redemption).
+            // Count this redemption of the customer's personalized offer; stamp
+            // redeemed_at when its usage cap (if any) is reached.
             if ($customerOffer && auth('customer')->check() && $customerOffer->customer_id === $customer->id) {
-                $customerOffer->update(['redeemed_at' => now()]);
+                $customerOffer->increment('redemptions');
+                if (! $customerOffer->hasUsesLeft() && $customerOffer->redeemed_at === null) {
+                    $customerOffer->update(['redeemed_at' => now()]);
+                }
             }
 
             // Deduct any redeemed loyalty points (logged-in customers only).

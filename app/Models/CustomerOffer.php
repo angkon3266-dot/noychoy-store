@@ -25,6 +25,7 @@ class CustomerOffer extends Model
         'customer_id', 'title', 'description', 'message', 'type', 'value', 'code',
         'applies_to', 'category_ids', 'product_ids',
         'min_subtotal', 'starts_at', 'expires_at', 'is_active', 'redeemed_at',
+        'max_redemptions', 'redemptions',
     ];
 
     protected $casts = [
@@ -35,6 +36,8 @@ class CustomerOffer extends Model
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'redeemed_at' => 'datetime',
+        'max_redemptions' => 'integer',
+        'redemptions' => 'integer',
         'is_active' => 'boolean',
     ];
 
@@ -43,13 +46,13 @@ class CustomerOffer extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    /** Live = active, started, not expired, not yet redeemed. */
+    /** Live = active, started, not expired, uses remaining. */
     public function scopeLive(Builder $q): Builder
     {
         $now = now();
 
         return $q->where('is_active', true)
-            ->whereNull('redeemed_at')
+            ->where(fn ($w) => $w->whereNull('max_redemptions')->orWhereColumn('redemptions', '<', 'max_redemptions'))
             ->where(fn ($w) => $w->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
             ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>=', $now));
     }
@@ -59,9 +62,25 @@ class CustomerOffer extends Model
         $now = now();
 
         return $this->is_active
-            && $this->redeemed_at === null
+            && $this->hasUsesLeft()
             && ($this->starts_at === null || $this->starts_at <= $now)
             && ($this->expires_at === null || $this->expires_at >= $now);
+    }
+
+    /** null max = unlimited until expiry; otherwise redemptions must be below the cap. */
+    public function hasUsesLeft(): bool
+    {
+        return $this->max_redemptions === null || (int) $this->redemptions < (int) $this->max_redemptions;
+    }
+
+    /** Human usage summary, e.g. "Unlimited until expiry" or "1 of 3 used". */
+    public function usageLabel(): string
+    {
+        if ($this->max_redemptions === null) {
+            return 'Unlimited until expiry';
+        }
+
+        return (int) $this->redemptions.' of '.(int) $this->max_redemptions.' used';
     }
 
     public function typeLabel(): string

@@ -47,9 +47,10 @@
                         {{ $offer->scopeLabel() }}@if($offer->applies_to==='categories' && $offer->category_ids) · {{ count($offer->category_ids) }} categor{{ count($offer->category_ids)===1?'y':'ies' }}@elseif($offer->applies_to==='products' && $offer->product_ids) · {{ count($offer->product_ids) }} product(s)@endif
                     </td>
                     <td class="px-4 py-3">
-                        @if($offer->redeemed_at)<span class="badge bg-ink-100 text-ink-700">Redeemed</span>
-                        @elseif($offer->isLive())<span class="badge bg-green-100 text-green-700">Live</span>
+                        @if($offer->isLive())<span class="badge bg-green-100 text-green-700">Live</span>
+                        @elseif($offer->redeemed_at)<span class="badge bg-ink-100 text-ink-700">Used up</span>
                         @else<span class="badge bg-amber-100 text-amber-700">Inactive</span>@endif
+                        <div class="text-[11px] text-ink-700/50 mt-0.5">{{ $offer->usageLabel() }}</div>
                     </td>
                     <td class="px-4 py-3 text-xs text-ink-700/60">{{ $offer->expires_at?->format('d M Y') ?? '—' }}</td>
                 </tr>

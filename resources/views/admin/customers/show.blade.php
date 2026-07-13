@@ -109,7 +109,7 @@
                         @if($offer->code)<p class="text-xs font-mono text-gold-700">{{ $offer->code }}</p>@endif
                         <p class="text-xs text-ink-700/50">{{ $offer->scopeLabel() }}@if($offer->applies_to==='categories' && $offer->category_ids) · {{ count($offer->category_ids) }} categor{{ count($offer->category_ids)===1?'y':'ies' }}@elseif($offer->applies_to==='products' && $offer->product_ids) · {{ count($offer->product_ids) }} product(s)@endif</p>
                         @if($offer->message)<p class="text-xs text-ink-700/60 italic">“{{ $offer->message }}”</p>@endif
-                        <p class="text-xs {{ $offer->isLive() ? 'text-green-700' : 'text-ink-700/40' }}">{{ $offer->isLive() ? 'Live' : ($offer->redeemed_at ? 'Redeemed '.$offer->redeemed_at->format('d M Y') : 'Inactive/expired') }}@if($offer->expires_at) · until {{ $offer->expires_at->format('d M Y') }}@endif</p>
+                        <p class="text-xs {{ $offer->isLive() ? 'text-green-700' : 'text-ink-700/40' }}">{{ $offer->isLive() ? 'Live' : ($offer->redeemed_at ? 'Used up '.$offer->redeemed_at->format('d M Y') : 'Inactive/expired') }} · {{ $offer->usageLabel() }}@if($offer->expires_at) · until {{ $offer->expires_at->format('d M Y') }}@endif</p>
                     </div>
                     <form action="{{ route('admin.customers.offers.destroy', [$customer, $offer]) }}" method="POST" onsubmit="return confirm('Remove this offer?')">
                         @csrf @method('DELETE')
@@ -163,7 +163,10 @@
                     <input name="code" class="input" placeholder="Code (optional)">
                     <input name="expires_at" type="date" class="input">
                 </div>
-                <input name="min_subtotal" type="number" step="0.01" class="input" placeholder="Min. cart value ৳ (optional)">
+                <div class="grid grid-cols-2 gap-2">
+                    <input name="min_subtotal" type="number" step="0.01" class="input" placeholder="Min. cart value ৳ (optional)">
+                    <input name="max_redemptions" type="number" min="1" class="input" placeholder="Uses (blank = until expiry)">
+                </div>
                 <textarea name="message" rows="2" class="input" placeholder="Message to the customer (shown on their dashboard &amp; product pages)"></textarea>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="send_sms" value="1"> Also send this message by SMS</label>
                 <button class="btn-primary w-full">Add offer</button>
