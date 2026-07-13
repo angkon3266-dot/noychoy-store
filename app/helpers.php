@@ -46,6 +46,22 @@ if (! function_exists('upload_limit_mb')) {
     }
 }
 
+if (! function_exists('member_pricing')) {
+    /** Shared MemberPricingService instance. */
+    function member_pricing(): \App\Services\MemberPricingService
+    {
+        return app(\App\Services\MemberPricingService::class);
+    }
+}
+
+if (! function_exists('is_member')) {
+    /** Is a storefront customer logged in? */
+    function is_member(): bool
+    {
+        return auth('customer')->check();
+    }
+}
+
 if (! function_exists('theme')) {
     /**
      * Read a theme/appearance setting, falling back to config defaults.

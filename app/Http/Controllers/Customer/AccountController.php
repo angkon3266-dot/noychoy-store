@@ -30,6 +30,9 @@ class AccountController extends Controller
             'lovedCount' => $customer->loves()->count(),
             'reviewCount' => $customer->reviews()->count(),
             'addressCount' => $customer->addresses()->count(),
+            // Member pricing
+            'memberSaved' => (float) $customer->orders()->sum('member_discount'),
+            'memberPercent' => member_pricing()->basePercent(),
             // Loyalty
             'loyaltyEnabled' => $loyalty->enabled(),
             'points' => (int) $customer->points,

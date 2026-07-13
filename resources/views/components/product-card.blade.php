@@ -4,6 +4,9 @@
     $available = $product->isAvailable();
     $preorder = $product->isPreorder();
     $variable = $product->has_variants;
+    // Member pricing: logged-in customers see the discounted price.
+    $memberPct = (is_member() && member_pricing()->enabled()) ? member_pricing()->percentForProduct($product) : 0;
+    $memberPrice = $memberPct > 0 ? member_pricing()->memberPrice($product) : null;
 @endphp
 
 <div class="group relative block">
@@ -34,10 +37,16 @@
                 <span class="text-ink-700/50">({{ $product->review_count }})</span>
             </div>
         @endif
-        <div class="mt-1 flex items-center gap-2">
-            <span class="font-semibold text-gold-700">{{ money($product->price) }}</span>
-            @if($product->is_on_sale)
-                <span class="text-xs text-ink-400 line-through">{{ money($product->compare_at_price) }}</span>
+        <div class="mt-1 flex items-center gap-2 flex-wrap">
+            @if($memberPrice !== null)
+                <span class="font-semibold text-gold-700">{{ $variable ? 'From ' : '' }}{{ money($memberPrice) }}</span>
+                <span class="text-xs text-ink-400 line-through">{{ money($product->price) }}</span>
+                <span class="badge bg-gold-600 text-white text-[10px]">Member −{{ rtrim(rtrim(number_format($memberPct,1),'0'),'.') }}%</span>
+            @else
+                <span class="font-semibold text-gold-700">{{ $variable ? 'From ' : '' }}{{ money($product->price) }}</span>
+                @if($product->is_on_sale)
+                    <span class="text-xs text-ink-400 line-through">{{ money($product->compare_at_price) }}</span>
+                @endif
             @endif
         </div>
     </a>

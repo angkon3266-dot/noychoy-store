@@ -36,6 +36,21 @@
         </template>
     </div>
 
+    {{-- Member price banner --}}
+    @if(is_member() && member_pricing()->enabled())
+        @php $mPct = member_pricing()->percentForProduct($product); @endphp
+        @if($mPct > 0)
+            <div class="mt-3 rounded-lg bg-gold-100/70 border border-gold-300 px-3 py-2.5 text-sm text-gold-800 flex items-center gap-2">
+                <span class="text-lg">🎖️</span>
+                <span>
+                    <strong>Member price {{ money(member_pricing()->memberPrice($product)) }}</strong>
+                    <span class="text-gold-700/70">· save {{ rtrim(rtrim(number_format($mPct,1),'0'),'.') }}%@unless($product->has_variants) ({{ money(member_pricing()->savings($product)) }})@endunless</span>
+                    — applied automatically at checkout.
+                </span>
+            </div>
+        @endif
+    @endif
+
     @if($product->short_description)
         <p class="mt-4 text-ink-700/80">{{ $product->short_description }}</p>
     @endif

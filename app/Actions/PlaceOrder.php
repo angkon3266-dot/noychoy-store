@@ -46,7 +46,10 @@ class PlaceOrder
         // Personalized offer applied to this order (marked redeemed after placing).
         $customerOffer = $this->cart->customerOffer();
 
-        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount, $customerOffer) {
+        // Member-pricing portion of the discount (for "saved as a member" totals).
+        $memberDiscount = $this->cart->memberSignupDiscount();
+
+        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount, $customerOffer, $memberDiscount) {
             // Attach to a customer record (find-or-create by phone) even for guests.
             $customer = Customer::firstOrCreate(
                 ['phone' => $data['phone']],
@@ -71,6 +74,7 @@ class PlaceOrder
                 'subtotal' => $subtotal,
                 'shipping_cost' => $shipping,
                 'discount' => $discount,
+                'member_discount' => $memberDiscount,
                 'points_redeemed' => $pointsRedeemed,
                 'points_discount' => $pointsDiscount,
                 'total' => max(0, $subtotal - $discount + $shipping),

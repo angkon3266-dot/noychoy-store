@@ -7,6 +7,7 @@ use App\Models\CustomerOffer;
 use App\Models\Offer;
 use App\Models\Order;
 use App\Models\Product;
+use App\Services\MemberPricingService;
 use App\Models\ProductVariant;
 use App\Models\Setting;
 use Illuminate\Support\Collection;
@@ -184,8 +185,8 @@ class CartService
         if (! $customer) {
             return 0.0;
         }
-        $pct = (float) Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 0));
-        if ($pct <= 0) {
+        $pricing = app(MemberPricingService::class);
+        if (! $pricing->enabled()) {
             return 0.0;
         }
         // Cap: at most `max_uses` orders in a rolling `window_days` window per
@@ -201,7 +202,16 @@ class CartService
             }
         }
 
-        return round($this->promoBase() * $pct / 100, 2);
+        // Per-line member discount so per-category / per-product overrides apply.
+        $total = 0.0;
+        foreach ($this->items() as $item) {
+            $pct = $pricing->percentForLine((int) $item['product_id'], $item['category_id'] ?? null);
+            if ($pct > 0) {
+                $total += $item['price'] * $item['qty'] * $pct / 100;
+            }
+        }
+
+        return round($total, 2);
     }
 
     // ── Personalized customer offers (auto-applied best eligible) ──────────────

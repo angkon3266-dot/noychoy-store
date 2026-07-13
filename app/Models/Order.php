@@ -25,7 +25,7 @@ class Order extends Model
     protected $fillable = [
         'order_number', 'customer_id', 'customer_name', 'customer_phone', 'customer_email',
         'shipping_address', 'area', 'city', 'district', 'is_inside_dhaka',
-        'subtotal', 'shipping_cost', 'discount', 'total',
+        'subtotal', 'shipping_cost', 'discount', 'member_discount', 'total',
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'source', 'woo_id', 'stock_restored',
@@ -40,6 +40,7 @@ class Order extends Model
         'total' => 'decimal:2',
         'points_redeemed' => 'integer',
         'points_discount' => 'decimal:2',
+        'member_discount' => 'decimal:2',
         'points_earned' => 'integer',
     ];
 

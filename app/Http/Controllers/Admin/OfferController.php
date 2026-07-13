@@ -23,6 +23,7 @@ class OfferController extends Controller
                 'max_uses' => (int) \App\Models\Setting::get('register_offer_max_uses', 2),
                 'window_days' => (int) \App\Models\Setting::get('register_offer_window_days', 7),
             ],
+            'memberOverrides' => $this->memberOverrideRows(),
             'loyalty' => [
                 'enabled' => (bool) \App\Models\Setting::get('loyalty_enabled', config('loyalty.enabled', true)),
                 'per_1000' => round(((float) \App\Models\Setting::get('loyalty_earn_per_taka', config('loyalty.earn_per_taka', 0.1))) * 1000),
@@ -76,7 +77,39 @@ class OfferController extends Controller
         \App\Models\Setting::put('register_offer_max_uses', (int) ($data['register_offer_max_uses'] ?? 0));
         \App\Models\Setting::put('register_offer_window_days', (int) ($data['register_offer_window_days'] ?? 7));
 
+        // Per-category / per-product member-discount overrides (from the JSON builder).
+        $rows = json_decode((string) $request->input('member_overrides_json', '[]'), true);
+        $overrides = ['products' => [], 'categories' => []];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $pct = max(0, min(90, (float) ($row['percent'] ?? 0)));
+            if ($id <= 0) {
+                continue;
+            }
+            if (($row['type'] ?? '') === 'product') {
+                $overrides['products'][$id] = $pct;
+            } elseif (($row['type'] ?? '') === 'category') {
+                $overrides['categories'][$id] = $pct;
+            }
+        }
+        \App\Models\Setting::put('member_discount_overrides', $overrides);
+
         return back()->with('success', 'Registration offer saved.');
+    }
+
+    /** Stored member-discount overrides → flat rows for the admin builder. */
+    protected function memberOverrideRows(): array
+    {
+        $o = \App\Models\Setting::get('member_discount_overrides', []);
+        $rows = [];
+        foreach (($o['categories'] ?? []) as $id => $pct) {
+            $rows[] = ['type' => 'category', 'id' => (int) $id, 'percent' => (float) $pct];
+        }
+        foreach (($o['products'] ?? []) as $id => $pct) {
+            $rows[] = ['type' => 'product', 'id' => (int) $id, 'percent' => (float) $pct];
+        }
+
+        return $rows;
     }
 
     public function store(Request $request)

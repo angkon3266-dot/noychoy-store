@@ -15,10 +15,11 @@
 <div class="card p-5 mb-6 max-w-3xl">
     <h2 class="font-semibold mb-1">Register-for-discount offer</h2>
     <p class="text-xs text-ink-700/60 mb-3">Guests see this as a nudge at checkout &amp; on the register page. Logged-in customers get the discount automatically on every order. Set the percent to 0 to turn it off.</p>
-    <form action="{{ route('admin.offers.register') }}" method="POST" class="flex flex-wrap items-end gap-3">
+    <form action="{{ route('admin.offers.register') }}" method="POST" class="flex flex-wrap items-end gap-3"
+          x-data="{ rows: @js($memberOverrides), categories: @js($categories->map(fn($c)=>['id'=>$c->id,'name'=>$c->name])->values()), products: @js($products->map(fn($p)=>['id'=>$p->id,'name'=>$p->name])->values()) }">
         @csrf
         <div>
-            <label class="label">Extra discount %</label>
+            <label class="label">Member discount %</label>
             <input name="register_offer_percent" type="number" step="0.1" min="0" max="90" value="{{ $registerOffer['percent'] }}" class="input w-32">
         </div>
         <div class="flex-1 min-w-[220px]">
@@ -33,8 +34,28 @@
             <label class="label">Per (days)</label>
             <input name="register_offer_window_days" type="number" min="1" value="{{ $registerOffer['window_days'] }}" class="input w-24">
         </div>
+
+        {{-- Per-category / per-product overrides --}}
+        <div class="w-full border-t border-ink-100 pt-3 mt-1">
+            <h3 class="text-sm font-semibold text-ink-700 mb-1">Category / product overrides (optional)</h3>
+            <p class="text-xs text-ink-700/50 mb-2">Members get the % above on everything. Add exceptions here — a different % for a category or a specific product.</p>
+            <template x-for="(r, i) in rows" :key="i">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <select x-model="r.type" class="input py-1.5 text-sm w-32"><option value="category">Category</option><option value="product">Product</option></select>
+                    <select x-model.number="r.id" class="input py-1.5 text-sm flex-1 min-w-[160px]">
+                        <option value="">Choose…</option>
+                        <template x-for="opt in (r.type==='product' ? products : categories)" :key="opt.id"><option :value="opt.id" x-text="opt.name"></option></template>
+                    </select>
+                    <input x-model.number="r.percent" type="number" step="0.1" min="0" max="90" class="input py-1.5 text-sm w-24" placeholder="% off">
+                    <button type="button" @click="rows.splice(i,1)" class="text-red-500 px-1 text-lg leading-none">&times;</button>
+                </div>
+            </template>
+            <button type="button" @click="rows.push({ type: 'category', id: '', percent: '' })" class="btn-outline text-xs py-1">+ Add override</button>
+            <input type="hidden" name="member_overrides_json" :value="JSON.stringify(rows.filter(r => r.id && r.percent !== ''))">
+        </div>
+
         <button class="btn-primary">Save</button>
-        <p class="w-full text-xs text-ink-700/50 mt-1">The member discount applies to at most <strong>Max uses</strong> orders within each rolling window of <strong>Per (days)</strong> days per customer. Set Max uses to 0 for no limit.</p>
+        <p class="w-full text-xs text-ink-700/50 mt-1">Logged-in members see this discounted price on every product. The discount applies to at most <strong>Max uses</strong> orders within each rolling window of <strong>Per (days)</strong> days per customer (0 = unlimited).</p>
     </form>
 </div>
 

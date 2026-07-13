@@ -19,6 +19,17 @@
                 </div>
             </div>
 
+            {{-- Member savings --}}
+            @if(($memberPercent ?? 0) > 0 || ($memberSaved ?? 0) > 0)
+                <div class="mb-6 rounded-xl border-2 border-gold-300 bg-gradient-to-r from-gold-100/70 to-white p-4 flex items-center gap-4">
+                    <span class="text-3xl">🎖️</span>
+                    <div>
+                        <p class="font-semibold text-gold-800">You're a member — {{ rtrim(rtrim(number_format($memberPercent ?? 0,1),'0'),'.') }}% off on every order.</p>
+                        <p class="text-sm text-ink-700/70">You've saved <strong class="text-gold-700">{{ money($memberSaved ?? 0) }}</strong> so far as a member. Keep shopping to save more!</p>
+                    </div>
+                </div>
+            @endif
+
             {{-- Summary --}}
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
                 <a href="{{ route('account.orders') }}" class="card p-4 hover:border-gold-300 transition">
