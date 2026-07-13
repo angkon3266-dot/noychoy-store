@@ -4,7 +4,13 @@
 
 @section('content')
 @if($product->exists)
-    <p class="text-sm text-ink-700/50 mb-3">Product ID <span class="font-semibold text-ink-700">#{{ $product->serial }}</span>@if($product->sku) · SKU {{ $product->sku }}@endif</p>
+    <div class="flex items-center justify-between gap-3 mb-3">
+        <p class="text-sm text-ink-700/50">Product ID <span class="font-semibold text-ink-700">#{{ $product->serial }}</span>@if($product->sku) · SKU {{ $product->sku }}@endif</p>
+        <a href="{{ route('product.show', $product) }}" target="_blank" rel="noopener" class="btn-outline text-sm py-1.5 inline-flex items-center gap-1.5 shrink-0">
+            View in website
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5m0-5L10 14M11 5H6a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg>
+        </a>
+    </div>
 @endif
 @if($errors->any())
     <div class="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm mb-4">

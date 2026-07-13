@@ -160,6 +160,17 @@ document.addEventListener('alpine:init', () => {
         <option value="">All folders</option>
         @foreach($folders as $f)<option value="{{ $f }}" @selected($folder==$f)>{{ $f }}</option>@endforeach
     </select>
+    <select name="ext" onchange="this.form.submit()" class="input py-2" title="File type">
+        <option value="">All formats</option>
+        @foreach($extensions as $e)<option value="{{ $e }}" @selected($ext==$e)>{{ strtoupper($e) }}</option>@endforeach
+    </select>
+    <select name="size" onchange="this.form.submit()" class="input py-2" title="File size">
+        <option value="">Any size</option>
+        <option value="gt1m" @selected($size=='gt1m')>≥ 1 MB</option>
+        <option value="500to1m" @selected($size=='500to1m')>500 KB – 1 MB</option>
+        <option value="100to500" @selected($size=='100to500')>100 – 500 KB</option>
+        <option value="lt100" @selected($size=='lt100')>&lt; 100 KB</option>
+    </select>
     <button class="btn-outline">Search</button>
     <div class="ml-auto flex items-center gap-1 text-sm">
         <a href="{{ request()->fullUrlWithQuery(['view'=>'grid']) }}" class="px-2.5 py-1.5 rounded {{ $view=='grid' ? 'bg-gold-100 text-gold-800' : 'text-ink-700/60 hover:bg-ink-100' }}">▦ Thumbnails</a>

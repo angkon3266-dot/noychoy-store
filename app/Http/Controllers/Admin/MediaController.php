@@ -24,6 +24,8 @@ class MediaController extends Controller
         $disk = Storage::disk('public');
         $type = $request->query('type', 'all');
         $folder = $request->query('folder');
+        $ext = strtolower(trim((string) $request->query('ext', '')));
+        $size = (string) $request->query('size', '');
         $q = trim((string) $request->query('q', ''));
         $view = $request->query('view') === 'list' ? 'list' : 'grid';
 
@@ -57,6 +59,10 @@ class MediaController extends Controller
             ->filter()
             ->when($type !== 'all', fn ($c) => $c->where('type', $type))
             ->when($folder, fn ($c) => $c->where('folder', $folder))
+            ->when($ext !== '', fn ($c) => $c->filter(fn ($m) => $ext === 'jpg'
+                ? in_array($m['ext'], ['jpg', 'jpeg'], true)
+                : $m['ext'] === $ext))
+            ->when($size !== '', fn ($c) => $c->filter(fn ($m) => $this->inSizeBucket($m['size'], $size)))
             ->when($q !== '', fn ($c) => $c->filter(fn ($m) => str_contains(strtolower((string) $m['product']), strtolower($q))
                 || str_contains(strtolower(basename($m['path'])), strtolower($q))))
             ->sortByDesc('size')
@@ -65,6 +71,14 @@ class MediaController extends Controller
         $folders = collect($disk->allFiles())
             ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
             ->map(fn ($p) => str_contains($p, '/') ? explode('/', $p)[0] : '(root)')
+            ->unique()->sort()->values();
+
+        // Distinct file extensions present (for the type filter). jpeg folds into jpg.
+        $extensions = collect($disk->allFiles())
+            ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+            ->map(fn ($p) => strtolower(pathinfo($p, PATHINFO_EXTENSION)))
+            ->filter(fn ($e) => in_array($e, array_merge($this->imageExt, $this->videoExt), true))
+            ->map(fn ($e) => $e === 'jpeg' ? 'jpg' : $e)
             ->unique()->sort()->values();
 
         // How many JPG/PNG files across the whole library could still become WebP.
@@ -78,8 +92,11 @@ class MediaController extends Controller
         return view('admin.media.index', [
             'items' => $items,
             'folders' => $folders,
+            'extensions' => $extensions,
             'type' => $type,
             'folder' => $folder,
+            'ext' => $ext,
+            'size' => $size,
             'q' => $q,
             'view' => $view,
             'totalSize' => $items->sum('size'),
@@ -88,6 +105,18 @@ class MediaController extends Controller
             'watermark' => $watermark->settings(),
             'watermarkReady' => $watermark->isReady(),
         ]);
+    }
+
+    /** Size-bucket predicate for the media filter. */
+    protected function inSizeBucket(int $bytes, string $bucket): bool
+    {
+        return match ($bucket) {
+            'lt100' => $bytes < 100 * 1024,
+            '100to500' => $bytes >= 100 * 1024 && $bytes < 500 * 1024,
+            '500to1m' => $bytes >= 500 * 1024 && $bytes < 1048576,
+            'gt1m' => $bytes >= 1048576,
+            default => true,
+        };
     }
 
     /**
@@ -376,7 +405,12 @@ class MediaController extends Controller
         return $bin;
     }
 
-    /** Stamp the configured watermark onto the selected images, in place. */
+    /**
+     * Stamp the configured watermark onto the selected images. Writes each result
+     * to a NEW path and repoints every reference (product/category/settings), then
+     * deletes the original — so the image URL changes and LiteSpeed/browser caches
+     * can't keep serving the old, un-watermarked copy.
+     */
     public function watermark(Request $request, WatermarkService $watermark)
     {
         $data = $request->validate([
@@ -393,19 +427,33 @@ class MediaController extends Controller
         @set_time_limit(300);
         @ini_set('memory_limit', '512M');
 
+        $disk = Storage::disk('public');
+        $cfg = $watermark->settings();
         $done = 0;
         $skipped = 0;
         foreach ($data['paths'] as $path) {
-            if (! $this->safePath($path) || ! in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if (! $this->safePath($path) || ! in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
                 $skipped++;
 
                 continue;
             }
-            $watermark->applyToPath($path) ? $done++ : $skipped++;
+            $bytes = $watermark->render($disk->get($path), $cfg, $ext);
+            if ($bytes === null) {
+                $skipped++;
+
+                continue;
+            }
+            $dir = trim((string) pathinfo($path, PATHINFO_DIRNAME), '.');
+            $new = ($dir !== '' ? $dir.'/' : '').\Illuminate\Support\Str::uuid()->toString().'.'.$ext;
+            $disk->put($new, $bytes);
+            $this->repointReferences($path, $new);
+            $disk->delete($path);
+            $done++;
         }
 
         if ($done === 0) {
-            return back()->with('error', 'No images were watermarked (only JPG/PNG/WebP are supported).');
+            return back()->with('error', 'No images were watermarked (only JPG/PNG/WebP are supported, and the watermark must be configured).');
         }
 
         return back()->with('success', "Watermarked {$done} image(s)".($skipped ? " ({$skipped} skipped)." : '.'));
