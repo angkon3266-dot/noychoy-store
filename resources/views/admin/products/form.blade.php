@@ -21,7 +21,7 @@
 @php
     $vType = old('product_type', $product->has_variants ? 'variable' : 'simple');
     $vAttributes = collect(old('attributes', collect($product->options ?? [])->map(fn ($o) => ['name' => $o['name'] ?? '', 'values' => implode(', ', $o['values'] ?? [])])->all()))->values();
-    $vVariants = collect(old('variants', $product->variants->map(fn ($v) => ['attrs' => $v->attributes ?? [], 'price' => $v->price, 'stock' => $v->stock_quantity, 'sku' => $v->sku])->all()))->values();
+    $vVariants = collect(old('variants', $product->variants->map(fn ($v) => ['attrs' => $v->attributes ?? [], 'price' => $v->price, 'compare' => $v->compare_at_price, 'stock' => $v->stock_quantity, 'sku' => $v->sku])->all()))->values();
     $formConfig = [
         'type' => $vType,
         'attributes' => $vAttributes,
@@ -172,12 +172,13 @@
                             <button type="button" @click="generate()" class="text-xs text-gold-700 hover:underline">↻ Regenerate</button>
                         </div>
                         <div class="grid grid-cols-12 gap-2 text-xs text-ink-700/60 px-1">
-                            <span class="col-span-5">Variation</span><span class="col-span-3">Price ৳</span><span class="col-span-2">Stock</span><span class="col-span-2">SKU</span>
+                            <span class="col-span-4">Variation</span><span class="col-span-2">Price ৳</span><span class="col-span-2">Compare ৳</span><span class="col-span-2">Stock</span><span class="col-span-2">SKU</span>
                         </div>
                         <template x-for="(v, i) in variants" :key="keyOf(v.attrs)">
                             <div class="grid grid-cols-12 gap-2 items-center">
-                                <span class="col-span-5 text-sm" x-text="label(v.attrs)"></span>
-                                <input :name="`variants[${i}][price]`" x-model="v.price" type="number" step="0.01" class="input py-2 col-span-3" placeholder="0.00">
+                                <span class="col-span-4 text-sm" x-text="label(v.attrs)"></span>
+                                <input :name="`variants[${i}][price]`" x-model="v.price" type="number" step="0.01" class="input py-2 col-span-2" placeholder="0.00">
+                                <input :name="`variants[${i}][compare]`" x-model="v.compare" type="number" step="0.01" class="input py-2 col-span-2" placeholder="—" title="Original price (strike-through)">
                                 <input :name="`variants[${i}][stock]`" x-model="v.stock" type="number" class="input py-2 col-span-2" placeholder="0">
                                 <input :name="`variants[${i}][sku]`" x-model="v.sku" class="input py-2 col-span-2" placeholder="SKU">
                                 <template x-for="(val, name) in v.attrs" :key="name">

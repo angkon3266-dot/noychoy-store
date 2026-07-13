@@ -24,10 +24,13 @@
 
     <div class="mt-4 flex items-baseline gap-3 flex-wrap">
         <span class="text-2xl font-semibold text-gold-700" x-text="priceText()"></span>
-        @if($product->is_on_sale)
-            <span class="text-ink-400 line-through">{{ money($product->compare_at_price) }}</span>
-            <span class="badge bg-red-100 text-red-700">Save {{ $product->discount_percent }}%</span>
-        @endif
+        {{-- Original price + discount % (per-variant for variable products; shown once a variant is chosen) --}}
+        <template x-if="onSale && (!hasVariants || matched)">
+            <span class="text-ink-400 line-through" x-text="fmt(compareAt)"></span>
+        </template>
+        <template x-if="onSale && (!hasVariants || matched)">
+            <span class="badge bg-red-100 text-red-700">Save <span x-text="discountPct"></span>%</span>
+        </template>
         <template x-if="offerPercent > 0">
             <span class="badge bg-green-100 text-green-700">Bundle price · save <span x-text="fmt(savings)"></span></span>
         </template>

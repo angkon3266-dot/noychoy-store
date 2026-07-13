@@ -63,12 +63,13 @@
         {{-- Products --}}
         <div>
             <div class="flex flex-wrap items-center justify-end gap-2 mb-4">
+                @php($curSort = $shopSort ?? 'new')
                 <select name="sort" onchange="this.form.submit()" class="input py-2 w-auto">
-                    <option value="">Newest</option>
-                    <option value="popular" @selected(request('sort')=='popular')>Most popular</option>
-                    <option value="price_asc" @selected(request('sort')=='price_asc')>Price: low to high</option>
-                    <option value="price_desc" @selected(request('sort')=='price_desc')>Price: high to low</option>
-                    <option value="name" @selected(request('sort')=='name')>Name A–Z</option>
+                    <option value="new" @selected($curSort=='new')>Newest</option>
+                    <option value="popular" @selected($curSort=='popular')>Most popular</option>
+                    <option value="price_asc" @selected($curSort=='price_asc')>Price: low to high</option>
+                    <option value="price_desc" @selected($curSort=='price_desc')>Price: high to low</option>
+                    <option value="name" @selected($curSort=='name')>Name A–Z</option>
                 </select>
             </div>
 

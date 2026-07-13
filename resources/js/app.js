@@ -190,7 +190,7 @@ document.addEventListener('alpine:init', () => {
                 const attrs = {};
                 combo.forEach(([n, v]) => { attrs[n] = v; });
                 const old = prev[this.keyOf(attrs)];
-                return { attrs, price: old ? old.price : '', stock: old ? old.stock : 0, sku: old ? old.sku : '' };
+                return { attrs, price: old ? old.price : '', compare: old ? old.compare : '', stock: old ? old.stock : 0, sku: old ? old.sku : '' };
             });
         },
     }));
@@ -582,6 +582,7 @@ document.addEventListener('alpine:init', () => {
         variantList: config.variants || [],       // [{id, attrs:{}, price, stock}]
         selected: {},                              // {Size:'7', Color:'Gold'}
         basePrice: config.price || 0,
+        baseCompare: config.compare || 0,          // simple-product original price
         // Catalog retailer_id ("prod-{id}") so Pixel/CAPI events link to catalog
         // products — must match MetaProductMapper::retailerId on the server.
         contentId: 'prod-' + (config.id || ''),
@@ -617,6 +618,13 @@ document.addEventListener('alpine:init', () => {
             if (this.hasVariants) return this.matched ? this.matched.price : this.basePrice;
             return this.basePrice;
         },
+        // "Compare-at" (original) price for the current selection, 0 if none.
+        get compareAt() {
+            if (this.hasVariants) return this.matched ? (this.matched.compare || 0) : 0;
+            return this.baseCompare || 0;
+        },
+        get onSale() { return this.compareAt > this.unitPrice; },
+        get discountPct() { return this.onSale ? Math.round((1 - this.unitPrice / this.compareAt) * 100) : 0; },
         get offerPercent() {
             let best = 0;
             for (const o of this.offers) {

@@ -49,15 +49,19 @@ class CatalogController extends Controller
 
     protected function applySort($query, Request $request): void
     {
-        $query->when($request->query('sort'), function ($q, $sort) {
-            match ($sort) {
-                'price_asc' => $q->orderBy('price'),
-                'price_desc' => $q->orderByDesc('price'),
-                'name' => $q->orderBy('name'),
-                'popular' => $q->orderByDesc('views'),
-                default => $q->latest(),
-            };
-        }, fn ($q) => $q->latest());
+        // Visitor's choice wins; otherwise the admin default (Appearance → Catalog).
+        $sort = $request->query('sort') ?: theme('default_sort', 'new');
+
+        match ($sort) {
+            'price_asc' => $query->orderBy('price'),
+            'price_desc' => $query->orderByDesc('price'),
+            'name' => $query->orderBy('name'),
+            'popular' => $query->orderByDesc('views'),
+            default => $query->latest(),   // 'new'
+        };
+
+        // Let the catalog view reflect the effective sort in its dropdown.
+        view()->share('shopSort', $sort);
     }
 
     /** JSON type-ahead suggestions for the header search box. */
@@ -146,6 +150,7 @@ class CatalogController extends Controller
             'id' => $product->id,
             'name' => $product->name,
             'price' => (float) $product->price,
+            'compare' => (float) $product->compare_at_price,
             'hasVariants' => (bool) $product->has_variants,
             'image' => $product->images->first()?->url ?? '',
             'attributes' => $product->options ?? [],   // [{name, values:[]}]
@@ -153,6 +158,7 @@ class CatalogController extends Controller
                 'id' => $v->id,
                 'attrs' => $v->attributes ?? [],
                 'price' => (float) ($v->price ?? $product->price),
+                'compare' => (float) $v->compare_at_price,
                 'stock' => (int) $v->stock_quantity,
             ])->values(),
             'offers' => $product->offerTiers(),

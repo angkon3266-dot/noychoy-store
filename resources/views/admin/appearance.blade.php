@@ -530,7 +530,13 @@
                 </div>
                 <div class="flex-1 min-w-[8rem]"><label class="label text-xs">Name</label><input x-model="t.name" class="input py-1.5 text-sm" placeholder="e.g. Necklaces"></div>
                 <div class="flex-1 min-w-[10rem]"><label class="label text-xs">Link</label><input x-model="t.link" class="input py-1.5 text-sm" placeholder="/category/necklaces"></div>
-                <div><label class="label text-xs">Image</label><input type="file" :name="`discover_image[${i}]`" accept="image/*" class="text-xs w-36"></div>
+                <div>
+                    <label class="label text-xs">Image</label>
+                    <div class="flex items-center gap-1">
+                        <button type="button" @click="$store.mediaLib.openWith(u => t.image = u, 'discover')" class="btn-outline py-1 text-xs shrink-0">Library</button>
+                        <input type="file" :name="`discover_image[${i}]`" accept="image/*" class="text-xs w-28">
+                    </div>
+                </div>
                 <div class="flex gap-1">
                     <button type="button" @click="move(i,-1)" class="px-2">↑</button>
                     <button type="button" @click="move(i,1)" class="px-2">↓</button>
@@ -559,10 +565,24 @@
         <h2 class="font-semibold mb-1">Storefront filters</h2>
         <p class="text-xs text-ink-700/60 mb-4">Choose which filters appear in the shop sidebar. Values are pulled automatically from your products. "Color" attributes show colour swatches.</p>
 
-        <div class="mb-4 max-w-xs">
-            <label class="label">Products per page</label>
-            <input type="number" name="products_per_page" min="1" max="200" value="{{ $theme['products_per_page'] ?? 20 }}" class="input">
-            <p class="text-xs text-ink-700/50 mt-1">How many products show per page on the shop &amp; category pages. Default 20.</p>
+        <div class="grid sm:grid-cols-2 gap-4 mb-4 max-w-xl">
+            <div>
+                <label class="label">Products per page</label>
+                <input type="number" name="products_per_page" min="1" max="200" value="{{ $theme['products_per_page'] ?? 20 }}" class="input">
+                <p class="text-xs text-ink-700/50 mt-1">How many products show on shop &amp; category pages. Default 20.</p>
+            </div>
+            <div>
+                <label class="label">Default sort order</label>
+                @php($ds = $theme['default_sort'] ?? 'new')
+                <select name="default_sort" class="input">
+                    <option value="new" @selected($ds=='new')>Newest</option>
+                    <option value="popular" @selected($ds=='popular')>Most popular (by views)</option>
+                    <option value="price_asc" @selected($ds=='price_asc')>Price: low to high</option>
+                    <option value="price_desc" @selected($ds=='price_desc')>Price: high to low</option>
+                    <option value="name" @selected($ds=='name')>Name A–Z</option>
+                </select>
+                <p class="text-xs text-ink-700/50 mt-1">How the shop &amp; category pages are sorted before a visitor picks. Default: Newest.</p>
+            </div>
         </div>
 
         <label class="label">Categories to show as a filter</label>

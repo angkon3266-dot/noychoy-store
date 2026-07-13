@@ -579,9 +579,14 @@ class ProductController extends Controller
                 ->values()->all();
 
             // Price = lowest variation price (for cards, sorting, "from" display).
-            $prices = collect($request->input('variants', []))
-                ->map(fn ($v) => (float) ($v['price'] ?? 0))->filter(fn ($p) => $p > 0);
+            $variantRows = collect($request->input('variants', []));
+            $prices = $variantRows->map(fn ($v) => (float) ($v['price'] ?? 0))->filter(fn ($p) => $p > 0);
             $validated['price'] = $prices->min() ?? 0;
+            // Compare-at for cards = cheapest variant's original price (if it's a real discount).
+            $cheapest = $variantRows->filter(fn ($v) => (float) ($v['price'] ?? 0) > 0)
+                ->sortBy(fn ($v) => (float) $v['price'])->first();
+            $cheapestCompare = (float) ($cheapest['compare'] ?? 0);
+            $validated['compare_at_price'] = $cheapestCompare > ($validated['price'] ?? 0) ? $cheapestCompare : null;
             $validated['manage_stock'] = true;
             $validated['stock_quantity'] = collect($request->input('variants', []))->sum(fn ($v) => (int) ($v['stock'] ?? 0));
             $validated['in_stock'] = $validated['stock_quantity'] > 0;
@@ -733,6 +738,7 @@ class ProductController extends Controller
                 'attributes' => $attrs,                                   // {"Size":"7","Color":"Gold"}
                 'sku' => $row['sku'] ?? null,
                 'price' => filled($row['price'] ?? null) ? (float) $row['price'] : null,
+                'compare_at_price' => filled($row['compare'] ?? null) ? (float) $row['compare'] : null,
                 'stock_quantity' => (int) ($row['stock'] ?? 0),
                 'is_active' => true,
             ]);

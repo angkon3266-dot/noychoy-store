@@ -8,13 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProductVariant extends Model
 {
     protected $fillable = [
-        'product_id', 'sku', 'attributes', 'price', 'stock_quantity',
+        'product_id', 'sku', 'attributes', 'price', 'compare_at_price', 'stock_quantity',
         'image_id', 'woo_variation_id', 'is_active',
     ];
 
     protected $casts = [
         'attributes' => 'array',
         'price' => 'decimal:2',
+        'compare_at_price' => 'decimal:2',
         'stock_quantity' => 'integer',
         'is_active' => 'boolean',
     ];
