@@ -570,6 +570,22 @@
     </main>
 
     <footer class="mt-16 bg-ink-900 text-gold-100">
+        @php($footerTrust = collect(theme('trust_badges') ?? [])->filter(fn ($b) => filled($b['title'] ?? null)))
+        @if(theme('footer_show_trust') && $footerTrust->isNotEmpty())
+            <div class="border-b border-white/10">
+                <div class="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                    @foreach($footerTrust->take(3) as $b)
+                        <div class="flex items-center justify-center gap-2">
+                            @if(!empty($b['icon']))<span class="text-xl">{{ $b['icon'] }}</span>@endif
+                            <div class="text-left">
+                                <div class="text-sm font-medium text-gold-100">{{ $b['title'] }}</div>
+                                @if(!empty($b['text']))<div class="text-xs text-gold-100/60">{{ $b['text'] }}</div>@endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
         <div class="mx-auto max-w-7xl px-4 py-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
                 <div class="font-display text-xl font-bold text-gold-300">{{ theme('footer_brand') ?: \App\Models\Setting::get('store_name', config('store.name')) }}</div>
@@ -586,7 +602,7 @@
             <div>
                 <h3 class="text-sm font-semibold uppercase tracking-wide text-gold-300">Shop</h3>
                 <ul class="mt-3 space-y-2 text-sm text-gold-100/80">
-                    @foreach($navCategories ?? [] as $cat)
+                    @foreach($footerCategories ?? ($navCategories ?? []) as $cat)
                         <li><a href="{{ route('category.show', $cat) }}" class="hover:text-white">{{ $cat->name }}</a></li>
                     @endforeach
                 </ul>
@@ -619,6 +635,16 @@
             {{ theme('footer_copyright') ?: '© '.date('Y').' '.config('store.name').'. All rights reserved.' }}
         </div>
     </footer>
+
+    {{-- Back-to-top button (appears after scrolling down) --}}
+    <button type="button" x-data="{ show: false }"
+            x-init="window.addEventListener('scroll', () => show = window.scrollY > 600)"
+            x-show="show" x-cloak x-transition
+            @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+            aria-label="Back to top"
+            class="fixed bottom-20 md:bottom-5 left-5 z-40 w-11 h-11 rounded-full bg-ink-900/80 text-white shadow-lg backdrop-blur flex items-center justify-center hover:bg-ink-900 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+    </button>
 
     {{-- Floating contact stack: Call, Messenger, WhatsApp --}}
     @if(theme('show_call_button') || (theme('show_whatsapp_button') && theme('whatsapp_number')) || (theme('show_messenger_button') && theme('messenger_url')))

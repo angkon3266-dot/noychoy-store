@@ -68,9 +68,18 @@ class AppServiceProvider extends ServiceProvider
 
         // Shared data for the storefront layout (nav menu + cart badge).
         View::composer(['shop.*', 'components.shop.*', 'layouts.shop'], function ($view) {
-            $view->with('navCategories', Category::active()->whereNull('parent_id')
+            $nav = Category::active()->whereNull('parent_id')
                 ->with(['children' => fn ($q) => $q->active()])
-                ->orderBy('position')->get());
+                ->orderBy('position')->get();
+            $view->with('navCategories', $nav);
+
+            // Footer "Shop" column: admin-chosen categories in order, else the nav.
+            $footerIds = collect(theme('footer_category_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
+            $view->with('footerCategories', $footerIds->isEmpty()
+                ? $nav
+                : Category::active()->whereIn('id', $footerIds)->get()
+                    ->sortBy(fn ($c) => $footerIds->search($c->id))->values());
+
             $view->with('siteMenu', site_menu());
             $view->with('cartCount', app(CartService::class)->count());
         });

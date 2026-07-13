@@ -797,6 +797,23 @@
                 <label class="label">Copyright line</label>
                 <input name="footer_copyright" value="{{ $theme['footer_copyright'] ?? '' }}" class="input" placeholder="© {{ date('Y') }} {{ config('store.name') }}. All rights reserved.">
             </div>
+
+            {{-- Footer "Shop" categories (ordered; empty = show all top-level categories) --}}
+            <div class="border-t border-ink-100 pt-4">
+                @include('admin.partials._category-picker', [
+                    'field' => 'footer_category_ids',
+                    'label' => 'Footer “Shop” categories',
+                    'help' => 'Pick exactly which categories appear in the footer Shop column, in order. Leave empty to auto-show your top-level categories.',
+                    'selectedIds' => $theme['footer_category_ids'] ?? [],
+                    'allCategories' => $allCategories,
+                ])
+            </div>
+
+            {{-- Footer trust strip (reuses the editable trust badges) --}}
+            <div class="border-t border-ink-100 pt-4">
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="footer_show_trust" value="1" @checked($theme['footer_show_trust'] ?? false)> Show a trust strip in the footer</label>
+                <p class="text-xs text-ink-700/50 mt-1">Displays your <strong>Trust badges</strong> (edited in the Storefront trust strip section) as a reassurance row above the footer columns.</p>
+            </div>
         </div>
     </div>
 
