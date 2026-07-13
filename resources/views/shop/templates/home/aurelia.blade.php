@@ -19,7 +19,7 @@
         </div>
     </section>
 
-    @if($categories->isNotEmpty())
+    @if(home_content('show_categories') && $categories->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-14">
         <h2 class="font-display text-2xl font-semibold text-center mb-8">{{ home_content('categories_title') }}</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -35,7 +35,11 @@
     </section>
     @endif
 
-    @foreach([home_content('featured_title') => $featured, home_content('new_arrivals_title') => $newArrivals] as $label => $list)
+    @php
+        $aureliaRows = [home_content('featured_title') => $featured];
+        if (home_content('show_new_arrivals')) { $aureliaRows[home_content('new_arrivals_title')] = $newArrivals; }
+    @endphp
+    @foreach($aureliaRows as $label => $list)
         @if($list->isNotEmpty())
         <section class="mx-auto max-w-7xl px-4 py-8">
             <div class="flex items-center justify-between mb-6">

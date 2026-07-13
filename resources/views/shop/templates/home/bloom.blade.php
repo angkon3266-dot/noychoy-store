@@ -12,7 +12,7 @@
         </div>
     </section>
 
-    @if($categories->isNotEmpty())
+    @if(home_content('show_categories') && $categories->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-10">
         <div class="flex flex-wrap justify-center gap-3">
             @foreach($categories as $cat)
@@ -39,7 +39,7 @@
         </div>
     </section>
 
-    @if($newArrivals->isNotEmpty())
+    @if(home_content('show_new_arrivals') && $newArrivals->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-6">
         <h2 class="font-display text-2xl font-semibold mb-6 text-center">Fresh & new</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">

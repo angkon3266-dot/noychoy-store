@@ -18,7 +18,7 @@
         </div>
     </section>
 
-    @if($categories->isNotEmpty())
+    @if(home_content('show_categories') && $categories->isNotEmpty())
     <section class="bg-ink-800">
         <div class="mx-auto max-w-7xl px-4 py-3 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-gold-100/80">
             @foreach($categories as $cat)<a href="{{ route('category.show', $cat) }}" class="hover:text-gold-300 uppercase tracking-wide">{{ $cat->name }}</a>@endforeach
@@ -35,7 +35,7 @@
     </section>
     @endif
 
-    @if($newArrivals->isNotEmpty())
+    @if(home_content('show_new_arrivals') && $newArrivals->isNotEmpty())
     <section class="bg-gold-100/40">
         <div class="mx-auto max-w-7xl px-4 py-16">
             <h2 class="font-display text-2xl font-semibold mb-8 text-center">New creations</h2>

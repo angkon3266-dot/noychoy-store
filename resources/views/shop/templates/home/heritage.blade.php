@@ -12,7 +12,7 @@
         </div>
     </section>
 
-    @if($categories->isNotEmpty())
+    @if(home_content('show_categories') && $categories->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-12">
         <h2 class="font-display text-2xl font-semibold text-center mb-8">Our collections</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -37,7 +37,7 @@
     </section>
     @endif
 
-    @if($newArrivals->isNotEmpty())
+    @if(home_content('show_new_arrivals') && $newArrivals->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-10">
         <div class="text-center mb-8"><h2 class="font-display text-2xl font-semibold">New Arrivals</h2><div class="mx-auto mt-2 h-px w-24 bg-gold-400"></div></div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">

@@ -41,7 +41,7 @@
 </section>
 
 {{-- ── Category lookbook ─────────────────────────────────────────────── --}}
-@if($cats->isNotEmpty())
+@if(home_content('show_categories') && $cats->isNotEmpty())
 <section class="mx-auto max-w-7xl px-4 py-16 lg:py-24">
     <div class="flex items-end justify-between mb-10">
         <div>
@@ -106,7 +106,7 @@
 </section>
 
 {{-- ── New arrivals ──────────────────────────────────────────────────── --}}
-@if($newArrivals->isNotEmpty())
+@if(home_content('show_new_arrivals') && $newArrivals->isNotEmpty())
 <section class="mx-auto max-w-7xl px-4 pb-20">
     <div class="flex items-end justify-between mb-10">
         <h2 class="font-display text-3xl sm:text-4xl text-ink-900">{{ home_content('new_arrivals_title') ?: 'New Arrivals' }}</h2>

@@ -22,7 +22,7 @@
         </div>
     </section>
 
-    @if($categories->isNotEmpty())
+    @if(home_content('show_categories') && $categories->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-12">
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             @foreach($categories as $cat)
@@ -49,7 +49,7 @@
         </div>
     </section>
 
-    @if($newArrivals->isNotEmpty())
+    @if(home_content('show_new_arrivals') && $newArrivals->isNotEmpty())
     <section class="mx-auto max-w-7xl px-4 py-12">
         <h2 class="font-display text-2xl font-semibold mb-6">Just dropped</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
