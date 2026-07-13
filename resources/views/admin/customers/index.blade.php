@@ -3,6 +3,12 @@
 @section('heading', 'Customers')
 
 @section('content')
+<div class="flex items-center justify-end mb-3">
+    <a href="{{ route('admin.customers.all-offers') }}" class="btn-outline text-sm inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+        Member offers
+    </a>
+</div>
 {{-- Analytics --}}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
     <div class="card p-4"><div class="text-xs text-ink-700/50">Total customers</div><div class="text-2xl font-semibold">{{ number_format($analytics['total']) }}</div></div>

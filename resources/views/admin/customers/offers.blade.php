@@ -1,10 +1,10 @@
 @extends('layouts.admin')
-@section('title', 'Customer offers')
-@section('heading', 'Customer offers')
+@section('title', 'Member offers')
+@section('heading', 'Member offers')
 
 @section('content')
 <p class="text-sm text-ink-700/60 mb-4 max-w-3xl">
-    Every personalized offer you've given to individual customers. Create them from a customer's page
+    Every personalized offer you've given to individual members. Create them from a customer's page
     (<a href="{{ route('admin.customers.index') }}" class="text-gold-700 underline">Customers</a> → open a customer → Personalised offers),
     or apply one to many at once from the customer list.
 </p>
