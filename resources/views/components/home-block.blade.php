@@ -77,6 +77,33 @@
         </section>
     @endif
 
+@elseif($type === 'cta_banner')
+    @php
+        $cta = $block['cta'] ?? [];
+        $ctaImg = $img($cta['image'] ?? null);
+        $align = in_array($cta['align'] ?? 'center', ['left', 'center', 'right'], true) ? $cta['align'] : 'center';
+        $alignCls = ['left' => 'text-left', 'right' => 'text-right ml-auto', 'center' => 'text-center mx-auto'][$align];
+        $height = ['sm' => 'min-h-[280px]', 'md' => 'min-h-[420px]', 'lg' => 'min-h-[560px]'][$cta['height'] ?? 'md'] ?? 'min-h-[420px]';
+    @endphp
+    @if($ctaImg || filled($cta['heading'] ?? null))
+    <section class="relative w-full {{ $height }} flex overflow-hidden my-6">
+        @if($ctaImg)<img src="{{ $ctaImg }}" alt="" class="absolute inset-0 w-full h-full object-cover">@endif
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative z-10 mx-auto max-w-7xl w-full px-6 py-12 flex flex-col justify-center">
+            <div class="max-w-xl {{ $alignCls }}">
+                @if(filled($cta['eyebrow'] ?? null))<p class="uppercase tracking-[0.3em] text-xs text-white/80 mb-3">{{ $cta['eyebrow'] }}</p>@endif
+                @if(filled($cta['heading'] ?? null))<h2 class="font-display text-3xl sm:text-5xl font-semibold text-white leading-tight">{{ $cta['heading'] }}</h2>@endif
+                @if(filled($cta['subheading'] ?? null))<p class="mt-4 text-white/85 text-lg">{{ $cta['subheading'] }}</p>@endif
+                @if(filled($cta['button_text'] ?? null))
+                    <div class="mt-7">
+                        <a href="{{ $cta['button_link'] ?: route('shop') }}" class="inline-flex items-center gap-2 rounded-full bg-white text-ink-900 px-8 py-3.5 text-sm tracking-wide hover:bg-gold-100 transition">{{ $cta['button_text'] }}</a>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </section>
+    @endif
+
 @elseif($type === 'richtext')
     @if(filled($block['html'] ?? null))
         <section class="mx-auto max-w-4xl px-4 py-8 prose prose-sm sm:prose">{!! $block['html'] !!}</section>

@@ -373,6 +373,7 @@
                 <div class="flex items-center gap-2 mb-2">
                     <select x-model="b.type" class="input py-1.5 w-48 text-sm">
                         <option value="banner">Promo banner(s)</option>
+                        <option value="cta_banner">CTA banner (image + text + button)</option>
                         <option value="product_carousel">Product carousel</option>
                         <option value="banner_carousel">Banner + products</option>
                         <option value="video">Video row</option>
@@ -433,6 +434,32 @@
                     <input x-model="b.banner.link" class="input py-1.5 text-sm w-36" placeholder="link">
                 </div>
 
+                {{-- CTA banner (image + overlay text + button) --}}
+                <div x-show="b.type==='cta_banner'" class="space-y-2">
+                    <div class="flex gap-2 items-center">
+                        <template x-if="b.cta.image">
+                            <img :src="b.cta.image.startsWith('http') || b.cta.image.startsWith('/') ? b.cta.image : '/storage/'+b.cta.image" class="w-14 h-10 object-cover rounded border border-ink-100 shrink-0">
+                        </template>
+                        <input x-model="b.cta.image" class="input py-1.5 text-sm flex-1" placeholder="background image path or URL">
+                        <button type="button" @click="$store.mediaLib.openWith(u => b.cta.image = u, 'sections')" class="btn-outline py-1 text-xs shrink-0">Library</button>
+                        <input type="file" :name="`block_cta[${bi}]`" accept="image/*" class="text-xs w-32">
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-2">
+                        <input x-model="b.cta.eyebrow" class="input py-1.5 text-sm" placeholder="Eyebrow (small text)">
+                        <input x-model="b.cta.heading" class="input py-1.5 text-sm" placeholder="Heading">
+                        <input x-model="b.cta.subheading" class="input py-1.5 text-sm sm:col-span-2" placeholder="Subheading">
+                        <input x-model="b.cta.button_text" class="input py-1.5 text-sm" placeholder="Button text (e.g. Take a look)">
+                        <input x-model="b.cta.button_link" class="input py-1.5 text-sm" placeholder="Button link (defaults to Shop)">
+                        <div><label class="label text-xs">Text position</label>
+                            <select x-model="b.cta.align" class="input py-1.5 text-sm w-full"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
+                        </div>
+                        <div><label class="label text-xs">Height</label>
+                            <select x-model="b.cta.height" class="input py-1.5 text-sm w-full"><option value="sm">Short</option><option value="md">Medium</option><option value="lg">Tall</option></select>
+                        </div>
+                    </div>
+                    <p class="text-xs text-ink-700/50">Full-width banner with your image behind heading + button — like a hero promo strip.</p>
+                </div>
+
                 {{-- Video --}}
                 <div x-show="b.type==='video'" class="space-y-2">
                     <template x-for="(v, vi) in b.videos" :key="vi">
@@ -457,6 +484,7 @@
             <select x-model="newType" class="input py-1.5 w-48 text-sm">
                 <option value="product_carousel">Product carousel</option>
                 <option value="banner">Promo banner(s)</option>
+                <option value="cta_banner">CTA banner (image + text + button)</option>
                 <option value="banner_carousel">Banner + products</option>
                 <option value="video">Video row</option>
                 <option value="richtext">Rich text / HTML</option>

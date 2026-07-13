@@ -114,6 +114,8 @@ class AppearanceController extends Controller
             'block_image.*.*' => ['nullable', 'image', 'max:4096'],
             'block_banner' => ['nullable', 'array'],
             'block_banner.*' => ['nullable', 'image', 'max:4096'],
+            'block_cta' => ['nullable', 'array'],
+            'block_cta.*' => ['nullable', 'image', 'max:4096'],
 
             // Floating contact buttons
             'messenger_url' => ['nullable', 'string', 'max:255'],
@@ -285,6 +287,11 @@ class AppearanceController extends Controller
                     $blocks[$bi]['banner']['image'] = $file->store('sections', 'public');
                 }
             }
+            foreach ((array) $request->file('block_cta', []) as $bi => $file) {
+                if ($file && $file->isValid()) {
+                    $blocks[$bi]['cta']['image'] = $file->store('sections', 'public');
+                }
+            }
             $home['sections'] = $this->normalizeSections($blocks);
         }
 
@@ -396,7 +403,7 @@ class AppearanceController extends Controller
     /** Sanitise builder blocks to a known shape before storing. */
     protected function normalizeSections(array $blocks): array
     {
-        $types = ['banner', 'product_carousel', 'banner_carousel', 'video', 'richtext'];
+        $types = ['banner', 'product_carousel', 'banner_carousel', 'cta_banner', 'video', 'richtext'];
 
         return collect($blocks)->map(function ($b) use ($types) {
             $type = in_array($b['type'] ?? '', $types, true) ? $b['type'] : null;
@@ -424,6 +431,18 @@ class AppearanceController extends Controller
                 $out['banner'] = [
                     'image' => trim((string) ($b['banner']['image'] ?? '')),
                     'link' => trim((string) ($b['banner']['link'] ?? '')),
+                ];
+            }
+            if ($type === 'cta_banner') {
+                $out['cta'] = [
+                    'image' => trim((string) ($b['cta']['image'] ?? '')),
+                    'eyebrow' => trim((string) ($b['cta']['eyebrow'] ?? '')),
+                    'heading' => trim((string) ($b['cta']['heading'] ?? '')),
+                    'subheading' => trim((string) ($b['cta']['subheading'] ?? '')),
+                    'button_text' => trim((string) ($b['cta']['button_text'] ?? '')),
+                    'button_link' => trim((string) ($b['cta']['button_link'] ?? '')),
+                    'align' => in_array($b['cta']['align'] ?? 'center', ['left', 'center', 'right'], true) ? $b['cta']['align'] : 'center',
+                    'height' => in_array($b['cta']['height'] ?? 'md', ['sm', 'md', 'lg'], true) ? $b['cta']['height'] : 'md',
                 ];
             }
             if ($type === 'video') {

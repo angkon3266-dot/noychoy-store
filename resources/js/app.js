@@ -217,15 +217,16 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('homeBuilder', (init) => ({
         blocks: (init && init.blocks) || [],
         newType: 'product_carousel',
+        blankCta() { return { image: '', eyebrow: '', heading: '', subheading: '', button_text: '', button_link: '', align: 'center', height: 'md' }; },
         add() {
             this.blocks.push({ type: this.newType, enabled: true, title: '', layout: 'single',
-                images: [], videos: [], source: 'new', category_id: '', limit: 10, view_all_link: '', banner: { image: '', link: '' }, html: '' });
+                images: [], videos: [], source: 'new', category_id: '', limit: 10, view_all_link: '', banner: { image: '', link: '' }, cta: this.blankCta(), html: '' });
         },
         remove(i) { this.blocks.splice(i, 1); },
         move(i, d) { const j = i + d; if (j < 0 || j >= this.blocks.length) return; [this.blocks[i], this.blocks[j]] = [this.blocks[j], this.blocks[i]]; },
         addImage(b) { if (!b.images) b.images = []; b.images.push({ image: '', link: '' }); },
         addVideo(b) { if (!b.videos) b.videos = []; b.videos.push({ title: '', url: '' }); },
-        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; return ''; },
+        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); return ''; },
     }));
 
     // ── Admin: Discover page tile builder (image + name + link) ─────────────
