@@ -668,8 +668,14 @@ class ProductController extends Controller
 
         if ($request->hasFile('images')) {
             $optimizer = app(ImageOptimizer::class);
+            $watermark = app(\App\Services\WatermarkService::class);
+            $autoStamp = ! empty($watermark->settings()['auto_products']) && $watermark->isReady();
             foreach ($request->file('images') as $file) {
-                $paths[] = $optimizer->storeWebp($file, 'products');
+                $stored = $optimizer->storeWebp($file, 'products');
+                if ($autoStamp) {
+                    $watermark->applyToPath($stored);   // only new device uploads, not library picks
+                }
+                $paths[] = $stored;
             }
         }
 

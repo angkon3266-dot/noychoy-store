@@ -101,6 +101,7 @@ Route::middleware('admin')->group(function () {
     Route::post('media/convert', [\App\Http\Controllers\Admin\MediaController::class, 'convert'])->name('media.convert');
     Route::post('media/watermark', [\App\Http\Controllers\Admin\MediaController::class, 'watermark'])->name('media.watermark');
     Route::post('media/watermark-settings', [\App\Http\Controllers\Admin\MediaController::class, 'watermarkSettings'])->name('media.watermark-settings');
+    Route::post('media/watermark-preview', [\App\Http\Controllers\Admin\MediaController::class, 'watermarkPreview'])->name('media.watermark-preview');
     Route::delete('media', [\App\Http\Controllers\Admin\MediaController::class, 'destroy'])->name('media.destroy');
 
     // Suppliers & purchase orders (sourcing / procurement)

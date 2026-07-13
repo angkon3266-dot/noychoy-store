@@ -26,8 +26,8 @@
 @endif
 
 {{-- Watermark settings --}}
-<div class="card p-4 mb-4" x-data="{ open: false, type: '{{ $watermark['type'] }}' }">
-    <button type="button" @click="open = !open" class="w-full flex items-center justify-between text-left">
+<div class="card p-4 mb-4" x-data="watermarkPanel('{{ $watermark['type'] }}', '{{ route('admin.media.watermark-preview') }}')">
+    <button type="button" @click="open = !open; if(open) $nextTick(() => refresh())" class="w-full flex items-center justify-between text-left">
         <span class="text-sm font-medium">🖋️ Watermark settings
             <span class="text-xs font-normal text-ink-700/50">— {{ $watermark['type'] === 'logo' ? 'Logo' : 'Text' }} · {{ str_replace('-', ' ', $watermark['position']) }} · {{ $watermark['opacity'] }}%
                 @unless($watermarkReady)<span class="text-amber-600">· needs a {{ $watermark['type'] === 'logo' ? 'logo' : 'font' }}</span>@endunless
@@ -35,8 +35,22 @@
         </span>
         <span x-text="open ? '▲' : '▼'" class="text-ink-700/40 text-xs"></span>
     </button>
-    <form x-show="open" x-cloak action="{{ route('admin.media.watermark-settings') }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-4 border-t border-ink-100 pt-4">
+    <form x-show="open" x-cloak x-ref="form" action="{{ route('admin.media.watermark-settings') }}" method="POST" enctype="multipart/form-data"
+          @input.debounce.500ms="refresh()" @change.debounce.500ms="refresh()"
+          class="mt-4 space-y-4 border-t border-ink-100 pt-4">
         @csrf
+
+        {{-- Live preview --}}
+        <div>
+            <label class="label">Live preview <span class="text-xs font-normal text-ink-700/40" x-show="loading">rendering…</span></label>
+            <div class="rounded-lg border border-ink-100 bg-ink-100 overflow-hidden min-h-[120px] flex items-center justify-center">
+                <template x-if="previewSrc"><img :src="previewSrc" class="max-h-72 w-auto" alt="watermark preview"></template>
+                <template x-if="!previewSrc && !err"><span class="text-xs text-ink-700/40 p-4" x-text="loading ? 'Rendering…' : 'Adjust settings to preview'"></span></template>
+                <template x-if="err"><span class="text-xs text-amber-600 p-4" x-text="err"></span></template>
+            </div>
+            <p class="text-xs text-ink-700/50 mt-1">Shown on your newest product photo — exactly how it will be baked in.</p>
+        </div>
+
         <div class="flex gap-4 text-sm">
             <label class="flex items-center gap-2"><input type="radio" name="type" value="text" x-model="type"> Text</label>
             <label class="flex items-center gap-2"><input type="radio" name="type" value="logo" x-model="type"> Logo / image</label>
@@ -90,9 +104,48 @@
                 <input type="range" name="margin" min="0" max="30" step="1" x-model="v" class="w-full">
             </div>
         </div>
+        <label class="flex items-center gap-2 text-sm border-t border-ink-100 pt-3">
+            <input type="checkbox" name="auto_products" value="1" @checked($watermark['auto_products'] ?? false)>
+            Automatically watermark newly uploaded <strong>product</strong> images
+            <span class="text-xs text-ink-700/50">(only new device uploads — never your logo, hero or existing library images)</span>
+        </label>
         <button class="btn-primary text-sm py-2">Save watermark settings</button>
     </form>
 </div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('watermarkPanel', (initialType, previewUrl) => ({
+        open: false,
+        type: initialType,
+        previewUrl,
+        previewSrc: '',
+        err: '',
+        loading: false,
+        async refresh() {
+            if (!this.open) return;
+            this.loading = true; this.err = '';
+            try {
+                const r = await fetch(this.previewUrl, {
+                    method: 'POST',
+                    body: new FormData(this.$refs.form),
+                    headers: { Accept: 'application/json' },
+                });
+                if (!r.ok) {
+                    let msg = 'Preview unavailable.';
+                    try { const j = await r.json(); if (j.error) msg = j.error; } catch (_) {}
+                    this.err = msg; this.previewSrc = '';
+                } else {
+                    const blob = await r.blob();
+                    if (this.previewSrc) URL.revokeObjectURL(this.previewSrc);
+                    this.previewSrc = URL.createObjectURL(blob);
+                }
+            } catch (_) { this.err = 'Preview failed.'; }
+            this.loading = false;
+        },
+    }));
+});
+</script>
 
 {{-- Filters --}}
 <form method="GET" class="flex flex-wrap items-center gap-2 mb-4">

@@ -24,6 +24,7 @@ class WatermarkService
         'size' => 6,                 // % of image width (text: font size · logo: width)
         'color' => '#ffffff',        // text colour
         'margin' => 4,               // % of image width, distance from the edge
+        'auto_products' => false,    // auto-stamp newly uploaded product images
     ];
 
     public function settings(): array
@@ -59,15 +60,34 @@ class WatermarkService
     {
         $disk = Storage::disk('public');
         $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-        if (! $disk->exists($relativePath) || ! $this->canApply() || ! in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+        if (! $disk->exists($relativePath) || ! in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
             return false;
         }
-        $cfg = $cfg ?: $this->settings();
+
+        $out = $this->render($disk->get($relativePath), $cfg ?: $this->settings(), $ext);
+        if ($out === null) {
+            return false;
+        }
+        $disk->put($relativePath, $out);
+
+        return true;
+    }
+
+    /**
+     * Watermark raw image bytes and return the encoded result (no disk writes).
+     * Used by applyToPath and by the live preview. Returns null on failure.
+     */
+    public function render(string $binary, array $cfg, string $ext = 'png'): ?string
+    {
+        if (! $this->canApply()) {
+            return null;
+        }
+        $ext = strtolower($ext);
 
         try {
-            $base = @imagecreatefromstring($disk->get($relativePath));
+            $base = @imagecreatefromstring($binary);
             if ($base === false) {
-                return false;
+                return null;
             }
             imagepalettetotruecolor($base);
             imagealphablending($base, true);
@@ -80,28 +100,26 @@ class WatermarkService
             if (! $ok) {
                 imagedestroy($base);
 
-                return false;
+                return null;
             }
 
             ob_start();
-            if ($ext === 'png') {
+            if ($ext === 'webp') {
+                imagewebp($base, null, 85);
+            } elseif (in_array($ext, ['jpg', 'jpeg'], true)) {
+                imagejpeg($base, null, 85);
+            } else {
                 imagesavealpha($base, true);
                 imagepng($base, null, 6);
-            } elseif ($ext === 'webp') {
-                imagewebp($base, null, 85);
-            } else {
-                imagejpeg($base, null, 85);
             }
             $out = ob_get_clean();
             imagedestroy($base);
 
-            $disk->put($relativePath, $out);
-
-            return true;
+            return $out;
         } catch (\Throwable $e) {
-            Log::warning('watermark failed', ['path' => $relativePath, 'error' => $e->getMessage()]);
+            Log::warning('watermark render failed', ['error' => $e->getMessage()]);
 
-            return false;
+            return null;
         }
     }
 

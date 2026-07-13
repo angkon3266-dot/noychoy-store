@@ -275,6 +275,7 @@ class MediaController extends Controller
         $cfg['size'] = (int) $data['size'];
         $cfg['color'] = $data['color'] ?: '#ffffff';
         $cfg['margin'] = (int) $data['margin'];
+        $cfg['auto_products'] = $request->boolean('auto_products');
 
         if ($request->hasFile('font_file')) {
             if (! empty($cfg['font_path'])) {
@@ -292,6 +293,87 @@ class MediaController extends Controller
         Setting::put('watermark', $cfg);
 
         return back()->with('success', 'Watermark settings saved.');
+    }
+
+    /**
+     * Render a live watermark preview from the (unsaved) settings onto a sample
+     * store image and stream it back as PNG. Honours a just-selected font/logo
+     * file so the preview matches before you save.
+     */
+    public function watermarkPreview(Request $request, WatermarkService $watermark)
+    {
+        $request->validate([
+            'type' => ['required', 'in:text,logo'],
+            'text' => ['nullable', 'string', 'max:60'],
+            'position' => ['required', 'in:top-left,top-right,bottom-left,bottom-right,center'],
+            'opacity' => ['required', 'integer', 'min:5', 'max:100'],
+            'size' => ['required', 'integer', 'min:2', 'max:60'],
+            'color' => ['nullable', 'string', 'max:9'],
+            'margin' => ['required', 'integer', 'min:0', 'max:30'],
+            'font_file' => ['nullable', 'file', 'extensions:ttf,otf', 'max:8192'],
+            'logo_file' => ['nullable', 'image', 'mimes:png,webp', 'max:4096'],
+        ]);
+
+        $disk = Storage::disk('public');
+        $cfg = array_merge($watermark->settings(), $request->only([
+            'type', 'text', 'position', 'opacity', 'size', 'color', 'margin',
+        ]));
+        $cfg['opacity'] = (int) $cfg['opacity'];
+        $cfg['size'] = (int) $cfg['size'];
+        $cfg['margin'] = (int) $cfg['margin'];
+
+        // Temp-store a just-selected font/logo so the preview uses it pre-save.
+        $temps = [];
+        if ($request->hasFile('font_file')) {
+            $cfg['font_path'] = $temps[] = $request->file('font_file')->store('watermark/tmp', 'public');
+        }
+        if ($request->hasFile('logo_file')) {
+            $cfg['logo_path'] = $temps[] = $request->file('logo_file')->store('watermark/tmp', 'public');
+        }
+
+        try {
+            $sample = $this->sampleImageBinary();
+            $png = $sample ? $watermark->render($sample, $cfg, 'png') : null;
+        } finally {
+            foreach ($temps as $t) {
+                $disk->delete($t);
+            }
+        }
+
+        if ($png === null) {
+            return response()->json(['error' => $cfg['type'] === 'logo'
+                ? 'Add a logo image to preview.'
+                : 'Text preview needs a font file (.ttf/.otf) and server FreeType.'], 422);
+        }
+
+        return response($png, 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'no-store']);
+    }
+
+    /** A representative store image (newest product photo) or a neutral fallback. */
+    protected function sampleImageBinary(): ?string
+    {
+        $disk = Storage::disk('public');
+        $path = ProductImage::latest('id')->value('path');
+        if ($path && $disk->exists($path)) {
+            return $disk->get($path);
+        }
+        // Neutral gradient fallback so preview still works on a fresh store.
+        if (! function_exists('imagecreatetruecolor')) {
+            return null;
+        }
+        $w = 900;
+        $h = 600;
+        $img = imagecreatetruecolor($w, $h);
+        for ($y = 0; $y < $h; $y++) {
+            $c = imagecolorallocate($img, 70 + (int) ($y / $h * 90), 90 + (int) ($y / $h * 70), 120 + (int) ($y / $h * 60));
+            imageline($img, 0, $y, $w, $y, $c);
+        }
+        ob_start();
+        imagejpeg($img, null, 90);
+        $bin = ob_get_clean();
+        imagedestroy($img);
+
+        return $bin;
     }
 
     /** Stamp the configured watermark onto the selected images, in place. */
