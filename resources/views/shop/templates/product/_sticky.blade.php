@@ -1,6 +1,6 @@
 {{-- Sticky buy bar — always on mobile, on scroll for desktop. Expects `productPage` scope. --}}
 @if(theme('sticky_buy_bar') && ($product->isAvailable() || $product->isPreorder()))
-    @php($preorder = $product->isPreorder())
+    @php $preorder = $product->isPreorder(); @endphp
     <div x-data="{ scrolled: false }" @scroll.window="scrolled = window.scrollY > 700">
         <div class="fixed bottom-14 md:bottom-0 inset-x-0 z-40 bg-white border-t border-ink-100 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] transition-transform"
              :class="(scrolled || window.innerWidth < 768) ? 'translate-y-0' : 'translate-y-full md:translate-y-full'">

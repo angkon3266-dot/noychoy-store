@@ -142,7 +142,7 @@
                                                         <span class="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{{ $offer->rewardText() }}</span>
                                                         @if($offer->applies_to !== 'all')<span class="inline-block text-[10px] text-ink-700/60 ml-1">· {{ $offer->scopeLabel() }}</span>@endif
                                                         @if($offer->message)<p class="text-xs text-ink-700/70 italic mt-1">{{ $offer->message }}</p>@endif
-                                                        <p class="text-xs text-green-700 mt-1">✓ Applied automatically at checkout@if($offer->expires_at) · until {{ $offer->expires_at->format('d M') }}@endif</p>
+                                                        <p class="text-xs text-green-700 mt-1">✓ Applied automatically at checkout{{ $offer->expires_at ? ' · until '.$offer->expires_at->format('d M') : '' }}</p>
                                                     </div>
                                                     @if($offer->code)
                                                         <span class="shrink-0 font-mono text-xs rounded-full border border-gold-300 px-2.5 py-1 bg-gold-50">{{ $offer->code }}</span>

@@ -27,7 +27,7 @@
             @endif
         </div>
         <h3 class="mt-3 text-sm font-medium text-ink-800 line-clamp-2 group-hover:text-gold-700">{{ $product->name }}</h3>
-        @php($cardRating = $product->average_rating)
+        @php $cardRating = $product->average_rating; @endphp
         @if($cardRating)
             <div class="mt-1 flex items-center gap-1 text-xs">
                 <span class="text-gold-500">{{ str_repeat('★', (int) round($cardRating)) }}<span class="text-ink-200">{{ str_repeat('★', 5 - (int) round($cardRating)) }}</span></span>

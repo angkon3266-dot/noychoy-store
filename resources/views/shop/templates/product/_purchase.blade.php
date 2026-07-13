@@ -93,7 +93,7 @@
                             <span class="badge bg-gold-600 text-white text-[10px] mr-1">{{ $o->rewardText() }}</span>
                             <strong>{{ $o->title }}</strong>
                             @if($o->message)<span class="block text-xs text-ink-700/70 italic mt-0.5">{{ $o->message }}</span>@endif
-                            <span class="block text-xs text-green-700 mt-0.5">Applied automatically at checkout@if($o->expires_at) · until {{ $o->expires_at->format('d M Y') }}@endif</span>
+                            <span class="block text-xs text-green-700 mt-0.5">Applied automatically at checkout{{ $o->expires_at ? ' · until '.$o->expires_at->format('d M Y') : '' }}</span>
                         </li>
                     @endforeach
                 </ul>
@@ -175,9 +175,9 @@
     @endif
 
     {{-- Actions --}}
-    @php($preorder = $product->isPreorder())
+    @php $preorder = $product->isPreorder(); @endphp
     @if($product->isAvailable() || $preorder)
-        @php($bookLabel = $preorder ? 'Book now (Pre-order)' : 'Buy now')
+        @php $bookLabel = $preorder ? 'Book now (Pre-order)' : 'Buy now'; @endphp
         <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <form action="{{ route('cart.add', $product) }}" method="POST" @submit.prevent="fireAddToCart($event.target); $store.cart.add($event.target)">
                 @csrf
@@ -199,7 +199,7 @@
 
     {{-- Order / ask via WhatsApp --}}
     @if(theme('show_pdp_whatsapp') && ($waNum = theme('whatsapp_number')))
-        @php($waMsg = rawurlencode('Hi! I\'m interested in "'.$product->name.'" — '.route('product.show', $product)))
+        @php $waMsg = rawurlencode('Hi! I\'m interested in "'.$product->name.'" — '.route('product.show', $product)); @endphp
         <a href="https://wa.me/{{ preg_replace('/\D/', '', $waNum) }}?text={{ $waMsg }}" target="_blank" rel="noopener"
            class="mt-3 flex items-center justify-center gap-2 rounded-md border border-[#25D366]/40 bg-[#25D366]/10 px-4 py-2.5 text-sm font-medium text-[#128C7E] hover:bg-[#25D366]/20 transition">
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413z"/></svg>
