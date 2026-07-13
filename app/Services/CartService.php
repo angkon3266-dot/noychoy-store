@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Coupon;
+use App\Models\CustomerOffer;
 use App\Models\Offer;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Setting;
@@ -172,19 +174,74 @@ class CartService
         return $this->matchingOffers()->contains(fn (Offer $o) => $o->type === 'free_shipping');
     }
 
-    /** Extra "thanks for registering" discount for logged-in customers (Admin → Offers). */
+    /**
+     * Extra "thanks for registering" discount for logged-in customers (Admin →
+     * Offers). Capped to 2 orders per rolling 7 days per customer.
+     */
     public function memberSignupDiscount(): float
     {
-        if (! auth('customer')->check()) {
+        $customer = auth('customer')->user();
+        if (! $customer) {
             return 0.0;
         }
         $pct = (float) Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 0));
         if ($pct <= 0) {
             return 0.0;
         }
+        // Members may avail this discount at most twice in any 7-day window.
+        $usedThisWeek = Order::where('customer_id', $customer->id)
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+        if ($usedThisWeek >= 2) {
+            return 0.0;
+        }
 
         return round($this->promoBase() * $pct / 100, 2);
     }
+
+    // ── Personalized customer offers (auto-applied best eligible) ──────────────
+
+    /** The single best live personalized offer for the logged-in customer. */
+    public function customerOffer(): ?CustomerOffer
+    {
+        if ($this->customerOfferResolved) {
+            return $this->resolvedCustomerOffer;
+        }
+        $this->customerOfferResolved = true;
+        $this->resolvedCustomerOffer = null;
+
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return null;
+        }
+
+        $best = null;
+        $bestAmount = -1.0;
+        foreach ($customer->offers()->live()->get() as $offer) {
+            $amount = $offer->discountFor($this);
+            $value = $amount > 0 ? $amount : ($offer->grantsFreeShipping($this) ? 0.01 : -1);
+            if ($value > $bestAmount) {
+                $bestAmount = $value;
+                $best = $offer;
+            }
+        }
+
+        return $this->resolvedCustomerOffer = $best;
+    }
+
+    public function customerOfferDiscount(): float
+    {
+        return round((float) ($this->customerOffer()?->discountFor($this) ?? 0), 2);
+    }
+
+    public function hasCustomerFreeShipping(): bool
+    {
+        return (bool) $this->customerOffer()?->grantsFreeShipping($this);
+    }
+
+    protected ?CustomerOffer $resolvedCustomerOffer = null;
+
+    protected bool $customerOfferResolved = false;
 
     // ── Coupons ───────────────────────────────────────────────────────────
     public function applyCoupon(Coupon $coupon): void
@@ -200,7 +257,7 @@ class CartService
     /** Base the coupon is calculated against: subtotal after product + auto offers. */
     protected function couponBase(): float
     {
-        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount());
+        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount() - $this->customerOfferDiscount());
     }
 
     public function coupon(): ?Coupon
@@ -236,7 +293,7 @@ class CartService
     /** Discountable base before any points are applied. */
     protected function baseBeforePoints(): float
     {
-        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount() - $this->couponDiscount());
+        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount() - $this->customerOfferDiscount() - $this->couponDiscount());
     }
 
     /** Whole points that will actually be redeemed for this cart (0 for guests). */
@@ -261,10 +318,10 @@ class CartService
         return app(LoyaltyService::class)->pointsValue($this->redeemablePoints());
     }
 
-    /** Total discount = quantity offers + auto promo offers + member + coupon + points. */
+    /** Total discount = quantity offers + auto promo offers + member + personalized + coupon + points. */
     public function discount(): float
     {
-        return round($this->offerDiscount() + $this->promoDiscount() + $this->memberSignupDiscount() + $this->couponDiscount() + $this->pointsDiscount(), 2);
+        return round($this->offerDiscount() + $this->promoDiscount() + $this->memberSignupDiscount() + $this->customerOfferDiscount() + $this->couponDiscount() + $this->pointsDiscount(), 2);
     }
 
     /**
@@ -298,6 +355,10 @@ class CartService
             $lines[] = ['label' => $label, 'amount' => round($this->memberSignupDiscount(), 2)];
         }
 
+        if (($cOffer = $this->customerOffer()) && $this->customerOfferDiscount() > 0) {
+            $lines[] = ['label' => ($cOffer->title ?: 'Your exclusive offer').' · for you', 'amount' => round($this->customerOfferDiscount(), 2)];
+        }
+
         if (($coupon = $this->coupon()) && $this->couponDiscount() > 0) {
             $lines[] = ['label' => 'Coupon '.$coupon->code, 'amount' => round($this->couponDiscount(), 2)];
         }
@@ -312,7 +373,7 @@ class CartService
     /** True if free delivery is currently unlocked (coupon, offer or threshold). */
     public function hasFreeShipping(): bool
     {
-        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer()) {
+        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
             return true;
         }
         $threshold = config('store.shipping.free_threshold');
@@ -354,7 +415,7 @@ class CartService
     public function shipping(bool $insideDhaka = false): float
     {
         // Free shipping from a coupon or an active offer overrides everything.
-        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer()) {
+        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
             return 0.0;
         }
         $threshold = config('store.shipping.free_threshold');

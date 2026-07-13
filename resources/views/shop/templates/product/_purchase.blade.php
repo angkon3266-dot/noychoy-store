@@ -78,6 +78,29 @@
         </div>
     @endif
 
+    {{-- Personalized offers for the logged-in customer (auto-applied at checkout) --}}
+    @auth('customer')
+        @php
+            $myOffers = auth('customer')->user()->offers()->live()->get()
+                ->filter(fn ($o) => $o->appliesToProduct($product))->values();
+        @endphp
+        @if($myOffers->isNotEmpty())
+            <div class="mt-5 rounded-xl border-2 border-gold-400 bg-gradient-to-r from-gold-100/80 to-white p-4">
+                <p class="text-sm font-semibold text-gold-800 flex items-center gap-1.5">🎁 Exclusive offer just for you</p>
+                <ul class="mt-2 space-y-2">
+                    @foreach($myOffers as $o)
+                        <li class="text-sm text-ink-800">
+                            <span class="badge bg-gold-600 text-white text-[10px] mr-1">{{ $o->rewardText() }}</span>
+                            <strong>{{ $o->title }}</strong>
+                            @if($o->message)<span class="block text-xs text-ink-700/70 italic mt-0.5">{{ $o->message }}</span>@endif
+                            <span class="block text-xs text-green-700 mt-0.5">Applied automatically at checkout@if($o->expires_at) · until {{ $o->expires_at->format('d M Y') }}@endif</span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+    @endauth
+
     {{-- Delivery estimate --}}
     @if(theme('show_delivery_estimate'))
         @php

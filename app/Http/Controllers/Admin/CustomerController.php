@@ -56,6 +56,21 @@ class CustomerController extends Controller
         return view('admin.customers.index', compact('customers', 'analytics', 'sort'));
     }
 
+    /** All personalized offers across customers — the "customized offers" hub. */
+    public function offersIndex(Request $request)
+    {
+        $status = $request->query('status', 'live');
+
+        $offers = \App\Models\CustomerOffer::with('customer')
+            ->when($status === 'live', fn ($q) => $q->live())
+            ->when($status === 'redeemed', fn ($q) => $q->whereNotNull('redeemed_at'))
+            ->when($status === 'expired', fn ($q) => $q->whereNotNull('expires_at')->where('expires_at', '<', now()))
+            ->latest()
+            ->paginate(40)->withQueryString();
+
+        return view('admin.customers.offers', compact('offers', 'status'));
+    }
+
     public function show(Customer $customer, CustomerInsight $insight)
     {
         $orders = $customer->orders()->with('shipment')->latest()->get();
@@ -66,6 +81,8 @@ class CustomerController extends Controller
             'insight' => $customer->phone ? $insight->forPhone($customer->phone) : null,
             'offers' => $customer->offers()->get(),
             'pointLog' => $customer->pointTransactions()->take(20)->get(),
+            'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
+            'allProducts' => \App\Models\Product::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -115,18 +132,37 @@ class CustomerController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:255'],
+            'message' => ['nullable', 'string', 'max:400'],
             'type' => ['required', 'in:'.implode(',', array_keys(\App\Models\CustomerOffer::TYPES))],
             'value' => ['nullable', 'numeric', 'min:0'],
             'code' => ['nullable', 'string', 'max:40'],
+            'applies_to' => ['required', 'in:'.implode(',', array_keys(\App\Models\CustomerOffer::SCOPES))],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:categories,id'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
             'min_subtotal' => ['nullable', 'numeric', 'min:0'],
             'expires_at' => ['nullable', 'date'],
         ]);
+
+        // Keep only the scope list that matches the chosen target.
+        $data['category_ids'] = $data['applies_to'] === 'categories' ? array_values($data['category_ids'] ?? []) : null;
+        $data['product_ids'] = $data['applies_to'] === 'products' ? array_values($data['product_ids'] ?? []) : null;
 
         $offer = $customer->offers()->create($data + ['is_active' => true]);
 
         // "Bonus points" offers credit immediately and stay as a record.
         if ($offer->type === 'points' && (int) $offer->value > 0) {
             app(\App\Services\LoyaltyService::class)->award($customer, (int) $offer->value, 'adjust', 'Bonus: '.$offer->title, $offer);
+        }
+
+        // Optional SMS notification to the customer.
+        if ($request->boolean('send_sms') && filled($offer->message) && filled($customer->phone)) {
+            try {
+                app(\App\Services\SmsService::class)->send($customer->phone, $offer->message);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return back()->with('success', 'Offer added for '.$customer->name.'.');

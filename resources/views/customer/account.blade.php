@@ -132,18 +132,22 @@
                             {{-- Personalised offers --}}
                             @if($liveOffers->isNotEmpty())
                                 <div>
-                                    <h3 class="text-sm font-semibold mb-2">Your exclusive offers</h3>
+                                    <h3 class="text-sm font-semibold mb-2 flex items-center gap-1.5">🎁 Your exclusive offers <span class="badge bg-gold-600 text-white text-[10px]">{{ $liveOffers->count() }}</span></h3>
                                     <div class="space-y-2">
                                         @foreach($liveOffers as $offer)
-                                            <div class="rounded-lg border border-gold-200 bg-white p-3 flex items-center justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <p class="text-sm font-medium">{{ $offer->title }}</p>
-                                                    @if($offer->description)<p class="text-xs text-ink-700/60">{{ $offer->description }}</p>@endif
-                                                    <p class="text-xs text-gold-700 mt-0.5">{{ $offer->rewardText() }}@if($offer->expires_at) · expires {{ $offer->expires_at->format('d M') }}@endif</p>
+                                            <div class="rounded-xl border-2 border-gold-300 bg-gradient-to-r from-gold-100/70 to-white p-3">
+                                                <div class="flex items-start justify-between gap-3">
+                                                    <div class="min-w-0">
+                                                        <p class="text-sm font-semibold">{{ $offer->title }}</p>
+                                                        <span class="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{{ $offer->rewardText() }}</span>
+                                                        @if($offer->applies_to !== 'all')<span class="inline-block text-[10px] text-ink-700/60 ml-1">· {{ $offer->scopeLabel() }}</span>@endif
+                                                        @if($offer->message)<p class="text-xs text-ink-700/70 italic mt-1">{{ $offer->message }}</p>@endif
+                                                        <p class="text-xs text-green-700 mt-1">✓ Applied automatically at checkout@if($offer->expires_at) · until {{ $offer->expires_at->format('d M') }}@endif</p>
+                                                    </div>
+                                                    @if($offer->code)
+                                                        <span class="shrink-0 font-mono text-xs rounded-full border border-gold-300 px-2.5 py-1 bg-gold-50">{{ $offer->code }}</span>
+                                                    @endif
                                                 </div>
-                                                @if($offer->code)
-                                                    <span class="shrink-0 font-mono text-xs rounded-full border border-gold-300 px-2.5 py-1 bg-gold-50">{{ $offer->code }}</span>
-                                                @endif
                                             </div>
                                         @endforeach
                                     </div>

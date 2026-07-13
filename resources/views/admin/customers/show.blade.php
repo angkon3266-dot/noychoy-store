@@ -107,7 +107,9 @@
                     <div class="min-w-0">
                         <p class="font-medium">{{ $offer->title }} <span class="text-xs text-ink-700/50">· {{ $offer->rewardText() }}</span></p>
                         @if($offer->code)<p class="text-xs font-mono text-gold-700">{{ $offer->code }}</p>@endif
-                        <p class="text-xs {{ $offer->isLive() ? 'text-green-700' : 'text-ink-700/40' }}">{{ $offer->isLive() ? 'Live' : 'Inactive/expired' }}@if($offer->expires_at) · until {{ $offer->expires_at->format('d M Y') }}@endif</p>
+                        <p class="text-xs text-ink-700/50">{{ $offer->scopeLabel() }}@if($offer->applies_to==='categories' && $offer->category_ids) · {{ count($offer->category_ids) }} categor{{ count($offer->category_ids)===1?'y':'ies' }}@elseif($offer->applies_to==='products' && $offer->product_ids) · {{ count($offer->product_ids) }} product(s)@endif</p>
+                        @if($offer->message)<p class="text-xs text-ink-700/60 italic">“{{ $offer->message }}”</p>@endif
+                        <p class="text-xs {{ $offer->isLive() ? 'text-green-700' : 'text-ink-700/40' }}">{{ $offer->isLive() ? 'Live' : ($offer->redeemed_at ? 'Redeemed '.$offer->redeemed_at->format('d M Y') : 'Inactive/expired') }}@if($offer->expires_at) · until {{ $offer->expires_at->format('d M Y') }}@endif</p>
                     </div>
                     <form action="{{ route('admin.customers.offers.destroy', [$customer, $offer]) }}" method="POST" onsubmit="return confirm('Remove this offer?')">
                         @csrf @method('DELETE')
@@ -118,7 +120,8 @@
                 <p class="text-sm text-ink-700/50 mb-3">No personalised offers yet.</p>
             @endforelse
 
-            <form action="{{ route('admin.customers.offers.store', $customer) }}" method="POST" class="space-y-2 mt-3">
+            <form action="{{ route('admin.customers.offers.store', $customer) }}" method="POST" class="space-y-2 mt-3"
+                  x-data="{ applies: 'all', catQ: '', prodQ: '' }">
                 @csrf
                 <input name="title" class="input" placeholder="Offer title (e.g. VIP 15% off)" required>
                 <input name="description" class="input" placeholder="Short description (optional)">
@@ -130,10 +133,39 @@
                     </select>
                     <input name="value" type="number" step="0.01" class="input" placeholder="Value (% / ৳ / pts)">
                 </div>
+
+                {{-- Scope: whole order / categories / products --}}
+                <select name="applies_to" x-model="applies" class="input">
+                    @foreach(\App\Models\CustomerOffer::SCOPES as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
+                </select>
+                <div x-show="applies==='categories'" x-cloak>
+                    <input x-model="catQ" placeholder="Filter categories…" class="input py-1.5 mb-1 text-sm">
+                    <div class="max-h-32 overflow-y-auto rounded-lg border border-ink-100 p-2 space-y-1">
+                        @foreach($allCategories as $cat)
+                            <label class="flex items-center gap-2 text-sm" x-show="catQ==='' || '{{ Str::lower($cat->name) }}'.includes(catQ.toLowerCase())">
+                                <input type="checkbox" name="category_ids[]" value="{{ $cat->id }}"> {{ $cat->name }}
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+                <div x-show="applies==='products'" x-cloak>
+                    <input x-model="prodQ" placeholder="Filter products…" class="input py-1.5 mb-1 text-sm">
+                    <div class="max-h-32 overflow-y-auto rounded-lg border border-ink-100 p-2 space-y-1">
+                        @foreach($allProducts as $p)
+                            <label class="flex items-center gap-2 text-sm" x-show="prodQ==='' || '{{ Str::lower(addslashes($p->name)) }}'.includes(prodQ.toLowerCase())">
+                                <input type="checkbox" name="product_ids[]" value="{{ $p->id }}"> {{ $p->name }}
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-2 gap-2">
                     <input name="code" class="input" placeholder="Code (optional)">
                     <input name="expires_at" type="date" class="input">
                 </div>
+                <input name="min_subtotal" type="number" step="0.01" class="input" placeholder="Min. cart value ৳ (optional)">
+                <textarea name="message" rows="2" class="input" placeholder="Message to the customer (shown on their dashboard &amp; product pages)"></textarea>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="send_sms" value="1"> Also send this message by SMS</label>
                 <button class="btn-primary w-full">Add offer</button>
             </form>
         </div>

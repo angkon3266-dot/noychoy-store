@@ -43,7 +43,10 @@ class PlaceOrder
         $pointsRedeemed = $this->cart->redeemablePoints();
         $pointsDiscount = $this->cart->pointsDiscount();
 
-        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount) {
+        // Personalized offer applied to this order (marked redeemed after placing).
+        $customerOffer = $this->cart->customerOffer();
+
+        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount, $customerOffer) {
             // Attach to a customer record (find-or-create by phone) even for guests.
             $customer = Customer::firstOrCreate(
                 ['phone' => $data['phone']],
@@ -107,6 +110,11 @@ class PlaceOrder
 
             if ($coupon) {
                 $coupon->increment('used_count');
+            }
+
+            // Mark the customer's personalized offer as used (single redemption).
+            if ($customerOffer && auth('customer')->check() && $customerOffer->customer_id === $customer->id) {
+                $customerOffer->update(['redeemed_at' => now()]);
             }
 
             // Deduct any redeemed loyalty points (logged-in customers only).

@@ -74,6 +74,7 @@ Route::middleware('admin')->group(function () {
 
     // Customers (CRM, analytics, SMS, import)
     Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
+    Route::get('customers/all-offers', [\App\Http\Controllers\Admin\CustomerController::class, 'offersIndex'])->name('customers.all-offers');
     Route::get('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'importForm'])->name('customers.import');
     Route::post('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'import'])->name('customers.import.store');
     Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');
