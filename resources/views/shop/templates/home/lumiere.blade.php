@@ -12,7 +12,7 @@
                 <div class="mt-6"><a href="{{ home_content('hero_cta_link') ?: route('shop') }}" class="btn-primary">{{ home_content('hero_cta_text') }}</a></div>
             </div>
             <div class="rounded-3xl overflow-hidden bg-ink-900 min-h-[320px]">
-                @php($lumHero = theme_asset(home_content('hero_image')))
+                @php $lumHero = theme_asset(home_content('hero_image')); @endphp
                 @if($lumHero)
                     <img src="{{ $lumHero }}" class="h-full w-full object-cover" alt="">
                 @elseif($featured->first()?->thumbnail)

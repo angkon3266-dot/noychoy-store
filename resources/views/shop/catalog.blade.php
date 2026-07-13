@@ -63,7 +63,7 @@
         {{-- Products --}}
         <div>
             <div class="flex flex-wrap items-center justify-end gap-2 mb-4">
-                @php($curSort = $shopSort ?? 'new')
+                @php $curSort = $shopSort ?? 'new'; @endphp
                 <select name="sort" onchange="this.form.submit()" class="input py-2 w-auto">
                     <option value="new" @selected($curSort=='new')>Newest</option>
                     <option value="popular" @selected($curSort=='popular')>Most popular</option>

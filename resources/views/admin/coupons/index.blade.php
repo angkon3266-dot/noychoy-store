@@ -3,7 +3,7 @@
 @section('heading', 'Coupons')
 
 @section('content')
-@php($c = $editing)
+@php $c = $editing; @endphp
 <div class="grid lg:grid-cols-3 gap-6">
     <div class="card p-6 h-fit lg:sticky lg:top-20"
          x-data="{ scope: '{{ old('applies_to', $c->applies_to ?? 'all') }}', type: '{{ old('type', $c->type ?? 'fixed') }}' }">

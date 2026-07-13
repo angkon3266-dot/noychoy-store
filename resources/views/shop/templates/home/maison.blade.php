@@ -4,7 +4,7 @@
 @section('content')
     {{-- Luxe dark (Cartier / Bvlgari-inspired) --}}
     <section class="relative min-h-[70vh] flex items-center justify-center text-center bg-ink-900 text-white overflow-hidden">
-        @php($maisonHero = theme_asset(home_content('hero_image')))
+        @php $maisonHero = theme_asset(home_content('hero_image')); @endphp
         @if($maisonHero)
             <img src="{{ $maisonHero }}" class="absolute inset-0 h-full w-full object-cover opacity-30" alt="">
         @elseif($featured->first()?->thumbnail)

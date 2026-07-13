@@ -42,7 +42,7 @@
     </div>
 </div>
 
-@php($pageIds = $products->pluck('id')->values())
+@php $pageIds = $products->pluck('id')->values(); @endphp
 <div x-data="{
         sel: [],
         catIds: [],
@@ -119,7 +119,7 @@
                         </div>
                     </td>
                     <td class="px-4 py-3 text-ink-700/70">
-                        @php($rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter())
+                        @php $rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter(); @endphp
                         {{ $rowCats->isNotEmpty() ? $rowCats->implode(', ') : '—' }}
                     </td>
                     <td class="px-4 py-3">

@@ -573,7 +573,7 @@
             </div>
             <div>
                 <label class="label">Default sort order</label>
-                @php($ds = $theme['default_sort'] ?? 'new')
+                @php $ds = $theme['default_sort'] ?? 'new'; @endphp
                 <select name="default_sort" class="input">
                     <option value="new" @selected($ds=='new')>Newest</option>
                     <option value="popular" @selected($ds=='popular')>Most popular (by views)</option>

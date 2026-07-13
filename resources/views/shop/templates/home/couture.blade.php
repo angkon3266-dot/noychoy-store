@@ -88,7 +88,7 @@
 
 {{-- ── Editorial brand band ("Our promise") ──────────────────────────── --}}
 @if(home_content('show_promise'))
-@php($promiseImg = theme_asset(home_content('promise_image')))
+@php $promiseImg = theme_asset(home_content('promise_image')); @endphp
 <section class="mx-auto max-w-7xl px-4 py-16 lg:py-24">
     <div class="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
         <div class="relative aspect-[5/4] rounded-2xl overflow-hidden bg-gold-100">

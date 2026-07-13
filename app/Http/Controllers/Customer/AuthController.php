@@ -76,7 +76,7 @@ class AuthController extends Controller
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
 
-        return redirect()->route('account')->with('success', 'Welcome to Noychoy!');
+        return redirect()->route('account')->with('success', 'Welcome to '.store_name().'!');
     }
 
     public function logout(Request $request)

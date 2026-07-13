@@ -96,7 +96,7 @@ class CustomerController extends Controller
             ->with('defaultAddress')
             ->get();
 
-        $filename = 'noychoy-customers-'.now()->format('Y-m-d').'.csv';
+        $filename = \Illuminate\Support\Str::slug(store_name()).'-customers-'.now()->format('Y-m-d').'.csv';
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',

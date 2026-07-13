@@ -122,8 +122,8 @@
             </div>
 
             {{-- Scope --}}
-            @php($selOffCats = collect(old('category_ids', $editing->category_ids ?? []))->map(fn($i)=>(int)$i)->all())
-            @php($selOffProds = collect(old('product_ids', $editing->product_ids ?? []))->map(fn($i)=>(int)$i)->all())
+            @php $selOffCats = collect(old('category_ids', $editing->category_ids ?? []))->map(fn($i)=>(int)$i)->all(); @endphp
+            @php $selOffProds = collect(old('product_ids', $editing->product_ids ?? []))->map(fn($i)=>(int)$i)->all(); @endphp
             <div>
                 <label class="label">Applies to *</label>
                 <select name="applies_to" x-model="applies" class="input">
