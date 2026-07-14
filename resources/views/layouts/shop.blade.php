@@ -300,6 +300,7 @@
                             $notifCustomer = auth('customer')->user();
                             $notifItems = $notifSvc->recentFor($notifCustomer, 10);
                             $notifUnread = $notifSvc->unreadCountFor($notifCustomer);
+                            $webPushReady = app(\App\Services\WebPushService::class)->ready();
                         @endphp
                         <div x-data="{ open: false, unread: {{ $notifUnread }} }" class="relative">
                             <button type="button" @click="open = !open; if (open && unread > 0) { fetch('{{ route('account.notifications.read') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } }); unread = 0; }"
@@ -313,6 +314,16 @@
                                     <p class="text-sm font-semibold">Notifications</p>
                                     <a href="{{ route('account.notifications') }}" class="text-xs text-gold-700 hover:underline">See all</a>
                                 </div>
+                                @if($webPushReady)
+                                    <div x-data="webPushOptIn()" x-init="init()" x-show="supported && state!=='granted'" x-cloak
+                                         class="mx-1 mb-1 rounded-lg bg-gold-50 border border-gold-200 px-2.5 py-2 flex items-center gap-2">
+                                        <span class="text-lg">🔔</span>
+                                        <p class="text-xs flex-1 text-ink-700/70">Get notified about new drops &amp; your offers — even when the site is closed.</p>
+                                        <button type="button" @click="enable()" :disabled="busy"
+                                                class="text-xs font-semibold text-white bg-gold-600 rounded-md px-2 py-1 hover:bg-gold-700 disabled:opacity-50"
+                                                x-text="busy ? '…' : 'Turn on'"></button>
+                                    </div>
+                                @endif
                                 @forelse($notifItems as $n)
                                     <a href="{{ $n->url ? route('account.notifications.go', $n) : route('account.notifications') }}" class="block px-2 py-2 rounded-lg hover:bg-ink-50">
                                         <p class="text-sm font-medium">{{ $n->iconOrDefault() }} {{ $n->title }}</p>
@@ -761,5 +772,67 @@
             </a>
         </div>
     </nav>
+
+    @auth('customer')
+        @if(app(\App\Services\WebPushService::class)->ready())
+            <script>
+                (function () {
+                    const VAPID = @json(app(\App\Services\WebPushService::class)->publicKey());
+                    const SUBSCRIBE = @json(route('account.push.subscribe'));
+                    const CSRF = @json(csrf_token());
+
+                    function urlB64ToUint8(base64) {
+                        const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+                        const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+                        const raw = atob(b64);
+                        return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+                    }
+
+                    window.webPushOptIn = function () {
+                        return {
+                            supported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
+                            state: 'default',
+                            busy: false,
+                            init() {
+                                if (!this.supported) return;
+                                this.state = Notification.permission;
+                                // If already granted, make sure a live subscription exists on the server.
+                                if (this.state === 'granted') this.ensure().catch(() => {});
+                            },
+                            async ensure() {
+                                const reg = await navigator.serviceWorker.register('/sw.js');
+                                await navigator.serviceWorker.ready;
+                                let sub = await reg.pushManager.getSubscription();
+                                if (!sub) {
+                                    sub = await reg.pushManager.subscribe({
+                                        userVisibleOnly: true,
+                                        applicationServerKey: urlB64ToUint8(VAPID),
+                                    });
+                                }
+                                await fetch(SUBSCRIBE, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, Accept: 'application/json' },
+                                    body: JSON.stringify(sub),
+                                });
+                            },
+                            async enable() {
+                                if (!this.supported || this.busy) return;
+                                this.busy = true;
+                                try {
+                                    const perm = await Notification.requestPermission();
+                                    this.state = perm;
+                                    if (perm === 'granted') await this.ensure();
+                                } catch (e) {
+                                    console.warn('Push opt-in failed', e);
+                                } finally {
+                                    this.busy = false;
+                                }
+                            },
+                        };
+                    };
+                })();
+            </script>
+        @endif
+    @endauth
 </body>
 </html>

@@ -98,6 +98,41 @@ class AccountController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** Save (or refresh) a browser web-push subscription for this member. */
+    public function subscribePush(Request $request)
+    {
+        $data = $request->validate([
+            'endpoint' => ['required', 'string', 'max:1000'],
+            'keys.p256dh' => ['required', 'string', 'max:255'],
+            'keys.auth' => ['required', 'string', 'max:255'],
+        ]);
+
+        \App\Models\PushSubscription::updateOrCreate(
+            ['endpoint_hash' => \App\Models\PushSubscription::hashFor($data['endpoint'])],
+            [
+                'customer_id' => $this->customer()->id,
+                'endpoint' => $data['endpoint'],
+                'p256dh' => $data['keys']['p256dh'],
+                'auth' => $data['keys']['auth'],
+                'ua' => substr((string) $request->userAgent(), 0, 255),
+                'last_used_at' => now(),
+            ],
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Remove a web-push subscription (member turned notifications off). */
+    public function unsubscribePush(Request $request)
+    {
+        $endpoint = (string) $request->input('endpoint');
+        if ($endpoint !== '') {
+            \App\Models\PushSubscription::where('endpoint_hash', \App\Models\PushSubscription::hashFor($endpoint))->delete();
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     /** Count a notification click, then forward to its destination (campaign analytics). */
     public function trackNotification(\App\Models\CustomerNotification $notification)
     {

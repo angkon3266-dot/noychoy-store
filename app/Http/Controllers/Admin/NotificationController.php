@@ -20,6 +20,9 @@ class NotificationController extends Controller
                 'notify_new_arrivals' => (bool) Setting::get('notify_new_arrivals', true),
                 'notify_preorders' => (bool) Setting::get('notify_preorders', true),
                 'webpush_enabled' => (bool) Setting::get('webpush_enabled', false),
+                'webpush_keys' => filled(Setting::get('webpush_public_key')),
+                'webpush_subject' => Setting::get('webpush_subject', ''),
+                'webpush_subscribers' => \App\Models\PushSubscription::whereNotNull('customer_id')->count(),
                 // Win-back automation.
                 'winback_enabled' => (bool) Setting::get('winback_enabled', false),
                 'winback_days' => (int) Setting::get('winback_days', 60),
@@ -111,8 +114,61 @@ class NotificationController extends Controller
         Setting::put('notify_new_arrivals', $request->boolean('notify_new_arrivals'));
         Setting::put('notify_preorders', $request->boolean('notify_preorders'));
         Setting::put('webpush_enabled', $request->boolean('webpush_enabled'));
+        Setting::put('webpush_subject', trim((string) $request->input('webpush_subject')));
 
         return back()->with('success', 'Notification settings saved.');
+    }
+
+    /** Generate (or replace) the VAPID keypair used to sign web-push messages. */
+    public function generateVapidKeys(Request $request, \App\Services\WebPushService $push)
+    {
+        $force = filled(Setting::get('webpush_public_key'));
+        try {
+            $keys = $push->generateKeys();
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Key generation failed: '.$e->getMessage());
+        }
+        Setting::put('webpush_public_key', $keys['public']);
+        Setting::put('webpush_private_key', $keys['private']);
+
+        return back()->with('success', $force
+            ? 'New VAPID keys generated. Existing subscribers must re-enable notifications.'
+            : 'VAPID keys generated. You can now enable web push.');
+    }
+
+    /** Send a test push to all current subscribers (synchronously, for instant feedback). */
+    public function testPush(\App\Services\WebPushService $push)
+    {
+        if (! $push->ready()) {
+            return back()->with('error', 'Web push isn’t ready — enable it and generate VAPID keys first.');
+        }
+
+        $subs = \App\Models\PushSubscription::whereNotNull('customer_id')->get();
+        if ($subs->isEmpty()) {
+            return back()->with('error', 'No subscribers yet. Open the storefront as a logged-in member and turn on notifications first.');
+        }
+
+        $payload = [
+            'title' => '🔔 Test notification',
+            'body' => 'Web push is working — this is a test from your admin.',
+            'url' => route('shop'),
+            'icon' => theme_asset(theme('logo')) ?: asset('favicon.ico'),
+            'tag' => 'test-'.now()->timestamp,
+        ];
+
+        $ok = 0;
+        $gone = 0;
+        foreach ($subs as $sub) {
+            $status = $push->send($sub, $payload);
+            if ($status >= 200 && $status < 300) {
+                $ok++;
+            } elseif (in_array($status, [404, 410], true)) {
+                $sub->delete();
+                $gone++;
+            }
+        }
+
+        return back()->with('success', "Test push sent: {$ok} delivered".($gone ? ", {$gone} stale subscription(s) removed" : '').'.');
     }
 
     /** Save the win-back automation settings. */

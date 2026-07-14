@@ -1,0 +1,244 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\PushSubscription;
+use App\Models\Setting;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Self-contained Web Push (RFC 8291 message encryption + RFC 8292 VAPID),
+ * implemented with PHP's native openssl + hash_hkdf — no third-party package,
+ * so there's nothing extra to install on the host. The aes128gcm encryption is
+ * verified byte-for-byte against the RFC 8291 §5 test vector.
+ *
+ * VAPID keys live in Settings (webpush_public_key / webpush_private_key), both
+ * base64url-encoded raw P-256 keys. Generate them with `php artisan webpush:keys`.
+ */
+class WebPushService
+{
+    /** Push is usable only when enabled AND a VAPID keypair exists. */
+    public function ready(): bool
+    {
+        return (bool) Setting::get('webpush_enabled', false)
+            && filled(Setting::get('webpush_public_key'))
+            && filled(Setting::get('webpush_private_key'));
+    }
+
+    public function publicKey(): ?string
+    {
+        return Setting::get('webpush_public_key') ?: null;
+    }
+
+    public function subject(): string
+    {
+        $sub = Setting::get('webpush_subject');
+        if (filled($sub)) {
+            return str_starts_with($sub, 'mailto:') || str_starts_with($sub, 'http') ? $sub : 'mailto:'.$sub;
+        }
+
+        return url('/');
+    }
+
+    /** Generate a fresh VAPID P-256 keypair as base64url raw keys. */
+    public function generateKeys(): array
+    {
+        $pkey = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+        if (! $pkey) {
+            throw new \RuntimeException('Could not generate an EC key — is the openssl extension available? '.openssl_error_string());
+        }
+        $d = openssl_pkey_get_details($pkey);
+        $public = "\x04".str_pad($d['ec']['x'], 32, "\x00", STR_PAD_LEFT).str_pad($d['ec']['y'], 32, "\x00", STR_PAD_LEFT);
+        $private = str_pad($d['ec']['d'], 32, "\x00", STR_PAD_LEFT);
+
+        return [
+            'public' => self::b64urlEncode($public),
+            'private' => self::b64urlEncode($private),
+        ];
+    }
+
+    /**
+     * Send one notification to one subscription.
+     * Returns the HTTP status (201/200 = delivered). 404/410 = gone (prune it).
+     */
+    public function send(PushSubscription $sub, array $payload): int
+    {
+        if (! $this->ready()) {
+            return 0;
+        }
+
+        try {
+            $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
+            [$content, $asPublic] = $this->encrypt($body, self::b64urlDecode($sub->p256dh), self::b64urlDecode($sub->auth));
+            $vapid = $this->vapidHeaders($sub->endpoint);
+
+            $headers = [
+                'Content-Type: application/octet-stream',
+                'Content-Encoding: aes128gcm',
+                'TTL: '.(int) Setting::get('webpush_ttl', 2419200), // 4 weeks
+                'Content-Length: '.strlen($content),
+                $vapid,
+            ];
+
+            $ch = curl_init($sub->endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $content,
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 15,
+            ]);
+            curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if ($err) {
+                Log::warning('WebPush transport error', ['endpoint' => $sub->endpoint, 'err' => $err]);
+            }
+
+            return $status;
+        } catch (\Throwable $e) {
+            Log::warning('WebPush send failed', ['id' => $sub->id, 'error' => $e->getMessage()]);
+
+            return 0;
+        }
+    }
+
+    // ── Crypto ───────────────────────────────────────────────────────────────
+
+    /**
+     * Encrypt a payload for a subscription (RFC 8291, aes128gcm).
+     * Test hooks let the RFC vector inject a fixed ephemeral key + salt.
+     *
+     * @return array{0:string, 1:string}  [body, applicationServerPublicKey(raw)]
+     */
+    public function encrypt(string $payload, string $uaPublic, string $authSecret, ?string $asPrivateRaw = null, ?string $salt = null): array
+    {
+        // Application-server (ephemeral) keypair.
+        if ($asPrivateRaw !== null) {
+            [$asPrivatePem, $asPublic] = $this->importFromRaw($asPrivateRaw);
+        } else {
+            $eph = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+            if (! $eph) {
+                throw new \RuntimeException('EC keygen failed: '.openssl_error_string());
+            }
+            $d = openssl_pkey_get_details($eph);
+            $asPublic = "\x04".str_pad($d['ec']['x'], 32, "\x00", STR_PAD_LEFT).str_pad($d['ec']['y'], 32, "\x00", STR_PAD_LEFT);
+            $asPrivatePem = $eph;
+        }
+
+        $salt ??= random_bytes(16);
+
+        // ECDH shared secret with the subscriber's public key.
+        $shared = openssl_pkey_derive(self::rawPublicToPem($uaPublic), $asPrivatePem, 32);
+        if (! $shared) {
+            throw new \RuntimeException('ECDH derive failed: '.openssl_error_string());
+        }
+
+        // RFC 8291 key derivation, then RFC 8188 content encryption keys.
+        $ikm = hash_hkdf('sha256', $shared, 32, "WebPush: info\x00".$uaPublic.$asPublic, $authSecret);
+        $cek = hash_hkdf('sha256', $ikm, 16, "Content-Encoding: aes128gcm\x00", $salt);
+        $nonce = hash_hkdf('sha256', $ikm, 12, "Content-Encoding: nonce\x00", $salt);
+
+        $tag = '';
+        $ciphertext = openssl_encrypt($payload."\x02", 'aes-128-gcm', $cek, OPENSSL_RAW_DATA, $nonce, $tag);
+
+        // Header: salt(16) | record-size(4, uint32) | idlen(1)=65 | keyid(as public 65) | ciphertext | tag
+        $body = $salt.pack('N', 4096).chr(65).$asPublic.$ciphertext.$tag;
+
+        return [$body, $asPublic];
+    }
+
+    /** Build the VAPID `Authorization` header for an endpoint (RFC 8292, ES256). */
+    public function vapidHeaders(string $endpoint): string
+    {
+        $publicRaw = self::b64urlDecode(Setting::get('webpush_public_key'));
+        $privateRaw = self::b64urlDecode(Setting::get('webpush_private_key'));
+
+        $parts = parse_url($endpoint);
+        $origin = $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
+
+        $header = self::b64urlEncode(json_encode(['typ' => 'JWT', 'alg' => 'ES256']));
+        $claims = self::b64urlEncode(json_encode([
+            'aud' => $origin,
+            'exp' => time() + 12 * 3600,
+            'sub' => $this->subject(),
+        ]));
+        $unsigned = $header.'.'.$claims;
+
+        [$privatePem] = $this->importFromRaw($privateRaw, $publicRaw);
+        $der = '';
+        openssl_sign($unsigned, $der, $privatePem, OPENSSL_ALGO_SHA256);
+        $jwt = $unsigned.'.'.self::b64urlEncode(self::derToRawSignature($der));
+
+        return 'Authorization: vapid t='.$jwt.', k='.self::b64urlEncode($publicRaw);
+    }
+
+    // ── Key/format helpers ───────────────────────────────────────────────────
+
+    /**
+     * Build a PEM EC private key (and its raw public key) from a raw 32-byte scalar.
+     * If the public key isn't supplied it's recovered from the private via openssl.
+     *
+     * @return array{0:string, 1:string}  [privatePem, rawPublic]
+     */
+    protected function importFromRaw(string $privateRaw, ?string $publicRaw = null): array
+    {
+        if ($publicRaw === null) {
+            // Derive the public point by importing a bare private key first
+            // (SEC1, named curve prime256v1, no explicit public key).
+            $bare = "\x30\x31\x02\x01\x01\x04\x20".$privateRaw."\xa0\x0a\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07";
+            $pem = "-----BEGIN EC PRIVATE KEY-----\n".chunk_split(base64_encode($bare), 64, "\n")."-----END EC PRIVATE KEY-----\n";
+            $k = openssl_pkey_get_private($pem);
+            $d = openssl_pkey_get_details($k);
+            $publicRaw = "\x04".str_pad($d['ec']['x'], 32, "\x00", STR_PAD_LEFT).str_pad($d['ec']['y'], 32, "\x00", STR_PAD_LEFT);
+        }
+
+        // SEC1 ECPrivateKey with named curve prime256v1 + explicit public key.
+        $der = "\x30\x77\x02\x01\x01\x04\x20".$privateRaw
+            ."\xa0\x0a\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07"
+            ."\xa1\x44\x03\x42\x00".$publicRaw;
+        $pem = "-----BEGIN EC PRIVATE KEY-----\n".chunk_split(base64_encode($der), 64, "\n")."-----END EC PRIVATE KEY-----\n";
+
+        return [$pem, $publicRaw];
+    }
+
+    /** Raw 65-byte uncompressed point → PEM SubjectPublicKeyInfo (P-256). */
+    protected static function rawPublicToPem(string $raw): string
+    {
+        $der = hex2bin('3059301306072a8648ce3d020106082a8648ce3d030107034200').$raw;
+
+        return "-----BEGIN PUBLIC KEY-----\n".chunk_split(base64_encode($der), 64, "\n")."-----END PUBLIC KEY-----\n";
+    }
+
+    /** DER-encoded ECDSA signature → raw 64-byte (r||s) for JWS ES256. */
+    protected static function derToRawSignature(string $der): string
+    {
+        $offset = 0;
+        $readInt = function () use ($der, &$offset): string {
+            $offset++; // skip 0x02 tag
+            $len = ord($der[$offset++]);
+            $val = substr($der, $offset, $len);
+            $offset += $len;
+            $val = ltrim($val, "\x00");              // drop sign padding
+
+            return str_pad($val, 32, "\x00", STR_PAD_LEFT);
+        };
+        $offset += 2; // skip SEQUENCE tag + length
+        $r = $readInt();
+        $s = $readInt();
+
+        return $r.$s;
+    }
+
+    public static function b64urlEncode(string $s): string
+    {
+        return rtrim(strtr(base64_encode($s), '+/', '-_'), '=');
+    }
+
+    public static function b64urlDecode(string $s): string
+    {
+        return base64_decode(strtr($s, '-_', '+/').str_repeat('=', (4 - strlen($s) % 4) % 4));
+    }
+}

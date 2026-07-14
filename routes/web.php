@@ -20,6 +20,7 @@ Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('m
 // ── Storefront ──────────────────────────────────────────────────────────────
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/shop', [CatalogController::class, 'index'])->name('shop');
+Route::get('/best-sellers', [CatalogController::class, 'bestSellers'])->name('best-sellers');
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager
@@ -84,6 +85,8 @@ Route::middleware('auth:customer')->group(function () {
     Route::get('/account/notifications', [AccountController::class, 'notifications'])->name('account.notifications');
     Route::post('/account/notifications/read', [AccountController::class, 'markNotificationsRead'])->name('account.notifications.read');
     Route::get('/account/n/{notification}', [AccountController::class, 'trackNotification'])->name('account.notifications.go');
+    Route::post('/account/push/subscribe', [AccountController::class, 'subscribePush'])->name('account.push.subscribe');
+    Route::post('/account/push/unsubscribe', [AccountController::class, 'unsubscribePush'])->name('account.push.unsubscribe');
     Route::get('/account/orders', [AccountController::class, 'orders'])->name('account.orders');
     Route::get('/account/orders/{orderNumber}', [AccountController::class, 'order'])->name('account.order');
     Route::post('/account/orders/{orderNumber}/reorder', [AccountController::class, 'reorder'])->name('account.reorder');

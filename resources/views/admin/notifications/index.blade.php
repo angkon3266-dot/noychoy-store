@@ -104,13 +104,33 @@
                 @csrf
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify_new_arrivals" value="1" @checked($settings['notify_new_arrivals'])> Announce <strong>new arrivals</strong> (batched — one notification for the day's new products)</label>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify_preorders" value="1" @checked($settings['notify_preorders'])> Announce <strong>new pre-orders</strong> instantly (early access for members)</label>
-                <label class="flex items-center gap-2 text-sm border-t border-ink-100 pt-2 mt-2"><input type="checkbox" name="webpush_enabled" value="1" @checked($settings['webpush_enabled'])> Enable <strong>browser web push</strong> <span class="badge bg-ink-100 text-ink-700 text-[10px]">delivery in Phase 4</span></label>
+
+                {{-- Browser web push --}}
+                <div class="border-t border-ink-100 pt-2 mt-2 space-y-2">
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="webpush_enabled" value="1" @checked($settings['webpush_enabled']) {{ $settings['webpush_keys'] ? '' : 'disabled' }}> Enable <strong>browser web push</strong>
+                        @if($settings['webpush_keys'])<span class="badge bg-green-100 text-green-700 text-[10px]">{{ number_format($settings['webpush_subscribers']) }} subscriber(s)</span>@else<span class="badge bg-amber-100 text-amber-700 text-[10px]">generate keys first</span>@endif
+                    </label>
+                    <div><label class="label text-xs">Contact for push services (email or URL)</label><input name="webpush_subject" value="{{ $settings['webpush_subject'] }}" class="input py-1.5 text-sm" placeholder="mailto:you@store.com"></div>
+                    <p class="text-[11px] text-ink-700/50">Members opt in from the notification bell on the storefront. Reaches them even when your site is closed.</p>
+                </div>
                 <button class="btn-outline text-sm mt-2">Save settings</button>
             </form>
-            <form action="{{ route('admin.notifications.run-new-arrivals') }}" method="POST" class="mt-3">
-                @csrf
-                <button class="text-xs text-gold-700 hover:underline">▸ Send the new-arrivals announcement now</button>
-            </form>
+            <div class="flex flex-wrap gap-3 mt-3">
+                <form action="{{ route('admin.notifications.run-new-arrivals') }}" method="POST">
+                    @csrf
+                    <button class="text-xs text-gold-700 hover:underline">▸ Send new-arrivals now</button>
+                </form>
+                <form action="{{ route('admin.notifications.vapid-keys') }}" method="POST" onsubmit="return {{ $settings['webpush_keys'] ? 'confirm(\'Replacing keys will disconnect all current subscribers. Continue?\')' : 'true' }}">
+                    @csrf
+                    <button class="text-xs text-gold-700 hover:underline">▸ {{ $settings['webpush_keys'] ? 'Regenerate' : 'Generate' }} VAPID keys</button>
+                </form>
+                @if($settings['webpush_keys'])
+                    <form action="{{ route('admin.notifications.test-push') }}" method="POST">
+                        @csrf
+                        <button class="text-xs text-gold-700 hover:underline">▸ Send test push</button>
+                    </form>
+                @endif
+            </div>
         </div>
 
         {{-- Sent / scheduled + per-campaign analytics --}}

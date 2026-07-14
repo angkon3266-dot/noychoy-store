@@ -50,7 +50,43 @@ class NotificationService
             }
         }
 
+        // Fire browser web push for immediate sends (scheduled ones push when they
+        // flip to sent in deliverDue()).
+        if ($n->sent_at) {
+            $this->deliverPush($n, $recipientIds);
+        }
+
         return $n;
+    }
+
+    /**
+     * Queue web-push delivery for a notification to its target subscriptions.
+     * No-op unless web push is enabled and a VAPID keypair exists.
+     */
+    public function deliverPush(CustomerNotification $n, ?array $recipientIds = null): void
+    {
+        $push = app(\App\Services\WebPushService::class);
+        if (! $push->ready()) {
+            return;
+        }
+
+        $query = \App\Models\PushSubscription::query()->whereNotNull('customer_id');
+        if ($n->audience === 'segment') {
+            $ids = $recipientIds ?? $n->recipients()->pluck('customers.id')->all();
+            $query->whereIn('customer_id', $ids);
+        }
+
+        $payload = [
+            'title' => trim($n->iconOrDefault().' '.$n->title),
+            'body' => (string) $n->body,
+            'url' => $n->url ? route('account.notifications.go', $n) : route('account.notifications'),
+            'icon' => theme_asset(theme('logo')) ?: theme_asset(theme('favicon')) ?: asset('favicon.ico'),
+            'tag' => 'notif-'.$n->id,
+        ];
+
+        $query->pluck('id')->chunk(500)->each(function ($chunk) use ($payload) {
+            \App\Jobs\SendWebPush::dispatch($chunk->all(), $payload);
+        });
     }
 
     /** Notifications visible to a given customer (all-audience + targeted-at-them). */
@@ -76,6 +112,7 @@ class NotificationService
 
         foreach ($due as $n) {
             $n->update(['sent_at' => now()]);
+            $this->deliverPush($n);
         }
 
         return $due->count();

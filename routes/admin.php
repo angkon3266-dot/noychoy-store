@@ -91,6 +91,8 @@ Route::middleware('admin')->group(function () {
     Route::post('notifications/winback-settings', [\App\Http\Controllers\Admin\NotificationController::class, 'winbackSettings'])->name('notifications.winback-settings');
     Route::post('notifications/run-new-arrivals', [\App\Http\Controllers\Admin\NotificationController::class, 'runNewArrivals'])->name('notifications.run-new-arrivals');
     Route::post('notifications/run-winback', [\App\Http\Controllers\Admin\NotificationController::class, 'runWinback'])->name('notifications.run-winback');
+    Route::post('notifications/vapid-keys', [\App\Http\Controllers\Admin\NotificationController::class, 'generateVapidKeys'])->name('notifications.vapid-keys');
+    Route::post('notifications/test-push', [\App\Http\Controllers\Admin\NotificationController::class, 'testPush'])->name('notifications.test-push');
     Route::delete('notifications/{notification}', [\App\Http\Controllers\Admin\NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'importForm'])->name('customers.import');
     Route::post('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'import'])->name('customers.import.store');

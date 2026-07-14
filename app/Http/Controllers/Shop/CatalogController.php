@@ -31,6 +31,18 @@ class CatalogController extends Controller
         ]);
     }
 
+    /** Curated best-sellers — the products you've flagged as bestsellers. */
+    public function bestSellers(Request $request)
+    {
+        $base = Product::published()->bestsellers()->search($request->query('q'));
+
+        return view('shop.catalog', [
+            'products' => $this->paginate($base, $request),
+            'filters' => $this->filters->groups($request, Product::published()->bestsellers()->search($request->query('q')), 'shop'),
+            'title' => 'Best Sellers',
+        ]);
+    }
+
     /** Apply filters + sort to a base query and paginate. */
     protected function paginate(Builder $base, Request $request)
     {
