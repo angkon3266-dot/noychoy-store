@@ -113,6 +113,23 @@ class NotificationService
         ]);
     }
 
+    /**
+     * Fire a transactional web push to one customer's subscriptions directly
+     * (no bell entry, no campaign analytics — for order updates, alerts, etc.).
+     */
+    public function pushToCustomer(int $customerId, array $payload): void
+    {
+        $push = app(\App\Services\WebPushService::class);
+        if (! $push->ready()) {
+            return;
+        }
+        $payload['icon'] ??= theme_asset(theme('logo')) ?: asset('favicon.ico');
+
+        \App\Models\PushSubscription::where('customer_id', $customerId)
+            ->pluck('id')->chunk(500)
+            ->each(fn ($chunk) => \App\Jobs\SendWebPush::dispatch($chunk->all(), $payload));
+    }
+
     /** Notifications visible to a given customer (all-audience + targeted-at-them). */
     public function visibleFor(?Customer $customer): \Illuminate\Database\Eloquent\Builder
     {

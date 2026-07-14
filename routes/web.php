@@ -21,6 +21,10 @@ Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('m
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/shop', [CatalogController::class, 'index'])->name('shop');
 Route::get('/best-sellers', [CatalogController::class, 'bestSellers'])->name('best-sellers');
+
+// Web-push subscription (public — works for guests and members).
+Route::post('/push/subscribe', [\App\Http\Controllers\Shop\PushController::class, 'subscribe'])->name('push.subscribe');
+Route::post('/push/unsubscribe', [\App\Http\Controllers\Shop\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager

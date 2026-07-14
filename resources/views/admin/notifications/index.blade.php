@@ -133,6 +133,23 @@
             </div>
         </div>
 
+        {{-- Automated transactional push templates (order updates) --}}
+        <div class="card p-6">
+            <h2 class="font-semibold mb-1">Automated order push</h2>
+            <p class="text-sm text-ink-700/60 mb-3">Sent automatically to the customer when an order changes status (works even when your site is closed). Edit the wording — use <code class="text-xs bg-ink-100 px-1 rounded">{name}</code>, <code class="text-xs bg-ink-100 px-1 rounded">{order}</code>, <code class="text-xs bg-ink-100 px-1 rounded">{total}</code>, <code class="text-xs bg-ink-100 px-1 rounded">{tracking}</code>.</p>
+            <form action="{{ route('admin.notifications.push-templates') }}" method="POST" class="space-y-4">
+                @csrf
+                @foreach($pushTemplates as $key => $tpl)
+                    <div class="rounded-lg border border-ink-100 p-3 space-y-2">
+                        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="enabled_{{ $key }}" value="1" @checked($tpl['enabled'])> {{ $tpl['label'] }}</label>
+                        <input name="title_{{ $key }}" value="{{ $tpl['title'] }}" maxlength="150" class="input py-1.5 text-sm" placeholder="Title">
+                        <textarea name="body_{{ $key }}" rows="2" maxlength="400" class="input py-1.5 text-sm" placeholder="Message">{{ $tpl['body'] }}</textarea>
+                    </div>
+                @endforeach
+                <button class="btn-outline text-sm">Save order templates</button>
+            </form>
+        </div>
+
         {{-- Sent / scheduled + per-campaign analytics --}}
         <div class="card overflow-x-auto">
             <table class="w-full min-w-[760px] text-sm">

@@ -773,66 +773,79 @@
         </div>
     </nav>
 
-    @auth('customer')
-        @if(app(\App\Services\WebPushService::class)->ready())
-            <script>
-                (function () {
-                    const VAPID = @json(app(\App\Services\WebPushService::class)->publicKey());
-                    const SUBSCRIBE = @json(route('account.push.subscribe'));
-                    const CSRF = @json(csrf_token());
+    @if(app(\App\Services\WebPushService::class)->ready())
+        <script>
+            (function () {
+                const VAPID = @json(app(\App\Services\WebPushService::class)->publicKey());
+                const SUBSCRIBE = @json(route('push.subscribe'));
+                const CSRF = @json(csrf_token());
+                // Auto-prompt once per browser: immediately for anyone, and right
+                // after a member registers (server flashes this flag).
+                const AUTOPROMPT = {{ (auth('customer')->check() ? session('prompt_push') : true) ? 'true' : 'false' }};
 
-                    function urlB64ToUint8(base64) {
-                        const pad = '='.repeat((4 - (base64.length % 4)) % 4);
-                        const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
-                        const raw = atob(b64);
-                        return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+                function urlB64ToUint8(base64) {
+                    const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+                    const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+                    const raw = atob(b64);
+                    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+                }
+
+                async function ensure() {
+                    const reg = await navigator.serviceWorker.register('/sw.js');
+                    await navigator.serviceWorker.ready;
+                    let sub = await reg.pushManager.getSubscription();
+                    if (!sub) {
+                        sub = await reg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlB64ToUint8(VAPID),
+                        });
                     }
+                    await fetch(SUBSCRIBE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, Accept: 'application/json' },
+                        body: JSON.stringify(sub),
+                    });
+                }
 
-                    window.webPushOptIn = function () {
-                        return {
-                            supported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
-                            state: 'default',
-                            busy: false,
-                            init() {
-                                if (!this.supported) return;
-                                this.state = Notification.permission;
-                                // If already granted, make sure a live subscription exists on the server.
-                                if (this.state === 'granted') this.ensure().catch(() => {});
-                            },
-                            async ensure() {
-                                const reg = await navigator.serviceWorker.register('/sw.js');
-                                await navigator.serviceWorker.ready;
-                                let sub = await reg.pushManager.getSubscription();
-                                if (!sub) {
-                                    sub = await reg.pushManager.subscribe({
-                                        userVisibleOnly: true,
-                                        applicationServerKey: urlB64ToUint8(VAPID),
-                                    });
-                                }
-                                await fetch(SUBSCRIBE, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, Accept: 'application/json' },
-                                    body: JSON.stringify(sub),
-                                });
-                            },
-                            async enable() {
-                                if (!this.supported || this.busy) return;
-                                this.busy = true;
-                                try {
-                                    const perm = await Notification.requestPermission();
-                                    this.state = perm;
-                                    if (perm === 'granted') await this.ensure();
-                                } catch (e) {
-                                    console.warn('Push opt-in failed', e);
-                                } finally {
-                                    this.busy = false;
-                                }
-                            },
-                        };
+                const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+                // Alpine component for the member "Turn on" button in the bell.
+                window.webPushOptIn = function () {
+                    return {
+                        supported,
+                        state: supported ? Notification.permission : 'unsupported',
+                        busy: false,
+                        init() {
+                            if (supported && this.state === 'granted') ensure().catch(() => {});
+                        },
+                        async enable() {
+                            if (!supported || this.busy) return;
+                            this.busy = true;
+                            try {
+                                const perm = await Notification.requestPermission();
+                                this.state = perm;
+                                if (perm === 'granted') await ensure();
+                            } catch (e) { console.warn('Push opt-in failed', e); }
+                            finally { this.busy = false; }
+                        },
                     };
-                })();
-            </script>
-        @endif
-    @endauth
+                };
+
+                // Immediate opt-in prompt (once per browser).
+                if (supported && AUTOPROMPT && Notification.permission === 'default' && !localStorage.getItem('wp_asked')) {
+                    localStorage.setItem('wp_asked', '1');
+                    // A tiny delay so it doesn't fire before first paint.
+                    setTimeout(() => {
+                        Notification.requestPermission().then((perm) => {
+                            if (perm === 'granted') ensure().catch(() => {});
+                        });
+                    }, 1500);
+                } else if (supported && Notification.permission === 'granted') {
+                    // Keep the subscription (and its customer link) fresh on every load.
+                    ensure().catch(() => {});
+                }
+            })();
+        </script>
+    @endif
 </body>
 </html>

@@ -39,7 +39,25 @@ class NotificationController extends Controller
                 ->where(fn ($w) => $w->whereNull('winback_sent_at')->orWhere('winback_sent_at', '<', now()->subDays((int) Setting::get('winback_cooldown_days', 30))))
                 ->count(),
             'analytics' => app(\App\Services\CampaignAnalyticsService::class),
+            'pushTemplates' => collect(\App\Services\PushTemplateService::defaults())->map(fn ($d, $key) => [
+                'label' => $d['label'],
+                'enabled' => (bool) Setting::get("push_tpl_{$key}_enabled", true),
+                'title' => Setting::get("push_tpl_{$key}_title", $d['title']),
+                'body' => Setting::get("push_tpl_{$key}_body", $d['body']),
+            ])->all(),
         ]);
+    }
+
+    /** Save the editable transactional push templates (order updates, etc.). */
+    public function savePushTemplates(Request $request)
+    {
+        foreach (array_keys(\App\Services\PushTemplateService::defaults()) as $key) {
+            Setting::put("push_tpl_{$key}_enabled", $request->boolean("enabled_{$key}"));
+            Setting::put("push_tpl_{$key}_title", trim((string) $request->input("title_{$key}")));
+            Setting::put("push_tpl_{$key}_body", trim((string) $request->input("body_{$key}")));
+        }
+
+        return back()->with('success', 'Automated push templates saved.');
     }
 
     /** Compose + send (or schedule) a notification to all members or a segment. */

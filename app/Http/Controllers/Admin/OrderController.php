@@ -326,6 +326,12 @@ class OrderController extends Controller
             }
         }
 
+        // Fire a web push for the status change (template-gated; free, so not tied
+        // to the SMS "notify" checkbox).
+        if ($previousStatus !== $data['status']) {
+            $this->pushOrderStatus($order->fresh(), $data['status']);
+        }
+
         return back()->with('success', 'Order status updated.');
     }
 
@@ -495,9 +501,32 @@ class OrderController extends Controller
         if (in_array($order->status, ['pending', 'confirmed', 'processing'], true)) {
             $order->update(['status' => 'shipped']);
             $order->history()->create(['status' => 'booked', 'note' => 'Consignment created at Steadfast', 'created_by' => auth()->user()->name]);
+            // Courier picked it up → tell the customer it's on the way.
+            $this->pushOrderStatus($order->fresh('shipment'), 'shipped');
         }
 
         return back()->with('success', "Consignment created. Tracking: {$shipment->tracking_code}");
+    }
+
+    /** Send the editable transactional web push for an order status change. */
+    protected function pushOrderStatus(Order $order, string $status): void
+    {
+        if (! $order->customer_id) {
+            return;
+        }
+        $trigger = match ($status) {
+            'confirmed' => 'order_confirmed',
+            'shipped' => 'order_shipped',
+            'delivered' => 'order_delivered',
+            default => null,
+        };
+        if (! $trigger) {
+            return;
+        }
+        $payload = app(\App\Services\PushTemplateService::class)->forOrder($trigger, $order);
+        if ($payload) {
+            app(\App\Services\NotificationService::class)->pushToCustomer((int) $order->customer_id, $payload);
+        }
     }
 
     public function refreshShipment(Order $order, SteadfastService $steadfast)

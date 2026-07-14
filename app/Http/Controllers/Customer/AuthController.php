@@ -76,7 +76,9 @@ class AuthController extends Controller
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
 
-        return redirect()->route('account')->with('success', 'Welcome to '.store_name().'!');
+        return redirect()->route('account')
+            ->with('success', 'Welcome to '.store_name().'!')
+            ->with('prompt_push', true);   // trigger the web-push opt-in prompt on landing
     }
 
     public function logout(Request $request)
