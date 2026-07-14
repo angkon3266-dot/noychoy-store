@@ -18,6 +18,12 @@
                     <div><label class="label">Name</label><input name="name" value="{{ old('name', $customer->name) }}" class="input" required></div>
                     <div><label class="label">Phone</label><input name="phone" value="{{ old('phone', $customer->phone) }}" class="input" required></div>
                     <div><label class="label">Email</label><input type="email" name="email" value="{{ old('email', $customer->email) }}" class="input" placeholder="you@example.com"></div>
+                    <div><label class="label">Gender (optional)</label>
+                        <select name="gender" class="input">
+                            <option value="">Prefer not to say</option>
+                            @foreach(\App\Models\Customer::GENDERS as $k => $lbl)<option value="{{ $k }}" @selected(old('gender', $customer->gender)===$k)>{{ $lbl }}</option>@endforeach
+                        </select>
+                    </div>
                     <div class="flex justify-end"><button class="btn-primary">Save changes</button></div>
                 </form>
             </div>

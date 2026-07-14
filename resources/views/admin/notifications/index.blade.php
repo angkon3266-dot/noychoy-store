@@ -31,6 +31,22 @@
                 <div><label class="label">Link (optional)</label><input name="url" class="input" placeholder="https://… or /shop"></div>
                 <div><label class="label">Button label</label><input name="cta_label" class="input" placeholder="Shop now"></div>
             </div>
+
+            {{-- Audience --}}
+            <div x-data="{ audience: 'all' }">
+                <label class="label">Send to</label>
+                <select name="audience" x-model="audience" class="input">
+                    <option value="all">All members ({{ number_format($memberCount) }})</option>
+                    <option value="segment">A specific group…</option>
+                </select>
+                <select name="segment_id" x-show="audience==='segment'" x-cloak :required="audience==='segment'" class="input mt-2">
+                    <option value="">Choose a group…</option>
+                    @foreach($segments as $seg)<option value="{{ $seg->id }}">{{ $seg->name }}</option>@endforeach
+                </select>
+                @if($segments->isEmpty())<p class="text-xs text-ink-700/50 mt-1">No groups yet — <a href="{{ route('admin.segments.index') }}" class="text-gold-700 underline">create one</a>.</p>@endif
+            </div>
+
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="send_sms" value="1"> Also send by SMS <span class="text-xs text-ink-700/50">(uses credits; immediate sends only)</span></label>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="schedule"> Schedule for later</label>
             <div x-show="schedule" x-cloak><label class="label">Send at</label><input type="datetime-local" name="scheduled_at" class="input" :required="schedule"></div>
             <button class="btn-primary w-full" x-text="schedule ? 'Schedule notification' : 'Send now'">Send now</button>
@@ -69,7 +85,7 @@
                                 <div class="font-medium">{{ $n->iconOrDefault() }} {{ $n->title }}</div>
                                 @if($n->body)<div class="text-xs text-ink-700/50 truncate max-w-[320px]">{{ $n->body }}</div>@endif
                             </td>
-                            <td class="px-4 py-3 text-ink-700/60">{{ ucfirst(str_replace('_', ' ', $n->type)) }}</td>
+                            <td class="px-4 py-3 text-ink-700/60">{{ ucfirst(str_replace('_', ' ', $n->type)) }}<div class="text-[11px] text-ink-700/40">{{ $n->audience === 'segment' ? ('→ '.($n->segment->name ?? 'group')) : 'All members' }}</div></td>
                             <td class="px-4 py-3 text-xs">
                                 @if($n->sent_at)<span class="text-green-700">Sent {{ $n->sent_at->diffForHumans() }}</span>
                                 @elseif($n->scheduled_at)<span class="text-amber-600">Scheduled {{ $n->scheduled_at->format('d M, H:i') }}</span>

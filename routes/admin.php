@@ -76,6 +76,13 @@ Route::middleware('admin')->group(function () {
     Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
     Route::get('customers/all-offers', [\App\Http\Controllers\Admin\CustomerController::class, 'offersIndex'])->name('customers.all-offers');
 
+    // Customer segments (groups)
+    Route::get('segments', [\App\Http\Controllers\Admin\SegmentController::class, 'index'])->name('segments.index');
+    Route::post('segments/preview', [\App\Http\Controllers\Admin\SegmentController::class, 'preview'])->name('segments.preview');
+    Route::post('segments', [\App\Http\Controllers\Admin\SegmentController::class, 'store'])->name('segments.store');
+    Route::put('segments/{segment}', [\App\Http\Controllers\Admin\SegmentController::class, 'update'])->name('segments.update');
+    Route::delete('segments/{segment}', [\App\Http\Controllers\Admin\SegmentController::class, 'destroy'])->name('segments.destroy');
+
     // Member notifications hub
     Route::get('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'store'])->name('notifications.store');

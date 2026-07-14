@@ -21,19 +21,42 @@ class NotificationService
     public function broadcast(array $data): CustomerNotification
     {
         $scheduled = $data['scheduled_at'] ?? null;
+        $recipientIds = $data['recipient_ids'] ?? null;   // array = targeted; null = all members
 
-        return CustomerNotification::create([
+        $n = CustomerNotification::create([
             'type' => $data['type'] ?? 'announcement',
             'title' => $data['title'],
             'body' => $data['body'] ?? null,
             'url' => $data['url'] ?? null,
             'cta_label' => $data['cta_label'] ?? null,
             'icon' => $data['icon'] ?? null,
-            'audience' => 'all',
+            'audience' => is_array($recipientIds) ? 'segment' : 'all',
+            'segment_id' => $data['segment_id'] ?? null,
             'scheduled_at' => $scheduled,
             'sent_at' => $scheduled ? null : now(),
             'created_by' => $data['created_by'] ?? optional(auth()->user())->id,
         ]);
+
+        if (is_array($recipientIds)) {
+            foreach (array_chunk(array_values(array_unique($recipientIds)), 1000) as $chunk) {
+                $n->recipients()->attach($chunk);
+            }
+        }
+
+        return $n;
+    }
+
+    /** Notifications visible to a given customer (all-audience + targeted-at-them). */
+    public function visibleFor(?Customer $customer): \Illuminate\Database\Eloquent\Builder
+    {
+        $q = CustomerNotification::whereNotNull('sent_at');
+        if (! $customer) {
+            return $q->where('audience', 'all');
+        }
+
+        return $q->where(fn ($w) => $w->where('audience', 'all')
+            ->orWhereIn('id', fn ($sub) => $sub->from('customer_notification_recipients')
+                ->select('customer_notification_id')->where('customer_id', $customer->id)));
     }
 
     /** Deliver any scheduled notifications whose time has arrived. */
@@ -51,10 +74,10 @@ class NotificationService
         return $due->count();
     }
 
-    /** Recent delivered notifications (for the bell + dashboard). */
-    public function recent(int $limit = 15)
+    /** Recent notifications visible to this customer (for the bell + dashboard). */
+    public function recentFor(?Customer $customer, int $limit = 15)
     {
-        return CustomerNotification::sent()->limit($limit)->get();
+        return $this->visibleFor($customer)->orderByDesc('sent_at')->limit($limit)->get();
     }
 
     public function unreadCountFor(?Customer $customer): int
@@ -63,7 +86,7 @@ class NotificationService
             return 0;
         }
 
-        return CustomerNotification::whereNotNull('sent_at')
+        return $this->visibleFor($customer)
             ->when($customer->notifications_read_at, fn ($q) => $q->where('sent_at', '>', $customer->notifications_read_at))
             ->count();
     }

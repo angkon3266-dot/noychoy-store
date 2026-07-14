@@ -12,8 +12,10 @@ class Customer extends Authenticatable
     protected $fillable = [
         'name', 'phone', 'email', 'password', 'total_orders',
         'total_spent', 'points', 'points_lifetime', 'last_order_at', 'blacklisted', 'notes', 'woo_id',
-        'google_id', 'avatar', 'referral_code', 'referred_by', 'referral_rewarded',
+        'google_id', 'avatar', 'referral_code', 'referred_by', 'referral_rewarded', 'gender',
     ];
+
+    public const GENDERS = ['male' => 'Male', 'female' => 'Female', 'other' => 'Other'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -86,6 +88,16 @@ class Customer extends Authenticatable
     public function offers(): HasMany
     {
         return $this->hasMany(CustomerOffer::class)->latest();
+    }
+
+    public function segments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(CustomerSegment::class, 'customer_segment_members');
+    }
+
+    public function genderLabel(): string
+    {
+        return self::GENDERS[$this->gender] ?? '—';
     }
 
     /** Currently usable per-customer offers. */

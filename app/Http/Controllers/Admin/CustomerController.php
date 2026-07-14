@@ -232,10 +232,12 @@ class CustomerController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:160'],
+            'gender' => ['nullable', 'in:male,female,other'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'blacklisted' => ['nullable', 'boolean'],
         ]);
         $data['blacklisted'] = $request->boolean('blacklisted');
+        $data['gender'] = $data['gender'] ?: null;
         $customer->update($data);
 
         return back()->with('success', 'Customer updated.');

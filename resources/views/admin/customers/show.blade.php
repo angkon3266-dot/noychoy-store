@@ -65,6 +65,12 @@
                 <div><label class="label">Name</label><input name="name" value="{{ old('name', $customer->name) }}" class="input" required></div>
                 <div><label class="label">Phone</label><input value="{{ $customer->phone ?? '—' }}" class="input bg-ink-50" disabled></div>
                 <div><label class="label">Email</label><input name="email" value="{{ old('email', $customer->email) }}" class="input"></div>
+                <div><label class="label">Gender</label>
+                    <select name="gender" class="input">
+                        <option value="">Unknown</option>
+                        @foreach(\App\Models\Customer::GENDERS as $k => $lbl)<option value="{{ $k }}" @selected(old('gender', $customer->gender)===$k)>{{ $lbl }}</option>@endforeach
+                    </select>
+                </div>
                 <div><label class="label">Internal notes</label><textarea name="notes" rows="3" class="input">{{ old('notes', $customer->notes) }}</textarea></div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="blacklisted" value="1" @checked($customer->blacklisted)> Blacklist (high-risk COD)</label>
                 <button class="btn-primary w-full">Save</button>

@@ -84,11 +84,11 @@ class AccountController extends Controller
 
     public function notifications(\App\Services\NotificationService $notifications)
     {
-        $notifications->markRead($this->customer());
+        $customer = $this->customer();
+        $items = $notifications->visibleFor($customer)->orderByDesc('sent_at')->paginate(20);
+        $notifications->markRead($customer);
 
-        return view('customer.notifications', [
-            'items' => \App\Models\CustomerNotification::sent()->paginate(20),
-        ]);
+        return view('customer.notifications', compact('items'));
     }
 
     public function markNotificationsRead(\App\Services\NotificationService $notifications)
@@ -147,7 +147,9 @@ class AccountController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:160', Rule::unique('customers', 'email')->ignore($customer->id)],
             'phone' => ['required', 'string', 'max:20', Rule::unique('customers', 'phone')->ignore($customer->id)],
+            'gender' => ['nullable', 'in:male,female,other'],
         ]);
+        $data['gender'] = $data['gender'] ?: null;
 
         $customer->update($data);
 

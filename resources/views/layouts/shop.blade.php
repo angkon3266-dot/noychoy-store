@@ -297,8 +297,9 @@
                     @auth('customer')
                         @php
                             $notifSvc = app(\App\Services\NotificationService::class);
-                            $notifItems = $notifSvc->recent(10);
-                            $notifUnread = $notifSvc->unreadCountFor(auth('customer')->user());
+                            $notifCustomer = auth('customer')->user();
+                            $notifItems = $notifSvc->recentFor($notifCustomer, 10);
+                            $notifUnread = $notifSvc->unreadCountFor($notifCustomer);
                         @endphp
                         <div x-data="{ open: false, unread: {{ $notifUnread }} }" class="relative">
                             <button type="button" @click="open = !open; if (open && unread > 0) { fetch('{{ route('account.notifications.read') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } }); unread = 0; }"
