@@ -194,9 +194,34 @@ class ProductController extends Controller
         $this->syncVideos($request, $product);
         $this->syncVariants($request, $product);
         $this->syncContentSections($request, $product);
+        $this->maybeAnnounceProduct($product->fresh());
 
         return redirect()->route('admin.products.edit', $product)
             ->with('success', 'Product created.');
+    }
+
+    /**
+     * Fire an early-access notification for a newly published pre-order product
+     * (once per product). New non-preorder products are announced in a batch by
+     * the notifications:new-arrivals command instead.
+     */
+    protected function maybeAnnounceProduct(Product $product): void
+    {
+        if ($product->status !== 'published') {
+            return;
+        }
+        $notify = app(\App\Services\NotificationService::class);
+
+        if ($product->isPreorder() && $product->preorder_announced_at === null && $notify->autoEnabled('notify_preorders')) {
+            $notify->broadcast([
+                'type' => 'preorder',
+                'title' => 'Pre-order now open: '.$product->name,
+                'body' => 'Members get early access — reserve yours before it drops.',
+                'url' => route('product.show', $product),
+                'cta_label' => 'Reserve now',
+            ]);
+            $product->forceFill(['preorder_announced_at' => now(), 'announced_at' => now()])->saveQuietly();
+        }
     }
 
     public function edit(Product $product)
@@ -222,6 +247,7 @@ class ProductController extends Controller
         $this->syncVideos($request, $product);
         $this->syncVariants($request, $product);
         $this->syncContentSections($request, $product);
+        $this->maybeAnnounceProduct($product->fresh());
 
         return redirect()->route('admin.products.edit', $product)
             ->with('success', 'Product updated.');

@@ -82,6 +82,22 @@ class AccountController extends Controller
         return view('customer.orders', compact('orders'));
     }
 
+    public function notifications(\App\Services\NotificationService $notifications)
+    {
+        $notifications->markRead($this->customer());
+
+        return view('customer.notifications', [
+            'items' => \App\Models\CustomerNotification::sent()->paginate(20),
+        ]);
+    }
+
+    public function markNotificationsRead(\App\Services\NotificationService $notifications)
+    {
+        $notifications->markRead($this->customer());
+
+        return response()->json(['ok' => true]);
+    }
+
     public function order(string $orderNumber, \App\Services\SteadfastService $steadfast)
     {
         $order = $this->customer()->orders()

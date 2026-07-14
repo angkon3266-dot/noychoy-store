@@ -30,3 +30,12 @@ Schedule::job(new RetryFailedMetaSyncs)->hourly()->name('meta-retry-failed')->wi
 
 // Daily: verify the whole catalog is in sync and re-queue anything stale.
 Schedule::job(new VerifyCatalogSync)->dailyAt('03:30')->name('meta-verify-catalog')->withoutOverlapping();
+
+// ── Member notifications ────────────────────────────────────────────────────
+// Batched "new arrivals" announcement — sends one notification for the day's new
+// products (a no-op when there are none). Adjust the time as you like.
+Schedule::command('notifications:new-arrivals')->dailyAt('10:00')->name('notify-new-arrivals')->withoutOverlapping();
+
+// Deliver any admin notifications that were scheduled for a future time.
+Schedule::call(fn () => app(\App\Services\NotificationService::class)->deliverDue())
+    ->everyFiveMinutes()->name('notify-deliver-scheduled');

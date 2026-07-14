@@ -75,6 +75,13 @@ Route::middleware('admin')->group(function () {
     // Customers (CRM, analytics, SMS, import)
     Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
     Route::get('customers/all-offers', [\App\Http\Controllers\Admin\CustomerController::class, 'offersIndex'])->name('customers.all-offers');
+
+    // Member notifications hub
+    Route::get('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'store'])->name('notifications.store');
+    Route::post('notifications/settings', [\App\Http\Controllers\Admin\NotificationController::class, 'settings'])->name('notifications.settings');
+    Route::post('notifications/run-new-arrivals', [\App\Http\Controllers\Admin\NotificationController::class, 'runNewArrivals'])->name('notifications.run-new-arrivals');
+    Route::delete('notifications/{notification}', [\App\Http\Controllers\Admin\NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'importForm'])->name('customers.import');
     Route::post('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'import'])->name('customers.import.store');
     Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');

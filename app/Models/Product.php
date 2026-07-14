@@ -50,6 +50,8 @@ class Product extends Model
         'is_bestseller' => 'boolean',
         'video_urls' => 'array',
         'content_sections' => 'array',
+        'announced_at' => 'datetime',
+        'preorder_announced_at' => 'datetime',
     ];
 
     public function scopeBestsellers(Builder $query): Builder

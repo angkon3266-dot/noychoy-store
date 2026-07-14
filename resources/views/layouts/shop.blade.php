@@ -295,6 +295,34 @@
                     </div>
                     @endif
                     @auth('customer')
+                        @php
+                            $notifSvc = app(\App\Services\NotificationService::class);
+                            $notifItems = $notifSvc->recent(10);
+                            $notifUnread = $notifSvc->unreadCountFor(auth('customer')->user());
+                        @endphp
+                        <div x-data="{ open: false, unread: {{ $notifUnread }} }" class="relative">
+                            <button type="button" @click="open = !open; if (open && unread > 0) { fetch('{{ route('account.notifications.read') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } }); unread = 0; }"
+                                    class="relative p-2 hover:text-gold-700" title="Notifications">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
+                                <span x-show="unread > 0" x-cloak class="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center" x-text="unread > 9 ? '9+' : unread"></span>
+                            </button>
+                            <div x-show="open" x-cloak @click.outside="open = false" x-transition
+                                 class="absolute right-0 mt-2 w-80 max-h-[70vh] overflow-y-auto rounded-xl border border-ink-100 bg-white shadow-2xl z-50 p-2">
+                                <div class="flex items-center justify-between px-2 py-1.5">
+                                    <p class="text-sm font-semibold">Notifications</p>
+                                    <a href="{{ route('account.notifications') }}" class="text-xs text-gold-700 hover:underline">See all</a>
+                                </div>
+                                @forelse($notifItems as $n)
+                                    <a href="{{ $n->url ?: route('account.notifications') }}" class="block px-2 py-2 rounded-lg hover:bg-ink-50">
+                                        <p class="text-sm font-medium">{{ $n->iconOrDefault() }} {{ $n->title }}</p>
+                                        @if($n->body)<p class="text-xs text-ink-700/60 line-clamp-2">{{ $n->body }}</p>@endif
+                                        <p class="text-[11px] text-ink-700/40 mt-0.5">{{ $n->sent_at?->diffForHumans() }}</p>
+                                    </a>
+                                @empty
+                                    <p class="px-2 py-6 text-sm text-ink-700/50 text-center">No notifications yet.</p>
+                                @endforelse
+                            </div>
+                        </div>
                         <a href="{{ route('account') }}" class="p-2 hover:text-gold-700" title="My account">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"/></svg>
                         </a>

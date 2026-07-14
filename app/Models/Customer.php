@@ -19,6 +19,7 @@ class Customer extends Authenticatable
 
     protected $casts = [
         'last_order_at' => 'datetime',
+        'notifications_read_at' => 'datetime',
         'total_spent' => 'decimal:2',
         'points' => 'integer',
         'points_lifetime' => 'integer',

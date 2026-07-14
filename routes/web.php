@@ -81,6 +81,8 @@ Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('custome
 
 Route::middleware('auth:customer')->group(function () {
     Route::get('/account', [AccountController::class, 'index'])->name('account');
+    Route::get('/account/notifications', [AccountController::class, 'notifications'])->name('account.notifications');
+    Route::post('/account/notifications/read', [AccountController::class, 'markNotificationsRead'])->name('account.notifications.read');
     Route::get('/account/orders', [AccountController::class, 'orders'])->name('account.orders');
     Route::get('/account/orders/{orderNumber}', [AccountController::class, 'order'])->name('account.order');
     Route::post('/account/orders/{orderNumber}/reorder', [AccountController::class, 'reorder'])->name('account.reorder');
