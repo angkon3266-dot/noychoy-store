@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class SegmentService
 {
+    public function __construct(protected RfmService $rfm) {}
+
     /** @return Builder<Customer> */
     public function query(CustomerSegment $segment): Builder
     {
@@ -29,6 +31,12 @@ class SegmentService
     public function dynamicQuery(array $r): Builder
     {
         $q = Customer::query();
+
+        // RFM bucket (Recency/Frequency auto-tier). Applied first — the other
+        // filters below further narrow within the bucket.
+        if (! empty($r['rfm']) && $this->rfm->isBucket($r['rfm'])) {
+            $this->rfm->applyBucket($q, $r['rfm']);
+        }
 
         if (! empty($r['members_only'])) {
             $q->whereNotNull('password');

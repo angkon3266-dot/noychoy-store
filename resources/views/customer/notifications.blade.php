@@ -7,7 +7,7 @@
 
     <div class="space-y-3">
         @forelse($items as $n)
-            <a href="{{ $n->url ?: '#' }}" class="card p-4 flex items-start gap-3 hover:border-gold-300 transition {{ $n->url ? '' : 'pointer-events-none' }}">
+            <a href="{{ $n->url ? route('account.notifications.go', $n) : '#' }}" class="card p-4 flex items-start gap-3 hover:border-gold-300 transition {{ $n->url ? '' : 'pointer-events-none' }}">
                 <span class="text-2xl shrink-0">{{ $n->iconOrDefault() }}</span>
                 <div class="min-w-0">
                     <p class="font-medium">{{ $n->title }}</p>

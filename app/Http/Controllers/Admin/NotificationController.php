@@ -20,7 +20,22 @@ class NotificationController extends Controller
                 'notify_new_arrivals' => (bool) Setting::get('notify_new_arrivals', true),
                 'notify_preorders' => (bool) Setting::get('notify_preorders', true),
                 'webpush_enabled' => (bool) Setting::get('webpush_enabled', false),
+                // Win-back automation.
+                'winback_enabled' => (bool) Setting::get('winback_enabled', false),
+                'winback_days' => (int) Setting::get('winback_days', 60),
+                'winback_cooldown_days' => (int) Setting::get('winback_cooldown_days', 30),
+                'winback_offer_percent' => (float) Setting::get('winback_offer_percent', 10),
+                'winback_offer_days' => (int) Setting::get('winback_offer_days', 14),
+                'winback_title' => Setting::get('winback_title', 'We miss you 💛'),
+                'winback_body' => Setting::get('winback_body', 'It’s been a while — here’s a little something to welcome you back.'),
+                'winback_sms' => (bool) Setting::get('winback_sms', false),
             ],
+            'winbackDue' => \App\Models\Customer::whereNotNull('password')->where('blacklisted', false)
+                ->where('total_orders', '>', 0)
+                ->where('last_order_at', '<', now()->subDays((int) Setting::get('winback_days', 60)))
+                ->where(fn ($w) => $w->whereNull('winback_sent_at')->orWhere('winback_sent_at', '<', now()->subDays((int) Setting::get('winback_cooldown_days', 30))))
+                ->count(),
+            'analytics' => app(\App\Services\CampaignAnalyticsService::class),
         ]);
     }
 
@@ -100,10 +115,42 @@ class NotificationController extends Controller
         return back()->with('success', 'Notification settings saved.');
     }
 
+    /** Save the win-back automation settings. */
+    public function winbackSettings(Request $request)
+    {
+        $data = $request->validate([
+            'winback_days' => ['required', 'integer', 'min:7', 'max:365'],
+            'winback_cooldown_days' => ['required', 'integer', 'min:7', 'max:365'],
+            'winback_offer_percent' => ['nullable', 'numeric', 'min:0', 'max:90'],
+            'winback_offer_days' => ['required', 'integer', 'min:1', 'max:90'],
+            'winback_title' => ['required', 'string', 'max:120'],
+            'winback_body' => ['nullable', 'string', 'max:400'],
+        ]);
+
+        Setting::put('winback_enabled', $request->boolean('winback_enabled'));
+        Setting::put('winback_days', $data['winback_days']);
+        Setting::put('winback_cooldown_days', $data['winback_cooldown_days']);
+        Setting::put('winback_offer_percent', $data['winback_offer_percent'] ?? 0);
+        Setting::put('winback_offer_days', $data['winback_offer_days']);
+        Setting::put('winback_title', $data['winback_title']);
+        Setting::put('winback_body', $data['winback_body'] ?? '');
+        Setting::put('winback_sms', $request->boolean('winback_sms'));
+
+        return back()->with('success', 'Win-back settings saved.');
+    }
+
     /** Run the batched new-arrivals announcement right now. */
     public function runNewArrivals()
     {
         \Illuminate\Support\Facades\Artisan::call('notifications:new-arrivals');
+
+        return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
+    }
+
+    /** Run the win-back automation right now. */
+    public function runWinback()
+    {
+        \Illuminate\Support\Facades\Artisan::call('crm:winback');
 
         return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
     }

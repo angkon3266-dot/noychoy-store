@@ -314,7 +314,7 @@
                                     <a href="{{ route('account.notifications') }}" class="text-xs text-gold-700 hover:underline">See all</a>
                                 </div>
                                 @forelse($notifItems as $n)
-                                    <a href="{{ $n->url ?: route('account.notifications') }}" class="block px-2 py-2 rounded-lg hover:bg-ink-50">
+                                    <a href="{{ $n->url ? route('account.notifications.go', $n) : route('account.notifications') }}" class="block px-2 py-2 rounded-lg hover:bg-ink-50">
                                         <p class="text-sm font-medium">{{ $n->iconOrDefault() }} {{ $n->title }}</p>
                                         @if($n->body)<p class="text-xs text-ink-700/60 line-clamp-2">{{ $n->body }}</p>@endif
                                         <p class="text-[11px] text-ink-700/40 mt-0.5">{{ $n->sent_at?->diffForHumans() }}</p>

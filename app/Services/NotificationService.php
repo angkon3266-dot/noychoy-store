@@ -23,6 +23,12 @@ class NotificationService
         $scheduled = $data['scheduled_at'] ?? null;
         $recipientIds = $data['recipient_ids'] ?? null;   // array = targeted; null = all members
 
+        // Reach snapshot for analytics: unique recipients for a segment send, or
+        // the current member count for an all-member send.
+        $reach = is_array($recipientIds)
+            ? count(array_unique($recipientIds))
+            : (int) ($data['recipients_count'] ?? Customer::whereNotNull('password')->count());
+
         $n = CustomerNotification::create([
             'type' => $data['type'] ?? 'announcement',
             'title' => $data['title'],
@@ -32,6 +38,7 @@ class NotificationService
             'icon' => $data['icon'] ?? null,
             'audience' => is_array($recipientIds) ? 'segment' : 'all',
             'segment_id' => $data['segment_id'] ?? null,
+            'recipients_count' => $reach,
             'scheduled_at' => $scheduled,
             'sent_at' => $scheduled ? null : now(),
             'created_by' => $data['created_by'] ?? optional(auth()->user())->id,

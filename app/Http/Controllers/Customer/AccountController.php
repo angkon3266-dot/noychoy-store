@@ -98,6 +98,16 @@ class AccountController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** Count a notification click, then forward to its destination (campaign analytics). */
+    public function trackNotification(\App\Models\CustomerNotification $notification)
+    {
+        $notification->increment('clicks');
+
+        $to = $notification->url ?: route('account.notifications');
+
+        return str_starts_with($to, 'http') ? redirect()->away($to) : redirect()->to($to);
+    }
+
     public function order(string $orderNumber, \App\Services\SteadfastService $steadfast)
     {
         $order = $this->customer()->orders()

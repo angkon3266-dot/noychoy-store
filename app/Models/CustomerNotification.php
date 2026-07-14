@@ -9,7 +9,7 @@ class CustomerNotification extends Model
 {
     protected $fillable = [
         'type', 'title', 'body', 'url', 'cta_label', 'icon', 'audience', 'segment_id',
-        'scheduled_at', 'sent_at', 'created_by',
+        'recipients_count', 'clicks', 'scheduled_at', 'sent_at', 'created_by',
     ];
 
     protected $casts = [

@@ -39,3 +39,7 @@ Schedule::command('notifications:new-arrivals')->dailyAt('10:00')->name('notify-
 // Deliver any admin notifications that were scheduled for a future time.
 Schedule::call(fn () => app(\App\Services\NotificationService::class)->deliverDue())
     ->everyFiveMinutes()->name('notify-deliver-scheduled');
+
+// Win-back automation — re-engage lapsed members once a day (a no-op when the
+// automation is off or nobody is due).
+Schedule::command('crm:winback')->dailyAt('11:00')->name('crm-winback')->withoutOverlapping();

@@ -81,13 +81,16 @@ Route::middleware('admin')->group(function () {
     Route::post('segments/preview', [\App\Http\Controllers\Admin\SegmentController::class, 'preview'])->name('segments.preview');
     Route::post('segments', [\App\Http\Controllers\Admin\SegmentController::class, 'store'])->name('segments.store');
     Route::put('segments/{segment}', [\App\Http\Controllers\Admin\SegmentController::class, 'update'])->name('segments.update');
+    Route::post('segments/{segment}/offer', [\App\Http\Controllers\Admin\SegmentController::class, 'grantOffer'])->name('segments.grant-offer');
     Route::delete('segments/{segment}', [\App\Http\Controllers\Admin\SegmentController::class, 'destroy'])->name('segments.destroy');
 
     // Member notifications hub
     Route::get('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'store'])->name('notifications.store');
     Route::post('notifications/settings', [\App\Http\Controllers\Admin\NotificationController::class, 'settings'])->name('notifications.settings');
+    Route::post('notifications/winback-settings', [\App\Http\Controllers\Admin\NotificationController::class, 'winbackSettings'])->name('notifications.winback-settings');
     Route::post('notifications/run-new-arrivals', [\App\Http\Controllers\Admin\NotificationController::class, 'runNewArrivals'])->name('notifications.run-new-arrivals');
+    Route::post('notifications/run-winback', [\App\Http\Controllers\Admin\NotificationController::class, 'runWinback'])->name('notifications.run-winback');
     Route::delete('notifications/{notification}', [\App\Http\Controllers\Admin\NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'importForm'])->name('customers.import');
     Route::post('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'import'])->name('customers.import.store');
