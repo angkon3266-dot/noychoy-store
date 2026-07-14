@@ -680,7 +680,7 @@
         $memberOffers = auth('customer')->check() ? auth('customer')->user()->liveOffers()->get() : collect();
     @endphp
     @if($memberOffers->isNotEmpty() || theme('show_call_button') || (theme('show_whatsapp_button') && theme('whatsapp_number')) || (theme('show_messenger_button') && theme('messenger_url')))
-        <div class="fixed bottom-20 md:bottom-5 right-5 z-50 flex flex-col items-center gap-3">
+        <div class="fixed right-5 z-50 flex flex-col items-center gap-3 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:bottom-5">
             {{-- Your offers --}}
             @if($memberOffers->isNotEmpty())
                 <div x-data="{ open: false }" class="relative">
