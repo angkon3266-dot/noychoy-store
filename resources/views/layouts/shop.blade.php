@@ -674,7 +674,7 @@
                                     <span class="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{{ $mo->rewardText() }}</span>
                                     @if($mo->applies_to !== 'all')<span class="text-[10px] text-ink-700/50 ml-1">· {{ $mo->scopeLabel() }}</span>@endif
                                     @if($mo->message)<p class="text-xs text-ink-700/70 italic mt-1">{{ $mo->message }}</p>@endif
-                                    <p class="text-[11px] text-green-700 mt-1">✓ Auto-applied at checkout@if($mo->expires_at) · until {{ $mo->expires_at->format('d M') }}@endif</p>
+                                    <p class="text-[11px] text-green-700 mt-1">✓ Auto-applied at checkout{{ $mo->expires_at ? ' · until '.$mo->expires_at->format('d M') : '' }}</p>
                                 </div>
                             @endforeach
                         </div>
