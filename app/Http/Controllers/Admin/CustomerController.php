@@ -166,12 +166,18 @@ class CustomerController extends Controller
             }
         }
 
+        // In-app + web-push nudge so the member knows about their new offer.
+        app(\App\Services\NotificationService::class)
+            ->notifyOfferGranted([$customer->id], $offer->title, $offer->message, $offer->rewardText());
+
         return back()->with('success', 'Offer added for '.$customer->name.'.');
     }
 
     public function destroyOffer(Customer $customer, \App\Models\CustomerOffer $offer)
     {
-        abort_unless($offer->customer_id === $customer->id, 404);
+        // Cast both sides — on some MySQL/PDO configs integer columns come back as
+        // strings, and a strict === would wrongly 404 a valid delete.
+        abort_unless((int) $offer->customer_id === (int) $customer->id, 404);
         $offer->delete();
 
         return back()->with('success', 'Offer removed.');
@@ -207,6 +213,17 @@ class CustomerController extends Controller
             if ($offer->type === 'points' && (int) $offer->value > 0) {
                 $loyalty->award($customer, (int) $offer->value, 'adjust', 'Bonus: '.$offer->title, $offer);
             }
+        }
+
+        // One targeted notification (bell + web push) to everyone who got the offer.
+        if ($customers->isNotEmpty()) {
+            $sample = $customers->first()->offers()->latest()->first();
+            app(\App\Services\NotificationService::class)->notifyOfferGranted(
+                $customers->pluck('id')->all(),
+                $data['title'],
+                null,
+                $sample?->rewardText() ?? 'a special reward',
+            );
         }
 
         return back()->with('success', 'Offer applied to '.$customers->count().' customer(s).');

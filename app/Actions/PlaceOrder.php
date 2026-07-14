@@ -118,7 +118,7 @@ class PlaceOrder
 
             // Count this redemption of the customer's personalized offer; stamp
             // redeemed_at when its usage cap (if any) is reached.
-            if ($customerOffer && auth('customer')->check() && $customerOffer->customer_id === $customer->id) {
+            if ($customerOffer && auth('customer')->check() && (int) $customerOffer->customer_id === (int) $customer->id) {
                 $customerOffer->increment('redemptions');
                 if (! $customerOffer->hasUsesLeft() && $customerOffer->redeemed_at === null) {
                     $customerOffer->update(['redeemed_at' => now()]);

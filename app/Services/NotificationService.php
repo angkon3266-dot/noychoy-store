@@ -89,6 +89,30 @@ class NotificationService
         });
     }
 
+    /**
+     * Notify one or more members that they've received a personalised offer.
+     * Reuses the targeted-broadcast path, so it shows in the bell, fires a web
+     * push, and counts toward campaign analytics — all in one.
+     *
+     * @param  array<int>  $customerIds
+     */
+    public function notifyOfferGranted(array $customerIds, string $title, ?string $message, string $reward): ?CustomerNotification
+    {
+        $customerIds = array_values(array_unique(array_filter($customerIds)));
+        if (empty($customerIds)) {
+            return null;
+        }
+
+        return $this->broadcast([
+            'type' => 'offer',
+            'title' => $title,
+            'body' => $message ?: 'You have a new offer: '.$reward.'. Tap to view it.',
+            'url' => route('account'),
+            'cta_label' => 'View my offers',
+            'recipient_ids' => $customerIds,
+        ]);
+    }
+
     /** Notifications visible to a given customer (all-audience + targeted-at-them). */
     public function visibleFor(?Customer $customer): \Illuminate\Database\Eloquent\Builder
     {

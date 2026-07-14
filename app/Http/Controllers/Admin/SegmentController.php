@@ -126,6 +126,16 @@ class SegmentController extends Controller
             }
         }
 
+        // In-app + web-push nudge to the whole group.
+        $reward = match ($data['type']) {
+            'percent' => rtrim(rtrim(number_format((float) ($data['value'] ?? 0), 2), '0'), '.').'% off',
+            'free_shipping' => 'Free shipping',
+            'points' => (int) ($data['value'] ?? 0).' bonus points',
+            default => money($data['value'] ?? 0).' off',
+        };
+        app(\App\Services\NotificationService::class)
+            ->notifyOfferGranted($members->pluck('id')->all(), $data['title'], $data['message'] ?? null, $reward);
+
         $msg = 'Offer granted to '.$members->count().' member(s) in "'.$segment->name.'".';
         if ($smsQueued > 0) {
             $msg .= " SMS queued to {$smsQueued}.";

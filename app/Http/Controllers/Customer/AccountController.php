@@ -294,7 +294,7 @@ class AccountController extends Controller
 
     protected function authorizeAddress(Address $address): void
     {
-        abort_unless($address->customer_id === $this->customer()->id, 403);
+        abort_unless((int) $address->customer_id === (int) $this->customer()->id, 403);
     }
 
     // ── Reviews & loved ──────────────────────────────────────────────────────
