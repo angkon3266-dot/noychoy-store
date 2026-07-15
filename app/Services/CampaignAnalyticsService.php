@@ -18,13 +18,24 @@ class CampaignAnalyticsService
 {
     public const ATTRIBUTION_DAYS = 7;
 
+    /** Per-request memo of computed metrics, keyed by notification id. */
+    protected array $memo = [];
+
+    /** All campaign send times (ascending), loaded once per request. */
+    protected ?\Illuminate\Support\Collection $sentTimeline = null;
+
     /**
-     * Per-notification metrics.
+     * Per-notification metrics (memoised — the summary roll-up and the table can
+     * both ask for the same campaign without recomputing).
      *
      * @return array{recipients:int, clicks:int, ctr:float, conversions:int, revenue:float, conv_rate:float}
      */
     public function forNotification(CustomerNotification $n): array
     {
+        if (isset($this->memo[$n->id])) {
+            return $this->memo[$n->id];
+        }
+
         $recipients = (int) $n->recipients_count;
         $clicks = (int) $n->clicks;
 
@@ -32,7 +43,7 @@ class CampaignAnalyticsService
             ? $this->conversions($n)
             : [0, 0.0];
 
-        return [
+        return $this->memo[$n->id] = [
             'recipients' => $recipients,
             'clicks' => $clicks,
             'ctr' => $recipients > 0 ? round($clicks / $recipients * 100, 1) : 0.0,
@@ -40,6 +51,15 @@ class CampaignAnalyticsService
             'revenue' => $revenue,
             'conv_rate' => $recipients > 0 ? round($conversions / $recipients * 100, 1) : 0.0,
         ];
+    }
+
+    /** Next campaign send time strictly after $sentAt, from a single cached query. */
+    protected function nextSentAt(\Illuminate\Support\Carbon $sentAt): ?\Illuminate\Support\Carbon
+    {
+        $this->sentTimeline ??= CustomerNotification::whereNotNull('sent_at')
+            ->orderBy('sent_at')->pluck('sent_at');
+
+        return $this->sentTimeline->first(fn ($t) => $t->gt($sentAt));
     }
 
     /**
@@ -55,14 +75,9 @@ class CampaignAnalyticsService
         // Last-touch attribution: cap the window at the next campaign that went
         // out, so an order is credited to only the most recent campaign before it
         // (no double-counting the same order across overlapping campaigns).
-        $nextSentAt = CustomerNotification::whereNotNull('sent_at')
-            ->where('sent_at', '>', $n->sent_at)
-            ->min('sent_at');
-        if ($nextSentAt) {
-            $next = \Illuminate\Support\Carbon::parse($nextSentAt);
-            if ($next->lt($to)) {
-                $to = $next;
-            }
+        $next = $this->nextSentAt($n->sent_at);
+        if ($next && $next->lt($to)) {
+            $to = $next;
         }
 
         // Half-open interval [from, to) so a boundary order isn't counted twice.
@@ -93,20 +108,18 @@ class CampaignAnalyticsService
     public function summary()
     {
         $sent = CustomerNotification::whereNotNull('sent_at')->get();
-        $reach = $sent->sum('recipients_count');
-        $clicks = $sent->sum('clicks');
         $conversions = 0;
         $revenue = 0.0;
         foreach ($sent as $n) {
-            [$c, $r] = $this->conversions($n);
-            $conversions += $c;
-            $revenue += $r;
+            $m = $this->forNotification($n);   // memoised — reused by the table rows
+            $conversions += $m['conversions'];
+            $revenue += $m['revenue'];
         }
 
         return [
             'campaigns' => $sent->count(),
-            'reach' => (int) $reach,
-            'clicks' => (int) $clicks,
+            'reach' => (int) $sent->sum('recipients_count'),
+            'clicks' => (int) $sent->sum('clicks'),
             'conversions' => $conversions,
             'revenue' => $revenue,
         ];

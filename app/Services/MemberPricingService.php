@@ -54,14 +54,21 @@ class MemberPricingService
      *
      * @return array{capped:bool, max:int, used:int, remaining:?int, resets_at:?\Illuminate\Support\Carbon, percent:float, window_days:int}
      */
+    /** Per-request memo so the layout + cart don't both query it. */
+    protected array $usageMemo = [];
+
     public function usageStatus(\App\Models\Customer $customer): array
     {
+        if (isset($this->usageMemo[$customer->id])) {
+            return $this->usageMemo[$customer->id];
+        }
+
         $max = (int) Setting::get('register_offer_max_uses', 2);
         $windowDays = max(1, (int) Setting::get('register_offer_window_days', 7));
         $percent = $this->basePercent();
 
         if ($max <= 0) {
-            return ['capped' => false, 'max' => 0, 'used' => 0, 'remaining' => null, 'resets_at' => null, 'percent' => $percent, 'window_days' => $windowDays];
+            return $this->usageMemo[$customer->id] = ['capped' => false, 'max' => 0, 'used' => 0, 'remaining' => null, 'resets_at' => null, 'percent' => $percent, 'window_days' => $windowDays];
         }
 
         $orders = \App\Models\Order::where('customer_id', $customer->id)
@@ -69,7 +76,7 @@ class MemberPricingService
         $used = (clone $orders)->count();
         $oldest = (clone $orders)->orderBy('created_at')->first();
 
-        return [
+        return $this->usageMemo[$customer->id] = [
             'capped' => true,
             'max' => $max,
             'used' => $used,

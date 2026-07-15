@@ -25,6 +25,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(CartService::class);
 
+        // One instance per request so member-discount usage is queried once even
+        // when both the layout and the cart view ask for it.
+        $this->app->singleton(\App\Services\MemberPricingService::class);
+
         // Shared config store (memoises reads for the request/worker lifecycle).
         $this->app->singleton(SystemConfigRepository::class);
 
