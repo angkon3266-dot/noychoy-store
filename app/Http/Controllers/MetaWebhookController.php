@@ -49,7 +49,12 @@ class MetaWebhookController extends Controller
             }
         }
 
-        Log::info('Meta webhook received', ['payload' => $request->all()]);
+        // Log a summary only — Meta payloads can include user PII (names, message
+        // content, ids). Full payload isn't persisted to logs.
+        Log::info('Meta webhook received', [
+            'object' => $request->input('object'),
+            'entries' => is_array($request->input('entry')) ? count($request->input('entry')) : 0,
+        ]);
 
         $this->settings->update(['last_webhook_event' => [
             'at' => now()->toIso8601String(),

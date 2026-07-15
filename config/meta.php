@@ -44,6 +44,14 @@ return [
         ))),
     ],
 
+    // Per-module Facebook Login for Business config ids (read via config so they
+    // survive `config:cache` — env() outside config returns null once cached).
+    'module_login' => [
+        'analytics' => env('META_LOGIN_CONFIG_ID_ANALYTICS'),
+        'inbox' => env('META_LOGIN_CONFIG_ID_INBOX'),
+        'publishing' => env('META_LOGIN_CONFIG_ID_PUBLISHING'),
+    ],
+
     // Webhook verify token (also pasted into the Meta App webhook configuration).
     'webhook_verify_token' => env('META_WEBHOOK_VERIFY_TOKEN'),
 

@@ -18,14 +18,29 @@ class SteadfastWebhookController extends Controller
 {
     public function handle(Request $request, SmsService $sms)
     {
-        // Optional shared-secret check (set "steadfast_webhook_secret" in admin).
-        $secret = data_get(Setting::get('integrations', []), 'steadfast_webhook_secret');
-        if (filled($secret) && $request->query('token') !== $secret && $request->header('X-Webhook-Token') !== $secret) {
+        // Shared-secret check — fail CLOSED. A secret must be configured
+        // ("steadfast_webhook_secret" in admin → Integrations) and match, or the
+        // request is rejected. Otherwise anyone could POST fake delivery statuses
+        // (flipping orders to delivered/cancelled and firing customer SMS).
+        $secret = (string) data_get(Setting::get('integrations', []), 'steadfast_webhook_secret');
+        $provided = (string) ($request->query('token') ?? $request->header('X-Webhook-Token') ?? '');
+        if (blank($secret) || ! hash_equals($secret, $provided)) {
+            Log::warning('Steadfast webhook rejected', [
+                'reason' => blank($secret) ? 'no secret configured' : 'token mismatch',
+                'ip' => $request->ip(),
+            ]);
+
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
         $payload = $request->all();
-        Log::info('Steadfast webhook', $payload);
+        // Log only non-PII identifiers (the full payload — which can carry the
+        // customer's phone — is still persisted to shipment.response for support).
+        Log::info('Steadfast webhook', [
+            'consignment_id' => $payload['consignment_id'] ?? null,
+            'invoice' => $payload['invoice'] ?? null,
+            'delivery_status' => $payload['delivery_status'] ?? $payload['status'] ?? null,
+        ]);
 
         $consignmentId = (string) ($payload['consignment_id'] ?? '');
         $invoice = (string) ($payload['invoice'] ?? '');

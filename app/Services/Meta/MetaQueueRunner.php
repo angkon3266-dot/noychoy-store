@@ -29,7 +29,7 @@ class MetaQueueRunner
 
             $php = $this->phpBinary();
             $artisan = base_path('artisan');
-            $connection = env('QUEUE_CONNECTION', 'database');
+            $connection = config('queue.default', 'database');
             $queue = config('meta.sync.queue', 'default');
 
             // Detach fully (setsid + nohup + background) so the worker keeps
