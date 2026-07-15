@@ -65,6 +65,9 @@ class AuthController extends Controller
             $loyalty->award($customer, $loyalty->signupPoints(), 'signup', 'Welcome bonus');
         }
 
+        // Enrol into any registration-triggered drip campaigns.
+        app(\App\Services\DripService::class)->enrollRegistration($customer);
+
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
 

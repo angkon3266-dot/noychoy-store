@@ -36,6 +36,8 @@ class NotificationService
             'url' => $data['url'] ?? null,
             'cta_label' => $data['cta_label'] ?? null,
             'icon' => $data['icon'] ?? null,
+            'image' => $data['image'] ?? null,
+            'actions' => ! empty($data['actions']) ? $data['actions'] : null,
             'audience' => is_array($recipientIds) ? 'segment' : 'all',
             'segment_id' => $data['segment_id'] ?? null,
             'recipients_count' => $reach,
@@ -81,6 +83,8 @@ class NotificationService
             'body' => (string) $n->body,
             'url' => $n->url ? route('account.notifications.go', $n) : route('account.notifications'),
             'icon' => theme_asset(theme('logo')) ?: theme_asset(theme('favicon')) ?: asset('favicon.ico'),
+            'image' => $n->image ?: null,
+            'actions' => $n->actions ?: null,
             'tag' => 'notif-'.$n->id,
         ];
 

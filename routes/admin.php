@@ -94,6 +94,13 @@ Route::middleware('admin')->group(function () {
     Route::post('notifications/vapid-keys', [\App\Http\Controllers\Admin\NotificationController::class, 'generateVapidKeys'])->name('notifications.vapid-keys');
     Route::post('notifications/test-push', [\App\Http\Controllers\Admin\NotificationController::class, 'testPush'])->name('notifications.test-push');
     Route::post('notifications/push-templates', [\App\Http\Controllers\Admin\NotificationController::class, 'savePushTemplates'])->name('notifications.push-templates');
+
+    // Drip campaigns (scheduled push sequences)
+    Route::get('drips', [\App\Http\Controllers\Admin\DripController::class, 'index'])->name('drips.index');
+    Route::post('drips', [\App\Http\Controllers\Admin\DripController::class, 'store'])->name('drips.store');
+    Route::put('drips/{drip}', [\App\Http\Controllers\Admin\DripController::class, 'update'])->name('drips.update');
+    Route::post('drips/{drip}/enroll', [\App\Http\Controllers\Admin\DripController::class, 'enrollSegment'])->name('drips.enroll');
+    Route::delete('drips/{drip}', [\App\Http\Controllers\Admin\DripController::class, 'destroy'])->name('drips.destroy');
     Route::delete('notifications/{notification}', [\App\Http\Controllers\Admin\NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'importForm'])->name('customers.import');
     Route::post('customers/import', [\App\Http\Controllers\Admin\CustomerController::class, 'import'])->name('customers.import.store');

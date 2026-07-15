@@ -69,6 +69,10 @@ class NotificationController extends Controller
             'url' => ['nullable', 'string', 'max:255'],
             'cta_label' => ['nullable', 'string', 'max:40'],
             'icon' => ['nullable', 'string', 'max:16'],
+            'image' => ['nullable', 'string', 'max:500'],
+            'actions' => ['nullable', 'array', 'max:2'],
+            'actions.*.label' => ['nullable', 'string', 'max:30'],
+            'actions.*.url' => ['nullable', 'string', 'max:255'],
             'audience' => ['required', 'in:all,segment'],
             'segment_id' => ['nullable', 'required_if:audience,segment', 'exists:customer_segments,id'],
             'scheduled_at' => ['nullable', 'date', 'after:now'],
@@ -86,6 +90,12 @@ class NotificationController extends Controller
             $segmentId = $segment->id;
         }
 
+        // Keep only fully-filled action buttons (label + url).
+        $actions = collect($data['actions'] ?? [])
+            ->filter(fn ($a) => filled($a['label'] ?? null) && filled($a['url'] ?? null))
+            ->map(fn ($a) => ['label' => $a['label'], 'url' => $a['url']])
+            ->values()->all();
+
         $notification = $notifications->broadcast([
             'type' => 'announcement',
             'title' => $data['title'],
@@ -93,6 +103,8 @@ class NotificationController extends Controller
             'url' => $data['url'] ?? null,
             'cta_label' => $data['cta_label'] ?? null,
             'icon' => $data['icon'] ?? null,
+            'image' => $data['image'] ?? null,
+            'actions' => $actions,
             'segment_id' => $segmentId,
             'recipient_ids' => $recipientIds,
             'scheduled_at' => $data['scheduled_at'] ?? null,

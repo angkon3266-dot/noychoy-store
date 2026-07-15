@@ -44,6 +44,15 @@
                 <div><label class="label">Button label</label><input name="cta_label" class="input" placeholder="Shop now"></div>
             </div>
 
+            {{-- Rich push: image + action buttons --}}
+            <div><label class="label">Image URL (optional — shows a big picture in the push)</label><input name="image" class="input" placeholder="https://…/banner.jpg"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="label text-xs">Action 1 label</label><input name="actions[0][label]" class="input py-1.5 text-sm" placeholder="Shop now"></div>
+                <div><label class="label text-xs">Action 1 link</label><input name="actions[0][url]" class="input py-1.5 text-sm" placeholder="/shop"></div>
+                <div><label class="label text-xs">Action 2 label</label><input name="actions[1][label]" class="input py-1.5 text-sm" placeholder="View offers"></div>
+                <div><label class="label text-xs">Action 2 link</label><input name="actions[1][url]" class="input py-1.5 text-sm" placeholder="/account"></div>
+            </div>
+
             {{-- Audience --}}
             <div x-data="{ audience: 'all' }">
                 <label class="label">Send to</label>

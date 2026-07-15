@@ -47,3 +47,6 @@ Schedule::command('crm:winback')->dailyAt('11:00')->name('crm-winback')->without
 // Abandoned-cart web-push reminders — every 30 min, remind members who left
 // items in their cart (once each; a no-op when off or nobody is due).
 Schedule::command('push:abandoned-cart')->everyThirtyMinutes()->name('push-abandoned-cart')->withoutOverlapping();
+
+// Scheduled drip campaigns — send any due steps (hourly).
+Schedule::command('push:drip')->hourly()->name('push-drip')->withoutOverlapping();

@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 class CustomerNotification extends Model
 {
     protected $fillable = [
-        'type', 'title', 'body', 'url', 'cta_label', 'icon', 'audience', 'segment_id',
+        'type', 'title', 'body', 'url', 'cta_label', 'icon', 'image', 'actions', 'audience', 'segment_id',
         'recipients_count', 'clicks', 'scheduled_at', 'sent_at', 'created_by',
     ];
 
     protected $casts = [
+        'actions' => 'array',
         'scheduled_at' => 'datetime',
         'sent_at' => 'datetime',
     ];

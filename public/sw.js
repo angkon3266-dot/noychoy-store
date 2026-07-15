@@ -19,13 +19,22 @@ self.addEventListener('push', (event) => {
     }
 
     const title = data.title || 'Notification';
+    // Rich push: optional big image and up to 2 action buttons.
+    const actions = Array.isArray(data.actions)
+        ? data.actions.slice(0, 2).map((a, i) => ({ action: 'a' + i, title: a.label || 'Open' }))
+        : [];
+    const actionUrls = {};
+    if (Array.isArray(data.actions)) data.actions.slice(0, 2).forEach((a, i) => { actionUrls['a' + i] = a.url || data.url || '/'; });
+
     const options = {
         body: data.body || '',
         icon: data.icon || undefined,
         badge: data.badge || data.icon || undefined,
+        image: data.image || undefined,
         tag: data.tag || undefined,
         renotify: !!data.tag,
-        data: { url: data.url || '/' },
+        actions: actions,
+        data: { url: data.url || '/', actionUrls: actionUrls },
     };
 
     event.waitUntil(self.registration.showNotification(title, options));
@@ -33,7 +42,9 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const url = (event.notification.data && event.notification.data.url) || '/';
+    const d = event.notification.data || {};
+    // A button click routes to that button's URL; a body click uses the main URL.
+    const url = (event.action && d.actionUrls && d.actionUrls[event.action]) || d.url || '/';
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
