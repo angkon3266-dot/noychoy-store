@@ -121,6 +121,36 @@
                     </label>
                     <div><label class="label text-xs">Contact for push services (email or URL)</label><input name="webpush_subject" value="{{ $settings['webpush_subject'] }}" class="input py-1.5 text-sm" placeholder="mailto:you@store.com"></div>
                     <p class="text-[11px] text-ink-700/50">Members opt in from the notification bell on the storefront. Reaches them even when your site is closed.</p>
+
+                    {{-- Diagnostics --}}
+                    @php
+                        $diag = $webpushDiag;
+                        $rows = [
+                            'Web push enabled' => $diag['enabled'],
+                            'VAPID keys generated' => $diag['keys_present'],
+                            'cURL available' => $diag['curl'],
+                            'OpenSSL signing' => $diag['openssl_sign'],
+                            'ECDH (openssl_pkey_derive)' => $diag['openssl_pkey_derive'],
+                            'hash_hkdf' => $diag['hash_hkdf'],
+                            'EC key generation' => $diag['ec_keygen'],
+                        ];
+                    @endphp
+                    <details class="rounded-lg border border-ink-100 p-2 text-xs">
+                        <summary class="cursor-pointer font-medium">Diagnostics ({{ number_format($diag['subscribers']) }} subscriber(s))</summary>
+                        <ul class="mt-2 space-y-1">
+                            @foreach($rows as $label => $ok)
+                                <li class="flex items-center gap-2">
+                                    <span class="{{ $ok ? 'text-green-700' : 'text-red-600' }}">{{ $ok ? '✓' : '✗' }}</span>
+                                    <span class="{{ $ok ? '' : 'text-red-600 font-medium' }}">{{ $label }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        @unless($diag['ec_keygen'])
+                            <p class="mt-2 text-red-600">EC key generation failed on this server — web push cannot encrypt messages. Ask your host to enable the OpenSSL EC curves for PHP.@if($diag['ec_error']) <span class="text-ink-700/60">({{ $diag['ec_error'] }})</span>@endif</p>
+                        @endunless
+                        <p class="mt-2 text-ink-700/50">Subject sent to push services: <code>{{ $diag['subject'] }}</code></p>
+                        <p class="mt-1 text-ink-700/50">Subscribers come from the storefront bell (log in as a customer, open the site, allow notifications), not the admin.</p>
+                    </details>
                 </div>
                 <button class="btn-outline text-sm mt-2">Save settings</button>
             </form>

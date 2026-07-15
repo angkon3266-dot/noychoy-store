@@ -17,12 +17,49 @@ use Illuminate\Support\Facades\Log;
  */
 class WebPushService
 {
+    /** Details of the most recent send() — status, error, response body. */
+    public array $lastResult = [];
+
     /** Push is usable only when enabled AND a VAPID keypair exists. */
     public function ready(): bool
     {
         return (bool) Setting::get('webpush_enabled', false)
             && filled(Setting::get('webpush_public_key'))
             && filled(Setting::get('webpush_private_key'));
+    }
+
+    /**
+     * Environment + config self-check, so "push isn't working" becomes a specific
+     * diagnosis (missing extension, EC keygen unavailable, no keys/subscribers…).
+     *
+     * @return array<string, mixed>
+     */
+    public function diagnostics(): array
+    {
+        $ecOk = false;
+        $ecErr = null;
+        try {
+            $k = @openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+            $ecOk = (bool) $k;
+            if (! $k) {
+                $ecErr = openssl_error_string() ?: 'openssl_pkey_new returned false';
+            }
+        } catch (\Throwable $e) {
+            $ecErr = $e->getMessage();
+        }
+
+        return [
+            'enabled' => (bool) Setting::get('webpush_enabled', false),
+            'keys_present' => filled(Setting::get('webpush_public_key')) && filled(Setting::get('webpush_private_key')),
+            'curl' => function_exists('curl_init'),
+            'openssl_sign' => function_exists('openssl_sign'),
+            'openssl_pkey_derive' => function_exists('openssl_pkey_derive'),
+            'hash_hkdf' => function_exists('hash_hkdf'),
+            'ec_keygen' => $ecOk,
+            'ec_error' => $ecErr,
+            'subscribers' => \App\Models\PushSubscription::count(),
+            'subject' => $this->subject(),
+        ];
     }
 
     public function publicKey(): ?string
@@ -88,17 +125,29 @@ class WebPushService
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 15,
             ]);
-            curl_exec($ch);
+            $response = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $err = curl_error($ch);
             curl_close($ch);
 
-            if ($err) {
-                Log::warning('WebPush transport error', ['endpoint' => $sub->endpoint, 'err' => $err]);
+            $this->lastResult = [
+                'status' => $status,
+                'error' => $err ?: null,
+                'body' => is_string($response) ? substr($response, 0, 400) : null,
+            ];
+
+            if ($status < 200 || $status >= 300) {
+                Log::warning('WebPush non-2xx', [
+                    'endpoint' => $sub->endpoint,
+                    'status' => $status,
+                    'error' => $err,
+                    'body' => $this->lastResult['body'],
+                ]);
             }
 
             return $status;
         } catch (\Throwable $e) {
+            $this->lastResult = ['status' => 0, 'error' => $e->getMessage(), 'body' => null];
             Log::warning('WebPush send failed', ['id' => $sub->id, 'error' => $e->getMessage()]);
 
             return 0;

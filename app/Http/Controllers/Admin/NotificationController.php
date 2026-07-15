@@ -39,6 +39,7 @@ class NotificationController extends Controller
                 ->where(fn ($w) => $w->whereNull('winback_sent_at')->orWhere('winback_sent_at', '<', now()->subDays((int) Setting::get('winback_cooldown_days', 30))))
                 ->count(),
             'analytics' => app(\App\Services\CampaignAnalyticsService::class),
+            'webpushDiag' => app(\App\Services\WebPushService::class)->diagnostics(),
             'pushTemplates' => collect(\App\Services\PushTemplateService::defaults())->map(fn ($d, $key) => [
                 'label' => $d['label'],
                 'enabled' => (bool) Setting::get("push_tpl_{$key}_enabled", true),
@@ -188,6 +189,7 @@ class NotificationController extends Controller
 
         $ok = 0;
         $gone = 0;
+        $failures = [];
         foreach ($subs as $sub) {
             $status = $push->send($sub, $payload);
             if ($status >= 200 && $status < 300) {
@@ -195,10 +197,19 @@ class NotificationController extends Controller
             } elseif (in_array($status, [404, 410], true)) {
                 $sub->delete();
                 $gone++;
+            } else {
+                // Capture the first real failure to show the admin exactly why.
+                $failures[] = 'HTTP '.$status.($push->lastResult['error'] ? ' ('.$push->lastResult['error'].')' : '')
+                    .($push->lastResult['body'] ? ' — '.$push->lastResult['body'] : '');
             }
         }
 
-        return back()->with('success', "Test push sent: {$ok} delivered".($gone ? ", {$gone} stale subscription(s) removed" : '').'.');
+        if ($ok > 0) {
+            return back()->with('success', "Test push sent: {$ok} delivered".($gone ? ", {$gone} stale subscription(s) removed" : '').'.');
+        }
+
+        $why = $failures ? ' First error: '.$failures[0] : ($gone ? ' All subscriptions were stale (removed).' : '');
+        return back()->with('error', "Test push delivered to 0 of {$subs->count()}.".$why);
     }
 
     /** Save the win-back automation settings. */
