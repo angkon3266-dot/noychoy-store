@@ -46,10 +46,7 @@ class ProductController extends Controller
 
         $bulkCategories = Category::orderBy('name')->get(['id', 'name']);
 
-        // For the quick-edit "related products" picker (name + thumbnail).
-        $allProducts = Product::with('primaryImage')->orderBy('name')->get(['id', 'name']);
-
-        return view('admin.products.index', compact('products', 'allTags', 'bulkCategories', 'allProducts'));
+        return view('admin.products.index', compact('products', 'allTags', 'bulkCategories'));
     }
 
     public function importForm()
