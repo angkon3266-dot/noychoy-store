@@ -126,7 +126,9 @@
             <div x-show="type==='manual'" x-cloak>
                 <input x-model="memberQ" placeholder="Filter customers…" class="input py-1.5 text-sm mb-2">
                 <div class="max-h-56 overflow-y-auto rounded-lg border border-ink-100 p-2 space-y-1">
-                    @php($chosen = $editing ? $editing->members->pluck('id')->all() : [])
+                    @php
+                        $chosen = $editing ? $editing->members->pluck('id')->all() : [];
+                    @endphp
                     @foreach($allCustomers as $cust)
                         <label class="flex items-center gap-2 text-sm" x-show="memberQ==='' || '{{ Str::lower(addslashes($cust->name)).' '.$cust->phone }}'.includes(memberQ.toLowerCase())">
                             <input type="checkbox" name="member_ids[]" value="{{ $cust->id }}" @checked(in_array($cust->id, $chosen))>

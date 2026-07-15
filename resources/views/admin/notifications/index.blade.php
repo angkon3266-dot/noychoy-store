@@ -2,7 +2,9 @@
 @section('title', 'Notifications')
 @section('heading', 'Member notifications')
 
-@php($sum = $analytics->summary())
+@php
+    $sum = $analytics->summary();
+@endphp
 
 @section('content')
 @if(session('success'))<div class="mb-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-2.5 text-sm whitespace-pre-line">{{ session('success') }}</div>@endif
@@ -205,7 +207,9 @@
                 </thead>
                 <tbody class="divide-y divide-ink-100">
                     @forelse($items as $n)
-                        @php($m = $analytics->forNotification($n))
+                        @php
+                            $m = $analytics->forNotification($n);
+                        @endphp
                         <tr class="hover:bg-ink-50">
                             <td class="px-4 py-3">
                                 <div class="font-medium">{{ $n->iconOrDefault() }} {{ $n->title }}</div>
