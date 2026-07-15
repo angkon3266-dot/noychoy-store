@@ -29,9 +29,7 @@ class OfferController extends Controller
                 'per_1000' => round(((float) \App\Models\Setting::get('loyalty_earn_per_taka', config('loyalty.earn_per_taka', 0.1))) * 1000),
                 'value_per_100' => round(((float) \App\Models\Setting::get('loyalty_redeem_value', config('loyalty.redeem_value', 0.05))) * 100, 2),
                 'review' => (int) \App\Models\Setting::get('loyalty_review_points', config('loyalty.review_points', 200)),
-                'share' => (int) \App\Models\Setting::get('loyalty_share_points', config('loyalty.share_points', 100)),
                 'signup' => (int) \App\Models\Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0)),
-                'referral' => (int) \App\Models\Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300)),
                 'photo_bonus' => (int) \App\Models\Setting::get('loyalty_review_photo_bonus', config('loyalty.review_photo_bonus', 100)),
             ],
         ]);
@@ -44,9 +42,7 @@ class OfferController extends Controller
             'per_1000' => ['required', 'numeric', 'min:0', 'max:100000'],
             'value_per_100' => ['required', 'numeric', 'min:0', 'max:100000'],
             'review' => ['required', 'integer', 'min:0', 'max:100000'],
-            'share' => ['required', 'integer', 'min:0', 'max:100000'],
             'signup' => ['required', 'integer', 'min:0', 'max:100000'],
-            'referral' => ['required', 'integer', 'min:0', 'max:100000'],
             'photo_bonus' => ['required', 'integer', 'min:0', 'max:100000'],
         ]);
 
@@ -54,9 +50,7 @@ class OfferController extends Controller
         \App\Models\Setting::put('loyalty_earn_per_taka', (float) $data['per_1000'] / 1000);
         \App\Models\Setting::put('loyalty_redeem_value', (float) $data['value_per_100'] / 100);
         \App\Models\Setting::put('loyalty_review_points', (int) $data['review']);
-        \App\Models\Setting::put('loyalty_share_points', (int) $data['share']);
         \App\Models\Setting::put('loyalty_signup_points', (int) $data['signup']);
-        \App\Models\Setting::put('loyalty_referral_points', (int) $data['referral']);
         \App\Models\Setting::put('loyalty_review_photo_bonus', (int) $data['photo_bonus']);
 
         return back()->with('success', 'Loyalty settings saved.');

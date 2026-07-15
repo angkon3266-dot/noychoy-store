@@ -43,11 +43,6 @@ class LoyaltyService
         return (int) Setting::get('loyalty_review_points', config('loyalty.review_points', 200));
     }
 
-    public function sharePoints(): int
-    {
-        return (int) Setting::get('loyalty_share_points', config('loyalty.share_points', 100));
-    }
-
     public function signupPoints(): int
     {
         return (int) Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0));
@@ -138,11 +133,6 @@ class LoyaltyService
         return (int) Setting::get('loyalty_review_photo_bonus', config('loyalty.review_photo_bonus', 100));
     }
 
-    public function referralPoints(): int
-    {
-        return (int) Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300));
-    }
-
     // ── Membership tiers ──────────────────────────────────────────────────────
 
     /**
@@ -191,27 +181,9 @@ class LoyaltyService
         $tx = $this->award($order->customer, $points, 'earn_order', 'Order '.$order->order_number.' delivered', $order);
         if ($tx) {
             $order->update(['points_earned' => $points]);
-            $this->rewardReferralIfFirst($order->customer->fresh());
         }
 
         return $tx;
-    }
-
-    /** When a referred customer's first order is delivered, reward both sides once. */
-    public function rewardReferralIfFirst(Customer $customer): void
-    {
-        if ($customer->referral_rewarded || ! $customer->referred_by) {
-            return;
-        }
-        $referrer = $customer->referrer;
-        if (! $referrer) {
-            return;
-        }
-
-        $pts = $this->referralPoints();
-        $this->award($customer, $pts, 'adjust', 'Referral welcome bonus 🎁');
-        $this->award($referrer, $pts, 'adjust', 'Referral reward — '.$customer->name.' placed their first order');
-        $customer->forceFill(['referral_rewarded' => true])->saveQuietly();
     }
 
     // ── Weekly milestones ─────────────────────────────────────────────────────

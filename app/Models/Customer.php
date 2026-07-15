@@ -2,10 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Support\Str;
 
 class Customer extends Authenticatable
 {
@@ -29,31 +27,6 @@ class Customer extends Authenticatable
         'referral_rewarded' => 'boolean',
         'password' => 'hashed',
     ];
-
-    /** The customer who referred this one. */
-    public function referrer(): BelongsTo
-    {
-        return $this->belongsTo(Customer::class, 'referred_by');
-    }
-
-    /** Customers this customer has referred. */
-    public function referrals(): HasMany
-    {
-        return $this->hasMany(Customer::class, 'referred_by');
-    }
-
-    /** Return the referral code, generating & saving a unique one if missing. */
-    public function ensureReferralCode(): string
-    {
-        if (blank($this->referral_code)) {
-            do {
-                $code = strtoupper(Str::random(7));
-            } while (static::where('referral_code', $code)->exists());
-            $this->forceFill(['referral_code' => $code])->saveQuietly();
-        }
-
-        return $this->referral_code;
-    }
 
     public function addresses(): HasMany
     {

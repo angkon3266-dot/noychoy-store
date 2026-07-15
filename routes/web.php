@@ -111,8 +111,6 @@ Route::middleware('auth:customer')->group(function () {
     Route::get('/account/reviews', [AccountController::class, 'reviews'])->name('account.reviews');
     Route::get('/account/loved', [AccountController::class, 'loved'])->name('account.loved');
 
-    // Loyalty — social share reward
-    Route::post('/account/share', [AccountController::class, 'share'])->name('account.share');
 });
 
 Route::get('/discover', [\App\Http\Controllers\Shop\DiscoverController::class, 'index'])->name('discover');

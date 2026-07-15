@@ -86,28 +86,7 @@
                     $per1000 = (int) round($L->earnPerTaka() * 1000);
                     $value100 = money($L->pointsValue(100));
                 @endphp
-                <div class="card mb-8 overflow-hidden" x-data="{
-                        open: true, shareMsg: '', points: {{ $points }},
-                        url: '{{ route('home') }}',
-                        async share(platform) {
-                            const u = encodeURIComponent(this.url);
-                            const t = encodeURIComponent('Shop handcrafted jewelry at {{ $storeName }}');
-                            if (platform === 'facebook') window.open('https://www.facebook.com/sharer/sharer.php?u=' + u, '_blank', 'width=600,height=500');
-                            else if (platform === 'messenger') window.location.href = 'fb-messenger://share/?link=' + u;
-                            else if (platform === 'whatsapp') window.open('https://wa.me/?text=' + t + '%20' + u, '_blank');
-                            else if (platform === 'copy') { try { await navigator.clipboard.writeText(this.url); } catch (e) {} }
-                            try {
-                                const res = await fetch('{{ route('account.share') }}', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
-                                    body: JSON.stringify({ platform })
-                                });
-                                const data = await res.json();
-                                this.shareMsg = data.message || '';
-                                if (data.ok && data.points !== undefined) this.points = data.points;
-                            } catch (e) {}
-                        }
-                    }">
+                <div class="card mb-8 overflow-hidden" x-data="{ open: true, points: {{ $points }} }">
                     <button type="button" @click="open = !open" class="w-full flex items-center justify-between p-5 text-left">
                         <span class="flex items-center gap-3">
                             <span class="text-2xl">🎁</span>
@@ -151,19 +130,8 @@
                             {{-- How to earn (encourages bigger orders) --}}
                             <div class="rounded-lg bg-ink-50 border border-ink-100 p-3 text-xs text-ink-700/80 space-y-1">
                                 <p>🛍️ Earn <strong>{{ $per1000 }} points</strong> for every <strong>৳1000</strong> you spend — added once your order is <strong>delivered</strong>. The more you buy, the more you save!</p>
-                                <p>⭐ Write a review: <strong>+{{ $L->reviewPoints() }} points</strong> (+{{ $L->reviewPhotoBonus() }} with a photo) · 📣 Share: <strong>+{{ $L->sharePoints() }} points</strong>/week</p>
+                                <p>⭐ Write a review: <strong>+{{ $L->reviewPoints() }} points</strong> (+{{ $L->reviewPhotoBonus() }} with a photo)</p>
                                 <p>💰 <strong>100 points = {{ $value100 }}</strong> — use them to cut your bill at checkout.</p>
-                            </div>
-
-                            {{-- Refer a friend --}}
-                            <div class="rounded-xl bg-gold-600 text-white p-4" x-data="{ copied: false, link: '{{ route('customer.register', ['ref' => $referralCode]) }}' }">
-                                <h3 class="font-semibold flex items-center gap-2">🤝 Refer friends, both earn {{ $referralPoints }} points</h3>
-                                <p class="text-xs text-white/80 mt-1">Share your link. When a friend signs up and their first order is delivered, you <strong>both</strong> get {{ $referralPoints }} points.@if($referralCount > 0) You've referred <strong>{{ $referralCount }}</strong> so far!@endif</p>
-                                <div class="mt-3 flex items-center gap-2">
-                                    <input readonly :value="link" class="flex-1 min-w-0 rounded-md px-2 py-1.5 text-xs text-ink-900" @focus="$event.target.select()">
-                                    <button type="button" @click="navigator.clipboard.writeText(link); copied = true; setTimeout(() => copied = false, 1500)" class="shrink-0 rounded-md bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-medium" x-text="copied ? 'Copied!' : 'Copy'"></button>
-                                    <a :href="'https://wa.me/?text=' + encodeURIComponent('Shop at {{ $storeName }} — sign up with my link and we both get rewards! ' + link)" target="_blank" class="shrink-0 rounded-md bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-medium">WhatsApp</a>
-                                </div>
                             </div>
 
                             {{-- Weekly milestones --}}
@@ -186,21 +154,6 @@
                                         </li>
                                     @endforeach
                                 </ul>
-
-                                {{-- Share to earn --}}
-                                <div class="mt-4 rounded-lg bg-ink-50 p-3">
-                                    <p class="text-xs text-ink-700/70 mb-2">Share {{ $storeName }} to friends to earn <strong>+{{ $L->sharePoints() }} points</strong> (once a week):</p>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <button type="button" @click="share('messenger')" class="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
-                                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.27 2 2 6.2 2 11.7c0 2.88 1.18 5.37 3.1 7.1.16.14.26.34.27.56l.05 1.75c.02.56.6.92 1.11.7l1.95-.86c.17-.07.36-.09.54-.04 1.25.34 2.58.5 3.88.5 5.73 0 10-4.2 10-9.7C22 6.2 17.73 2 12 2zm6 7.46l-2.93 4.65c-.47.74-1.47.93-2.18.4l-2.33-1.75a.6.6 0 00-.72 0l-3.14 2.39c-.42.32-.97-.18-.69-.63l2.93-4.65c.47-.74 1.47-.93 2.18-.4l2.33 1.75c.21.16.51.16.72 0l3.14-2.38c.42-.32.97.18.69.62z"/></svg>
-                                            Messenger
-                                        </button>
-                                        <button type="button" @click="share('whatsapp')" class="btn-outline text-xs py-1.5 px-3">WhatsApp</button>
-                                        <button type="button" @click="share('facebook')" class="btn-outline text-xs py-1.5 px-3">Facebook</button>
-                                        <button type="button" @click="share('copy')" class="btn-outline text-xs py-1.5 px-3">Copy link</button>
-                                        <span class="text-xs text-green-700" x-text="shareMsg"></span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>

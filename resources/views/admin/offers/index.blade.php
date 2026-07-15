@@ -80,16 +80,8 @@
                 <input name="review" type="number" step="1" min="0" value="{{ $loyalty['review'] }}" class="input">
             </div>
             <div>
-                <label class="label">Points for a social share</label>
-                <input name="share" type="number" step="1" min="0" value="{{ $loyalty['share'] }}" class="input">
-            </div>
-            <div>
                 <label class="label">Welcome bonus (signup)</label>
                 <input name="signup" type="number" step="1" min="0" value="{{ $loyalty['signup'] }}" class="input">
-            </div>
-            <div>
-                <label class="label">Referral (each side)</label>
-                <input name="referral" type="number" step="1" min="0" value="{{ $loyalty['referral'] }}" class="input">
             </div>
             <div>
                 <label class="label">Review-with-photo bonus</label>

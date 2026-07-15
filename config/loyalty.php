@@ -21,7 +21,6 @@ return [
     // key must match a point_transactions.type or a tracked action.
     'milestones' => [
         ['key' => 'earn_review', 'label' => 'Write a product review', 'points' => 100, 'icon' => '⭐'],
-        ['key' => 'earn_share', 'label' => 'Share us on social media', 'points' => 100, 'icon' => '📣'],
         ['key' => 'earn_order', 'label' => 'Place an order this week', 'points' => 100, 'icon' => '🛍️'],
     ],
 

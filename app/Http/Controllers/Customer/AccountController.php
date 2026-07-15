@@ -40,38 +40,6 @@ class AccountController extends Controller
             'liveOffers' => $customer->liveOffers()->get(),
             'milestones' => $loyalty->weeklyMilestones($customer),
             'tier' => $loyalty->tierFor($customer),
-            'referralCode' => $customer->ensureReferralCode(),
-            'referralCount' => $customer->referrals()->count(),
-            'referralPoints' => $loyalty->referralPoints(),
-        ]);
-    }
-
-    /** Award one-per-week social-share points (called from the storefront share buttons). */
-    public function share(Request $request, \App\Services\LoyaltyService $loyalty)
-    {
-        $customer = $this->customer();
-
-        if (! $loyalty->enabled()) {
-            return response()->json(['ok' => false, 'message' => 'Rewards are currently off.']);
-        }
-
-        // Once per ISO week.
-        $already = $customer->pointTransactions()
-            ->where('type', 'earn_share')
-            ->where('created_at', '>=', now()->startOfWeek())
-            ->exists();
-
-        if ($already) {
-            return response()->json(['ok' => false, 'message' => 'You already earned share points this week.']);
-        }
-
-        $points = $loyalty->sharePoints();
-        $loyalty->award($customer, $points, 'earn_share', 'Shared on '.$request->string('platform', 'social'));
-
-        return response()->json([
-            'ok' => true,
-            'message' => '+'.$points.' points for sharing — thank you!',
-            'points' => (int) $customer->fresh()->points,
         ]);
     }
 
