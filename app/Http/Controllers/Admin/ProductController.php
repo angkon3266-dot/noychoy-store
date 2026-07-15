@@ -238,6 +238,10 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        // Snapshot for back-in-stock + price-drop push triggers.
+        $wasAvailable = $product->isAvailable();
+        $oldPrice = (float) $product->price;
+
         $data = $this->validateData($request, $product);
         $product->update($data);
 
@@ -248,6 +252,7 @@ class ProductController extends Controller
         $this->syncVariants($request, $product);
         $this->syncContentSections($request, $product);
         $this->maybeAnnounceProduct($product->fresh());
+        app(\App\Services\StockAlertService::class)->handleProductChange($product->fresh(), $wasAvailable, $oldPrice);
 
         return redirect()->route('admin.products.edit', $product)
             ->with('success', 'Product updated.');
@@ -343,6 +348,9 @@ class ProductController extends Controller
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        $wasAvailable = $product->isAvailable();
+        $oldPrice = (float) $product->price;
+
         if (array_key_exists('price', $data) && $data['price'] !== null) {
             $product->price = $data['price'];
         }
@@ -353,6 +361,7 @@ class ProductController extends Controller
             }
         }
         $product->save();
+        app(\App\Services\StockAlertService::class)->handleProductChange($product->fresh(), $wasAvailable, $oldPrice);
 
         return back()->with('success', $product->name.' updated.');
     }

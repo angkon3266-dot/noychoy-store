@@ -130,6 +130,19 @@ class NotificationService
             ->each(fn ($chunk) => \App\Jobs\SendWebPush::dispatch($chunk->all(), $payload));
     }
 
+    /** Push directly to a set of subscription IDs (e.g. stock-watch list). */
+    public function pushToSubscriptionIds(array $subscriptionIds, array $payload): void
+    {
+        $push = app(\App\Services\WebPushService::class);
+        if (! $push->ready() || empty($subscriptionIds)) {
+            return;
+        }
+        $payload['icon'] ??= theme_asset(theme('logo')) ?: asset('favicon.ico');
+
+        collect($subscriptionIds)->chunk(500)
+            ->each(fn ($chunk) => \App\Jobs\SendWebPush::dispatch($chunk->values()->all(), $payload));
+    }
+
     /** Notifications visible to a given customer (all-audience + targeted-at-them). */
     public function visibleFor(?Customer $customer): \Illuminate\Database\Eloquent\Builder
     {

@@ -25,6 +25,7 @@ Route::get('/best-sellers', [CatalogController::class, 'bestSellers'])->name('be
 // Web-push subscription (public — works for guests and members).
 Route::post('/push/subscribe', [\App\Http\Controllers\Shop\PushController::class, 'subscribe'])->name('push.subscribe');
 Route::post('/push/unsubscribe', [\App\Http\Controllers\Shop\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
+Route::post('/push/watch-stock', [\App\Http\Controllers\Shop\PushController::class, 'watchStock'])->name('push.watch-stock');
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager

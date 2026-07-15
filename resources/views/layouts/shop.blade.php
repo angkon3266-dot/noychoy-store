@@ -778,6 +778,7 @@
             (function () {
                 const VAPID = @json(app(\App\Services\WebPushService::class)->publicKey());
                 const SUBSCRIBE = @json(route('push.subscribe'));
+                const WATCH = @json(route('push.watch-stock'));
                 const CSRF = @json(csrf_token());
                 // Auto-prompt once per browser: immediately for anyone, and right
                 // after a member registers (server flashes this flag).
@@ -805,9 +806,43 @@
                         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, Accept: 'application/json' },
                         body: JSON.stringify(sub),
                     });
+                    return sub;
                 }
 
                 const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+                // Ensure permission + a live subscription; returns the subscription or null.
+                window.wpEnsure = async function () {
+                    if (!supported) return null;
+                    if (Notification.permission === 'denied') return null;
+                    if (Notification.permission === 'default') {
+                        const perm = await Notification.requestPermission();
+                        if (perm !== 'granted') return null;
+                    }
+                    return ensure();
+                };
+
+                // "Notify me when back in stock" button on out-of-stock products.
+                window.stockNotify = function (productId) {
+                    return {
+                        busy: false, state: 'idle',
+                        async notifyMe() {
+                            if (this.busy) return;
+                            this.busy = true;
+                            try {
+                                const sub = await window.wpEnsure();
+                                if (!sub) { this.state = 'denied'; return; }
+                                const res = await fetch(WATCH, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, Accept: 'application/json' },
+                                    body: JSON.stringify({ product_id: productId, endpoint: sub.endpoint }),
+                                });
+                                this.state = res.ok ? 'done' : 'idle';
+                            } catch (e) { this.state = 'idle'; }
+                            finally { this.busy = false; }
+                        },
+                    };
+                };
 
                 // Alpine component for the member "Turn on" button in the bell.
                 window.webPushOptIn = function () {

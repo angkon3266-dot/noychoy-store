@@ -36,6 +36,27 @@ class PushController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** Register a "notify me when back in stock" watcher for a product. */
+    public function watchStock(Request $request)
+    {
+        $data = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'endpoint' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $sub = PushSubscription::where('endpoint_hash', PushSubscription::hashFor($data['endpoint']))->first();
+        if (! $sub) {
+            return response()->json(['ok' => false, 'message' => 'Not subscribed'], 422);
+        }
+
+        \App\Models\StockWatcher::firstOrCreate([
+            'product_id' => $data['product_id'],
+            'push_subscription_id' => $sub->id,
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function unsubscribe(Request $request)
     {
         $endpoint = (string) $request->input('endpoint');

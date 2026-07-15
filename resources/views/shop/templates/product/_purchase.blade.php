@@ -213,6 +213,17 @@
         <p x-show="!canBuy" x-cloak class="mt-2 text-xs text-red-600">Please choose an option above.</p>
     @else
         <button disabled class="btn-dark w-full mt-5 opacity-60">Sold out</button>
+        @if(app(\App\Services\WebPushService::class)->ready())
+            <div x-data="stockNotify({{ $product->id }})" class="mt-3">
+                <button type="button" @click="notifyMe()" x-show="state !== 'done'" :disabled="busy"
+                        class="btn-outline w-full inline-flex items-center justify-center gap-2 disabled:opacity-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0"/></svg>
+                    <span x-text="busy ? 'Setting up…' : 'Notify me when available'"></span>
+                </button>
+                <p x-show="state === 'done'" x-cloak class="text-sm text-green-700 text-center">✓ We'll notify you the moment it's back in stock.</p>
+                <p x-show="state === 'denied'" x-cloak class="text-xs text-ink-700/60 text-center mt-1">Enable notifications in your browser to use this.</p>
+            </div>
+        @endif
     @endif
 
     {{-- Order / ask via WhatsApp --}}

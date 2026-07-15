@@ -37,6 +37,21 @@ class PushTemplateService
                 'title' => 'অর্ডার ডেলিভারড হয়েছে 🎉',
                 'body' => '{name}, আপনার অর্ডার #{order} ডেলিভারড হয়েছে। আপনার কেনাকাটার জন্য ধন্যবাদ! ❤️',
             ],
+            'back_in_stock' => [
+                'label' => 'Back in stock (uses {product})',
+                'title' => 'Back in Stock! ✨',
+                'body' => '{product} আবার স্টকে ফিরেছে। এখনই আপনারটি লুফে নিন!',
+            ],
+            'price_drop' => [
+                'label' => 'Price drop (uses {product}, {price}, {old_price})',
+                'title' => 'দাম কমেছে! 💸',
+                'body' => 'আপনার পছন্দের {product} এখন মাত্র {price} ({old_price} থেকে কমেছে)। শেষ হওয়ার আগেই নিয়ে নিন!',
+            ],
+            'abandoned_cart' => [
+                'label' => 'Abandoned cart (uses {name}, {product})',
+                'title' => 'আপনার কার্টে কিছু রয়ে গেছে 🛒',
+                'body' => '{name}, {product} এখনও আপনার কার্টে অপেক্ষা করছে। অর্ডারটি সম্পন্ন করুন!',
+            ],
         ];
     }
 
@@ -78,6 +93,49 @@ class PushTemplateService
             'body' => strtr($this->body($trigger), $map),
             'url' => route('account.order', $order->order_number),
             'tag' => 'order-'.$order->id.'-'.$trigger,
+        ];
+    }
+
+    /**
+     * Render a product-scoped template (back_in_stock, price_drop) into a payload.
+     *
+     * @param  array<string,string>  $extra  extra placeholders, e.g. {price},{old_price}
+     * @return array{title:string, body:string, url:string, tag:string}|null
+     */
+    public function forProduct(string $trigger, \App\Models\Product $product, array $extra = []): ?array
+    {
+        if (! $this->enabled($trigger)) {
+            return null;
+        }
+
+        $map = array_merge(['{product}' => $product->name], $extra);
+
+        return [
+            'title' => strtr($this->title($trigger), $map),
+            'body' => strtr($this->body($trigger), $map),
+            'url' => route('product.show', $product->slug),
+            'tag' => $trigger.'-'.$product->id,
+        ];
+    }
+
+    /**
+     * Render the abandoned-cart template into a payload.
+     *
+     * @return array{title:string, body:string, url:string, tag:string}|null
+     */
+    public function forCart(string $name, string $productSummary): ?array
+    {
+        if (! $this->enabled('abandoned_cart')) {
+            return null;
+        }
+
+        $map = ['{name}' => $name ?: 'Hello', '{product}' => $productSummary];
+
+        return [
+            'title' => strtr($this->title('abandoned_cart'), $map),
+            'body' => strtr($this->body('abandoned_cart'), $map),
+            'url' => route('cart'),
+            'tag' => 'abandoned-cart',
         ];
     }
 }

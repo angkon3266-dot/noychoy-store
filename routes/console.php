@@ -43,3 +43,7 @@ Schedule::call(fn () => app(\App\Services\NotificationService::class)->deliverDu
 // Win-back automation — re-engage lapsed members once a day (a no-op when the
 // automation is off or nobody is due).
 Schedule::command('crm:winback')->dailyAt('11:00')->name('crm-winback')->withoutOverlapping();
+
+// Abandoned-cart web-push reminders — every 30 min, remind members who left
+// items in their cart (once each; a no-op when off or nobody is due).
+Schedule::command('push:abandoned-cart')->everyThirtyMinutes()->name('push-abandoned-cart')->withoutOverlapping();
