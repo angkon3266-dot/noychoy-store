@@ -20,12 +20,16 @@ class WatermarkService
         'font_path' => null,         // public-disk path to an uploaded .ttf/.otf
         'logo_path' => null,         // public-disk path to an uploaded PNG
         'position' => 'top-right',   // top-left|top-right|bottom-left|bottom-right|center
+        'mode' => 'single',          // 'single' | 'multiple' (stamp at several positions)
+        'positions' => ['top-right'], // used when mode = 'multiple'
         'opacity' => 60,             // 0-100
         'size' => 6,                 // % of image width (text: font size · logo: width)
         'color' => '#ffffff',        // text colour
         'margin' => 4,               // % of image width, distance from the edge
         'auto_products' => false,    // auto-stamp newly uploaded product images
     ];
+
+    public const POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'];
 
     public function settings(): array
     {
@@ -93,14 +97,16 @@ class WatermarkService
             imagealphablending($base, true);
             imagesavealpha($base, true);
 
-            $ok = ($cfg['type'] ?? 'text') === 'logo'
-                ? $this->stampLogo($base, $cfg)
-                : $this->stampText($base, $cfg);
+            // Stamp at one position, or several when mode = 'multiple'.
+            $isLogo = ($cfg['type'] ?? 'text') === 'logo';
+            foreach ($this->positionsFor($cfg) as $pos) {
+                $cfgPos = array_merge($cfg, ['position' => $pos]);
+                $ok = $isLogo ? $this->stampLogo($base, $cfgPos) : $this->stampText($base, $cfgPos);
+                if (! $ok) {
+                    imagedestroy($base);
 
-            if (! $ok) {
-                imagedestroy($base);
-
-                return null;
+                    return null;
+                }
             }
 
             ob_start();
@@ -121,6 +127,23 @@ class WatermarkService
 
             return null;
         }
+    }
+
+    /**
+     * The list of positions to stamp: several in 'multiple' mode, one otherwise.
+     *
+     * @return array<int, string>
+     */
+    protected function positionsFor(array $cfg): array
+    {
+        if (($cfg['mode'] ?? 'single') === 'multiple' && ! empty($cfg['positions']) && is_array($cfg['positions'])) {
+            $valid = array_values(array_intersect($cfg['positions'], self::POSITIONS));
+            if (! empty($valid)) {
+                return array_unique($valid);
+            }
+        }
+
+        return [$cfg['position'] ?? 'top-right'];
     }
 
     /** @param \GdImage $base */

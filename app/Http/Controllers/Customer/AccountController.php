@@ -33,6 +33,7 @@ class AccountController extends Controller
             // Member pricing
             'memberSaved' => (float) $customer->orders()->sum('member_discount'),
             'memberPercent' => member_pricing()->basePercent(),
+            'memberUsage' => member_pricing()->enabled() ? member_pricing()->usageStatus($customer) : null,
             // Loyalty
             'loyaltyEnabled' => $loyalty->enabled(),
             'points' => (int) $customer->points,

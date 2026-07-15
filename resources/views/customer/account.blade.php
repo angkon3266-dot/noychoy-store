@@ -134,6 +134,22 @@
                                 <p>💰 <strong>100 points = {{ $value100 }}</strong> — use them to cut your bill at checkout.</p>
                             </div>
 
+                            {{-- Member discount status --}}
+                            @if($memberUsage && $memberUsage['percent'] > 0)
+                                <div class="rounded-xl border border-gold-200 bg-gold-50 p-4">
+                                    <h3 class="font-semibold text-sm flex items-center gap-2">💎 Your member discount ({{ rtrim(rtrim(number_format($memberUsage['percent'], 2), '0'), '.') }}% off)</h3>
+                                    @if($memberUsage['capped'])
+                                        @if($memberUsage['remaining'] > 0)
+                                            <p class="text-xs text-ink-700/70 mt-1"><strong>{{ $memberUsage['remaining'] }} of {{ $memberUsage['max'] }}</strong> uses left this period.@if($memberUsage['resets_at']) Resets {{ $memberUsage['resets_at']->format('d M') }}.@endif</p>
+                                        @else
+                                            <p class="text-xs text-ink-700/70 mt-1">You've used all {{ $memberUsage['max'] }} for now.@if($memberUsage['resets_at']) More unlock {{ $memberUsage['resets_at']->format('d M') }}.@endif</p>
+                                        @endif
+                                    @else
+                                        <p class="text-xs text-ink-700/70 mt-1">Applied automatically on every order.</p>
+                                    @endif
+                                </div>
+                            @endif
+
                             {{-- Weekly milestones --}}
                             <div>
                                 <div class="flex items-center justify-between mb-2">

@@ -109,6 +109,8 @@ Route::middleware('admin')->group(function () {
     Route::post('customers/{customer}/sms', [\App\Http\Controllers\Admin\CustomerController::class, 'sendSms'])->name('customers.sms');
     Route::get('customers-export', [\App\Http\Controllers\Admin\CustomerController::class, 'export'])->name('customers.export');
     Route::post('customers/{customer}/offers', [\App\Http\Controllers\Admin\CustomerController::class, 'storeOffer'])->name('customers.offers.store');
+    Route::put('customers/{customer}/offers/{offer}', [\App\Http\Controllers\Admin\CustomerController::class, 'updateOffer'])->name('customers.offers.update');
+    Route::post('customers/{customer}/offers/{offer}/toggle', [\App\Http\Controllers\Admin\CustomerController::class, 'toggleOffer'])->name('customers.offers.toggle');
     Route::delete('customers/{customer}/offers/{offer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroyOffer'])->name('customers.offers.destroy');
     Route::post('customers/{customer}/points', [\App\Http\Controllers\Admin\CustomerController::class, 'adjustPoints'])->name('customers.points');
     Route::post('customers/bulk-offer', [\App\Http\Controllers\Admin\CustomerController::class, 'bulkOffer'])->name('customers.bulk-offer');

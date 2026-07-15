@@ -26,11 +26,12 @@
                 <th class="px-4 py-3">Applies to</th>
                 <th class="px-4 py-3">Status</th>
                 <th class="px-4 py-3">Expires</th>
+                <th class="px-4 py-3 text-right">Actions</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-ink-100">
             @forelse($offers as $offer)
-                <tr class="hover:bg-ink-50">
+                <tr class="hover:bg-ink-50" x-data="{ edit: false }">
                     <td class="px-4 py-3">
                         @if($offer->customer)
                             <a href="{{ route('admin.customers.show', $offer->customer) }}" class="text-gold-700 hover:underline">{{ $offer->customer->name }}</a>
@@ -53,9 +54,36 @@
                         <div class="text-[11px] text-ink-700/50 mt-0.5">{{ $offer->usageLabel() }}</div>
                     </td>
                     <td class="px-4 py-3 text-xs text-ink-700/60">{{ $offer->expires_at?->format('d M Y') ?? '—' }}</td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        @if($offer->customer)
+                            <button type="button" @click="edit = !edit" class="text-gold-700 hover:underline text-xs">Edit</button>
+                            <form action="{{ route('admin.customers.offers.toggle', [$offer->customer, $offer]) }}" method="POST" class="inline">@csrf<button class="text-xs hover:underline ml-2 {{ $offer->is_active ? 'text-amber-600' : 'text-green-700' }}">{{ $offer->is_active ? 'Pause' : 'Activate' }}</button></form>
+                            <form action="{{ route('admin.customers.offers.destroy', [$offer->customer, $offer]) }}" method="POST" class="inline" onsubmit="return confirm('Delete this offer?')">@csrf @method('DELETE')<button class="text-red-600 hover:underline text-xs ml-2">Delete</button></form>
+                        @endif
+                    </td>
                 </tr>
+                @if($offer->customer)
+                    <tr x-show="edit" x-cloak>
+                        <td colspan="7" class="px-4 py-3 bg-ink-50">
+                            <form action="{{ route('admin.customers.offers.update', [$offer->customer, $offer]) }}" method="POST" class="grid sm:grid-cols-4 gap-2 items-end">
+                                @csrf @method('PUT')
+                                <div class="sm:col-span-2"><label class="label text-xs">Title</label><input name="title" value="{{ $offer->title }}" class="input py-1.5 text-sm" required></div>
+                                <div><label class="label text-xs">Type</label>
+                                    <select name="type" class="input py-1.5 text-sm">@foreach(\App\Models\CustomerOffer::TYPES as $k=>$lbl)<option value="{{ $k }}" @selected($offer->type===$k)>{{ $lbl }}</option>@endforeach</select>
+                                </div>
+                                <div><label class="label text-xs">Value</label><input type="number" step="0.01" name="value" value="{{ $offer->value }}" class="input py-1.5 text-sm"></div>
+                                <div><label class="label text-xs">Code</label><input name="code" value="{{ $offer->code }}" class="input py-1.5 text-sm"></div>
+                                <div><label class="label text-xs">Expires</label><input type="date" name="expires_at" value="{{ $offer->expires_at?->format('Y-m-d') }}" class="input py-1.5 text-sm"></div>
+                                <div><label class="label text-xs">Max uses</label><input type="number" min="1" name="max_redemptions" value="{{ $offer->max_redemptions }}" class="input py-1.5 text-sm" placeholder="∞"></div>
+                                <div class="sm:col-span-2"><label class="label text-xs">Message</label><input name="message" value="{{ $offer->message }}" class="input py-1.5 text-sm"></div>
+                                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" value="1" @checked($offer->is_active)> Active</label>
+                                <div><button class="btn-primary text-sm w-full">Save</button></div>
+                            </form>
+                        </td>
+                    </tr>
+                @endif
             @empty
-                <tr><td colspan="6" class="px-4 py-10 text-center text-ink-700/50">No offers in this view.</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No offers in this view.</td></tr>
             @endforelse
         </tbody>
     </table>

@@ -689,17 +689,26 @@
     {{-- Floating contact stack: Offers, Call, Messenger, WhatsApp --}}
     @php
         $memberOffers = auth('customer')->check() ? auth('customer')->user()->liveOffers()->get() : collect();
+        $memberUsage = null;
+        if (auth('customer')->check() && member_pricing()->enabled()) {
+            $memberUsage = member_pricing()->usageStatus(auth('customer')->user());
+        }
+        $hasMemberDiscount = $memberUsage && $memberUsage['percent'] > 0;
+        $showOffersButton = $memberOffers->isNotEmpty() || $hasMemberDiscount;
     @endphp
-    @if($memberOffers->isNotEmpty() || theme('show_call_button') || (theme('show_whatsapp_button') && theme('whatsapp_number')) || (theme('show_messenger_button') && theme('messenger_url')))
+    @if($showOffersButton || theme('show_call_button') || (theme('show_whatsapp_button') && theme('whatsapp_number')) || (theme('show_messenger_button') && theme('messenger_url')))
         <div class="fixed right-5 z-50 flex flex-col items-center gap-3 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:bottom-5">
             {{-- Your offers --}}
-            @if($memberOffers->isNotEmpty())
+            @if($showOffersButton)
                 <div x-data="{ open: false }" class="relative">
                     <button type="button" @click="open = !open"
                             class="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gold-600 text-white shadow-lg hover:scale-105 transition p-3.5"
                             title="Your exclusive offers">
                         <svg class="w-full h-full" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
-                        <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold">{{ $memberOffers->count() }}</span>
+                        @php
+                            $offerBadge = $memberOffers->count() + ($hasMemberDiscount ? 1 : 0);
+                        @endphp
+                        <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold">{{ $offerBadge }}</span>
                     </button>
                     <div x-show="open" x-cloak x-transition @click.outside="open = false"
                          class="absolute bottom-16 right-0 w-72 max-h-[70vh] overflow-y-auto rounded-xl bg-white shadow-2xl border border-ink-100 p-4">
@@ -707,6 +716,21 @@
                             <p class="font-semibold text-sm flex items-center gap-1.5">🎁 Your exclusive offers</p>
                             <button type="button" @click="open = false" class="text-ink-700/40 hover:text-ink-900 text-lg leading-none">&times;</button>
                         </div>
+                        @if($hasMemberDiscount)
+                            <div class="rounded-lg border border-gold-300 bg-gold-600 text-white p-2.5 mb-2">
+                                <p class="text-sm font-medium">💎 {{ rtrim(rtrim(number_format($memberUsage['percent'], 2), '0'), '.') }}% member discount</p>
+                                @if($memberUsage['capped'])
+                                    @php
+                                        $wmReset = $memberUsage['resets_at'] ? ' · resets '.$memberUsage['resets_at']->format('d M') : '';
+                                    @endphp
+                                    <p class="text-[11px] text-white/85 mt-0.5">
+                                        {{ $memberUsage['remaining'] > 0 ? $memberUsage['remaining'].' of '.$memberUsage['max'].' uses left'.$wmReset : 'Used up'.$wmReset }}
+                                    </p>
+                                @else
+                                    <p class="text-[11px] text-white/85 mt-0.5">Auto-applied on every order</p>
+                                @endif
+                            </div>
+                        @endif
                         <div class="space-y-2">
                             @foreach($memberOffers as $mo)
                                 <div class="rounded-lg border border-gold-200 bg-gold-50/60 p-2.5">

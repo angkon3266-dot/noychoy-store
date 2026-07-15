@@ -119,6 +119,25 @@
                     </div>
                 </dl>
 
+                {{-- Member discount usage status --}}
+                @auth('customer')
+                    @php
+                        $mu = member_pricing()->enabled() ? member_pricing()->usageStatus(auth('customer')->user()) : null;
+                    @endphp
+                    @if($mu && $mu['percent'] > 0 && $mu['capped'])
+                        @php
+                            $muReset = $mu['resets_at'] ? $mu['resets_at']->format('d M') : null;
+                        @endphp
+                        <p class="mt-2 text-xs {{ $mu['remaining'] > 0 ? 'text-green-700' : 'text-ink-700/60' }}">
+                            @if($mu['remaining'] > 0)
+                                💎 Member discount: <strong>{{ $mu['remaining'] }} of {{ $mu['max'] }}</strong> uses left{{ $muReset ? ' (resets '.$muReset.')' : '' }}.
+                            @else
+                                💎 Member discount used up for now{{ $muReset ? ' — resets '.$muReset : '' }}.
+                            @endif
+                        </p>
+                    @endif
+                @endauth
+
                 @foreach($cart->offerHints() as $hint)
                     <div class="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {{ $hint }}</div>
                 @endforeach

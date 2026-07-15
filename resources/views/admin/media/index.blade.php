@@ -82,13 +82,24 @@
 
         {{-- Shared options --}}
         <div class="grid sm:grid-cols-4 gap-3">
-            <div>
-                <label class="label">Position</label>
-                <select name="position" class="input text-sm">
+            <div x-data="{ wmode: '{{ $watermark['mode'] ?? 'single' }}' }" class="sm:col-span-2">
+                <label class="label">Placement</label>
+                <select name="mode" x-model="wmode" class="input text-sm mb-2">
+                    <option value="single">Single watermark</option>
+                    <option value="multiple">Multiple watermarks</option>
+                </select>
+                {{-- Single: one position --}}
+                <select name="position" x-show="wmode==='single'" class="input text-sm">
                     @foreach(['top-left'=>'Top left','top-right'=>'Top right','bottom-left'=>'Bottom left','bottom-right'=>'Bottom right','center'=>'Center'] as $k=>$lbl)
                         <option value="{{ $k }}" @selected($watermark['position']===$k)>{{ $lbl }}</option>
                     @endforeach
                 </select>
+                {{-- Multiple: tick several positions --}}
+                <div x-show="wmode==='multiple'" x-cloak class="grid grid-cols-2 gap-1 text-xs">
+                    @foreach(['top-left'=>'Top left','top-right'=>'Top right','bottom-left'=>'Bottom left','bottom-right'=>'Bottom right','center'=>'Center'] as $k=>$lbl)
+                        <label class="flex items-center gap-1.5"><input type="checkbox" name="positions[]" value="{{ $k }}" @checked(in_array($k, $watermark['positions'] ?? ['top-right']))> {{ $lbl }}</label>
+                    @endforeach
+                </div>
             </div>
             <div x-data="{ v: {{ $watermark['opacity'] }} }">
                 <label class="label">Opacity <span class="font-semibold" x-text="v + '%'"></span></label>

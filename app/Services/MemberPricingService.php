@@ -49,6 +49,37 @@ class MemberPricingService
             || collect($o['categories'] ?? [])->contains(fn ($p) => (float) $p > 0);
     }
 
+    /**
+     * The member-discount weekly usage status for a customer.
+     *
+     * @return array{capped:bool, max:int, used:int, remaining:?int, resets_at:?\Illuminate\Support\Carbon, percent:float, window_days:int}
+     */
+    public function usageStatus(\App\Models\Customer $customer): array
+    {
+        $max = (int) Setting::get('register_offer_max_uses', 2);
+        $windowDays = max(1, (int) Setting::get('register_offer_window_days', 7));
+        $percent = $this->basePercent();
+
+        if ($max <= 0) {
+            return ['capped' => false, 'max' => 0, 'used' => 0, 'remaining' => null, 'resets_at' => null, 'percent' => $percent, 'window_days' => $windowDays];
+        }
+
+        $orders = \App\Models\Order::where('customer_id', $customer->id)
+            ->where('created_at', '>=', now()->subDays($windowDays));
+        $used = (clone $orders)->count();
+        $oldest = (clone $orders)->orderBy('created_at')->first();
+
+        return [
+            'capped' => true,
+            'max' => $max,
+            'used' => $used,
+            'remaining' => max(0, $max - $used),
+            'resets_at' => $oldest?->created_at?->copy()->addDays($windowDays),
+            'percent' => $percent,
+            'window_days' => $windowDays,
+        ];
+    }
+
     /** Effective % for a cart line — no DB hit (uses stored product/category id). */
     public function percentForLine(int $productId, ?int $categoryId): float
     {

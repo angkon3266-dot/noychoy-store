@@ -183,6 +183,36 @@ class CustomerController extends Controller
         return back()->with('success', 'Offer removed.');
     }
 
+    /** Edit an existing personalised offer's key fields. */
+    public function updateOffer(Request $request, Customer $customer, \App\Models\CustomerOffer $offer)
+    {
+        abort_unless((int) $offer->customer_id === (int) $customer->id, 404);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:120'],
+            'message' => ['nullable', 'string', 'max:400'],
+            'type' => ['required', 'in:'.implode(',', array_keys(\App\Models\CustomerOffer::TYPES))],
+            'value' => ['nullable', 'numeric', 'min:0'],
+            'code' => ['nullable', 'string', 'max:40'],
+            'expires_at' => ['nullable', 'date'],
+            'max_redemptions' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+        $data['is_active'] = $request->boolean('is_active');
+        $offer->update($data);
+
+        return back()->with('success', 'Offer updated.');
+    }
+
+    /** Mark an offer active/paused (the "mark" toggle). */
+    public function toggleOffer(Customer $customer, \App\Models\CustomerOffer $offer)
+    {
+        abort_unless((int) $offer->customer_id === (int) $customer->id, 404);
+        $offer->update(['is_active' => ! $offer->is_active]);
+
+        return back()->with('success', $offer->is_active ? 'Offer activated.' : 'Offer paused.');
+    }
+
     /** Assign one personalised offer to many selected customers at once. */
     public function bulkOffer(Request $request)
     {

@@ -288,6 +288,9 @@ class MediaController extends Controller
             'type' => ['required', 'in:text,logo'],
             'text' => ['nullable', 'string', 'max:60'],
             'position' => ['required', 'in:top-left,top-right,bottom-left,bottom-right,center'],
+            'mode' => ['nullable', 'in:single,multiple'],
+            'positions' => ['nullable', 'array'],
+            'positions.*' => ['in:top-left,top-right,bottom-left,bottom-right,center'],
             'opacity' => ['required', 'integer', 'min:5', 'max:100'],
             'size' => ['required', 'integer', 'min:2', 'max:60'],
             'color' => ['nullable', 'string', 'max:9'],
@@ -300,6 +303,8 @@ class MediaController extends Controller
         $cfg['type'] = $data['type'];
         $cfg['text'] = $data['text'] ?? $cfg['text'];
         $cfg['position'] = $data['position'];
+        $cfg['mode'] = $data['mode'] ?? 'single';
+        $cfg['positions'] = ! empty($data['positions']) ? array_values($data['positions']) : [$data['position']];
         $cfg['opacity'] = (int) $data['opacity'];
         $cfg['size'] = (int) $data['size'];
         $cfg['color'] = $data['color'] ?: '#ffffff';
@@ -335,6 +340,9 @@ class MediaController extends Controller
             'type' => ['required', 'in:text,logo'],
             'text' => ['nullable', 'string', 'max:60'],
             'position' => ['required', 'in:top-left,top-right,bottom-left,bottom-right,center'],
+            'mode' => ['nullable', 'in:single,multiple'],
+            'positions' => ['nullable', 'array'],
+            'positions.*' => ['in:top-left,top-right,bottom-left,bottom-right,center'],
             'opacity' => ['required', 'integer', 'min:5', 'max:100'],
             'size' => ['required', 'integer', 'min:2', 'max:60'],
             'color' => ['nullable', 'string', 'max:9'],
@@ -345,11 +353,13 @@ class MediaController extends Controller
 
         $disk = Storage::disk('public');
         $cfg = array_merge($watermark->settings(), $request->only([
-            'type', 'text', 'position', 'opacity', 'size', 'color', 'margin',
+            'type', 'text', 'position', 'mode', 'positions', 'opacity', 'size', 'color', 'margin',
         ]));
         $cfg['opacity'] = (int) $cfg['opacity'];
         $cfg['size'] = (int) $cfg['size'];
         $cfg['margin'] = (int) $cfg['margin'];
+        $cfg['mode'] = $request->input('mode', 'single');
+        $cfg['positions'] = $request->input('positions', [$cfg['position'] ?? 'top-right']);
 
         // Temp-store a just-selected font/logo so the preview uses it pre-save.
         $temps = [];
