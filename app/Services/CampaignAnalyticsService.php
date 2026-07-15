@@ -52,9 +52,24 @@ class CampaignAnalyticsService
         $from = $n->sent_at;
         $to = $n->sent_at->copy()->addDays(self::ATTRIBUTION_DAYS);
 
+        // Last-touch attribution: cap the window at the next campaign that went
+        // out, so an order is credited to only the most recent campaign before it
+        // (no double-counting the same order across overlapping campaigns).
+        $nextSentAt = CustomerNotification::whereNotNull('sent_at')
+            ->where('sent_at', '>', $n->sent_at)
+            ->min('sent_at');
+        if ($nextSentAt) {
+            $next = \Illuminate\Support\Carbon::parse($nextSentAt);
+            if ($next->lt($to)) {
+                $to = $next;
+            }
+        }
+
+        // Half-open interval [from, to) so a boundary order isn't counted twice.
         $q = Order::query()
             ->whereNotNull('customer_id')
-            ->whereBetween('created_at', [$from, $to]);
+            ->where('created_at', '>=', $from)
+            ->where('created_at', '<', $to);
 
         if ($n->audience === 'segment') {
             // Exact recipients snapshot.

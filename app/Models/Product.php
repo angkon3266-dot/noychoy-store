@@ -43,6 +43,7 @@ class Product extends Model
         'cross_sell_ids' => 'array',
         'is_preorder' => 'boolean',
         'preorder_release_date' => 'date',
+        'price_drop_notified_at' => 'datetime',
         'colors' => 'array',
         'custom_show' => 'boolean',
         'custom_fields' => 'array',

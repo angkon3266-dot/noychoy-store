@@ -72,10 +72,12 @@ class NotificationService
             return;
         }
 
-        $query = \App\Models\PushSubscription::query()->whereNotNull('customer_id');
+        // Segment sends go only to the targeted members; an "all" send reaches
+        // every subscription — registered members AND opted-in guests.
+        $query = \App\Models\PushSubscription::query();
         if ($n->audience === 'segment') {
             $ids = $recipientIds ?? $n->recipients()->pluck('customers.id')->all();
-            $query->whereIn('customer_id', $ids);
+            $query->whereNotNull('customer_id')->whereIn('customer_id', $ids);
         }
 
         $payload = [
