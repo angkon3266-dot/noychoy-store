@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 // Auth (no admin middleware)
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('login', [AuthController::class, 'login'])->name('login.post');
+Route::post('login', [AuthController::class, 'login'])->name('login.post')->middleware('throttle:5,1');
 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
 // Protected admin area

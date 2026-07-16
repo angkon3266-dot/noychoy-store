@@ -50,6 +50,11 @@ class PlaceOrder
         $memberDiscount = $this->cart->memberSignupDiscount();
 
         $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount, $customerOffer, $memberDiscount) {
+            // Re-validate every line against live data, holding row locks so two
+            // simultaneous checkouts can't both take the last unit. Throws
+            // CheckoutException (rolling back) if anything no longer holds.
+            [$products, $variants] = $this->validateLines();
+
             // Attach to a customer record (find-or-create by phone) even for guests.
             $customer = Customer::firstOrCreate(
                 ['phone' => $data['phone']],
@@ -61,8 +66,7 @@ class PlaceOrder
                 $customer = auth('customer')->user();
             }
 
-            $order = Order::create([
-                'order_number' => Order::generateNumber(),
+            $order = $this->createWithUniqueNumber([
                 'customer_id' => $customer->id,
                 'customer_name' => $data['name'],
                 'customer_phone' => $data['phone'],
@@ -86,13 +90,10 @@ class PlaceOrder
                 'source' => 'web',
             ]);
 
-            // Snapshot landed cost per product so margin reporting stays accurate
-            // even if the product's cost changes later.
-            $costs = Product::whereIn('id', collect($this->cart->items())->pluck('product_id')->filter())
-                ->get(['id', 'cost_price', 'transport_cost'])->keyBy('id');
-
+            // The locked products double as the landed-cost snapshot (margin
+            // reporting stays accurate even if the product's cost changes later).
             foreach ($this->cart->items() as $item) {
-                $product = $costs->get($item['product_id']);
+                $product = $products->get($item['product_id']);
 
                 $order->items()->create([
                     'product_id' => $item['product_id'],
@@ -107,7 +108,7 @@ class PlaceOrder
                     'subtotal' => $item['price'] * $item['qty'],
                 ]);
 
-                $this->decrementStock($item['product_id'], $item['variant_id'], $item['qty']);
+                $this->decrementStock($product, $variants->get($item['variant_id']), (int) $item['qty']);
             }
 
             $order->history()->create(['status' => 'processing', 'note' => 'Order placed by customer']);
@@ -169,12 +170,99 @@ class PlaceOrder
         return $order;
     }
 
-    protected function decrementStock(int $productId, ?int $variantId, int $qty): void
+    /**
+     * Re-validate every cart line against live, row-locked data: the product is
+     * still published, stock covers the quantity (pre-orders exempt), and the
+     * price hasn't changed since it was added to the cart. On a price change the
+     * cart line is repriced so the customer sees current numbers on the bounce.
+     *
+     * @return array{0:\Illuminate\Support\Collection, 1:\Illuminate\Support\Collection} [products, variants] keyed by id
+     *
+     * @throws \App\Exceptions\CheckoutException
+     */
+    protected function validateLines(): array
     {
-        if ($variantId) {
-            \App\Models\ProductVariant::where('id', $variantId)->decrement('stock_quantity', $qty);
+        $items = $this->cart->items();
+
+        // lockForUpdate holds the rows until the transaction commits, so a
+        // concurrent checkout waits here instead of overselling the last unit.
+        $products = Product::with('category')
+            ->whereIn('id', $items->pluck('product_id')->filter()->unique())
+            ->lockForUpdate()->get()->keyBy('id');
+        $variants = \App\Models\ProductVariant::whereIn('id', $items->pluck('variant_id')->filter()->unique())
+            ->lockForUpdate()->get()->keyBy('id');
+
+        $repriced = [];
+
+        foreach ($items as $item) {
+            $product = $products->get($item['product_id']);
+            $variant = $item['variant_id'] ? $variants->get($item['variant_id']) : null;
+
+            // Product (or chosen variant) has been removed / unpublished.
+            if (! $product || $product->status !== 'published' || ($item['variant_id'] && ! $variant)) {
+                $this->cart->remove($item['key']);
+
+                throw new \App\Exceptions\CheckoutException(
+                    '"'.$item['name'].'" is no longer available and was removed from your cart.'
+                );
+            }
+
+            // Stock check (pre-orders intentionally sell past zero).
+            if (! $product->isPreorder()) {
+                $qty = (int) $item['qty'];
+                if ($variant && (int) $variant->stock_quantity < $qty) {
+                    throw new \App\Exceptions\CheckoutException(
+                        'Only '.max(0, (int) $variant->stock_quantity).' of "'.$item['name'].'" left in stock — please adjust the quantity.'
+                    );
+                }
+                if (! $variant && $product->manage_stock && (int) $product->stock_quantity < $qty) {
+                    throw new \App\Exceptions\CheckoutException(
+                        'Only '.max(0, (int) $product->stock_quantity).' of "'.$item['name'].'" left in stock — please adjust the quantity.'
+                    );
+                }
+            }
+
+            // Price check — the session snapshot must match the live price.
+            $current = (float) ($variant?->effective_price ?? $product->price);
+            if (round($current, 2) !== round((float) $item['price'], 2)) {
+                $this->cart->repriceLine($item['key'], $current);
+                $repriced[] = $item['name'];
+            }
         }
-        $product = Product::find($productId);
+
+        if ($repriced !== []) {
+            throw new \App\Exceptions\CheckoutException(
+                'Prices were updated for: '.implode(', ', $repriced).'. Please review your cart before ordering.'
+            );
+        }
+
+        return [$products, $variants];
+    }
+
+    /**
+     * Create the order, retrying on an order-number collision (two simultaneous
+     * checkouts can generate the same sequential number; the unique index makes
+     * the loser retry with the next one instead of 500ing).
+     */
+    protected function createWithUniqueNumber(array $attributes): Order
+    {
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return Order::create(['order_number' => Order::generateNumber()] + $attributes);
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                if ($attempt >= 3) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    /** Decrement stock on the already-locked models (validated ≥ qty above). */
+    protected function decrementStock(?Product $product, ?\App\Models\ProductVariant $variant, int $qty): void
+    {
+        if ($variant) {
+            $variant->decrement('stock_quantity', $qty);
+        }
         if ($product && $product->manage_stock) {
             $product->decrement('stock_quantity', $qty);
             if ($product->stock_quantity <= 0) {

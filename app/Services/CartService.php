@@ -57,6 +57,16 @@ class CartService
         session([$this->sessionKey => $items]);
     }
 
+    /** Overwrite a line's snapshotted unit price (checkout re-validation). */
+    public function repriceLine(string $key, float $price): void
+    {
+        $items = session($this->sessionKey, []);
+        if (isset($items[$key])) {
+            $items[$key]['price'] = $price;
+            session([$this->sessionKey => $items]);
+        }
+    }
+
     public function update(string $key, int $qty): void
     {
         $items = session($this->sessionKey, []);

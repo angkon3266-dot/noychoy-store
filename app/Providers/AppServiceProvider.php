@@ -38,6 +38,34 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ── Rate limiters for public storefront endpoints ────────────────────
+        // OTP: strict — this sends a paid SMS. Limited per phone AND per IP so
+        // neither a phone can be bombed nor one IP can drain SMS credit.
+        \Illuminate\Support\Facades\RateLimiter::for('otp', function (\Illuminate\Http\Request $request) {
+            // Key by the target identity (phone for SMS OTP, email for reset
+            // links) so one account can't be bombed; fall back to IP.
+            $target = bd_phone((string) $request->input('phone'))
+                ?: strtolower(trim((string) $request->input('email')))
+                ?: $request->ip();
+
+            return [
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(2)->by('otp-t:'.$target),
+                \Illuminate\Cache\RateLimiting\Limit::perHour(6)->by('otp-th:'.$target),
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by('otp-ip:'.$request->ip()),
+            ];
+        });
+
+        // Login: per account+IP so one attacker can't lock everyone out, with an
+        // IP ceiling against distributed guessing.
+        \Illuminate\Support\Facades\RateLimiter::for('login', function (\Illuminate\Http\Request $request) {
+            $who = bd_phone((string) $request->input('phone')) ?: (string) $request->input('email');
+
+            return [
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by('login:'.$who.'|'.$request->ip()),
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(20)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
         // Authorization: Super-Admin-only modules.
         Gate::define('meta.access', [MetaPolicy::class, 'access']);
         Gate::define('system-config.access', [SystemConfigPolicy::class, 'access']);
@@ -45,6 +73,13 @@ class AppServiceProvider extends ServiceProvider
         // Automatic Meta catalog sync on product / variant lifecycle changes.
         Product::observe(MetaProductObserver::class);
         ProductVariant::observe(MetaVariantObserver::class);
+
+        // Bust the cached homepage whenever its ingredients change.
+        $bustHome = fn () => \Illuminate\Support\Facades\Cache::forget(\App\Http\Controllers\Shop\HomeController::CACHE_KEY);
+        Product::saved($bustHome);
+        Product::deleted($bustHome);
+        Category::saved($bustHome);
+        Category::deleted($bustHome);
 
         // Rebuild caches after a configuration restore/import.
         Event::listen(ConfigurationRestored::class, RebuildConfigurationCache::class);

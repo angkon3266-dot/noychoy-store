@@ -23,10 +23,10 @@ class ReviewController extends Controller
         ]);
 
         // Verified buyer = this phone has an order containing this product.
+        // Orders store phones canonically — exact match (indexed, no false hits).
         $verified = false;
         if (! empty($data['phone'])) {
-            $digits = preg_replace('/\D/', '', $data['phone']);
-            $verified = Order::where('customer_phone', 'like', '%'.substr($digits, -9).'%')
+            $verified = Order::where('customer_phone', bd_phone($data['phone']))
                 ->whereHas('items', fn ($q) => $q->where('product_id', $product->id))
                 ->exists();
         }

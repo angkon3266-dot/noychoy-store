@@ -11,13 +11,47 @@ use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
+    /** Cache key for the homepage id-plan (bumped on product/category/appearance saves). */
+    public const CACHE_KEY = 'home.plan.v1';
+
     public function index(Request $request)
     {
-        $with = ['images', 'approvedReviews', 'category'];
+        // The expensive part of the homepage is DECIDING what to show (several
+        // product queries incl. a SUM over order_items for auto-bestsellers).
+        // We cache that decision as plain ids — the app's cache store refuses to
+        // serialize objects (cache.serializable_classes = false) — then hydrate
+        // everything with one indexed whereIn query, so prices/stock stay live.
+        $plan = \Illuminate\Support\Facades\Cache::remember(self::CACHE_KEY, 600, function () {
+            $sectionBlocks = collect(home_content('sections') ?? [])
+                ->filter(fn ($b) => ($b['enabled'] ?? true) && filled($b['type'] ?? null))
+                ->map(function ($b) {
+                    if (in_array($b['type'], ['product_carousel', 'banner_carousel'], true)) {
+                        $b['product_ids'] = $this->sourceProductIds($b['source'] ?? 'new', $b['category_id'] ?? null, (int) ($b['limit'] ?? 10));
+                    }
 
-        $featured = Product::published()->featured()->with($with)->latest()->take(8)->get();
-        $newArrivals = Product::published()->with($with)->latest()->take(8)->get();
-        $bestSellers = $this->bestSellers($with, 8);
+                    return $b;
+                })->values()->all();
+
+            return [
+                'featured' => Product::published()->featured()->latest()->take(8)->pluck('id')->all(),
+                'new' => Product::published()->latest()->take(8)->pluck('id')->all(),
+                'best' => $this->bestSellerIds(8),
+                'sections' => $sectionBlocks,
+            ];
+        });
+
+        // One query hydrates every product used anywhere on the page.
+        $with = ['images', 'approvedReviews', 'category'];
+        $allIds = collect([$plan['featured'], $plan['new'], $plan['best']])
+            ->flatten()
+            ->merge(collect($plan['sections'])->pluck('product_ids')->flatten()->filter())
+            ->unique()->values();
+        $pool = Product::published()->with($with)->whereIn('id', $allIds)->get()->keyBy('id');
+        $pick = fn (array $ids) => collect($ids)->map(fn ($id) => $pool->get($id))->filter()->values();
+
+        $featured = $pick($plan['featured']);
+        $newArrivals = $pick($plan['new']);
+        $bestSellers = $pick($plan['best']);
 
         // Category scroller — admin-chosen categories in order, else auto (top parents).
         $scrollerIds = collect(home_content('category_scroller_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
@@ -31,8 +65,19 @@ class HomeController extends Controller
         $highlightCategories = $highlightIds->isEmpty() ? collect() : Category::whereIn('id', $highlightIds)->get()
             ->sortBy(fn ($c) => $highlightIds->search($c->id))->values();
 
-        // Custom section blocks (page builder). Empty = fall back to fixed sections.
-        $sections = $this->resolveSections(home_content('sections') ?? [], $with);
+        // Custom section blocks: hydrate products + video meta from the plan.
+        $sections = collect($plan['sections'])->map(function ($b) use ($pick) {
+            if (isset($b['product_ids'])) {
+                $b['products'] = $pick($b['product_ids']);
+            }
+            if ($b['type'] === 'video') {
+                $b['videos'] = collect($b['videos'] ?? [])
+                    ->map(fn ($v) => ['title' => $v['title'] ?? '', 'meta' => video_meta($v['url'] ?? '')])
+                    ->filter(fn ($v) => $v['meta'] !== null)->values();
+            }
+
+            return $b;
+        })->values();
 
         // Logged-in admins can preview any template via ?preview_home=KEY without saving it.
         $key = theme('homepage_template');
@@ -51,40 +96,21 @@ class HomeController extends Controller
         ));
     }
 
-    /** Turn stored builder blocks into render-ready blocks (with products resolved). */
-    protected function resolveSections(array $blocks, array $with): \Illuminate\Support\Collection
-    {
-        return collect($blocks)
-            ->filter(fn ($b) => ($b['enabled'] ?? true) && filled($b['type'] ?? null))
-            ->map(function ($b) use ($with) {
-                $type = $b['type'];
-                if (in_array($type, ['product_carousel', 'banner_carousel'], true)) {
-                    $b['products'] = $this->sourceProducts($b['source'] ?? 'new', $b['category_id'] ?? null, (int) ($b['limit'] ?? 10), $with);
-                }
-                if ($type === 'video') {
-                    $b['videos'] = collect($b['videos'] ?? [])
-                        ->map(fn ($v) => ['title' => $v['title'] ?? '', 'meta' => video_meta($v['url'] ?? '')])
-                        ->filter(fn ($v) => $v['meta'] !== null)->values();
-                }
-                return $b;
-            })->values();
-    }
-
-    /** Resolve a product source keyword to a collection. */
-    protected function sourceProducts(string $source, $categoryId, int $limit, array $with): \Illuminate\Support\Collection
+    /** Resolve a builder block's product source keyword to an ordered id list. */
+    protected function sourceProductIds(string $source, $categoryId, int $limit): array
     {
         $limit = max(1, min(20, $limit));
 
         return match ($source) {
-            'best' => $this->bestSellers($with, $limit),
-            'featured' => Product::published()->featured()->with($with)->latest()->take($limit)->get(),
+            'best' => $this->bestSellerIds($limit),
+            'featured' => Product::published()->featured()->latest()->take($limit)->pluck('id')->all(),
             'category' => $categoryId
-                ? Product::published()->with($with)
+                ? Product::published()
                     ->where(fn ($w) => $w->where('category_id', $categoryId)
                         ->orWhereHas('categories', fn ($c) => $c->where('categories.id', $categoryId)))
-                    ->latest()->take($limit)->get()
-                : collect(),
-            default => Product::published()->with($with)->latest()->take($limit)->get(), // new
+                    ->latest()->take($limit)->pluck('id')->all()
+                : [],
+            default => Product::published()->latest()->take($limit)->pluck('id')->all(), // new
         };
     }
 
@@ -92,9 +118,9 @@ class HomeController extends Controller
      * Best sellers: admin-flagged products first, then the top auto-sellers
      * (by units sold), finally newest published products to fill the row.
      */
-    protected function bestSellers(array $with, int $limit): \Illuminate\Support\Collection
+    protected function bestSellerIds(int $limit): array
     {
-        $best = Product::published()->bestsellers()->with($with)->latest()->take($limit)->get();
+        $best = Product::published()->bestsellers()->latest()->take($limit)->pluck('id');
 
         if ($best->count() < $limit) {
             $topIds = OrderItem::query()
@@ -103,23 +129,22 @@ class HomeController extends Controller
                 ->select('product_id', DB::raw('SUM(quantity) as q'))
                 ->groupBy('product_id')->orderByDesc('q')
                 ->pluck('product_id')
-                ->reject(fn ($id) => $best->contains('id', $id))
+                ->reject(fn ($id) => $best->contains($id))
                 ->take($limit - $best->count());
 
             if ($topIds->isNotEmpty()) {
-                $auto = Product::published()->whereIn('id', $topIds)->with($with)->get()
-                    ->sortBy(fn ($p) => $topIds->search($p->id));
-                $best = $best->concat($auto);
+                // Keep only ids that are still published, preserving sales order.
+                $published = Product::published()->whereIn('id', $topIds)->pluck('id');
+                $best = $best->concat($topIds->filter(fn ($id) => $published->contains($id)));
             }
         }
 
         if ($best->count() < $limit) {
-            $have = $best->pluck('id');
-            $fill = Product::published()->whereNotIn('id', $have)->with($with)->latest()
-                ->take($limit - $best->count())->get();
+            $fill = Product::published()->whereNotIn('id', $best)->latest()
+                ->take($limit - $best->count())->pluck('id');
             $best = $best->concat($fill);
         }
 
-        return $best->take($limit)->values();
+        return $best->take($limit)->map(fn ($id) => (int) $id)->values()->all();
     }
 }

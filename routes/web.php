@@ -19,13 +19,20 @@ Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('m
 
 // ── Storefront ──────────────────────────────────────────────────────────────
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/sitemap.xml', [\App\Http\Controllers\Shop\SitemapController::class, 'index'])->name('sitemap');
+Route::get('/robots.txt', fn () => response(
+    "User-agent: *\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n\nSitemap: ".route('sitemap')."\n",
+    200, ['Content-Type' => 'text/plain'],
+))->name('robots');
 Route::get('/shop', [CatalogController::class, 'index'])->name('shop');
 Route::get('/best-sellers', [CatalogController::class, 'bestSellers'])->name('best-sellers');
 
 // Web-push subscription (public — works for guests and members).
-Route::post('/push/subscribe', [\App\Http\Controllers\Shop\PushController::class, 'subscribe'])->name('push.subscribe');
-Route::post('/push/unsubscribe', [\App\Http\Controllers\Shop\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
-Route::post('/push/watch-stock', [\App\Http\Controllers\Shop\PushController::class, 'watchStock'])->name('push.watch-stock');
+Route::middleware('throttle:20,1')->group(function () {
+    Route::post('/push/subscribe', [\App\Http\Controllers\Shop\PushController::class, 'subscribe'])->name('push.subscribe');
+    Route::post('/push/unsubscribe', [\App\Http\Controllers\Shop\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
+    Route::post('/push/watch-stock', [\App\Http\Controllers\Shop\PushController::class, 'watchStock'])->name('push.watch-stock');
+});
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager
@@ -36,49 +43,52 @@ Route::get('/track', [CheckoutController::class, 'track'])->name('track');
 Route::controller(CartController::class)->group(function () {
     Route::get('/cart', 'index')->name('cart');
     Route::get('/cart/mini', 'mini')->name('cart.mini');
-    Route::post('/cart/add/{product:slug}', 'add')->name('cart.add');
-    Route::post('/cart/add-many', 'addMany')->name('cart.add-many');
-    Route::post('/cart/buy-now/{product:slug}', 'buyNow')->name('cart.buynow');
-    Route::patch('/cart/update', 'update')->name('cart.update');
-    Route::delete('/cart/remove', 'remove')->name('cart.remove');
-    Route::post('/cart/coupon', 'applyCoupon')->name('cart.coupon');
-    Route::delete('/cart/coupon', 'removeCoupon')->name('cart.coupon.remove');
-    Route::post('/cart/points', 'applyPoints')->name('cart.points');
-    Route::delete('/cart/points', 'removePoints')->name('cart.points.remove');
+    // Write endpoints are throttled generously (anti-spam, not anti-human).
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('/cart/add/{product:slug}', 'add')->name('cart.add');
+        Route::post('/cart/add-many', 'addMany')->name('cart.add-many');
+        Route::post('/cart/buy-now/{product:slug}', 'buyNow')->name('cart.buynow');
+        Route::patch('/cart/update', 'update')->name('cart.update');
+        Route::delete('/cart/remove', 'remove')->name('cart.remove');
+        Route::post('/cart/coupon', 'applyCoupon')->name('cart.coupon');
+        Route::delete('/cart/coupon', 'removeCoupon')->name('cart.coupon.remove');
+        Route::post('/cart/points', 'applyPoints')->name('cart.points');
+        Route::delete('/cart/points', 'removePoints')->name('cart.points.remove');
+    });
 });
 
 // Checkout
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
-Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
-Route::post('/checkout/lead', [\App\Http\Controllers\Shop\LeadController::class, 'capture'])->name('checkout.lead');
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:5,1');
+Route::post('/checkout/lead', [\App\Http\Controllers\Shop\LeadController::class, 'capture'])->name('checkout.lead')->middleware('throttle:15,1');
 
-// Product reviews
-Route::post('/product/{product:slug}/review', [\App\Http\Controllers\Shop\ReviewController::class, 'store'])->name('review.store');
+// Product reviews (photo uploads — keep tight)
+Route::post('/product/{product:slug}/review', [\App\Http\Controllers\Shop\ReviewController::class, 'store'])->name('review.store')->middleware('throttle:5,10');
 
 // Love / heart reaction (anonymous, per-browser cookie)
-Route::post('/product/{product:slug}/love', [\App\Http\Controllers\Shop\LoveController::class, 'toggle'])->name('product.love');
+Route::post('/product/{product:slug}/love', [\App\Http\Controllers\Shop\LoveController::class, 'toggle'])->name('product.love')->middleware('throttle:60,1');
 Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'confirmation'])->name('order.confirmation');
 
 // ── Customer accounts (optional) ─────────────────────────────────────────────
 Route::middleware('guest:customer')->group(function () {
     Route::get('/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login');
-    Route::post('/login', [CustomerAuthController::class, 'login'])->name('customer.login.post');
+    Route::post('/login', [CustomerAuthController::class, 'login'])->name('customer.login.post')->middleware('throttle:login');
     Route::get('/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register');
-    Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.post');
+    Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.post')->middleware('throttle:5,1');
 
     // Continue with Google (OAuth2, no Socialite)
     Route::get('/auth/google', [\App\Http\Controllers\Customer\GoogleController::class, 'redirect'])->name('customer.google');
 
-    // Forgot password via SMS OTP
+    // Forgot password via SMS OTP (throttled per phone + IP — sends paid SMS)
     Route::get('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showForgot'])->name('customer.password.forgot');
-    Route::post('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendOtp'])->name('customer.password.send');
+    Route::post('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendOtp'])->name('customer.password.send')->middleware('throttle:otp');
     Route::get('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showReset'])->name('customer.password.reset');
-    Route::post('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'reset'])->name('customer.password.update');
+    Route::post('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'reset'])->name('customer.password.update')->middleware('throttle:10,1');
 
     // Forgot password via email link
-    Route::post('/password/email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendEmailLink'])->name('customer.password.email');
+    Route::post('/password/email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendEmailLink'])->name('customer.password.email')->middleware('throttle:otp');
     Route::get('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showEmailReset'])->name('customer.password.email.form');
-    Route::post('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'resetViaEmail'])->name('customer.password.email.update');
+    Route::post('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'resetViaEmail'])->name('customer.password.email.update')->middleware('throttle:10,1');
 });
 
 // Google OAuth callback (outside guest group so it works mid-session)

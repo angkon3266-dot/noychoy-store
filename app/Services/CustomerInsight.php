@@ -24,11 +24,9 @@ class CustomerInsight
      */
     public function forPhone(string $phone, ?int $excludeOrderId = null): array
     {
-        $digits = preg_replace('/\D/', '', $phone);
-        $last9 = strlen($digits) >= 9 ? substr($digits, -9) : $digits;
-
+        // Orders store phones canonically — exact match uses the phone index.
         $orders = Order::query()
-            ->where('customer_phone', 'like', "%{$last9}%")
+            ->where('customer_phone', bd_phone($phone))
             ->when($excludeOrderId, fn ($q) => $q->where('id', '!=', $excludeOrderId))
             ->with('shipment')
             ->latest()

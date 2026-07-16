@@ -34,7 +34,7 @@ class PasswordResetController extends Controller
             'phone' => ['required', 'string', 'regex:/^(\+?880|0)1[3-9]\d{8}$/'],
         ], ['phone.regex' => 'Enter a valid Bangladeshi mobile number.']);
 
-        $customer = Customer::where('phone', 'like', '%'.substr(preg_replace('/\D/', '', $data['phone']), -10).'%')->first();
+        $customer = Customer::where('phone', bd_phone($data['phone']))->first();
 
         // Always behave the same way to avoid leaking which numbers exist.
         if ($customer) {
@@ -82,7 +82,7 @@ class PasswordResetController extends Controller
             return back()->withInput()->with('error', 'Incorrect code. Please try again.');
         }
 
-        $customer = Customer::where('phone', 'like', '%'.substr(preg_replace('/\D/', '', $data['phone']), -10).'%')->first();
+        $customer = Customer::where('phone', bd_phone($data['phone']))->first();
         if (! $customer) {
             return back()->with('error', 'Account not found.');
         }

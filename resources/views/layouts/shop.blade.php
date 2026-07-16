@@ -21,6 +21,9 @@
             <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
         @endif
     @endisset
+    {{-- Canonical: strips query strings (?sort=, filters) so crawlers don't index
+         endless duplicates of the same catalog page. Views may override. --}}
+    <link rel="canonical" href="{{ $canonicalUrl ?? url()->current() }}">
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">@endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
@@ -37,7 +40,11 @@
         $googleFonts = collect();
         if ($fHeadingSrc === 'google' && $fHeading) $googleFonts->push($fHeading);
         if ($fBodySrc === 'google' && $fBody) $googleFonts->push($fBody);
-        $googleFonts = $googleFonts->filter()->unique()->values();
+        // These two families are already self-hosted via the Vite build (Bunny
+        // fonts) — don't ALSO download them from Google (double font payload).
+        $googleFonts = $googleFonts->filter()->unique()
+            ->reject(fn ($f) => in_array($f, ['Instrument Sans', 'Playfair Display'], true))
+            ->values();
     @endphp
     @if($googleFonts->isNotEmpty())
         @php $googleFontsUrl = 'https://fonts.googleapis.com/css2?'.$googleFonts->map(fn($f) => 'family='.str_replace(' ', '+', $f).':wght@400;500;600;700')->implode('&').'&display=swap'; @endphp

@@ -62,14 +62,40 @@ class CheckoutController extends Controller
 
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
 
-        $order = $placeOrder->handle($data);
+        try {
+            $order = $placeOrder->handle($data);
+        } catch (\App\Exceptions\CheckoutException $e) {
+            // Stock ran out / a price changed / a product went away — the cart
+            // has been corrected; send the customer back to review it.
+            return redirect()->route('cart')->with('error', $e->getMessage());
+        }
+
+        // Authorize this browser to view the confirmation page (kept to the
+        // last few orders so the session doesn't grow unbounded).
+        $placed = array_slice(array_unique(array_merge(
+            (array) session('placed_orders', []),
+            [$order->order_number],
+        )), -5);
+        session()->put('placed_orders', $placed);
 
         return redirect()->route('order.confirmation', $order->order_number);
     }
 
-    public function confirmation(string $orderNumber)
+    public function confirmation(Request $request, string $orderNumber)
     {
         $order = Order::where('order_number', $orderNumber)->with('items')->firstOrFail();
+
+        // Order numbers are sequential and guessable — only the buyer may view
+        // this page: the session that just placed it, the logged-in owner, or a
+        // signed link. Everyone else goes to the phone-verified tracking page.
+        $allowed = in_array($orderNumber, (array) session('placed_orders', []), true)
+            || (auth('customer')->check() && (int) $order->customer_id === (int) auth('customer')->id())
+            || $request->hasValidSignature();
+
+        if (! $allowed) {
+            return redirect()->route('track')
+                ->with('error', 'Please verify with your order number and phone to view this order.');
+        }
 
         return view('shop.confirmation', compact('order'));
     }
@@ -79,8 +105,10 @@ class CheckoutController extends Controller
         $order = null;
         $tracking = null;
         if ($request->filled('order_number') && $request->filled('phone')) {
+            // Orders store phones canonically (bd_phone in PlaceOrder) — match
+            // exactly so a partial input can't unlock someone else's order.
             $order = Order::where('order_number', $request->string('order_number'))
-                ->where('customer_phone', 'like', '%'.preg_replace('/\D/', '', $request->string('phone')).'%')
+                ->where('customer_phone', bd_phone($request->string('phone')))
                 ->with(['items', 'shipment', 'history'])
                 ->first();
 

@@ -121,7 +121,16 @@ class CatalogController extends Controller
         abort_unless($product->status === 'published', 404);
 
         $product->load(['images', 'variants' => fn ($q) => $q->where('is_active', true), 'category', 'categories', 'approvedReviews']);
-        $product->increment('views');
+
+        // Count a view once per session per product — avoids a DB write on every
+        // refresh and stops bots/reloads skewing the "popular" sort.
+        $viewed = (array) session('viewed_products', []);
+        if (! in_array($product->id, $viewed, true)) {
+            // Query-builder increment: no model events (won't bust the homepage
+            // cache or trigger the Meta sync observer for a mere view count).
+            Product::whereKey($product->id)->increment('views');
+            session()->put('viewed_products', array_slice([...$viewed, $product->id], -100));
+        }
 
         // "Frequently bought together": real co-purchase pairs from past orders,
         // falling back to manual cross-sells, then same-category products.

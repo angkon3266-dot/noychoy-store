@@ -408,6 +408,9 @@ class AppearanceController extends Controller
             Setting::put('discover_tiles', $tiles);
         }
 
+        // Homepage content/sections may have changed — rebuild its cache.
+        \Illuminate\Support\Facades\Cache::forget(\App\Http\Controllers\Shop\HomeController::CACHE_KEY);
+
         return back()->with('success', 'Appearance updated.');
     }
 

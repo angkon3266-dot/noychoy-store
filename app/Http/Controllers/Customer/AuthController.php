@@ -23,8 +23,10 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $phone = preg_replace('/\D/', '', $data['phone']);
-        $customer = Customer::where('phone', 'like', '%'.$phone.'%')->whereNotNull('password')->first();
+        // Phones are stored canonically (01XXXXXXXXX) — normalise the input the
+        // same way and match exactly, so a partial number can't hit the wrong
+        // account (and the query can use the phone index).
+        $customer = Customer::where('phone', bd_phone($data['phone']))->whereNotNull('password')->first();
 
         if (! $customer || ! Hash::check($data['password'], $customer->password)) {
             throw ValidationException::withMessages(['phone' => 'Invalid phone or password.']);
