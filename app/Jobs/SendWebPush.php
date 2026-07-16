@@ -33,8 +33,8 @@ class SendWebPush implements ShouldQueue
         PushSubscription::whereIn('id', $this->subscriptionIds)->each(function (PushSubscription $sub) use ($push) {
             $status = $push->send($sub, $this->payload);
 
-            if (in_array($status, [404, 410], true)) {
-                $sub->delete();                 // subscription is gone for good
+            if ($push->shouldPrune($status)) {
+                $sub->delete();                 // gone, or made under an old VAPID key
             } elseif ($status >= 200 && $status < 300) {
                 $sub->forceFill(['last_used_at' => now()])->saveQuietly();
             }

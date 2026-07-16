@@ -154,6 +154,24 @@ class WebPushService
         }
     }
 
+    /**
+     * Should the subscription that produced $status be deleted? Gone endpoints
+     * (404/410) and subscriptions made under a now-replaced VAPID key
+     * (VapidPkHashMismatch, returned as 400/403) are both dead — pruning lets the
+     * browser recreate a fresh one on its next visit.
+     */
+    public function shouldPrune(int $status): bool
+    {
+        if (in_array($status, [404, 410], true)) {
+            return true;
+        }
+        if (in_array($status, [400, 403], true)) {
+            return str_contains((string) ($this->lastResult['body'] ?? ''), 'VapidPkHashMismatch');
+        }
+
+        return false;
+    }
+
     // ── Crypto ───────────────────────────────────────────────────────────────
 
     /**

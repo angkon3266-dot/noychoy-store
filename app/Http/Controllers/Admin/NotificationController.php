@@ -194,7 +194,9 @@ class NotificationController extends Controller
             $status = $push->send($sub, $payload);
             if ($status >= 200 && $status < 300) {
                 $ok++;
-            } elseif (in_array($status, [404, 410], true)) {
+            } elseif ($push->shouldPrune($status)) {
+                // Gone, or subscribed under an old VAPID key — remove it so the
+                // member re-subscribes cleanly next time they open the site.
                 $sub->delete();
                 $gone++;
             } else {
@@ -208,7 +210,12 @@ class NotificationController extends Controller
             return back()->with('success', "Test push sent: {$ok} delivered".($gone ? ", {$gone} stale subscription(s) removed" : '').'.');
         }
 
-        $why = $failures ? ' First error: '.$failures[0] : ($gone ? ' All subscriptions were stale (removed).' : '');
+        if ($gone > 0 && ! $failures) {
+            // The classic "keys were regenerated after people subscribed" case.
+            return back()->with('error', "Removed {$gone} subscription(s) that were made under an older key. Ask members to reopen the storefront (they'll re-subscribe automatically), then test again.");
+        }
+
+        $why = $failures ? ' First error: '.$failures[0] : '';
         return back()->with('error', "Test push delivered to 0 of {$subs->count()}.".$why);
     }
 

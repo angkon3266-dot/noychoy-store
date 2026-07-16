@@ -822,10 +822,30 @@
                     return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
                 }
 
+                // True if an existing subscription was created with the VAPID key
+                // we're currently signing with. When the key is regenerated, the
+                // old subscription would fail server-side with VapidPkHashMismatch.
+                function keyMatches(sub) {
+                    try {
+                        const want = urlB64ToUint8(VAPID);
+                        const have = new Uint8Array(sub.options && sub.options.applicationServerKey ? sub.options.applicationServerKey : []);
+                        if (have.length !== want.length) return false;
+                        for (let i = 0; i < want.length; i++) if (have[i] !== want[i]) return false;
+                        return true;
+                    } catch (e) {
+                        return true; // can't tell → don't churn a working sub
+                    }
+                }
+
                 async function ensure() {
                     const reg = await navigator.serviceWorker.register('/sw.js');
                     await navigator.serviceWorker.ready;
                     let sub = await reg.pushManager.getSubscription();
+                    // Self-heal a stale subscription left over from a previous VAPID key.
+                    if (sub && !keyMatches(sub)) {
+                        try { await sub.unsubscribe(); } catch (e) {}
+                        sub = null;
+                    }
                     if (!sub) {
                         sub = await reg.pushManager.subscribe({
                             userVisibleOnly: true,
