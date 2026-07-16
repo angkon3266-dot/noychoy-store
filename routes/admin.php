@@ -70,7 +70,6 @@ Route::middleware('admin')->group(function () {
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
     Route::post('orders/{order}/sms', [OrderController::class, 'sendSms'])->name('orders.sms');
-    Route::post('orders/{order}/fraud-check', [OrderController::class, 'checkFraud'])->name('orders.fraud-check');
 
     // Customers (CRM, analytics, SMS, import)
     Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
@@ -312,6 +311,5 @@ Route::middleware('admin')->group(function () {
     Route::get('settings', [SettingController::class, 'index'])->name('settings');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('settings/mail', [SettingController::class, 'updateMail'])->name('settings.mail');
-    Route::post('settings/fraud-checker', [SettingController::class, 'updateFraudChecker'])->name('settings.fraud-checker');
     Route::post('settings/mail/test', [SettingController::class, 'testMail'])->name('settings.mail.test');
 });

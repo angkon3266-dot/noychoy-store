@@ -4,18 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
-use App\Services\FraudChecker\FraudCheckerSettings;
 use App\Services\SmsService;
 use App\Services\SteadfastService;
 use Illuminate\Http\Request;
 
 class SettingController extends Controller
 {
-    public function index(SteadfastService $steadfast, SmsService $sms, FraudCheckerSettings $fraud)
+    public function index(SteadfastService $steadfast, SmsService $sms)
     {
         return view('admin.settings', [
-            'fraudChecker' => $fraud->formData(),
-            'fraudConfigured' => $fraud->isConfigured(),
             'general' => [
                 'store_name' => Setting::get('store_name', config('store.name')),
                 'store_phone' => Setting::get('store_phone', config('store.phone')),
@@ -38,23 +35,6 @@ class SettingController extends Controller
                 'from_name' => Setting::get('mail_from_name', Setting::get('store_name', config('store.name'))),
             ],
         ]);
-    }
-
-    /** Save the courier fraud-checker login credentials (DB, encrypted). */
-    public function updateFraudChecker(Request $request, FraudCheckerSettings $fraud)
-    {
-        $data = $request->validate([
-            'steadfast_user' => ['nullable', 'string', 'max:160'],
-            'steadfast_password' => ['nullable', 'string', 'max:200'],
-            'pathao_user' => ['nullable', 'string', 'max:160'],
-            'pathao_password' => ['nullable', 'string', 'max:200'],
-            'redx_phone' => ['nullable', 'string', 'max:40'],
-            'redx_password' => ['nullable', 'string', 'max:200'],
-        ]);
-
-        $fraud->save($data);
-
-        return back()->with('success', 'Fraud checker credentials saved.');
     }
 
     /** Save SMTP email settings (used to send order confirmations & invoices). */

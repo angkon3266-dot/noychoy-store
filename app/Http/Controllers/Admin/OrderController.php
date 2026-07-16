@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function index(Request $request, \App\Services\FraudChecker\FraudCheckerService $fraud)
+    public function index(Request $request)
     {
         $trashed = $request->boolean('trashed');
 
@@ -40,26 +40,6 @@ class OrderController extends Controller
             ->groupBy('customer_phone')
             ->pluck('c', 'customer_phone');
 
-        // Fraud-risk map (raw phone → risky) from previously cached fraud reports,
-        // so risky customers' rows can be flagged yellow. No live lookups here.
-        $normToRaw = [];
-        foreach ($phones as $ph) {
-            if ($n = $fraud->normalizePhone($ph)) {
-                $normToRaw[$n][] = $ph;
-            }
-        }
-        $fraudRisky = [];
-        if ($normToRaw) {
-            \App\Models\FraudReport::whereIn('phone', array_keys($normToRaw))
-                ->where('is_risky', true)
-                ->pluck('phone')
-                ->each(function ($n) use (&$fraudRisky, $normToRaw) {
-                    foreach ($normToRaw[$n] ?? [] as $raw) {
-                        $fraudRisky[$raw] = true;
-                    }
-                });
-        }
-
         // Fulfilment queue: products inside "processing" orders (qty to prepare + product ID/serial).
         $processingItems = OrderItem::query()
             ->whereHas('order', fn ($q) => $q->where('status', 'processing'))
@@ -81,11 +61,10 @@ class OrderController extends Controller
             'processingImages' => $processingImages,
             'trashed' => $trashed,
             'trashCount' => Order::onlyTrashed()->count(),
-            'fraudRisky' => $fraudRisky,
         ]);
     }
 
-    public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast, \App\Services\FraudChecker\FraudCheckerService $fraud)
+    public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast)
     {
         $order->load('items', 'history', 'shipment', 'customer');
 
@@ -142,18 +121,7 @@ class OrderController extends Controller
             'insight' => $insight->forPhone($order->customer_phone, $order->id),
             'courier' => $courier,
             'balance' => $balance,
-            'fraudReport' => $fraud->cachedFor($order->customer_phone),
-            'fraudConfigured' => $fraud->isConfigured(),
         ]);
-    }
-
-    /** Run (or refresh) the courier fraud check for this order's customer. */
-    public function checkFraud(Order $order, \App\Services\FraudChecker\FraudCheckerService $fraud)
-    {
-        [$report, $error] = $fraud->check($order->customer_phone);
-
-        return back()->with($error ? 'error' : 'success',
-            $error ?? 'Fraud check complete for '.$order->customer_phone.'.');
     }
 
     /** Print-ready shipping labels (A4, 14 per page) for orders with a consignment. */

@@ -76,15 +76,13 @@
                     @php
                         $repeat = ($orderCounts[$order->customer_phone] ?? 1) > 1;
                         $booked = $order->shipment && $order->shipment->consignment_id;
-                        $risky = $fraudRisky[$order->customer_phone] ?? false;
                     @endphp
-                    <tr class="{{ $trashed ? 'opacity-70' : 'cursor-pointer' }} {{ $risky ? 'bg-yellow-50 hover:bg-yellow-100' : ($repeat ? 'bg-violet-50 hover:bg-violet-100' : 'hover:bg-ink-50') }}" @unless($trashed) onclick="window.location='{{ route('admin.orders.show', $order) }}'" @endunless>
+                    <tr class="{{ $trashed ? 'opacity-70' : 'cursor-pointer' }} {{ $repeat ? 'bg-violet-50 hover:bg-violet-100' : 'hover:bg-ink-50' }}" @unless($trashed) onclick="window.location='{{ route('admin.orders.show', $order) }}'" @endunless>
                         <td class="px-3 py-3" onclick="event.stopPropagation()">
                             <input type="checkbox" value="{{ $order->id }}" x-model.number="sel">
                         </td>
                         <td class="px-4 py-3 font-medium text-gold-700">
                             {{ $order->order_number }}
-                            @if($risky)<span class="ml-1 align-middle badge bg-yellow-200 text-yellow-900 text-[10px]" title="High courier fraud/cancellation risk">⚠ Risk</span>@endif
                             @if($repeat)<span class="ml-1 align-middle badge bg-violet-100 text-violet-700 text-[10px]" title="Returning customer — {{ $orderCounts[$order->customer_phone] }} orders total">🔁 Repeat</span>@endif
                             @if($booked)<div class="text-[10px] text-emerald-700 mt-0.5">📦 {{ $order->shipment->consignment_id }}</div>@endif
                         </td>

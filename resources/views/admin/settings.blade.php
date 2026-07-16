@@ -42,28 +42,6 @@
     </div>
 </div>
 
-{{-- Fraud Checker (courier portal logins) — powers the order fraud report --}}
-<div class="card p-6 mt-6 max-w-3xl">
-    <div class="flex items-center justify-between mb-1">
-        <h2 class="font-semibold">Fraud Checker (Courier logins)</h2>
-        <span class="badge {{ $fraudConfigured ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }}">{{ $fraudConfigured ? 'Configured' : 'Not set' }}</span>
-    </div>
-    <p class="text-xs text-ink-700/60 mb-4">The fraud report on each order logs into your courier <strong>merchant portals</strong> to fetch a customer's delivery/cancellation history. Enter your portal <strong>login</strong> credentials (not API keys). Passwords are stored encrypted. Set at least one courier; missing ones are skipped.</p>
-
-    <form action="{{ route('admin.settings.fraud-checker') }}" method="POST" class="space-y-4">
-        @csrf
-        <div class="grid sm:grid-cols-2 gap-4">
-            <div><label class="label">Steadfast — user / email</label><input name="steadfast_user" value="{{ $fraudChecker['steadfast_user'] }}" class="input" autocomplete="off"></div>
-            <div><label class="label">Steadfast — password</label><input name="steadfast_password" type="password" autocomplete="new-password" class="input" placeholder="{{ $fraudChecker['steadfast_has_pw'] ? '•••••••• (saved — blank to keep)' : 'Portal password' }}"></div>
-            <div><label class="label">Pathao — user / email</label><input name="pathao_user" value="{{ $fraudChecker['pathao_user'] }}" class="input" autocomplete="off"></div>
-            <div><label class="label">Pathao — password</label><input name="pathao_password" type="password" autocomplete="new-password" class="input" placeholder="{{ $fraudChecker['pathao_has_pw'] ? '•••••••• (saved — blank to keep)' : 'Portal password' }}"></div>
-            <div><label class="label">RedX — login phone</label><input name="redx_phone" value="{{ $fraudChecker['redx_phone'] }}" class="input" autocomplete="off" placeholder="01XXXXXXXXX"></div>
-            <div><label class="label">RedX — password</label><input name="redx_password" type="password" autocomplete="new-password" class="input" placeholder="{{ $fraudChecker['redx_has_pw'] ? '•••••••• (saved — blank to keep)' : 'Portal password' }}"></div>
-        </div>
-        <button class="btn-primary">Save fraud checker credentials</button>
-    </form>
-</div>
-
 {{-- Email (SMTP) — sends order confirmations & invoices --}}
 <div class="card p-6 mt-6 max-w-3xl">
     <div class="flex items-center justify-between mb-1">
