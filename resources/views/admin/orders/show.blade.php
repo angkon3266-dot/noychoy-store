@@ -9,34 +9,98 @@
 <div class="grid lg:grid-cols-3 gap-6 mt-4">
     <!-- main -->
     <div class="lg:col-span-2 space-y-6">
-        <div class="card overflow-hidden">
+        <div class="card overflow-hidden"
+             x-data="orderAmend({
+                items: {{ Illuminate\Support\Js::from($order->items->map(fn($i) => ['id'=>$i->id,'name'=>$i->name,'price'=>(float)$i->price,'quantity'=>(int)$i->quantity])) }},
+                shipping: {{ (float) $order->shipping_cost }},
+                discount: {{ (float) $order->discount }},
+                adjustments: {{ Illuminate\Support\Js::from(collect($order->adjustments ?? [])->map(fn($a) => ['label'=>$a['label'],'amount'=>(float)$a['amount']])->values()) }},
+             })">
             <div class="px-5 py-4 border-b border-ink-100 flex items-center justify-between">
-                <h2 class="font-semibold">Items</h2>
-                <span class="badge bg-gold-100 text-gold-800 capitalize">{{ $order->status }}</span>
+                <h2 class="font-semibold">Items &amp; amounts</h2>
+                <div class="flex items-center gap-2">
+                    <span class="badge bg-gold-100 text-gold-800 capitalize">{{ $order->status }}</span>
+                    <button type="button" @click="editing = !editing" class="btn-outline text-xs py-1" x-text="editing ? 'Cancel' : '✎ Amend amounts'"></button>
+                </div>
             </div>
-            <table class="w-full text-sm">
-                <tbody class="divide-y divide-ink-100">
-                    @foreach($order->items as $item)
-                        <tr>
-                            <td class="px-5 py-3">{{ $item->name }}
-                                @if($item->attributes)<span class="text-xs text-ink-700/50">({{ collect($item->attributes)->implode(', ') }})</span>@endif
-                                <div class="text-xs text-ink-700/40">
-                                    @if($item->product)Product ID #{{ $item->product->serial }}@endif
-                                    @if($item->sku) · SKU {{ $item->sku }}@endif
-                                </div>
-                            </td>
-                            <td class="px-5 py-3 text-ink-700/70">{{ money($item->price) }} × {{ $item->quantity }}</td>
-                            <td class="px-5 py-3 text-right font-medium">{{ money($item->subtotal) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-                <tfoot class="border-t border-ink-100 text-sm">
-                    <tr><td colspan="2" class="px-5 py-1.5 text-right text-ink-700/70">Subtotal</td><td class="px-5 py-1.5 text-right">{{ money($order->subtotal) }}</td></tr>
-                    @if($order->discount > 0)<tr><td colspan="2" class="px-5 py-1.5 text-right text-green-700">Discount {{ $order->coupon_code ? '('.$order->coupon_code.')' : '' }}</td><td class="px-5 py-1.5 text-right text-green-700">−{{ money($order->discount) }}</td></tr>@endif
-                    <tr><td colspan="2" class="px-5 py-1.5 text-right text-ink-700/70">Shipping</td><td class="px-5 py-1.5 text-right">{{ money($order->shipping_cost) }}</td></tr>
-                    <tr class="font-semibold"><td colspan="2" class="px-5 py-2 text-right">Total (COD)</td><td class="px-5 py-2 text-right">{{ money($order->total) }}</td></tr>
-                </tfoot>
-            </table>
+
+            {{-- Read-only view --}}
+            <div x-show="!editing">
+                <table class="w-full text-sm">
+                    <tbody class="divide-y divide-ink-100">
+                        @foreach($order->items as $item)
+                            <tr>
+                                <td class="px-5 py-3">{{ $item->name }}
+                                    @if($item->attributes)<span class="text-xs text-ink-700/50">({{ collect($item->attributes)->implode(', ') }})</span>@endif
+                                    <div class="text-xs text-ink-700/40">
+                                        @if($item->product)Product ID #{{ $item->product->serial }}@endif
+                                        @if($item->sku) · SKU {{ $item->sku }}@endif
+                                    </div>
+                                </td>
+                                <td class="px-5 py-3 text-ink-700/70">{{ money($item->price) }} × {{ $item->quantity }}</td>
+                                <td class="px-5 py-3 text-right font-medium">{{ money($item->subtotal) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot class="border-t border-ink-100 text-sm">
+                        <tr><td colspan="2" class="px-5 py-1.5 text-right text-ink-700/70">Subtotal</td><td class="px-5 py-1.5 text-right">{{ money($order->subtotal) }}</td></tr>
+                        @if($order->discount > 0)<tr><td colspan="2" class="px-5 py-1.5 text-right text-green-700">Discount {{ $order->coupon_code ? '('.$order->coupon_code.')' : '' }}</td><td class="px-5 py-1.5 text-right text-green-700">−{{ money($order->discount) }}</td></tr>@endif
+                        @foreach($order->adjustments ?? [] as $adj)
+                            <tr><td colspan="2" class="px-5 py-1.5 text-right {{ $adj['amount'] < 0 ? 'text-green-700' : 'text-ink-700/70' }}">{{ $adj['label'] }}</td><td class="px-5 py-1.5 text-right {{ $adj['amount'] < 0 ? 'text-green-700' : '' }}">{{ $adj['amount'] < 0 ? '−'.money(abs($adj['amount'])) : money($adj['amount']) }}</td></tr>
+                        @endforeach
+                        <tr><td colspan="2" class="px-5 py-1.5 text-right text-ink-700/70">Shipping</td><td class="px-5 py-1.5 text-right">{{ money($order->shipping_cost) }}</td></tr>
+                        <tr class="font-semibold"><td colspan="2" class="px-5 py-2 text-right">Total (COD)</td><td class="px-5 py-2 text-right">{{ money($order->total) }}</td></tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            {{-- Edit form --}}
+            <form x-show="editing" x-cloak action="{{ route('admin.orders.amend', $order) }}" method="POST" class="p-5 space-y-3 text-sm">
+                @csrf
+                <template x-for="(it, i) in items" :key="it.id">
+                    <div class="grid grid-cols-12 gap-2 items-center">
+                        <div class="col-span-6">
+                            <span x-text="it.name" class="font-medium"></span>
+                            <input type="hidden" :name="`items[${i}][id]`" :value="it.id">
+                        </div>
+                        <div class="col-span-3">
+                            <label class="label text-[10px]">Unit price ৳</label>
+                            <input type="number" step="0.01" min="0" :name="`items[${i}][price]`" x-model.number="it.price" class="input py-1 text-sm">
+                        </div>
+                        <div class="col-span-3">
+                            <label class="label text-[10px]">Qty</label>
+                            <input type="number" min="1" :name="`items[${i}][quantity]`" x-model.number="it.quantity" class="input py-1 text-sm">
+                        </div>
+                    </div>
+                </template>
+
+                <div class="border-t border-ink-100 pt-3 space-y-2">
+                    <p class="font-medium text-xs text-ink-700/60">Custom adjustments (positive = extra charge, negative = discount)</p>
+                    <template x-for="(adj, i) in adjustments" :key="i">
+                        <div class="grid grid-cols-12 gap-2 items-center">
+                            <input :name="`adjustments[${i}][label]`" x-model="adj.label" placeholder="Label (e.g. Gift wrap)" class="input py-1 text-sm col-span-7">
+                            <input type="number" step="0.01" :name="`adjustments[${i}][amount]`" x-model.number="adj.amount" placeholder="Amount ৳" class="input py-1 text-sm col-span-4">
+                            <button type="button" @click="adjustments.splice(i,1)" class="col-span-1 text-red-600">✕</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="adjustments.push({label:'',amount:0})" class="text-xs text-gold-700 hover:underline">+ Add adjustment</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 border-t border-ink-100 pt-3">
+                    <div><label class="label text-xs">Overall discount ৳</label><input type="number" step="0.01" min="0" name="discount" x-model.number="discount" class="input py-1 text-sm"></div>
+                    <div><label class="label text-xs">Shipping ৳</label><input type="number" step="0.01" min="0" name="shipping_cost" x-model.number="shipping" class="input py-1 text-sm"></div>
+                </div>
+                <div><label class="label text-xs">Reason / note (optional)</label><input name="reason" class="input py-1 text-sm" placeholder="Why this amendment?"></div>
+
+                <div class="rounded-lg bg-ink-50 p-3 space-y-1 text-xs">
+                    <div class="flex justify-between"><span>Items subtotal</span><span x-text="money(subtotal())"></span></div>
+                    <div class="flex justify-between text-green-700" x-show="discount>0"><span>Discount</span><span x-text="'−'+money(discount)"></span></div>
+                    <div class="flex justify-between"><span>Adjustments</span><span x-text="money(adjTotal())"></span></div>
+                    <div class="flex justify-between"><span>Shipping</span><span x-text="money(shipping)"></span></div>
+                    <div class="flex justify-between font-semibold text-sm border-t border-ink-200 pt-1"><span>New total</span><span x-text="money(total())"></span></div>
+                </div>
+                <button class="btn-primary w-full">Save amended amounts</button>
+            </form>
         </div>
 
         <!-- Timeline -->

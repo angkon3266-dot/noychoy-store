@@ -124,6 +124,73 @@ class OrderController extends Controller
         ]);
     }
 
+    /**
+     * Manually amend an order's amounts: per-line price/quantity, shipping, the
+     * overall discount, and any number of custom adjustment lines (a positive
+     * amount is an extra charge, a negative one a discount). Recomputes the
+     * subtotal + total and records a history note.
+     */
+    public function amend(Request $request, Order $order)
+    {
+        $data = $request->validate([
+            'items' => ['array'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.price' => ['required', 'numeric', 'min:0'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'shipping_cost' => ['required', 'numeric', 'min:0'],
+            'discount' => ['required', 'numeric', 'min:0'],
+            'adjustments' => ['nullable', 'array', 'max:20'],
+            'adjustments.*.label' => ['nullable', 'string', 'max:60'],
+            'adjustments.*.amount' => ['nullable', 'numeric', 'between:-1000000,1000000'],
+            'reason' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        DB::transaction(function () use ($order, $data) {
+            $itemsById = $order->items->keyBy('id');
+            $subtotal = 0.0;
+
+            foreach ($data['items'] ?? [] as $row) {
+                $item = $itemsById->get((int) $row['id']);
+                if (! $item) {
+                    continue;
+                }
+                $lineSubtotal = round((float) $row['price'] * (int) $row['quantity'], 2);
+                $item->update([
+                    'price' => $row['price'],
+                    'quantity' => $row['quantity'],
+                    'subtotal' => $lineSubtotal,
+                ]);
+                $subtotal += $lineSubtotal;
+            }
+
+            // Keep only fully-filled adjustment lines.
+            $adjustments = collect($data['adjustments'] ?? [])
+                ->filter(fn ($a) => filled($a['label'] ?? null) && $a['amount'] !== null && $a['amount'] !== '')
+                ->map(fn ($a) => ['label' => $a['label'], 'amount' => round((float) $a['amount'], 2)])
+                ->values()->all();
+            $adjustmentsTotal = array_sum(array_column($adjustments, 'amount'));
+
+            $total = max(0, round($subtotal - (float) $data['discount'] + (float) $data['shipping_cost'] + $adjustmentsTotal, 2));
+
+            $order->update([
+                'subtotal' => $subtotal,
+                'shipping_cost' => $data['shipping_cost'],
+                'discount' => $data['discount'],
+                'adjustments' => $adjustments ?: null,
+                'total' => $total,
+            ]);
+
+            $order->history()->create([
+                'status' => $order->status,
+                'note' => 'Order amount amended — new total '.money($total)
+                    .($data['reason'] ?? null ? '. '.$data['reason'] : ''),
+                'created_by' => auth()->user()?->name ?? 'Admin',
+            ]);
+        });
+
+        return back()->with('success', 'Order amounts updated.');
+    }
+
     /** Print-ready shipping labels (A4, 14 per page) for orders with a consignment. */
     public function labels(Request $request)
     {

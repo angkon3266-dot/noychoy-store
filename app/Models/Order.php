@@ -25,7 +25,7 @@ class Order extends Model
     protected $fillable = [
         'order_number', 'customer_id', 'customer_name', 'customer_phone', 'customer_email',
         'shipping_address', 'area', 'city', 'district', 'is_inside_dhaka',
-        'subtotal', 'shipping_cost', 'discount', 'member_discount', 'total',
+        'subtotal', 'shipping_cost', 'discount', 'adjustments', 'member_discount', 'total',
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'source', 'woo_id', 'stock_restored',
@@ -34,6 +34,7 @@ class Order extends Model
     protected $casts = [
         'is_inside_dhaka' => 'boolean',
         'stock_restored' => 'boolean',
+        'adjustments' => 'array',
         'subtotal' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'discount' => 'decimal:2',

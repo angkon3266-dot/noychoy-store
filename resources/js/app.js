@@ -125,6 +125,27 @@ document.addEventListener('alpine:init', () => {
         },
     });
 
+    // ── Admin: amend order amounts (items, adjustments, shipping, discount) ──
+    window.Alpine.data('orderAmend', (init) => ({
+        editing: false,
+        items: init.items || [],
+        adjustments: init.adjustments || [],
+        shipping: init.shipping || 0,
+        discount: init.discount || 0,
+        money(n) {
+            return '৳' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        },
+        subtotal() {
+            return this.items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
+        },
+        adjTotal() {
+            return this.adjustments.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+        },
+        total() {
+            return Math.max(0, this.subtotal() - (Number(this.discount) || 0) + (Number(this.shipping) || 0) + this.adjTotal());
+        },
+    }));
+
     // ── Header search type-ahead ─────────────────────────────────────────────
     window.Alpine.data('searchBox', () => ({
         q: '',
