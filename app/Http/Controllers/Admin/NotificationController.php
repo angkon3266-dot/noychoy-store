@@ -16,6 +16,10 @@ class NotificationController extends Controller
             'items' => CustomerNotification::with('segment')->orderByDesc('id')->paginate(20),
             'memberCount' => \App\Models\Customer::whereNotNull('password')->count(),
             'segments' => \App\Models\CustomerSegment::orderBy('name')->get(),
+            // Live coupons the admin can attach to a push as a real offer.
+            'coupons' => \App\Models\Coupon::where('is_active', true)
+                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
+                ->orderByDesc('id')->get(),
             'settings' => [
                 'notify_new_arrivals' => (bool) Setting::get('notify_new_arrivals', true),
                 'notify_preorders' => (bool) Setting::get('notify_preorders', true),
@@ -76,8 +80,18 @@ class NotificationController extends Controller
             'actions.*.url' => ['nullable', 'string', 'max:255'],
             'audience' => ['required', 'in:all,segment'],
             'segment_id' => ['nullable', 'required_if:audience,segment', 'exists:customer_segments,id'],
+            'coupon_code' => ['nullable', 'string', 'max:40'],
             'scheduled_at' => ['nullable', 'date', 'after:now'],
         ]);
+
+        // Attach a real offer: embed the coupon code in the message + point the
+        // push at the shop so recipients can redeem it.
+        if (filled($data['coupon_code'] ?? null)) {
+            $code = strtoupper(trim($data['coupon_code']));
+            $data['body'] = trim(($data['body'] ?? '')."\n🎟 Use code ".$code." at checkout.");
+            $data['url'] = ($data['url'] ?? null) ?: route('shop');
+            $data['cta_label'] = ($data['cta_label'] ?? null) ?: 'Shop the offer';
+        }
 
         // Resolve recipients for a segment send (snapshot at send time).
         $recipientIds = null;

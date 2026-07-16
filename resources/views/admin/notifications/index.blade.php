@@ -27,7 +27,8 @@
 <div class="grid lg:grid-cols-3 gap-6">
     {{-- Compose --}}
     <div class="card p-6 h-fit" x-data="{ schedule: false, icon: '🎁' }">
-        <h2 class="font-semibold mb-4">Send a notification</h2>
+        <h2 class="font-semibold mb-1">Send a web push</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Fires a <strong>browser push notification</strong> (pops up even when your site is closed) and shows in the member bell. Send a custom message, an image, offer, or coupon any time.</p>
         <form action="{{ route('admin.notifications.store') }}" method="POST" class="space-y-3">
             @csrf
             <div class="flex gap-2">
@@ -44,6 +45,16 @@
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="label">Link (optional)</label><input name="url" class="input" placeholder="https://… or /shop"></div>
                 <div><label class="label">Button label</label><input name="cta_label" class="input" placeholder="Shop now"></div>
+            </div>
+
+            {{-- Attach a real offer (coupon) --}}
+            <div>
+                <label class="label">Attach an offer (optional)</label>
+                <input name="coupon_code" list="pushCoupons" class="input" placeholder="Pick or type a coupon code">
+                <datalist id="pushCoupons">
+                    @foreach($coupons as $c)<option value="{{ $c->code }}">{{ $c->code }} — {{ $c->free_shipping ? 'Free shipping' : ($c->type === 'percent' ? rtrim(rtrim(number_format($c->value,2),'0'),'.').'% off' : money($c->value).' off') }}</option>@endforeach
+                </datalist>
+                <p class="text-[11px] text-ink-700/50 mt-1">The code is added to the message and the push links to your shop so members can redeem it.</p>
             </div>
 
             {{-- Rich push: image + action buttons --}}
