@@ -1,5 +1,5 @@
 @extends('layouts.shop')
-@section('title', store_name().' — Online Store')
+@section('title', home_content('seo_title') ?: 'Online Store')
 
 @section('content')
 @php

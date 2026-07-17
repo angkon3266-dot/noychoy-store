@@ -215,6 +215,12 @@
         <h2 class="font-semibold mb-1">Homepage content</h2>
         <p class="text-xs text-ink-700/60 mb-4">Edit the text, links and image shown on your homepage hero &amp; sections. Applies to whichever homepage template is active. Leave a field empty to use the default.</p>
 
+        <div class="max-w-xl mb-5">
+            <label class="label">Browser tab title (SEO tagline)</label>
+            <input name="home[seo_title]" value="{{ $home['seo_title'] ?? '' }}" class="input" placeholder="Fine Jewelry">
+            <p class="text-xs text-ink-700/50 mt-1">Homepage title shows as “<span class="font-medium">this — {{ store_name() }}</span>” in the browser tab and Google. Leave empty for the template default.</p>
+        </div>
+
         <h3 class="text-sm font-semibold text-ink-700 mt-2 mb-3">Hero banner</h3>
         <div class="grid sm:grid-cols-2 gap-4">
             <div><label class="label">Eyebrow (small text above heading)</label><input name="home[hero_eyebrow]" value="{{ $home['hero_eyebrow'] }}" class="input" placeholder="{{ store_name() }}"></div>
@@ -577,6 +583,7 @@
                 <select name="default_sort" class="input">
                     <option value="new" @selected($ds=='new')>Newest</option>
                     <option value="popular" @selected($ds=='popular')>Most popular (by views)</option>
+                    <option value="best_selling" @selected($ds=='best_selling')>Best selling (by units sold)</option>
                     <option value="price_asc" @selected($ds=='price_asc')>Price: low to high</option>
                     <option value="price_desc" @selected($ds=='price_desc')>Price: high to low</option>
                     <option value="name" @selected($ds=='name')>Name A–Z</option>

@@ -130,7 +130,7 @@ class AppearanceController extends Controller
 
             // Catalog
             'products_per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
-            'default_sort' => ['nullable', 'in:new,popular,price_asc,price_desc,name'],
+            'default_sort' => ['nullable', 'in:new,popular,best_selling,price_asc,price_desc,name'],
 
             // Storefront filters
             'filter_attributes' => ['nullable', 'array'],

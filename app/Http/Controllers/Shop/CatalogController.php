@@ -69,6 +69,16 @@ class CatalogController extends Controller
             'price_desc' => $query->orderByDesc('price'),
             'name' => $query->orderBy('name'),
             'popular' => $query->orderByDesc('views'),
+            // Real units sold (cancelled/returned/deleted orders excluded) —
+            // distinct from the curated is_bestseller flag.
+            'best_selling' => $query->orderByDesc(
+                \App\Models\OrderItem::query()
+                    ->join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->whereNull('orders.deleted_at')
+                    ->whereNotIn('orders.status', ['cancelled', 'returned'])
+                    ->whereColumn('order_items.product_id', 'products.id')
+                    ->selectRaw('COALESCE(SUM(order_items.quantity), 0)')
+            ),
             default => $query->latest(),   // 'new'
         };
 

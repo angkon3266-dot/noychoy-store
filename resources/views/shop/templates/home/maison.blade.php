@@ -1,5 +1,5 @@
 @extends('layouts.shop')
-@section('title', 'Fine Jewelry')
+@section('title', home_content('seo_title') ?: 'Fine Jewelry')
 
 @section('content')
     {{-- Luxe dark (Cartier / Bvlgari-inspired) --}}

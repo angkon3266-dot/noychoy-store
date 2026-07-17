@@ -1,5 +1,5 @@
 @extends('layouts.shop')
-@section('title', 'Fine Jewelry')
+@section('title', home_content('seo_title') ?: 'Fine Jewelry')
 
 @section('content')
     <section class="relative bg-gradient-to-br from-ink-900 to-ink-800 text-white overflow-hidden">
