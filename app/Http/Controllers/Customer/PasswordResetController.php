@@ -31,7 +31,7 @@ class PasswordResetController extends Controller
     public function sendOtp(Request $request, SmsService $sms)
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^(\+?880|0)1[3-9]\d{8}$/'],
+            'phone' => ['required', 'string', new \App\Rules\BdPhone],
         ], ['phone.regex' => 'Enter a valid Bangladeshi mobile number.']);
 
         $customer = Customer::where('phone', bd_phone($data['phone']))->first();

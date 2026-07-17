@@ -11,7 +11,8 @@ class OrderInvoiceMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public Order $order) {}
+    /** @param  ?string  $viewLink  signed URL to the gated confirmation page */
+    public function __construct(public Order $order, public ?string $viewLink = null) {}
 
     public function build()
     {
@@ -19,6 +20,6 @@ class OrderInvoiceMail extends Mailable
 
         return $this->from(config('mail.from.address'), $store)
             ->subject('Order confirmation & invoice — '.$store.' #'.$this->order->order_number)
-            ->view('emails.invoice');
+            ->view('emails.invoice', ['viewLink' => $this->viewLink]);
     }
 }

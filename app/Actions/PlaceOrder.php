@@ -6,16 +6,12 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\CartService;
-use App\Services\MetaConversionsApi;
-use App\Services\SmsService;
 use Illuminate\Support\Facades\DB;
 
 class PlaceOrder
 {
     public function __construct(
         protected CartService $cart,
-        protected SmsService $sms,
-        protected MetaConversionsApi $capi,
     ) {}
 
     /**
@@ -64,6 +60,12 @@ class PlaceOrder
             // If a customer is logged in, prefer that record.
             if (auth('customer')->check()) {
                 $customer = auth('customer')->user();
+            }
+
+            // Backfill an email a repeat guest provides on a later order —
+            // firstOrCreate only sets it on creation.
+            if (blank($customer->email) && filled($data['email'] ?? null)) {
+                $customer->update(['email' => $data['email']]);
             }
 
             $order = $this->createWithUniqueNumber([
@@ -149,21 +151,13 @@ class PlaceOrder
             ->where(fn ($q) => $q->where('phone', $data['phone'])->orWhere('session_id', session()->getId()))
             ->update(['recovered' => true]);
 
-        // Fire-and-forget SMS confirmation (logged either way).
-        $this->sms->sendTemplate('order_placed', $order);
-
-        // Email the invoice if the customer left an email address.
-        if (filled($order->customer_email)) {
-            try {
-                \Illuminate\Support\Facades\Mail::to($order->customer_email)
-                    ->send(new \App\Mail\OrderInvoiceMail($order));
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        }
-
-        // Server-side Purchase (deduplicated with the browser Pixel via order_number).
-        $this->capi->purchase($order, $order->order_number);
+        // Confirmation SMS, invoice email and Meta CAPI Purchase are queued so a
+        // slow gateway never delays the buyer's redirect. The browser context is
+        // captured now — the queue worker has no request to read it from.
+        \App\Jobs\SendOrderPlacedEffects::dispatch(
+            $order,
+            \App\Services\Meta\MetaTrackingService::captureClientContext(),
+        );
 
         $this->cart->clear();
 

@@ -18,7 +18,7 @@ class LeadController extends Controller
     public function capture(Request $request)
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^(\+?880|0)1[3-9]\d{8}$/'],
+            'phone' => ['required', 'string', new \App\Rules\BdPhone],
             'name' => ['nullable', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:160'],
         ]);

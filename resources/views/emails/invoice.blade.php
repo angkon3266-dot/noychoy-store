@@ -59,7 +59,13 @@
             </div>
 
             <p style="text-align:center;margin:28px 0 8px;">
-                <a href="{{ route('track') }}" style="background:#9a6c2e;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;display:inline-block;">Track your order</a>
+                @if(!empty($viewLink))
+                    <a href="{{ $viewLink }}" style="background:#9a6c2e;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;display:inline-block;">View your order</a>
+                    &nbsp;
+                    <a href="{{ route('track') }}" style="background:#fff;color:#9a6c2e;border:1px solid #9a6c2e;text-decoration:none;padding:9px 24px;border-radius:8px;font-size:14px;display:inline-block;">Track delivery</a>
+                @else
+                    <a href="{{ route('track') }}" style="background:#9a6c2e;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-size:14px;display:inline-block;">Track your order</a>
+                @endif
             </p>
         </div>
         <p style="text-align:center;font-size:12px;color:#999;margin-top:16px;">© {{ date('Y') }} {{ $store }} · No advance payment needed</p>

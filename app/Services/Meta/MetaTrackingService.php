@@ -131,7 +131,26 @@ class MetaTrackingService
         ], $eventId);
     }
 
-    public function purchase(Order $order, string $eventId): void
+    /**
+     * Snapshot the browser signals Meta uses for ad attribution (IP, user agent,
+     * click/browser cookies, page URL). Capture this inside the HTTP request and
+     * hand it to queued senders — a queue worker has no request to read from.
+     *
+     * @return array{ip:?string,ua:?string,fbc:?string,fbp:?string,url:string,time:int}
+     */
+    public static function captureClientContext(): array
+    {
+        return [
+            'ip' => request()->ip(),
+            'ua' => request()->userAgent(),
+            'fbc' => request()->cookie('_fbc'),
+            'fbp' => request()->cookie('_fbp'),
+            'url' => url()->current(),
+            'time' => time(),
+        ];
+    }
+
+    public function purchase(Order $order, string $eventId, ?array $context = null): void
     {
         $order->loadMissing('items');
 
@@ -150,7 +169,7 @@ class MetaTrackingService
             'currency' => $this->currency(),
             'value' => (float) $order->total,
             'num_items' => (int) $order->items->sum('quantity'),
-        ], $eventId);
+        ], $eventId, context: $context);
     }
 
     public function lead(string $phone, ?string $name, string $eventId): void
@@ -171,7 +190,7 @@ class MetaTrackingService
      *
      * @return array{ok:bool,status:int,body:mixed,error:?string,ms:int}
      */
-    protected function send(string $eventName, array $userData, array $customData, string $eventId, bool $test = false): array
+    protected function send(string $eventName, array $userData, array $customData, string $eventId, bool $test = false, ?array $context = null): array
     {
         $skip = ['ok' => false, 'status' => 0, 'body' => null, 'error' => null, 'ms' => 0];
 
@@ -192,15 +211,15 @@ class MetaTrackingService
             $payload = [
                 'data' => [[
                     'event_name' => $eventName,
-                    'event_time' => time(),
+                    'event_time' => $context['time'] ?? time(),
                     'event_id' => $eventId,
                     'action_source' => 'website',
-                    'event_source_url' => url()->current(),
+                    'event_source_url' => $context['url'] ?? url()->current(),
                     'user_data' => array_merge(array_filter($userData), array_filter([
-                        'client_ip_address' => request()->ip(),
-                        'client_user_agent' => request()->userAgent(),
-                        'fbc' => request()->cookie('_fbc'),
-                        'fbp' => request()->cookie('_fbp'),
+                        'client_ip_address' => $context['ip'] ?? request()->ip(),
+                        'client_user_agent' => $context['ua'] ?? request()->userAgent(),
+                        'fbc' => $context['fbc'] ?? request()->cookie('_fbc'),
+                        'fbp' => $context['fbp'] ?? request()->cookie('_fbp'),
                     ])),
                     'custom_data' => array_filter($customData, fn ($v) => $v !== null && $v !== []),
                 ]],

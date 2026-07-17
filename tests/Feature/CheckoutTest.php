@@ -115,6 +115,33 @@ class CheckoutTest extends TestCase
         $this->get('/order/'.$order->order_number.'/confirmation')->assertRedirect('/track');
     }
 
+    public function test_checkout_queues_post_order_effects(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $p = $this->product();
+        $this->addToCart($p, 1);
+
+        $this->post('/checkout', $this->checkoutData());
+
+        // SMS / invoice email / Meta CAPI run on the queue, not in-request.
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SendOrderPlacedEffects::class);
+    }
+
+    public function test_signed_link_opens_confirmation_for_email_recipient(): void
+    {
+        $order = Order::create([
+            'order_number' => '10002', 'customer_name' => 'B', 'customer_phone' => '01712345679',
+            'shipping_address' => 'Y', 'subtotal' => 1000, 'shipping_cost' => 0, 'discount' => 0,
+            'member_discount' => 0, 'total' => 1000, 'payment_method' => 'cod',
+            'payment_status' => 'unpaid', 'status' => 'processing', 'source' => 'web',
+        ]);
+
+        $url = \Illuminate\Support\Facades\URL::signedRoute('order.confirmation', ['orderNumber' => $order->order_number]);
+
+        // The invoice email's signed link works from any device/session.
+        $this->get($url)->assertOk();
+    }
+
     public function test_buyer_can_view_their_own_confirmation(): void
     {
         $p = $this->product();

@@ -38,7 +38,9 @@ Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('sear
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager
 Route::get('/feed/meta.csv', [\App\Http\Controllers\Shop\ProductFeedController::class, 'meta'])->name('feed.meta');
-Route::get('/track', [CheckoutController::class, 'track'])->name('track');
+// Throttled: order numbers are sequential, so an unthrottled lookup would let
+// someone who knows a phone number enumerate their way to the matching order.
+Route::get('/track', [CheckoutController::class, 'track'])->name('track')->middleware('throttle:20,1');
 
 // Cart
 Route::controller(CartController::class)->group(function () {
