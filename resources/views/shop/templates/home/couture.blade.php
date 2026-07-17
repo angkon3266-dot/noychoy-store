@@ -1,5 +1,5 @@
 @extends('layouts.shop')
-@section('title', config('store.name').' — Fine Jewelry')
+@section('title', store_name().' — Fine Jewelry')
 
 @section('content')
 @php

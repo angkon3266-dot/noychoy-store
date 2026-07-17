@@ -3,13 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin Login — {{ config('store.name') }}</title>
+    <title>Admin Login — {{ store_name() }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-ink-900 flex items-center justify-center px-4">
     <div class="w-full max-w-sm">
         <div class="text-center mb-6">
-            <div class="font-display text-3xl font-bold text-gold-300">{{ config('store.name') }}</div>
+            <div class="font-display text-3xl font-bold text-gold-300">{{ store_name() }}</div>
             <p class="text-gold-100/50 text-sm mt-1">Admin Panel</p>
         </div>
         <div class="card p-8">

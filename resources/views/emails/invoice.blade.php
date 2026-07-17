@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-@php $store = \App\Models\Setting::get('store_name', config('store.name')); @endphp
+@php $store = store_name(); @endphp
 <body style="margin:0;background:#f5f3ee;font-family:Arial,Helvetica,sans-serif;color:#161618;">
     <div style="max-width:600px;margin:0 auto;padding:24px;">
         <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #eee;">

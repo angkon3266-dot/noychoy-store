@@ -1,5 +1,5 @@
 @extends('layouts.shop')
-@section('title', \App\Models\Setting::get('store_name', config('store.name')).' — Online Store')
+@section('title', store_name().' — Online Store')
 
 @section('content')
 @php

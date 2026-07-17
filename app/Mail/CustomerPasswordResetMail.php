@@ -15,7 +15,7 @@ class CustomerPasswordResetMail extends Mailable
 
     public function build()
     {
-        return $this->subject('Reset your '.config('store.name').' password')
+        return $this->subject('Reset your '.store_name().' password')
             ->view('emails.password-reset');
     }
 }

@@ -44,7 +44,7 @@ class PasswordResetController extends Controller
             // Editable template (Admin → Integrations → SMS templates → "Password reset code").
             $template = $sms->template('password_reset') ?: 'Your {store} password reset code is {code}. Valid for {minutes} minutes.';
             $message = strtr($template, [
-                '{store}' => \App\Models\Setting::get('store_name', config('store.name')),
+                '{store}' => store_name(),
                 '{code}' => $otp,
                 '{minutes}' => '10',
             ]);

@@ -16,7 +16,7 @@ class OrderInvoiceMail extends Mailable
 
     public function build()
     {
-        $store = \App\Models\Setting::get('store_name', config('store.name'));
+        $store = store_name();
 
         return $this->from(config('mail.from.address'), $store)
             ->subject('Order confirmation & invoice — '.$store.' #'.$this->order->order_number)

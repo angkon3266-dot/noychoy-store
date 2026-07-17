@@ -14,7 +14,7 @@ class SettingController extends Controller
     {
         return view('admin.settings', [
             'general' => [
-                'store_name' => Setting::get('store_name', config('store.name')),
+                'store_name' => store_name(),
                 'store_phone' => Setting::get('store_phone', config('store.phone')),
                 'store_email' => Setting::get('store_email', config('store.email')),
                 'shipping_inside' => Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
@@ -32,7 +32,7 @@ class SettingController extends Controller
                 'has_password' => filled(Setting::get('mail_password')),
                 'encryption' => Setting::get('mail_encryption', 'ssl'),
                 'from_address' => Setting::get('mail_from_address', ''),
-                'from_name' => Setting::get('mail_from_name', Setting::get('store_name', config('store.name'))),
+                'from_name' => Setting::get('mail_from_name', store_name()),
             ],
         ]);
     }
@@ -76,8 +76,8 @@ class SettingController extends Controller
 
         try {
             \Illuminate\Support\Facades\Mail::raw(
-                'This is a test email from your '.Setting::get('store_name', config('store.name')).' store. If you received this, SMTP is working. 🎉',
-                fn ($m) => $m->to($data['test_email'])->subject('SMTP test — '.Setting::get('store_name', config('store.name')))
+                'This is a test email from your '.store_name().' store. If you received this, SMTP is working. 🎉',
+                fn ($m) => $m->to($data['test_email'])->subject('SMTP test — '.store_name())
             );
         } catch (\Throwable $e) {
             return back()->with('error', 'Test failed: '.$e->getMessage());

@@ -7,7 +7,7 @@
             <img src="{{ $heroImg }}" alt="" class="absolute inset-0 h-full w-full object-cover opacity-30">
         @endif
         <div class="relative z-10 mx-auto max-w-7xl px-4 py-20 sm:py-28 text-center">
-            <p class="text-gold-300 uppercase tracking-[0.3em] text-xs mb-4">{{ home_content('hero_eyebrow') ?: config('store.name') }}</p>
+            <p class="text-gold-300 uppercase tracking-[0.3em] text-xs mb-4">{{ home_content('hero_eyebrow') ?: store_name() }}</p>
             <h1 class="font-display text-4xl sm:text-6xl font-bold leading-tight">{!! home_content_heading('text-gold-300') !!}</h1>
             <p class="mt-5 max-w-xl mx-auto text-white/70">{{ home_content('hero_subtitle') }}</p>
             <div class="mt-8 flex justify-center gap-3">

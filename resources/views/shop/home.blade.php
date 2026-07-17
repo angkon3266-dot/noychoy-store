@@ -5,7 +5,7 @@
     <!-- Hero -->
     <section class="relative bg-gradient-to-br from-ink-900 to-ink-800 text-white">
         <div class="mx-auto max-w-7xl px-4 py-20 sm:py-28 text-center">
-            <p class="text-gold-300 uppercase tracking-[0.3em] text-xs mb-4">{{ config('store.name') }}</p>
+            <p class="text-gold-300 uppercase tracking-[0.3em] text-xs mb-4">{{ store_name() }}</p>
             <h1 class="font-display text-4xl sm:text-6xl font-bold leading-tight">Jewelry that tells <span class="text-gold-300">your story</span></h1>
             <p class="mt-5 max-w-xl mx-auto text-white/70">Handpicked pieces, delivered across Bangladesh with cash on delivery.</p>
             <div class="mt-8 flex justify-center gap-3">

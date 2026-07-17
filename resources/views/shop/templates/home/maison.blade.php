@@ -11,7 +11,7 @@
             <img src="{{ $featured->first()->thumbnail }}" class="absolute inset-0 h-full w-full object-cover opacity-30" alt="">
         @endif
         <div class="relative z-10 px-4">
-            <p class="text-gold-300 uppercase tracking-[0.4em] text-xs mb-5">{{ home_content('hero_eyebrow') ?: 'Maison '.config('store.name') }}</p>
+            <p class="text-gold-300 uppercase tracking-[0.4em] text-xs mb-5">{{ home_content('hero_eyebrow') ?: 'Maison '.store_name() }}</p>
             <h1 class="font-display text-5xl sm:text-7xl font-bold leading-none">{!! home_content_heading('text-gold-300') !!}</h1>
             <p class="mt-6 max-w-lg mx-auto text-white/70">{{ home_content('hero_subtitle') }}</p>
             <a href="{{ home_content('hero_cta_link') ?: route('shop') }}" class="btn-primary mt-8">{{ home_content('hero_cta_text') }}</a>

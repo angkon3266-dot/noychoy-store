@@ -60,7 +60,7 @@
             @php $cod = (float) ($order->shipment->cod_amount ?? $order->total); @endphp
             <div class="label">
                 <div class="top">
-                    <span class="brand">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                    <span class="brand">{{ store_name() }}</span>
                     <span class="cod">COD ৳{{ number_format($cod, 0) }}</span>
                 </div>
                 <div class="cid">CID: {{ $order->shipment->consignment_id }}</div>

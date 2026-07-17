@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', config('store.name')) — {{ config('store.name') }}</title>
+    <title>@yield('title', store_name()) — {{ store_name() }}</title>
     @hasSection('meta')@yield('meta')@endif
     @isset($product)
         @if($product instanceof \App\Models\Product)
@@ -14,7 +14,7 @@
             <meta property="og:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($product->meta_description ?: $product->short_description ?: $product->description), 200) }}">
             <meta property="og:url" content="{{ route('product.show', $product) }}">
             @if($ogImg)<meta property="og:image" content="{{ \Illuminate\Support\Str::startsWith($ogImg, 'http') ? $ogImg : rtrim(config('app.url'),'/').'/'.ltrim($ogImg,'/') }}">@endif
-            <meta property="product:brand" content="{{ config('store.name') }}">
+            <meta property="product:brand" content="{{ store_name() }}">
             <meta property="product:availability" content="{{ ($product->isAvailable() || $product->isPreorder()) ? 'in stock' : 'out of stock' }}">
             <meta property="product:condition" content="new">
             <meta property="product:price:amount" content="{{ number_format((float) $product->price, 2, '.', '') }}">
@@ -24,6 +24,19 @@
     {{-- Canonical: strips query strings (?sort=, filters) so crawlers don't index
          endless duplicates of the same catalog page. Views may override. --}}
     <link rel="canonical" href="{{ $canonicalUrl ?? url()->current() }}">
+    {{-- Search/link-preview description: controller-provided, else the product's
+         own copy, else the storefront tagline. --}}
+    @php
+        $metaDesc = $metaDescription ?? null;
+        if (blank($metaDesc) && isset($product) && $product instanceof \App\Models\Product) {
+            $metaDesc = $product->meta_description ?: $product->short_description ?: $product->description;
+        }
+        if (blank($metaDesc)) {
+            $metaDesc = home_content('hero_subtitle') ?: 'Shop '.store_name().' — quality pieces delivered across Bangladesh with cash on delivery.';
+        }
+        $metaDesc = \Illuminate\Support\Str::limit(trim(strip_tags((string) $metaDesc)), 160);
+    @endphp
+    <meta name="description" content="{{ $metaDesc }}">
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">@endif
     {{-- PWA / iOS: web push on iPhone only works from a Home-Screen-installed app,
          which requires this manifest (display: standalone). --}}
@@ -201,10 +214,10 @@
                 {{-- Logo. Separate image for desktop & mobile; placement configurable. --}}
                 <a href="{{ route('home') }}" class="shrink-0 {{ $logoAlignClass }}">
                     @if($logoDesktop || $logoMobile)
-                        @if($logoDesktop)<img src="{{ $logoDesktop }}" alt="{{ config('store.name') }}" height="{{ $logoHD }}" decoding="async" fetchpriority="high" class="logo-d w-auto hidden md:block">@endif
-                        @if($logoMobile)<img src="{{ $logoMobile }}" alt="{{ config('store.name') }}" height="{{ $logoHM }}" decoding="async" fetchpriority="high" class="logo-m w-auto md:hidden">@endif
+                        @if($logoDesktop)<img src="{{ $logoDesktop }}" alt="{{ store_name() }}" height="{{ $logoHD }}" decoding="async" fetchpriority="high" class="logo-d w-auto hidden md:block">@endif
+                        @if($logoMobile)<img src="{{ $logoMobile }}" alt="{{ store_name() }}" height="{{ $logoHM }}" decoding="async" fetchpriority="high" class="logo-m w-auto md:hidden">@endif
                     @else
-                        <span class="logo-m md:logo-d inline-flex items-center font-display font-bold tracking-wide text-gold-700" style="font-size: calc({{ $logoHM }}px * 0.55)">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                        <span class="logo-m md:logo-d inline-flex items-center font-display font-bold tracking-wide text-gold-700" style="font-size: calc({{ $logoHM }}px * 0.55)">{{ store_name() }}</span>
                     @endif
                 </a>
 
@@ -420,9 +433,9 @@
             <div class="flex items-center justify-between h-16 px-4 border-b border-gold-100 shrink-0">
                 <a href="{{ route('home') }}" @click="$store.mobileNav.close()" class="shrink-0">
                     @if($logoMobile || $logoDesktop)
-                        <img src="{{ $logoMobile ?: $logoDesktop }}" alt="{{ config('store.name') }}" height="{{ $logoHM }}" class="w-auto" style="height: {{ $logoHM }}px">
+                        <img src="{{ $logoMobile ?: $logoDesktop }}" alt="{{ store_name() }}" height="{{ $logoHM }}" class="w-auto" style="height: {{ $logoHM }}px">
                     @else
-                        <span class="font-display text-xl font-bold text-gold-700">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                        <span class="font-display text-xl font-bold text-gold-700">{{ store_name() }}</span>
                     @endif
                 </a>
                 <button @click="$store.mobileNav.close()" aria-label="Close menu" class="p-2 -mr-2 text-ink-700/70 hover:text-ink-900">
@@ -511,7 +524,7 @@
                 $igDrawer = theme('footer_instagram');
             @endphp
             <div class="shrink-0 border-t border-ink-100 px-4 py-3 flex items-center justify-between" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom))">
-                <span class="text-xs text-ink-700/50">{{ \App\Models\Setting::get('store_name', config('store.name')) }}</span>
+                <span class="text-xs text-ink-700/50">{{ store_name() }}</span>
                 <div class="flex items-center gap-2">
                     @if($fbDrawer)
                         <a href="{{ $fbDrawer }}" target="_blank" rel="noopener" aria-label="Facebook" class="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
@@ -649,7 +662,7 @@
         @endif
         <div class="mx-auto max-w-7xl px-4 py-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-                <div class="font-display text-xl font-bold text-gold-300">{{ theme('footer_brand') ?: \App\Models\Setting::get('store_name', config('store.name')) }}</div>
+                <div class="font-display text-xl font-bold text-gold-300">{{ theme('footer_brand') ?: store_name() }}</div>
                 <p class="mt-3 text-sm text-gold-100/70">{{ theme('footer_about') ?: 'Handpicked jewelry, delivered across Bangladesh. Cash on delivery available.' }}</p>
                 @php $fbUrl = theme('footer_facebook'); @endphp
                 @php $igUrl = theme('footer_instagram'); @endphp
@@ -693,7 +706,7 @@
             </div>
         </div>
         <div class="border-t border-white/10 py-4 text-center text-xs text-gold-100/50">
-            {{ theme('footer_copyright') ?: '© '.date('Y').' '.config('store.name').'. All rights reserved.' }}
+            {{ theme('footer_copyright') ?: '© '.date('Y').' '.store_name().'. All rights reserved.' }}
         </div>
     </footer>
 

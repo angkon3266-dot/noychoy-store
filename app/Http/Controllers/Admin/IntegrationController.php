@@ -90,7 +90,7 @@ class IntegrationController extends Controller
     public function testSms(Request $request, SmsService $sms)
     {
         $data = $request->validate(['phone' => ['required', 'string', 'max:20']]);
-        $ok = $sms->send($data['phone'], 'Test SMS from '.config('store.name').' — your SMS gateway is working.');
+        $ok = $sms->send($data['phone'], 'Test SMS from '.store_name().' — your SMS gateway is working.');
 
         return back()->with($ok ? 'success' : 'error',
             ($ok ? 'Test SMS sent.' : 'Test SMS failed.').$sms->explainLast());

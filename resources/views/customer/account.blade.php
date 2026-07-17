@@ -82,7 +82,7 @@
                     $msDone = collect($milestones)->where('done', true)->count();
                     $msTotal = count($milestones);
                     $L = app(\App\Services\LoyaltyService::class);
-                    $storeName = \App\Models\Setting::get('store_name', config('store.name'));
+                    $storeName = store_name();
                     $per1000 = (int) round($L->earnPerTaka() * 1000);
                     $value100 = money($L->pointsValue(100));
                 @endphp

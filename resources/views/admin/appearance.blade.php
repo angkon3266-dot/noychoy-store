@@ -217,7 +217,7 @@
 
         <h3 class="text-sm font-semibold text-ink-700 mt-2 mb-3">Hero banner</h3>
         <div class="grid sm:grid-cols-2 gap-4">
-            <div><label class="label">Eyebrow (small text above heading)</label><input name="home[hero_eyebrow]" value="{{ $home['hero_eyebrow'] }}" class="input" placeholder="{{ config('store.name') }}"></div>
+            <div><label class="label">Eyebrow (small text above heading)</label><input name="home[hero_eyebrow]" value="{{ $home['hero_eyebrow'] }}" class="input" placeholder="{{ store_name() }}"></div>
             <div><label class="label">Highlighted phrase (coloured part of heading)</label><input name="home[hero_highlight]" value="{{ $home['hero_highlight'] }}" class="input" placeholder="your story"></div>
             <div class="sm:col-span-2"><label class="label">Heading</label><input name="home[hero_heading]" value="{{ $home['hero_heading'] }}" class="input"></div>
             <div class="sm:col-span-2"><label class="label">Subtitle</label><textarea name="home[hero_subtitle]" rows="2" class="input">{{ $home['hero_subtitle'] }}</textarea></div>
@@ -802,7 +802,7 @@
         <div class="space-y-4">
             <div>
                 <label class="label">Footer brand text</label>
-                <input name="footer_brand" value="{{ $theme['footer_brand'] ?? '' }}" class="input" placeholder="{{ \App\Models\Setting::get('store_name', config('store.name')) }}">
+                <input name="footer_brand" value="{{ $theme['footer_brand'] ?? '' }}" class="input" placeholder="{{ store_name() }}">
                 <p class="text-xs text-ink-700/50 mt-1">The big heading in the footer. Leave empty to use your store name (set in <a href="{{ route('admin.settings') }}" class="text-gold-700 underline">Settings</a>).</p>
             </div>
             <div>
@@ -815,7 +815,7 @@
             </div>
             <div>
                 <label class="label">Copyright line</label>
-                <input name="footer_copyright" value="{{ $theme['footer_copyright'] ?? '' }}" class="input" placeholder="© {{ date('Y') }} {{ config('store.name') }}. All rights reserved.">
+                <input name="footer_copyright" value="{{ $theme['footer_copyright'] ?? '' }}" class="input" placeholder="© {{ date('Y') }} {{ store_name() }}. All rights reserved.">
             </div>
 
             {{-- Footer "Shop" categories (ordered; empty = show all top-level categories) --}}
