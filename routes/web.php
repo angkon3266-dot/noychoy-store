@@ -20,6 +20,7 @@ Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('m
 // ── Storefront ──────────────────────────────────────────────────────────────
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/sitemap.xml', [\App\Http\Controllers\Shop\SitemapController::class, 'index'])->name('sitemap');
+Route::get('/site.webmanifest', \App\Http\Controllers\Shop\ManifestController::class)->name('manifest');
 Route::get('/robots.txt', fn () => response(
     "User-agent: *\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n\nSitemap: ".route('sitemap')."\n",
     200, ['Content-Type' => 'text/plain'],

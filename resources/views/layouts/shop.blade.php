@@ -25,6 +25,15 @@
          endless duplicates of the same catalog page. Views may override. --}}
     <link rel="canonical" href="{{ $canonicalUrl ?? url()->current() }}">
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">@endif
+    {{-- PWA / iOS: web push on iPhone only works from a Home-Screen-installed app,
+         which requires this manifest (display: standalone). --}}
+    <link rel="manifest" href="{{ route('manifest') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="{{ store_name() }}">
+    <meta name="theme-color" content="#9a6c2e">
+    <link rel="apple-touch-icon" href="{{ $fav ?: asset('favicon.ico') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
     {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}
@@ -322,11 +331,16 @@
                                     <a href="{{ route('account.notifications') }}" class="text-xs text-gold-700 hover:underline">See all</a>
                                 </div>
                                 @if($webPushReady)
-                                    <div x-data="webPushOptIn()" x-init="init()" x-show="supported && state!=='granted'" x-cloak
+                                    <div x-data="webPushOptIn()" x-init="init()" x-show="(supported && state!=='granted') || needsInstall" x-cloak
                                          class="mx-1 mb-1 rounded-lg bg-gold-50 border border-gold-200 px-2.5 py-2 flex items-center gap-2">
                                         <span class="text-lg">🔔</span>
-                                        <p class="text-xs flex-1 text-ink-700/70">Get notified about new drops &amp; your offers — even when the site is closed.</p>
-                                        <button type="button" @click="enable()" :disabled="busy"
+                                        <template x-if="!needsInstall">
+                                            <p class="text-xs flex-1 text-ink-700/70">Get notified about new drops &amp; your offers — even when the site is closed.</p>
+                                        </template>
+                                        <template x-if="needsInstall">
+                                            <p class="text-xs flex-1 text-ink-700/70">On iPhone, notifications need our app icon: tap <span class="font-semibold">Share</span> → <span class="font-semibold">Add to Home Screen</span>, then open {{ store_name() }} from there and turn them on here.</p>
+                                        </template>
+                                        <button type="button" x-show="!needsInstall" @click="enable()" :disabled="busy"
                                                 class="text-xs font-semibold text-white bg-gold-600 rounded-md px-2 py-1 hover:bg-gold-700 disabled:opacity-50"
                                                 x-text="busy ? '…' : 'Turn on'"></button>
                                     </div>
@@ -862,6 +876,15 @@
 
                 const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
+                // iOS Safari only exposes the Push API inside a Home-Screen-installed
+                // web app. Detect that case so the UI can explain the install step
+                // instead of silently showing nothing.
+                const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+                    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const standalone = window.matchMedia('(display-mode: standalone)').matches
+                    || window.navigator.standalone === true;
+                const needsInstall = isIOS && !standalone && !supported;
+
                 // Ensure permission + a live subscription; returns the subscription or null.
                 window.wpEnsure = async function () {
                     if (!supported) return null;
@@ -899,6 +922,7 @@
                 window.webPushOptIn = function () {
                     return {
                         supported,
+                        needsInstall,
                         state: supported ? Notification.permission : 'unsupported',
                         busy: false,
                         init() {

@@ -33,6 +33,10 @@
     $avg = $product->average_rating;
     $count = $product->review_count;
     $dist = collect(range(5, 1))->mapWithKeys(fn ($s) => [$s => $reviews->where('rating', $s)->count()]);
+    $loyalty = app(\App\Services\LoyaltyService::class);
+    $reviewPerk = $loyalty->enabled() ? $loyalty->reviewPoints() : 0;
+    $reviewPhotoPerk = $loyalty->enabled() ? $loyalty->reviewPhotoBonus() : 0;
+    $isMember = auth('customer')->check();
 @endphp
 <section class="mt-16 border-t border-ink-100 pt-10" id="reviews" x-data="{ open: false }">
     <button type="button" @click="open = !open" class="w-full flex items-center justify-between gap-4 text-left">
@@ -49,6 +53,23 @@
     </button>
 
     <div class="grid md:grid-cols-3 gap-8 mt-6" x-show="open" x-collapse x-cloak>
+        {{-- Review reward banner --}}
+        @if($reviewPerk > 0)
+            <div class="md:col-span-3">
+                @if($isMember)
+                    <div class="flex items-start gap-3 rounded-xl border border-gold-200 bg-gold-100/60 px-4 py-3 text-sm text-gold-800">
+                        <span class="text-lg leading-none">🎁</span>
+                        <p><span class="font-semibold">Share a review, earn {{ number_format($reviewPerk) }} bonus points</span>{{ $reviewPhotoPerk > 0 ? ' — add a photo for +'.number_format($reviewPhotoPerk).' more' : '' }}. Points are added to your account as soon as your review is approved.</p>
+                    </div>
+                @else
+                    <div class="flex items-start gap-3 rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm text-ink-700/80">
+                        <span class="text-lg leading-none">🎁</span>
+                        <p>Members earn <span class="font-semibold text-gold-700">{{ number_format($reviewPerk) }} bonus points</span> for every approved review{{ $reviewPhotoPerk > 0 ? ' (+'.number_format($reviewPhotoPerk).' with a photo)' : '' }}. <a href="{{ route('customer.login') }}" class="font-medium text-gold-700 underline">Sign in</a> or <a href="{{ route('customer.register') }}" class="font-medium text-gold-700 underline">join free</a> to start earning.</p>
+                    </div>
+                @endif
+            </div>
+        @endif
+
         {{-- Summary --}}
         <div>
             @if($count)
@@ -101,7 +122,11 @@
 
             {{-- Write a review --}}
             <details class="rounded-xl border border-ink-100 p-5" x-data="{ rating: 0, hover: 0 }">
-                <summary class="font-medium cursor-pointer">✍️ Write a review</summary>
+                <summary class="font-medium cursor-pointer">✍️ Write a review
+                    @if($reviewPerk > 0 && $isMember)
+                        <span class="badge bg-gold-100 text-gold-800 ml-1">🎁 +{{ number_format($reviewPerk) }} points</span>
+                    @endif
+                </summary>
                 @if(session('success'))<p class="mt-3 text-sm text-green-700 bg-green-50 rounded p-2">{{ session('success') }}</p>@endif
                 @if($errors->any())<div class="mt-3 text-sm text-red-700 bg-red-50 rounded p-2">{{ $errors->first() }}</div>@endif
                 <form action="{{ route('review.store', $product) }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
