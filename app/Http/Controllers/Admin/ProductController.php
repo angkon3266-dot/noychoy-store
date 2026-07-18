@@ -262,6 +262,42 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
     }
 
+    /** Save the admin-typed product IDs (serials) from the list page in one go. */
+    public function bulkSerials(Request $request)
+    {
+        $data = $request->validate([
+            'serials' => ['required', 'array'],
+            'serials.*' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $serials = collect($data['serials'])->map(fn ($v) => filled($v) ? (int) $v : null);
+
+        $dupes = $serials->filter()->duplicates()->unique();
+        if ($dupes->isNotEmpty()) {
+            return back()->with('error', 'Duplicate ID'.($dupes->count() > 1 ? 's' : '').' #'.$dupes->implode(', #').' — each product needs a different number.');
+        }
+
+        // Conflicts with products outside this save — including deleted ones,
+        // which still hold their number in the DB unique index.
+        $conflict = Product::withTrashed()
+            ->whereNotIn('id', $serials->keys())
+            ->whereIn('serial', $serials->filter()->values())
+            ->first();
+        if ($conflict) {
+            return back()->with('error', 'ID #'.$conflict->serial.' is already used by “'.$conflict->name.'”'.($conflict->trashed() ? ' (deleted)' : '').'. Pick another number.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($serials) {
+            // Two-phase write so swapping numbers can't trip the unique index.
+            Product::withTrashed()->whereIn('id', $serials->keys())->update(['serial' => null]);
+            foreach ($serials->filter() as $id => $serial) {
+                Product::withTrashed()->where('id', $id)->update(['serial' => $serial]);
+            }
+        });
+
+        return back()->with('success', 'Product IDs saved.');
+    }
+
     /** Persist the product's editorial "story sections" from the JSON builder. */
     protected function syncContentSections(Request $request, Product $product): void
     {
@@ -519,6 +555,10 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:200'],
             'slug' => ['nullable', 'string', 'max:200'],
+            // Admin-managed display ID. The unique check must include trashed
+            // products — they still hold their number in the DB unique index.
+            'serial' => ['nullable', 'integer', 'min:1',
+                \Illuminate\Validation\Rule::unique('products', 'serial')->ignore($product?->id)],
             'sku' => ['nullable', 'string', 'max:80'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'category_ids' => ['nullable', 'array'],
