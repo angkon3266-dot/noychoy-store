@@ -13,6 +13,9 @@ use App\Models\Setting;
  */
 class NotificationService
 {
+    /** Subscriptions queued for browser push by the most recent deliverPush(). */
+    public int $lastPushQueued = 0;
+
     /**
      * Create + deliver a broadcast (or schedule it for later).
      *
@@ -65,11 +68,14 @@ class NotificationService
      * Queue web-push delivery for a notification to its target subscriptions.
      * No-op unless web push is enabled and a VAPID keypair exists.
      */
-    public function deliverPush(CustomerNotification $n, ?array $recipientIds = null): void
+    /** @return int subscriptions queued (0 when web push is off / has no targets) */
+    public function deliverPush(CustomerNotification $n, ?array $recipientIds = null): int
     {
+        $this->lastPushQueued = 0;
+
         $push = app(\App\Services\WebPushService::class);
         if (! $push->ready()) {
-            return;
+            return 0;
         }
 
         // Segment sends go only to the targeted members; an "all" send reaches
@@ -90,9 +96,12 @@ class NotificationService
             'tag' => 'notif-'.$n->id,
         ];
 
-        $query->pluck('id')->chunk(500)->each(function ($chunk) use ($payload) {
+        $ids = $query->pluck('id');
+        $ids->chunk(500)->each(function ($chunk) use ($payload) {
             \App\Jobs\SendWebPush::dispatch($chunk->all(), $payload);
         });
+
+        return $this->lastPushQueued = $ids->count();
     }
 
     /**

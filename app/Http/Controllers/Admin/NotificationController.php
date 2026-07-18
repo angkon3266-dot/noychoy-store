@@ -143,6 +143,21 @@ class NotificationController extends Controller
             $msg .= " SMS queued to {$smsQueued} member(s).";
         }
 
+        // Be honest about browser push — "sent" while push silently skipped is
+        // exactly the confusion we want to avoid.
+        if ($notification->sent_at) {
+            $pushSvc = app(\App\Services\WebPushService::class);
+            if (! $pushSvc->ready()) {
+                return back()->with('success', $msg)
+                    ->with('warning', 'Browser push was NOT fired — web push is disabled or VAPID keys are missing. Fix it in “Web push” settings below, then send again.');
+            }
+            if ($notifications->lastPushQueued === 0) {
+                return back()->with('success', $msg)
+                    ->with('warning', 'Browser push was NOT fired — nobody is subscribed yet. Members must tap the bell on the storefront and press “Turn on” (on iPhone: install via Share → Add to Home Screen first).');
+            }
+            $msg .= " Browser push queued to {$notifications->lastPushQueued} device(s) — delivers within a minute.";
+        }
+
         return back()->with('success', $msg);
     }
 

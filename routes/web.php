@@ -62,7 +62,7 @@ Route::controller(CartController::class)->group(function () {
 
 // Checkout
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
-Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:5,1');
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:10,1');
 Route::post('/checkout/lead', [\App\Http\Controllers\Shop\LeadController::class, 'capture'])->name('checkout.lead')->middleware('throttle:15,1');
 
 // Product reviews (photo uploads — keep tight)

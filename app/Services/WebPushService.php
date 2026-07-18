@@ -39,11 +39,9 @@ class WebPushService
         $ecOk = false;
         $ecErr = null;
         try {
-            $k = @openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
-            $ecOk = (bool) $k;
-            if (! $k) {
-                $ecErr = openssl_error_string() ?: 'openssl_pkey_new returned false';
-            }
+            // Exercise the real key path (random scalar + import) rather than
+            // openssl_pkey_new, which some PHP builds can't do for EC curves.
+            $ecOk = strlen($this->importFromRaw(self::randomScalar())[1]) === 65;
         } catch (\Throwable $e) {
             $ecErr = $e->getMessage();
         }
@@ -80,18 +78,28 @@ class WebPushService
     /** Generate a fresh VAPID P-256 keypair as base64url raw keys. */
     public function generateKeys(): array
     {
-        $pkey = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
-        if (! $pkey) {
-            throw new \RuntimeException('Could not generate an EC key — is the openssl extension available? '.openssl_error_string());
-        }
-        $d = openssl_pkey_get_details($pkey);
-        $public = "\x04".str_pad($d['ec']['x'], 32, "\x00", STR_PAD_LEFT).str_pad($d['ec']['y'], 32, "\x00", STR_PAD_LEFT);
-        $private = str_pad($d['ec']['d'], 32, "\x00", STR_PAD_LEFT);
+        // A uniformly random 32-byte scalar in [1, n-1] is a valid P-256 private
+        // key; deriving the public point via key import avoids openssl_pkey_new,
+        // which some PHP builds (e.g. native Windows) can't do for EC curves.
+        $private = self::randomScalar();
+        [, $public] = $this->importFromRaw($private);
 
         return [
             'public' => self::b64urlEncode($public),
             'private' => self::b64urlEncode($private),
         ];
+    }
+
+    /** Random P-256 private scalar in [1, n-1] (big-endian, 32 bytes). */
+    protected static function randomScalar(): string
+    {
+        // Curve order n for prime256v1.
+        $n = hex2bin('FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551');
+        do {
+            $d = random_bytes(32);
+        } while ($d === str_repeat("\x00", 32) || strcmp($d, $n) >= 0);
+
+        return $d;
     }
 
     /**
@@ -182,18 +190,9 @@ class WebPushService
      */
     public function encrypt(string $payload, string $uaPublic, string $authSecret, ?string $asPrivateRaw = null, ?string $salt = null): array
     {
-        // Application-server (ephemeral) keypair.
-        if ($asPrivateRaw !== null) {
-            [$asPrivatePem, $asPublic] = $this->importFromRaw($asPrivateRaw);
-        } else {
-            $eph = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
-            if (! $eph) {
-                throw new \RuntimeException('EC keygen failed: '.openssl_error_string());
-            }
-            $d = openssl_pkey_get_details($eph);
-            $asPublic = "\x04".str_pad($d['ec']['x'], 32, "\x00", STR_PAD_LEFT).str_pad($d['ec']['y'], 32, "\x00", STR_PAD_LEFT);
-            $asPrivatePem = $eph;
-        }
+        // Application-server (ephemeral) keypair — random scalar + import, so
+        // encryption works even where openssl_pkey_new can't make EC keys.
+        [$asPrivatePem, $asPublic] = $this->importFromRaw($asPrivateRaw ?? self::randomScalar());
 
         $salt ??= random_bytes(16);
 
