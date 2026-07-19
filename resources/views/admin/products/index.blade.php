@@ -58,6 +58,7 @@
             if (action === 'delete' && !confirm('Delete ' + this.sel.length + ' product(s)? This cannot be undone.')) return;
             if (action === 'category' && !this.catIds.length) { alert('Pick at least one category first.'); return; }
             if (action === 'category' && !confirm('This will REPLACE the categories of ' + this.sel.length + ' product(s) with the ' + this.catIds.length + ' selected. Continue?')) return;
+            if (action === 'generate_serials' && !confirm('Renumber the ' + this.sel.length + ' selected product(s) as ID 1–' + this.sel.length + ', oldest first? Their current IDs will be replaced.')) return;
             this.$refs.act.value = action;
             this.$refs.bulk.submit();
         }
@@ -73,6 +74,7 @@
         <button type="button" @click="run('unfeature')" class="text-gold-700 hover:underline">Unfeature</button>
         <button type="button" @click="run('bestseller')" class="text-gold-700 hover:underline">Mark bestseller</button>
         <button type="button" @click="run('unbestseller')" class="text-gold-700 hover:underline">Unmark bestseller</button>
+        <button type="button" @click="run('generate_serials')" class="text-gold-700 hover:underline" title="Assign ID 1, 2, 3… to the selected products, oldest first">Generate IDs 1–N</button>
         <span class="text-ink-300">|</span>
         <select x-model="catIds" multiple size="1" class="input py-1 text-xs w-44 h-auto max-h-24" title="Ctrl/Cmd-click to pick several">
             @foreach($bulkCategories as $cat)<option value="{{ $cat->id }}">{{ $cat->name }}</option>@endforeach

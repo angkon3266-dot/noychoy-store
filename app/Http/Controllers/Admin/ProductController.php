@@ -56,8 +56,8 @@ class ProductController extends Controller
 
     /**
      * Bulk-create products from an uploaded CSV.
-     * Header row expected: name, price, sku, category, short_description, description,
-     * meta_description, stock, status, tags
+     * Header row expected: name, product_id, price, sku, category, short_description,
+     * description, meta_description, stock, status, tags
      */
     public function import(Request $request)
     {
@@ -121,8 +121,24 @@ class ProductController extends Controller
                     }
                 }
 
+                // Optional admin-managed product ID (accepts a product_id or
+                // serial column). A taken number never blocks the row — the
+                // product imports without it and the reason is reported.
+                $serial = null;
+                $serialRaw = trim((string) ($data['product_id'] ?? $data['serial'] ?? ''));
+                if ($serialRaw !== '' && ctype_digit($serialRaw) && (int) $serialRaw >= 1) {
+                    $serial = (int) $serialRaw;
+                    if (Product::withTrashed()->where('serial', $serial)->exists()) {
+                        if (count($errors) < 20) {
+                            $errors[] = "Row {$row}: product ID #{$serial} already in use — imported without it";
+                        }
+                        $serial = null;
+                    }
+                }
+
                 $product = Product::create([
                     'name' => $name,
+                    'serial' => $serial,
                     'sku' => $data['sku'] ?? null,
                     'category_id' => $categoryId,
                     'short_description' => $data['short_description'] ?? null,
@@ -260,6 +276,33 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
+    }
+
+    /**
+     * Renumber the selected products 1..N in creation order (oldest = 1).
+     * Deleted products silently release any number in range; a live unselected
+     * product holding one is a hard error — we never steal a number in use.
+     */
+    protected function generateSerials(array $ids)
+    {
+        $ids = Product::whereIn('id', $ids)->orderBy('id')->pluck('id');
+        $n = $ids->count();
+
+        $conflict = Product::whereNotIn('id', $ids)->whereBetween('serial', [1, $n])->first();
+        if ($conflict) {
+            return back()->with('error', "Can’t renumber 1–{$n}: “{$conflict->name}” (not selected) already uses ID #{$conflict->serial}. Select all products, or change that one first.");
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($ids) {
+            Product::onlyTrashed()->whereBetween('serial', [1, $ids->count()])->update(['serial' => null]);
+            Product::whereIn('id', $ids)->update(['serial' => null]);
+            $serial = 0;
+            foreach ($ids as $id) {
+                Product::where('id', $id)->update(['serial' => ++$serial]);
+            }
+        });
+
+        return back()->with('success', "Product IDs generated: 1–{$n}, oldest product first.");
     }
 
     /** Save the admin-typed product IDs (serials) from the list page in one go. */
@@ -472,12 +515,16 @@ class ProductController extends Controller
     public function bulk(Request $request)
     {
         $data = $request->validate([
-            'action' => ['required', 'in:publish,draft,feature,unfeature,bestseller,unbestseller,delete,category'],
+            'action' => ['required', 'in:publish,draft,feature,unfeature,bestseller,unbestseller,delete,category,generate_serials'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
             'category_ids' => ['nullable', 'array', 'required_if:action,category'],
             'category_ids.*' => ['integer', 'exists:categories,id'],
         ]);
+
+        if ($data['action'] === 'generate_serials') {
+            return $this->generateSerials($data['ids']);
+        }
 
         $catIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
         $query = Product::whereIn('id', $data['ids']);

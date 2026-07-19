@@ -23,22 +23,22 @@
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
                 <thead class="bg-ink-50 text-left"><tr>
-                    <th class="px-2 py-1.5">name*</th><th class="px-2 py-1.5">price</th><th class="px-2 py-1.5">sku</th><th class="px-2 py-1.5">category</th><th class="px-2 py-1.5">stock</th><th class="px-2 py-1.5">status</th><th class="px-2 py-1.5">meta_description</th><th class="px-2 py-1.5">tags</th>
+                    <th class="px-2 py-1.5">name*</th><th class="px-2 py-1.5">product_id</th><th class="px-2 py-1.5">price</th><th class="px-2 py-1.5">sku</th><th class="px-2 py-1.5">category</th><th class="px-2 py-1.5">stock</th><th class="px-2 py-1.5">status</th><th class="px-2 py-1.5">meta_description</th><th class="px-2 py-1.5">tags</th>
                 </tr></thead>
                 <tbody><tr class="text-ink-700/70">
-                    <td class="px-2 py-1.5">Gold Ring</td><td class="px-2 py-1.5">2500</td><td class="px-2 py-1.5">GR-01</td><td class="px-2 py-1.5">Rings</td><td class="px-2 py-1.5">10</td><td class="px-2 py-1.5">published</td><td class="px-2 py-1.5">Elegant 22k gold ring…</td><td class="px-2 py-1.5">eid, gold</td>
+                    <td class="px-2 py-1.5">Gold Ring</td><td class="px-2 py-1.5">1</td><td class="px-2 py-1.5">2500</td><td class="px-2 py-1.5">GR-01</td><td class="px-2 py-1.5">Rings</td><td class="px-2 py-1.5">10</td><td class="px-2 py-1.5">published</td><td class="px-2 py-1.5">Elegant 22k gold ring…</td><td class="px-2 py-1.5">eid, gold</td>
                 </tr></tbody>
             </table>
         </div>
-        <p class="text-xs text-ink-700/50 mt-3">Also supported: <code>short_description</code>, <code>description</code>. Unknown categories are created automatically. (These import as <strong>simple</strong> products — add images &amp; variations after import.)</p>
+        <p class="text-xs text-ink-700/50 mt-3">Also supported: <code>short_description</code>, <code>description</code>. <code>product_id</code> is your own ID number (must be unique; leave empty to auto-assign — a taken number imports the product without it). Unknown categories are created automatically. (These import as <strong>simple</strong> products — add images &amp; variations after import.)</p>
         <button type="button" onclick="downloadTemplate()" class="btn-outline mt-3">Download template CSV</button>
     </div>
 </div>
 
 <script>
 function downloadTemplate() {
-    const csv = 'name,price,sku,category,stock,status,short_description,description,meta_description,tags\n' +
-                'Gold Ring,2500,GR-01,Rings,10,published,Elegant gold ring,Full description here,Shop our elegant 22k gold ring,"eid, gold"\n';
+    const csv = 'name,product_id,price,sku,category,stock,status,short_description,description,meta_description,tags\n' +
+                'Gold Ring,1,2500,GR-01,Rings,10,published,Elegant gold ring,Full description here,Shop our elegant 22k gold ring,"eid, gold"\n';
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
     a.download = 'product-import-template.csv';
