@@ -70,6 +70,12 @@ class HomeController extends Controller
             if (isset($b['product_ids'])) {
                 $b['products'] = $pick($b['product_ids']);
             }
+            if ($b['type'] === 'reviews') {
+                $ids = collect($b['review_ids'] ?? [])->map(fn ($i) => (int) $i)->filter()->values();
+                $b['reviews'] = $ids->isEmpty() ? collect() : \App\Models\Review::approved()
+                    ->with('product:id,name,slug')->whereIn('id', $ids)->get()
+                    ->sortBy(fn ($r) => $ids->search($r->id))->values();
+            }
             if ($b['type'] === 'video') {
                 $b['videos'] = collect($b['videos'] ?? [])
                     ->map(fn ($v) => ['title' => $v['title'] ?? '', 'meta' => video_meta($v['url'] ?? '')])

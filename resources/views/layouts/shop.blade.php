@@ -138,7 +138,7 @@
     </style>
     @include('partials.meta-pixel')
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col" data-shop>
     @php
         $announce = theme();
         $announceMsgs = array_values(array_filter((array) ($announce['announcement_messages'] ?? [])));

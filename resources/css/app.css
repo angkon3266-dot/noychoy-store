@@ -63,3 +63,37 @@
         @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
     }
 }
+
+/* ── Premium motion (storefront) ─────────────────────────────────────────────
+   Scroll-reveal + hover polish. JS (initReveal in app.js) sets .reveal-init
+   only when it runs, so content is always visible without JS. */
+html {
+    scroll-behavior: smooth;
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(26px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.reveal-init { opacity: 0; }
+.reveal-in {
+    animation: fadeUp 0.7s ease-out both;
+    animation-delay: var(--reveal-delay, 0s);
+}
+
+/* Gentle lift on product cards (storefront only, gated by [data-shop]). */
+[data-shop] .group.relative.block {
+    transition: transform 0.35s ease;
+}
+[data-shop] .group.relative.block:hover {
+    transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal-init { opacity: 1 !important; }
+    .reveal-in { animation: none !important; }
+    [data-shop] .group.relative.block { transition: none; }
+    [data-shop] .group.relative.block:hover { transform: none; }
+}

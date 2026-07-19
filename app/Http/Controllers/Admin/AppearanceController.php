@@ -17,6 +17,9 @@ class AppearanceController extends Controller
             'homeTemplates' => config('theme.homepage_templates'),
             'productTemplates' => config('theme.product_templates'),
             'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
+            // For the section builder's "Customer reviews" block picker.
+            'recentReviews' => \App\Models\Review::approved()->with('product:id,name')
+                ->latest()->take(60)->get(['id', 'product_id', 'author_name', 'rating', 'title', 'body']),
             'filterConfig' => $filters->config(),
             'filterAttributes' => $filters->discoverAttributes(),
             'filterCustomFields' => $filters->discoverCustomFields(),

@@ -108,6 +108,14 @@ class Product extends Model
                 $product->serial = (int) static::withTrashed()->max('serial') + 1;
             }
         });
+
+        // Keep the product's knowledge markdown in step with every save
+        // (queued; skipped in tests so suites don't write files).
+        static::saved(function (Product $product) {
+            if (! app()->environment('testing')) {
+                \App\Jobs\SyncProductKnowledge::dispatch($product->id);
+            }
+        });
     }
 
     public static function uniqueSlug(string $name, ?int $ignoreId = null): string

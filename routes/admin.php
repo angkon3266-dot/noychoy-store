@@ -35,6 +35,11 @@ Route::middleware('admin')->group(function () {
     Route::post('products/{product}/quick-media', [ProductController::class, 'quickMedia'])->name('products.quick-media');
     Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
     Route::post('products/bulk-serials', [ProductController::class, 'bulkSerials'])->name('products.bulk-serials');
+
+    // AI knowledge base browser/editor
+    Route::get('knowledge', [\App\Http\Controllers\Admin\KnowledgeController::class, 'index'])->name('knowledge.index');
+    Route::post('knowledge/save', [\App\Http\Controllers\Admin\KnowledgeController::class, 'save'])->name('knowledge.save');
+    Route::post('knowledge/sync', [\App\Http\Controllers\Admin\KnowledgeController::class, 'sync'])->name('knowledge.sync');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     Route::delete('products/{product}/images', [ProductController::class, 'bulkDeleteImages'])->name('products.images.bulk-delete');
     Route::delete('product-images/{image}', [ProductController::class, 'deleteImage'])->name('products.images.delete');

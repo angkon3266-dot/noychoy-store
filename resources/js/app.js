@@ -241,13 +241,13 @@ document.addEventListener('alpine:init', () => {
         blankCta() { return { image: '', eyebrow: '', heading: '', subheading: '', button_text: '', button_link: '', align: 'center', height: 'md' }; },
         add() {
             this.blocks.push({ type: this.newType, enabled: true, title: '', layout: 'single',
-                images: [], videos: [], source: 'new', category_id: '', limit: 10, view_all_link: '', banner: { image: '', link: '' }, cta: this.blankCta(), html: '' });
+                images: [], videos: [], source: 'new', category_id: '', limit: 10, view_all_link: '', banner: { image: '', link: '' }, cta: this.blankCta(), html: '', review_ids: [] });
         },
         remove(i) { this.blocks.splice(i, 1); },
         move(i, d) { const j = i + d; if (j < 0 || j >= this.blocks.length) return; [this.blocks[i], this.blocks[j]] = [this.blocks[j], this.blocks[i]]; },
         addImage(b) { if (!b.images) b.images = []; b.images.push({ image: '', link: '' }); },
         addVideo(b) { if (!b.videos) b.videos = []; b.videos.push({ title: '', url: '' }); },
-        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); return ''; },
+        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); b.review_ids = (b.review_ids || []).map(Number); return ''; },
     }));
 
     // ── Admin: Discover page tile builder (image + name + link) ─────────────
@@ -714,3 +714,49 @@ document.addEventListener('alpine:init', () => {
 
 // Boot Alpine after all stores/components/plugins are registered above.
 Alpine.start();
+
+// ── Storefront scroll-reveal (premium motion) ────────────────────────────────
+// Sections fade-up as they enter the viewport; cards inside a section stagger.
+// Gated to the storefront ([data-shop]) so the admin stays instant, and skipped
+// entirely for reduced-motion users. Content is untouched when JS doesn't run.
+(function () {
+    if (!document.body.hasAttribute('data-shop')) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!('IntersectionObserver' in window)) return;
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('reveal-in');
+            observer.unobserve(entry.target);
+        });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+    // Above-the-fold elements animate immediately — they are never put in a
+    // hidden state that depends on observer callbacks firing. Only below-fold
+    // elements wait to be revealed (observer, plus the scroll sweep below as a
+    // fallback for environments that throttle IntersectionObserver).
+    const activate = (el, delay) => {
+        if (delay) el.style.setProperty('--reveal-delay', delay);
+        el.classList.add('reveal-init');
+        if (el.getBoundingClientRect().top < window.innerHeight - 20) {
+            el.classList.add('reveal-in');
+        } else {
+            observer.observe(el);
+        }
+    };
+
+    document.querySelectorAll('main section').forEach((el) => activate(el, ''));
+    // Stagger cards in reading order, restarting every row-ish group of 4.
+    document.querySelectorAll('main .group.relative.block, main .card')
+        .forEach((el, i) => activate(el, `${(i % 4) * 0.08}s`));
+
+    const sweep = () => {
+        document.querySelectorAll('.reveal-init:not(.reveal-in)').forEach((el) => {
+            const r = el.getBoundingClientRect();
+            if (r.top < window.innerHeight + 80 && r.bottom > -80) el.classList.add('reveal-in');
+        });
+    };
+    window.addEventListener('scroll', sweep, { passive: true });
+    setTimeout(sweep, 2000);
+})();

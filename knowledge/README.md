@@ -49,9 +49,9 @@ threshold). Loyalty rates: admin → Settings → Loyalty.
 
 ## 4. Version control & git workflow
 
-- This folder **is committed to the app repo** — knowledge deploys with code, is branch-reviewable, and one clone gives an agent code + business context.
+- This folder **is committed to the app repo** — knowledge deploys with code, is branch-reviewable, and one clone gives an agent code + business context. **Exception:** `products/` is gitignored — it's a generated artifact, rebuilt per environment from that environment's database (auto-synced on every product save, or via `php artisan knowledge:sync`), so server-side generation never dirties the deploy tree.
 - Knowledge edits are normal commits, prefixed `kb:` (e.g. `kb: update returns policy wording`). Review diffs like code — a wrong policy in git becomes a wrong answer to a customer.
-- Regenerated product front matter arrives via `php artisan knowledge:sync` commits (`kb-sync:` prefix) — bodies are preserved, so sync commits should show only front-matter diffs.
+- The whole folder is also browsable/editable at **Admin → Knowledge** (product files warn that their front matter is machine-owned).
 - Never rewrite history on knowledge files: point-in-time answers ("what did our policy say in June?") depend on it.
 
 ## 5. RAG optimization
@@ -76,7 +76,7 @@ Because every file has front matter + stable paths, that server is a thin file/D
 
 ## 8. Automation opportunities (in rough order of value)
 
-1. **Auto-sync on product save** — fire `knowledge:sync --product={id}` from a queued job on product create/update, so markdown never drifts (the command exists; wiring it to the model event is a one-liner when wanted).
+1. **Auto-sync on product save** — DONE: every product create/update queues `knowledge:sync --product={id}` (see `App\Jobs\SyncProductKnowledge`), so markdown never drifts.
 2. **AI body-filling** — for any product whose body still has template placeholders, run the `prompts/product-description.md` recipe against front matter + material files, and commit the draft for human review.
 3. **Push/SMS copywriting** — feed `marketing/` + a product file to draft campaign copy for the admin composer.
 4. **Support drafting** — `support/` + `policies/` + the order record answer most inbound messages; a human approves.
@@ -85,6 +85,6 @@ Because every file has front matter + stable paths, that server is a thin file/D
 ## 9. How a new product enters the system
 
 1. Admin creates the product in the panel (or CSV import) — as today, nothing extra.
-2. `php artisan knowledge:sync` (manually, via deploy, or the model-event hook) creates `products/{slug}.md`: front matter from the DB + body seeded from `_templates/product.md` with the description filled in.
-3. A human or AI fills the placeholder sections (story, audience, angles, FAQ) — guided by `brand/` and `materials/`.
-4. Future syncs refresh only front matter; the authored body is never overwritten.
+2. The save automatically queues a sync that creates `products/{slug}.md`: front matter from the DB + body seeded from `_templates/product.md` with the description filled in (visible within a minute at Admin → Knowledge).
+3. A human or AI fills the placeholder sections (story, audience, angles, FAQ) — guided by `brand/` and `materials/` — right in Admin → Knowledge or any editor.
+4. Every later save refreshes only the front matter; the authored body is never overwritten.

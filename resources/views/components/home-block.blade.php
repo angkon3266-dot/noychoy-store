@@ -104,6 +104,55 @@
     </section>
     @endif
 
+@elseif($type === 'reviews')
+    @php
+        $reviews = collect($block['reviews'] ?? []);
+        // Sample testimonials shown until the admin picks real reviews.
+        $placeholder = $reviews->isEmpty();
+        $items = $placeholder ? collect([
+            ['author' => 'Taslima S.', 'meta' => 'Dhaka', 'rating' => 5, 'quote' => 'The earrings arrived beautifully packaged. The quality is amazing for this price — my friends thought I spent ten times more!'],
+            ['author' => 'Rafiq H.', 'meta' => 'Chattogram', 'rating' => 5, 'quote' => 'Ordered a ring for my wife. She absolutely loves it. The cash on delivery option made it so easy.'],
+            ['author' => 'Nusrat A.', 'meta' => 'Sylhet', 'rating' => 5, 'quote' => 'I\'ve ordered three times now and every piece has been perfect. The bracelets are my favorite — so elegant and well-made.'],
+        ]) : $reviews->map(fn ($r) => [
+            'author' => $r->author_name,
+            'meta' => $r->product?->name,
+            'link' => $r->product ? route('product.show', $r->product->slug) : null,
+            'rating' => (int) $r->rating,
+            'quote' => $r->body ?: $r->title,
+        ]);
+    @endphp
+    <section class="py-14 bg-gold-50/60">
+        <div class="mx-auto max-w-7xl px-4">
+            <div class="text-center mb-10">
+                <p class="uppercase tracking-[0.3em] text-xs text-gold-600 mb-3">Customer love</p>
+                <h2 class="font-display text-3xl sm:text-4xl text-ink-900">{{ ($block['title'] ?? '') !== '' ? $block['title'] : "What they're saying" }}</h2>
+            </div>
+            <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach($items as $t)
+                    <div class="rounded-2xl bg-white border border-ink-100 p-6 shadow-sm flex flex-col">
+                        <div class="text-gold-500 tracking-wide mb-3" aria-label="{{ $t['rating'] }} star review">{{ str_repeat('★', max(1, min(5, $t['rating']))) }}</div>
+                        <p class="font-display italic text-ink-800 leading-relaxed flex-1">&ldquo;{{ $t['quote'] }}&rdquo;</p>
+                        <div class="flex items-center gap-3 mt-5">
+                            <div class="w-10 h-10 rounded-full bg-gold-100 text-gold-700 text-xs font-semibold flex items-center justify-center shrink-0">
+                                {{ collect(explode(' ', trim($t['author'])))->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('') }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-ink-900">{{ $t['author'] }}</p>
+                                @if(filled($t['meta'] ?? null))
+                                    @if(filled($t['link'] ?? null))
+                                        <a href="{{ $t['link'] }}" class="text-xs text-ink-700/50 hover:text-gold-700 truncate block">{{ $t['meta'] }}</a>
+                                    @else
+                                        <p class="text-xs text-ink-700/50 truncate">{{ $t['meta'] }}</p>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
 @elseif($type === 'richtext')
     @if(filled($block['html'] ?? null))
         <section class="mx-auto max-w-4xl px-4 py-8 prose prose-sm sm:prose">{!! $block['html'] !!}</section>

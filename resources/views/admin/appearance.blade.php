@@ -383,6 +383,7 @@
                         <option value="product_carousel">Product carousel</option>
                         <option value="banner_carousel">Banner + products</option>
                         <option value="video">Video row</option>
+                        <option value="reviews">Customer reviews</option>
                         <option value="richtext">Rich text / HTML</option>
                     </select>
                     <input x-model="b.title" class="input py-1.5 flex-1 text-sm" placeholder="Section title (optional)">
@@ -479,6 +480,28 @@
                     <p class="text-xs text-ink-700/50">Upload MP4s in the section above (Homepage sections) or paste links here.</p>
                 </div>
 
+                {{-- Customer reviews picker --}}
+                <div x-show="b.type==='reviews'" class="space-y-2">
+                    @if(($recentReviews ?? collect())->isEmpty())
+                        <p class="text-xs text-ink-700/60">No approved reviews yet — the section will show sample testimonials until you pick real ones here.</p>
+                    @else
+                        <p class="text-xs text-ink-700/60">Tick the reviews to highlight (<span x-text="b.review_ids.length"></span> selected, shown in this order). None ticked = sample testimonials.</p>
+                        <div class="max-h-56 overflow-y-auto rounded-lg border border-ink-100 divide-y divide-ink-100">
+                            @foreach($recentReviews as $rv)
+                                <label class="flex items-start gap-2 px-3 py-2 text-xs hover:bg-ink-50 cursor-pointer">
+                                    <input type="checkbox" :value="{{ $rv->id }}" x-model.number="b.review_ids" class="mt-0.5">
+                                    <span class="min-w-0">
+                                        <span class="font-medium">{{ $rv->author_name }}</span>
+                                        <span class="text-gold-600">{{ str_repeat('★', (int) $rv->rating) }}</span>
+                                        <span class="text-ink-700/50">· {{ $rv->product?->name }}</span>
+                                        <span class="block text-ink-700/60 truncate">{{ \Illuminate\Support\Str::limit($rv->body ?: $rv->title, 110) }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
                 {{-- Rich text --}}
                 <div x-show="b.type==='richtext'">
                     <textarea x-model="b.html" rows="4" class="input text-sm font-mono" placeholder="<h2>Custom HTML…</h2>"></textarea>
@@ -493,6 +516,7 @@
                 <option value="cta_banner">CTA banner (image + text + button)</option>
                 <option value="banner_carousel">Banner + products</option>
                 <option value="video">Video row</option>
+                <option value="reviews">Customer reviews</option>
                 <option value="richtext">Rich text / HTML</option>
             </select>
             <button type="button" @click="add()" class="btn-outline text-sm">+ Add section</button>
