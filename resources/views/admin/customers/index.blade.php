@@ -60,6 +60,11 @@
             <input name="value" type="number" step="0.01" class="input" placeholder="Value (% / ৳ / points)">
             <input name="code" class="input" placeholder="Code (optional)">
             <input name="expires_at" type="date" class="input">
+            <textarea name="message" rows="2" class="input sm:col-span-2" placeholder="Message (optional) — used in the web push and SMS. Empty = auto-written from the title & reward."></textarea>
+            <div class="sm:col-span-2 flex flex-wrap items-center gap-5 text-sm">
+                <label class="flex items-center gap-2"><input type="checkbox" name="send_push" value="1" checked> 🔔 Send web push + bell notification</label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="send_sms" value="1"> 💬 Also send SMS <span class="text-xs text-ink-700/50">(uses SMS credits)</span></label>
+            </div>
             <button class="btn-primary sm:col-span-2">Apply offer to <span x-text="sel.length"></span> customer(s)</button>
         </form>
     </div>

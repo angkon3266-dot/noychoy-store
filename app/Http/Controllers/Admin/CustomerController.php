@@ -225,38 +225,60 @@ class CustomerController extends Controller
             'value' => ['nullable', 'numeric', 'min:0'],
             'code' => ['nullable', 'string', 'max:40'],
             'expires_at' => ['nullable', 'date'],
+            'message' => ['nullable', 'string', 'max:300'],
         ]);
 
         $loyalty = app(\App\Services\LoyaltyService::class);
         $customers = Customer::whereIn('id', $data['ids'])->get();
 
+        $sample = null;
         foreach ($customers as $customer) {
             $offer = $customer->offers()->create([
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
+                'message' => $data['message'] ?? null,
                 'type' => $data['type'],
                 'value' => $data['value'] ?? 0,
                 'code' => $data['code'] ?? null,
                 'expires_at' => $data['expires_at'] ?? null,
                 'is_active' => true,
             ]);
+            $sample ??= $offer;
             if ($offer->type === 'points' && (int) $offer->value > 0) {
                 $loyalty->award($customer, (int) $offer->value, 'adjust', 'Bonus: '.$offer->title, $offer);
             }
         }
 
-        // One targeted notification (bell + web push) to everyone who got the offer.
-        if ($customers->isNotEmpty()) {
-            $sample = $customers->first()->offers()->latest()->first();
-            app(\App\Services\NotificationService::class)->notifyOfferGranted(
-                $customers->pluck('id')->all(),
-                $data['title'],
-                null,
-                $sample?->rewardText() ?? 'a special reward',
-            );
+        if ($customers->isEmpty()) {
+            return back()->with('error', 'No customers matched the selection.');
         }
 
-        return back()->with('success', 'Offer applied to '.$customers->count().' customer(s).');
+        $reward = $sample?->rewardText() ?? 'a special reward';
+        $message = filled($data['message'] ?? null) ? $data['message'] : null;
+        $msg = 'Offer applied to '.$customers->count().' customer(s).';
+
+        // Bell + browser web push (admin-controlled, on by default in the form).
+        if ($request->boolean('send_push')) {
+            $notifications = app(\App\Services\NotificationService::class);
+            $notifications->notifyOfferGranted($customers->pluck('id')->all(), $data['title'], $message, $reward);
+            $msg .= $notifications->lastPushQueued > 0
+                ? ' Web push queued to '.$notifications->lastPushQueued.' device(s).'
+                : ' (No push-subscribed devices among them — they’ll still see it in the bell.)';
+        }
+
+        // Optional SMS — queued so a big list doesn't block the request.
+        if ($request->boolean('send_sms')) {
+            $text = $message ?: trim($data['title'].' — '.$reward
+                .(filled($data['code'] ?? null) ? '. Use code '.strtoupper($data['code']) : '')
+                .'. '.store_name());
+            $phones = $customers->pluck('phone')->filter()->values();
+            foreach ($phones->chunk(100) as $chunk) {
+                \App\Jobs\SendSegmentSms::dispatch($chunk->values()->all(), $text);
+            }
+            $msg .= ' SMS queued to '.$phones->count().' number(s).';
+        }
+
+        return back()->with('success', $msg);
     }
 
     /** Manually add or subtract loyalty points. */
