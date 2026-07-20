@@ -29,6 +29,14 @@
             @endforeach
         </select>
         <input name="custom" value="{{ request('custom') }}" placeholder="Custom field value…" class="input py-2 w-40">
+        <select name="sort" onchange="this.form.submit()" class="input py-2" title="Sort products">
+            <option value="">Newest first</option>
+            <option value="serial" @selected(request('sort')=='serial')>Product ID (1 → N)</option>
+            <option value="name" @selected(request('sort')=='name')>Name A–Z</option>
+            <option value="price" @selected(request('sort')=='price')>Price: low to high</option>
+            <option value="price_desc" @selected(request('sort')=='price_desc')>Price: high to low</option>
+            <option value="stock" @selected(request('sort')=='stock')>Stock: low first</option>
+        </select>
         <select name="per_page" onchange="this.form.submit()" class="input py-2" title="Products per page">
             @foreach(['20','50','100','200','all'] as $pp)
                 <option value="{{ $pp }}" @selected((string) request('per_page', '20') === $pp)>{{ $pp === 'all' ? 'Show all' : $pp.' / page' }}</option>

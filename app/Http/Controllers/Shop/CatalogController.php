@@ -191,6 +191,8 @@ class CatalogController extends Controller
                 'price' => (float) ($v->price ?? $product->price),
                 'compare' => (float) $v->compare_at_price,
                 'stock' => (int) $v->stock_quantity,
+                // Variation photo — the gallery jumps to it when this variant is picked.
+                'image' => $v->image_id ? $product->images->firstWhere('id', $v->image_id)?->url : null,
             ])->values(),
             'offers' => $product->offerTiers(),
         ];

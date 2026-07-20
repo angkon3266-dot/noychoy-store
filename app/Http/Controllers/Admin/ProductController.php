@@ -29,8 +29,17 @@ class ProductController extends Controller
             ->when($request->query('custom'), fn ($q, $c) => $q->where(fn ($w) => $w
                 ->where('custom_value', 'like', "%{$c}%")
                 ->orWhere('custom_label', 'like', "%{$c}%")
-                ->orWhere('custom_fields', 'like', "%{$c}%")))
-            ->latest();
+                ->orWhere('custom_fields', 'like', "%{$c}%")));
+
+        // Sort: newest (default), product ID (serial), name, price, stock.
+        $products = match ($request->query('sort')) {
+            'serial' => $products->orderByRaw('serial IS NULL')->orderBy('serial'),
+            'name' => $products->orderBy('name'),
+            'price' => $products->orderBy('price'),
+            'price_desc' => $products->orderByDesc('price'),
+            'stock' => $products->orderBy('stock_quantity'),
+            default => $products->latest(),
+        };
 
         // Per-page: lets the admin show more rows to select many at once.
         $perPage = $request->query('per_page', 20);
@@ -848,17 +857,22 @@ class ProductController extends Controller
         // Rebuild fresh each save (small catalog, keeps it predictable).
         $product->variants()->delete();
 
+        // Per-variant images must belong to this product's gallery.
+        $validImageIds = $product->images()->pluck('id')->flip();
+
         foreach ($rows as $row) {
             $attrs = collect($row['attrs'])->map(fn ($v) => (string) $v)->filter(fn ($v) => $v !== '')->all();
             if (empty($attrs)) {
                 continue;
             }
+            $imageId = (int) ($row['image_id'] ?? 0);
             $product->variants()->create([
                 'attributes' => $attrs,                                   // {"Size":"7","Color":"Gold"}
                 'sku' => $row['sku'] ?? null,
                 'price' => filled($row['price'] ?? null) ? (float) $row['price'] : null,
                 'compare_at_price' => filled($row['compare'] ?? null) ? (float) $row['compare'] : null,
                 'stock_quantity' => (int) ($row['stock'] ?? 0),
+                'image_id' => $validImageIds->has($imageId) ? $imageId : null,
                 'is_active' => true,
             ]);
         }

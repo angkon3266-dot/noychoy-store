@@ -14,6 +14,7 @@
         ['Customers', $stats['customers'], 'text-ink-800', $stats['repeat_rate'].'% repeat'],
         ['New customers', $stats['new_customers_month'], 'text-ink-800', 'this month'],
         ['Low stock', $stats['low_stock'], 'text-red-600', '≤ 3 left'],
+        ['Stock on hand', number_format($stats['stock_units']).' pcs', 'text-ink-800', money($stats['stock_cost_value']).' at cost'],
     ]; @endphp
     @foreach($cards as [$label, $value, $color, $sub])
         <div class="card p-5">
@@ -137,6 +138,35 @@
         <p class="text-sm text-ink-700/50">No love reactions yet. They'll appear here as customers tap the ❤️ on products.</p>
     @endforelse
 </div>
+
+{{-- Contact messages inbox --}}
+@if($unreadMessages > 0)
+<div class="card mt-6 overflow-hidden border-gold-200">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-ink-100 bg-gold-50/60">
+        <h2 class="font-semibold flex items-center gap-2">📨 New messages
+            <span class="min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-xs font-semibold inline-flex items-center justify-center">{{ $unreadMessages }}</span>
+        </h2>
+        <a href="{{ route('admin.messages') }}" class="text-sm text-gold-700 hover:underline">All messages →</a>
+    </div>
+    <div class="divide-y divide-ink-100">
+        @foreach($recentMessages as $m)
+            <div class="px-5 py-3 flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium">{{ $m->name }}
+                        <span class="text-xs font-normal text-ink-700/50">· {{ $m->phone ?: $m->email }} · {{ $m->created_at->diffForHumans() }}</span>
+                    </p>
+                    @if($m->subject)<p class="text-xs font-medium text-ink-700/70 mt-0.5">{{ $m->subject }}</p>@endif
+                    <p class="text-sm text-ink-700/70 mt-0.5">{{ \Illuminate\Support\Str::limit($m->message, 160) }}</p>
+                </div>
+                <form action="{{ route('admin.messages.read', $m) }}" method="POST" class="shrink-0">
+                    @csrf
+                    <button class="text-xs text-gold-700 hover:underline whitespace-nowrap">Mark read</button>
+                </form>
+            </div>
+        @endforeach
+    </div>
+</div>
+@endif
 
 {{-- Recent orders --}}
 <div class="card mt-6 overflow-hidden">

@@ -71,10 +71,14 @@
 
                 <div class="items">
                     @foreach($order->items as $item)
-                        @php $var = collect($item->attributes ?? [])->filter()->implode(', '); @endphp
+                        @php
+                            $var = collect($item->attributes ?? [])->filter()->map(fn ($v, $k) => "$k: $v")->implode(' · ');
+                            // Prefer the exact variation's photo so the packer sees the right colour/size.
+                            $itemImg = $item->variant?->image?->url ?? $item->product?->thumbnail;
+                        @endphp
                         <div class="item">
-                            @if($item->product?->thumbnail)
-                                <img src="{{ $item->product->thumbnail }}" alt="">
+                            @if($itemImg)
+                                <img src="{{ $itemImg }}" alt="">
                             @else
                                 <span class="ph"></span>
                             @endif

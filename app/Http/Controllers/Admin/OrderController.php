@@ -196,7 +196,7 @@ class OrderController extends Controller
     {
         $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
 
-        $orders = Order::with('items.product.images', 'shipment')
+        $orders = Order::with('items.product.images', 'items.variant.image', 'shipment')
             ->whereHas('shipment', fn ($s) => $s->whereNotNull('consignment_id'))
             ->when($ids, fn ($q) => $q->whereIn('id', $ids))
             ->latest()

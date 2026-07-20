@@ -21,11 +21,12 @@
 @php
     $vType = old('product_type', $product->has_variants ? 'variable' : 'simple');
     $vAttributes = collect(old('attributes', collect($product->options ?? [])->map(fn ($o) => ['name' => $o['name'] ?? '', 'values' => implode(', ', $o['values'] ?? [])])->all()))->values();
-    $vVariants = collect(old('variants', $product->variants->map(fn ($v) => ['attrs' => $v->attributes ?? [], 'price' => $v->price, 'compare' => $v->compare_at_price, 'stock' => $v->stock_quantity, 'sku' => $v->sku])->all()))->values();
+    $vVariants = collect(old('variants', $product->variants->map(fn ($v) => ['attrs' => $v->attributes ?? [], 'price' => $v->price, 'compare' => $v->compare_at_price, 'stock' => $v->stock_quantity, 'sku' => $v->sku, 'image_id' => $v->image_id])->all()))->values();
     $formConfig = [
         'type' => $vType,
         'attributes' => $vAttributes,
         'variants' => $vVariants,
+        'images' => $product->images->map(fn ($i) => ['id' => $i->id, 'url' => $i->url])->values(),
         'offers' => collect(old('quantity_offers', $product->quantity_offers ?? []))->map(fn ($t) => ['min_qty' => $t['min_qty'] ?? '', 'percent' => $t['percent'] ?? ''])->values(),
         'price' => (float) old('price', $product->price ?: 0),
         'cost' => (float) old('cost_price', $product->cost_price ?: 0),
@@ -174,15 +175,39 @@
                             <button type="button" @click="generate()" class="text-xs text-gold-700 hover:underline">↻ Regenerate</button>
                         </div>
                         <div class="grid grid-cols-12 gap-2 text-xs text-ink-700/60 px-1">
-                            <span class="col-span-4">Variation</span><span class="col-span-2">Price ৳</span><span class="col-span-2">Compare ৳</span><span class="col-span-2">Stock</span><span class="col-span-2">SKU</span>
+                            <span class="col-span-1">Image</span><span class="col-span-3">Variation</span><span class="col-span-2">Price ৳</span><span class="col-span-2">Compare ৳</span><span class="col-span-2">Stock</span><span class="col-span-2">SKU</span>
                         </div>
                         <template x-for="(v, i) in variants" :key="keyOf(v.attrs)">
                             <div class="grid grid-cols-12 gap-2 items-center">
-                                <span class="col-span-4 text-sm" x-text="label(v.attrs)"></span>
+                                <div class="col-span-1 relative" x-data="{ pick: false }">
+                                    <button type="button" @click="pick = !pick" class="w-10 h-10 rounded-lg border overflow-hidden flex items-center justify-center bg-white transition"
+                                            :class="imageThumb(v.image_id) ? 'border-gold-400' : 'border-dashed border-ink-300 hover:border-gold-400'"
+                                            title="This variation's photo — shown when a customer picks it, and printed on labels">
+                                        <template x-if="imageThumb(v.image_id)"><img :src="imageThumb(v.image_id)" class="w-full h-full object-cover"></template>
+                                        <template x-if="!imageThumb(v.image_id)"><span class="text-ink-700/40 text-base">＋</span></template>
+                                    </button>
+                                    <div x-show="pick" @click.outside="pick = false" x-cloak
+                                         class="absolute left-0 z-30 mt-1 w-60 rounded-lg border border-ink-100 bg-white shadow-xl p-2.5">
+                                        <p class="text-xs text-ink-700/60 mb-1.5">Photo for <span class="font-medium" x-text="label(v.attrs)"></span></p>
+                                        <div class="grid grid-cols-4 gap-1.5" x-show="images.length">
+                                            <template x-for="im in images" :key="im.id">
+                                                <button type="button" @click="v.image_id = im.id; pick = false"
+                                                        class="aspect-square rounded overflow-hidden border-2 transition"
+                                                        :class="Number(v.image_id) === Number(im.id) ? 'border-gold-600' : 'border-transparent hover:border-gold-300'">
+                                                    <img :src="im.url" class="w-full h-full object-cover">
+                                                </button>
+                                            </template>
+                                        </div>
+                                        <p x-show="!images.length" class="text-xs text-ink-700/50">Upload product photos and save first — then pick here.</p>
+                                        <button type="button" x-show="v.image_id" @click="v.image_id = ''; pick = false" class="text-xs text-red-600 hover:underline mt-2">Remove image</button>
+                                    </div>
+                                </div>
+                                <span class="col-span-3 text-sm" x-text="label(v.attrs)"></span>
                                 <input :name="`variants[${i}][price]`" x-model="v.price" type="number" step="0.01" class="input py-2 col-span-2" placeholder="0.00">
                                 <input :name="`variants[${i}][compare]`" x-model="v.compare" type="number" step="0.01" class="input py-2 col-span-2" placeholder="—" title="Original price (strike-through)">
                                 <input :name="`variants[${i}][stock]`" x-model="v.stock" type="number" class="input py-2 col-span-2" placeholder="0">
                                 <input :name="`variants[${i}][sku]`" x-model="v.sku" class="input py-2 col-span-2" placeholder="SKU">
+                                <input type="hidden" :name="`variants[${i}][image_id]`" :value="v.image_id">
                                 <template x-for="(val, name) in v.attrs" :key="name">
                                     <input type="hidden" :name="`variants[${i}][attrs][${name}]`" :value="val">
                                 </template>
@@ -231,14 +256,25 @@
                         <div x-data="relatedPicker({{ Js::from($allProductsJs) }}, {{ Js::from($sel) }}, '{{ $field }}')" @click.outside="open=false">
                             <label class="label">{{ $label }}</label>
                             <div class="relative">
-                                <input x-model="q" @focus="open=true" @input="open=true" placeholder="Search products…" class="input py-2" autocomplete="off">
-                                <div x-show="open && results.length" x-cloak class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-ink-100 bg-white shadow-lg">
-                                    <template x-for="p in results" :key="p.id">
-                                        <button type="button" @click="add(p.id)" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-gold-50">
-                                            <img :src="p.thumb" x-show="p.thumb" class="w-8 h-8 rounded object-cover bg-ink-100 shrink-0" alt="">
-                                            <span x-text="p.name"></span>
-                                        </button>
-                                    </template>
+                                <input x-model="q" @focus="open=true" @input="open=true" placeholder="Search, then tick as many as you like…" class="input py-2" autocomplete="off">
+                                <div x-show="open" x-cloak class="absolute z-20 mt-1 w-full rounded-lg border border-ink-100 bg-white shadow-lg">
+                                    <div class="max-h-56 overflow-y-auto">
+                                        <template x-for="p in results" :key="p.id">
+                                            <button type="button" @click="toggle(p.id)" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-gold-50">
+                                                <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition"
+                                                      :class="has(p.id) ? 'bg-gold-600 border-gold-600' : 'border-ink-300 bg-white'">
+                                                    <svg x-show="has(p.id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                                </span>
+                                                <img :src="p.thumb" x-show="p.thumb" class="w-8 h-8 rounded object-cover bg-ink-100 shrink-0" alt="">
+                                                <span x-text="p.name" :class="has(p.id) && 'font-medium'"></span>
+                                            </button>
+                                        </template>
+                                        <p x-show="!results.length" class="px-3 py-3 text-xs text-ink-700/50">No products match.</p>
+                                    </div>
+                                    <div class="flex items-center justify-between border-t border-ink-100 px-3 py-2 bg-ink-50/60 rounded-b-lg">
+                                        <span class="text-xs text-ink-700/60"><span x-text="selected.length"></span> selected</span>
+                                        <button type="button" @click="open=false; q=''" class="text-xs font-semibold text-gold-700 hover:underline">Done</button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1.5">

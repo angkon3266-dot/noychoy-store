@@ -38,6 +38,8 @@ class ProductVariant extends Model
 
     public function getLabelAttribute(): string
     {
-        return collect($this->attributes ?? [])->map(fn ($v, $k) => "$k: $v")->implode(', ');
+        // getAttribute('attributes') = the casted JSON column; a bare
+        // $this->attributes here would be Eloquent's raw internal array.
+        return collect($this->getAttribute('attributes') ?? [])->map(fn ($v, $k) => "$k: $v")->implode(', ');
     }
 }

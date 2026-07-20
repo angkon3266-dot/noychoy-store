@@ -48,6 +48,11 @@ class DashboardController extends Controller
             'repeat_rate' => $totalCustomers ? round($repeatCustomers / $totalCustomers * 100) : 0,
             'new_customers_month' => Customer::where('created_at', '>=', $monthStart)->count(),
             'low_stock' => Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)->count(),
+            // Inventory on hand: units + what that stock cost (landed = cost + transport).
+            'stock_units' => (int) Product::where('manage_stock', true)->where('stock_quantity', '>', 0)->sum('stock_quantity'),
+            'stock_cost_value' => (float) Product::where('manage_stock', true)->where('stock_quantity', '>', 0)
+                ->selectRaw('COALESCE(SUM(stock_quantity * (COALESCE(cost_price, 0) + COALESCE(transport_cost, 0))), 0) as v')
+                ->value('v'),
         ];
 
         // Last 7 days revenue (for a mini bar chart).
@@ -96,6 +101,10 @@ class DashboardController extends Controller
 
         $recentOrders = Order::latest()->take(10)->get();
 
+        // Contact-form inbox, surfaced here so new messages are seen immediately.
+        $unreadMessages = \App\Models\ContactMessage::where('is_read', false)->count();
+        $recentMessages = \App\Models\ContactMessage::where('is_read', false)->latest()->take(6)->get();
+
         $statusCounts = Order::query()
             ->selectRaw('status, count(*) as count')
             ->groupBy('status')
@@ -103,7 +112,8 @@ class DashboardController extends Controller
 
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
-            'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability'
+            'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability',
+            'unreadMessages', 'recentMessages'
         ));
     }
 }

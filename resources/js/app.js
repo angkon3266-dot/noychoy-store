@@ -173,7 +173,8 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('productForm', (config) => ({
         type: config.type || 'simple',
         attributes: config.attributes || [],   // [{ name, values }] (values = comma string)
-        variants: config.variants || [],       // [{ attrs:{Size:'7'}, price, stock, sku }]
+        variants: config.variants || [],       // [{ attrs:{Size:'7'}, price, stock, sku, image_id }]
+        images: config.images || [],           // product gallery [{id, url}] for per-variant images
         offers: config.offers || [],
         price: Number(config.price) || 0,
         cost: Number(config.cost) || 0,
@@ -190,6 +191,7 @@ document.addEventListener('alpine:init', () => {
         keyOf(attrs) { return Object.keys(attrs).sort().map(k => k + ':' + attrs[k]).join('|'); },
         label(attrs) { return Object.entries(attrs).map(([k, v]) => k + ': ' + v).join(' · '); },
         attrNames(v) { return Object.keys(v.attrs); },
+        imageThumb(id) { const im = this.images.find(x => Number(x.id) === Number(id)); return im ? im.url : null; },
 
         /** Rebuild the variant matrix as the cartesian product of attribute values. */
         generate() {
@@ -211,7 +213,7 @@ document.addEventListener('alpine:init', () => {
                 const attrs = {};
                 combo.forEach(([n, v]) => { attrs[n] = v; });
                 const old = prev[this.keyOf(attrs)];
-                return { attrs, price: old ? old.price : '', compare: old ? old.compare : '', stock: old ? old.stock : 0, sku: old ? old.sku : '' };
+                return { attrs, price: old ? old.price : '', compare: old ? old.compare : '', stock: old ? old.stock : 0, sku: old ? old.sku : '', image_id: old ? (old.image_id || '') : '' };
             });
         },
     }));
@@ -259,6 +261,8 @@ document.addEventListener('alpine:init', () => {
     }));
 
     // ── Admin: searchable related-product picker (upsell / cross-sell) ───────
+    // Multi-tick: the list stays open while products are checked on/off, so a
+    // whole set can be attached in one pass instead of one search per product.
     window.Alpine.data('relatedPicker', (all, selected, field) => ({
         all: all || [],
         selected: (selected || []).map(Number),
@@ -267,16 +271,15 @@ document.addEventListener('alpine:init', () => {
         open: false,
         get results() {
             const term = this.q.trim().toLowerCase();
-            const matches = this.all
-                .filter(p => !this.selected.includes(p.id))
-                .filter(p => term === '' || p.name.toLowerCase().includes(term));
+            const matches = this.all.filter(p => term === '' || p.name.toLowerCase().includes(term));
             // Show everything while searching; cap only the initial (no-term) list.
             return term === '' ? matches.slice(0, 100) : matches;
         },
         get chosen() {
             return this.selected.map(id => this.all.find(p => p.id === id)).filter(Boolean);
         },
-        add(id) { if (!this.selected.includes(id)) this.selected.push(id); this.q = ''; this.open = false; },
+        has(id) { return this.selected.includes(id); },
+        toggle(id) { this.has(id) ? this.remove(id) : this.selected.push(id); },
         remove(id) { this.selected = this.selected.filter(x => x !== id); },
     }));
 
@@ -628,7 +631,11 @@ document.addEventListener('alpine:init', () => {
         get variant() { return this.hasVariants ? (this.matched ? String(this.matched.id) : '') : 'none'; },
         get variantStock() { return this.matched ? this.matched.stock : null; },
 
-        selectAttr(name, val) { this.selected[name] = val; },
+        selectAttr(name, val) {
+            this.selected[name] = val;
+            // Jump the gallery to the chosen variation's photo, if it has one.
+            if (this.matched && this.matched.image) this.img = this.matched.image;
+        },
         isSelected(name, val) { return String(this.selected[name]) === String(val); },
         // Disable a value if no variant with it is in stock.
         valueInStock(name, val) {

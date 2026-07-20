@@ -420,7 +420,7 @@ class AppearanceController extends Controller
     /** Sanitise builder blocks to a known shape before storing. */
     protected function normalizeSections(array $blocks): array
     {
-        $types = ['banner', 'product_carousel', 'banner_carousel', 'cta_banner', 'video', 'richtext'];
+        $types = ['banner', 'product_carousel', 'banner_carousel', 'cta_banner', 'video', 'richtext', 'reviews'];
 
         return collect($blocks)->map(function ($b) use ($types) {
             $type = in_array($b['type'] ?? '', $types, true) ? $b['type'] : null;
@@ -469,6 +469,10 @@ class AppearanceController extends Controller
             }
             if ($type === 'richtext') {
                 $out['html'] = (string) ($b['html'] ?? '');
+            }
+            if ($type === 'reviews') {
+                $out['review_ids'] = collect($b['review_ids'] ?? [])
+                    ->map(fn ($i) => (int) $i)->filter()->unique()->values()->all();
             }
 
             return $out;
