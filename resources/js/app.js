@@ -398,8 +398,11 @@ document.addEventListener('alpine:init', () => {
         },
         choose(url) { if (this._cb) this._cb(url); this.close(); },
         // File picker <input> change handler — delegates to uploadFiles().
+        // Snapshot into a real array FIRST: e.target.files is a live FileList,
+        // and resetting e.target.value = '' empties it, so reading it after the
+        // reset would hand uploadFiles() zero files (silent no-op).
         uploadDevice(e) {
-            const files = e.target.files;
+            const files = Array.from(e.target.files || []);
             e.target.value = '';
             return this.uploadFiles(files);
         },
