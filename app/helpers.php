@@ -327,6 +327,33 @@ if (! function_exists('bd_phone')) {
     }
 }
 
+if (! function_exists('wa_phone')) {
+    /**
+     * International form for WhatsApp / wa.me links: 8801XXXXXXXXX, no plus.
+     * Numbers are stored locally as 01XXXXXXXXX; this converts at the boundary,
+     * the same way SmsService does for the SMS gateway.
+     */
+    function wa_phone(?string $phone): string
+    {
+        $d = bd_phone($phone);
+
+        return $d === '' ? '' : '880'.ltrim($d, '0');
+    }
+}
+
+if (! function_exists('wa_link')) {
+    /** A wa.me link for a customer, optionally pre-filling the first message. */
+    function wa_link(?string $phone, ?string $message = null): ?string
+    {
+        $to = wa_phone($phone);
+        if ($to === '') {
+            return null;
+        }
+
+        return 'https://wa.me/'.$to.(filled($message) ? '?text='.rawurlencode($message) : '');
+    }
+}
+
 if (! function_exists('meta_content_id')) {
     /**
      * The Meta content id for a product (optionally a variant). This MUST equal

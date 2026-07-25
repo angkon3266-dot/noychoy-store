@@ -137,16 +137,22 @@
                         @php $rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter(); @endphp
                         {{ $rowCats->isNotEmpty() ? $rowCats->implode(', ') : '—' }}
                     </td>
-                    <td class="px-4 py-3">
-                        <form action="{{ route('admin.products.quick', $product) }}" method="POST" class="flex items-center gap-1.5">
+                    {{-- Saves inline via fetch — no page reload, so filters, page
+                         number and scroll position all survive an edit. --}}
+                    <td class="px-4 py-3" x-data="quickPrice('{{ route('admin.products.quick', $product) }}')">
+                        <form @submit.prevent="save($event.target)" class="flex items-center gap-1.5">
                             @csrf @method('PATCH')
                             <span class="text-ink-700/50 text-xs">৳</span>
-                            <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Price">
-                            <input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input py-1 w-16 text-xs" title="Stock" @disabled(!$product->manage_stock) placeholder="∞">
-                            <button class="text-xs text-gold-700 hover:underline">Save</button>
+                            <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Price"
+                                   @keydown.enter.prevent="save($el.form)">
+                            <input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input py-1 w-16 text-xs" title="Stock"
+                                   @disabled(!$product->manage_stock) placeholder="∞" @keydown.enter.prevent="save($el.form)">
+                            <button class="text-xs text-gold-700 hover:underline whitespace-nowrap" :disabled="busy"
+                                    x-text="busy ? '…' : (state === 'saved' ? '✓ Saved' : (state === 'error' ? 'Retry' : 'Save'))"
+                                    :class="state === 'error' && 'text-red-600'"></button>
                         </form>
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-3" data-margin-cell>
                         @if($product->margin_percent !== null)
                             <span class="font-medium {{ $product->margin_amount < 0 ? 'text-red-600' : ($product->margin_percent < 20 ? 'text-amber-600' : 'text-green-700') }}">{{ $product->margin_percent }}%</span>
                             <div class="text-xs text-ink-700/50">{{ money($product->margin_amount) }}/unit</div>

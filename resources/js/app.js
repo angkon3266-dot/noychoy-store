@@ -222,6 +222,51 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: inline price/stock save on the product list ──────────────────
+    // Posts the row's form and patches the margin cell from the response, so
+    // editing a price never reloads the page and loses the admin's place.
+    window.Alpine.data('quickPrice', (url) => ({
+        busy: false,
+        state: 'idle',
+
+        async save(form) {
+            if (this.busy) return;
+            this.busy = true;
+            this.state = 'idle';
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new FormData(form),
+                });
+                if (!res.ok) throw new Error(res.status);
+                const data = await res.json();
+                this.paintMargin(form, data);
+                this.state = 'saved';
+                setTimeout(() => { if (this.state === 'saved') this.state = 'idle'; }, 2500);
+            } catch (e) {
+                this.state = 'error';
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        /** Margin moves with the price, so repaint it rather than leave it stale. */
+        paintMargin(form, data) {
+            const cell = form.closest('td')?.nextElementSibling;
+            if (!cell || !cell.hasAttribute('data-margin-cell')) return;
+
+            if (data.margin_percent === null || data.margin_percent === undefined) {
+                cell.innerHTML = '<span class="text-xs text-ink-700/40">—</span>';
+                return;
+            }
+            const tone = data.margin_percent < 0 ? 'text-red-600'
+                : (data.margin_percent < 20 ? 'text-amber-600' : 'text-green-700');
+            cell.innerHTML = `<span class="font-medium ${tone}">${data.margin_percent}%</span>`
+                + `<div class="text-xs text-ink-700/50">${data.margin_amount ?? ''}/unit</div>`;
+        },
+    }));
+
     // ── Admin: product editor (simple/variable + multi-attribute variants) ───
     window.Alpine.data('productForm', (config) => ({
         type: config.type || 'simple',

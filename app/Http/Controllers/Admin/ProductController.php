@@ -446,7 +446,23 @@ class ProductController extends Controller
             }
         }
         $product->save();
-        app(\App\Services\StockAlertService::class)->handleProductChange($product->fresh(), $wasAvailable, $oldPrice);
+        $product = $product->fresh();
+        app(\App\Services\StockAlertService::class)->handleProductChange($product, $wasAvailable, $oldPrice);
+
+        // Saved inline from the product list: hand back the recomputed figures
+        // so the row updates in place instead of reloading the whole page
+        // (which loses the admin's scroll position, filters and page number).
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'price' => (float) $product->price,
+                'stock_quantity' => (int) $product->stock_quantity,
+                'in_stock' => (bool) $product->in_stock,
+                'margin_percent' => $product->margin_percent,
+                'margin_amount' => $product->margin_amount === null ? null : money($product->margin_amount),
+                'message' => $product->name.' updated.',
+            ]);
+        }
 
         return back()->with('success', $product->name.' updated.');
     }

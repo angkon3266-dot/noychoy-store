@@ -79,6 +79,17 @@
             </div>
         </div>
 
+        {{-- WhatsApp opening message --}}
+        <div class="card p-6">
+            <h2 class="font-semibold mb-1">WhatsApp message</h2>
+            <p class="text-xs text-ink-700/60 mb-4">
+                Pre-filled when you tap the WhatsApp button on an order — you can still edit it in WhatsApp before sending.
+                Placeholders: <code>&#123;name&#125;</code> <code>&#123;store&#125;</code> <code>&#123;order_number&#125;</code> <code>&#123;total&#125;</code>.
+            </p>
+            <textarea name="whatsapp_order_template" rows="2" class="input"
+                      placeholder="Hello {name}, this is {store} regarding your order {order_number}.">{{ \App\Models\Setting::get('whatsapp_order_template') }}</textarea>
+        </div>
+
         <div class="flex justify-end"><button class="btn-primary">Save integrations</button></div>
     </form>
 

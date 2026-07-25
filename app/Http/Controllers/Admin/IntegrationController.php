@@ -63,6 +63,7 @@ class IntegrationController extends Controller
             // Templates
             'templates' => ['nullable', 'array'],
             'templates.*' => ['nullable', 'string', 'max:600'],
+            'whatsapp_order_template' => ['nullable', 'string', 'max:600'],
         ]);
 
         $int = Setting::get('integrations', []);
@@ -84,7 +85,10 @@ class IntegrationController extends Controller
             ->all();
         Setting::put('sms_templates', $templates);
 
-        return back()->with('success', 'Integrations & SMS templates saved.');
+        // Opening line for the WhatsApp buttons on the orders screens.
+        Setting::put('whatsapp_order_template', trim((string) ($data['whatsapp_order_template'] ?? '')) ?: null);
+
+        return back()->with('success', 'Integrations & templates saved.');
     }
 
     public function testSms(Request $request, SmsService $sms)
