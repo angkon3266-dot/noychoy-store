@@ -345,11 +345,16 @@ class Product extends Model
      * price — so the cart, checkout and product-page maths all stay percent-based.
      * The display fields (title/badge/highlight) ride along for the storefront.
      *
-     * @return array<int, array{min_qty:int, percent:float, type:string, value:float, title:string, badge:string, highlight:bool, label:string, save_each:float}>
+     * A tier with min_qty 1 is simply a discount on this product — it needs no
+     * bundle. A pre-order-only tier disappears the moment the product stops
+     * being a pre-order, so a "prebook and save" offer expires by itself.
+     *
+     * @return array<int, array{min_qty:int, percent:float, type:string, value:float, title:string, badge:string, highlight:bool, preorder_only:bool, label:string, save_each:float}>
      */
     public function offerTiers(): array
     {
         $price = (float) $this->price;
+        $isPreorder = $this->isPreorder();
 
         return collect($this->quantity_offers ?? [])
             ->map(function ($t) use ($price) {
@@ -365,20 +370,21 @@ class Product extends Model
                 $percent = round(max(0, min(90, $percent)), 2);
 
                 $tier = [
-                    'min_qty' => (int) ($t['min_qty'] ?? 0),
+                    'min_qty' => max(1, (int) ($t['min_qty'] ?? 1)),
                     'type' => $type,
                     'value' => round($value, 2),
                     'percent' => $percent,
                     'title' => trim((string) ($t['title'] ?? '')),
                     'badge' => trim((string) ($t['badge'] ?? '')),
                     'highlight' => (bool) ($t['highlight'] ?? false),
+                    'preorder_only' => (bool) ($t['preorder_only'] ?? false),
                     'save_each' => round($price * $percent / 100, 2),
                 ];
                 $tier['label'] = $tier['title'] !== '' ? $tier['title'] : self::autoOfferLabel($tier);
 
                 return $tier;
             })
-            ->filter(fn ($t) => $t['min_qty'] >= 2 && $t['percent'] > 0)
+            ->filter(fn ($t) => $t['percent'] > 0 && (! $t['preorder_only'] || $isPreorder))
             ->sortBy('min_qty')
             ->values()
             ->all();
@@ -388,11 +394,23 @@ class Product extends Model
     protected static function autoOfferLabel(array $tier): string
     {
         $trim = fn (float $n) => rtrim(rtrim(number_format($n, 2), '0'), '.');
+        $pre = ! empty($tier['preorder_only']);
+
+        // min_qty 1 means "no bundle needed" — phrase it as a plain discount.
+        if ($tier['min_qty'] <= 1) {
+            return match ($tier['type']) {
+                'amount' => ($pre ? 'Pre-order and save ' : 'Save ').money($tier['value']).' each',
+                'unit_price' => ($pre ? 'Pre-order price: ' : 'Yours at ').money($tier['value']).' each',
+                default => ($pre ? 'Pre-order now and get ' : 'Get ').$trim($tier['percent']).'% off',
+            };
+        }
+
+        $buy = $pre ? 'Pre-order '.$tier['min_qty'].'+' : 'Buy '.$tier['min_qty'].'+';
 
         return match ($tier['type']) {
-            'amount' => 'Buy '.$tier['min_qty'].'+ & save '.money($tier['value']).' each',
-            'unit_price' => 'Buy '.$tier['min_qty'].'+ at '.money($tier['value']).' each',
-            default => 'Buy '.$tier['min_qty'].'+ & get '.$trim($tier['percent']).'% off',
+            'amount' => $buy.' & save '.money($tier['value']).' each',
+            'unit_price' => $buy.' at '.money($tier['value']).' each',
+            default => $buy.' & get '.$trim($tier['percent']).'% off',
         };
     }
 

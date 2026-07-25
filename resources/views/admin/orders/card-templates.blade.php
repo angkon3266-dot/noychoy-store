@@ -5,8 +5,8 @@
 @section('content')
 <div class="max-w-3xl">
     <p class="text-sm text-ink-700/70 mb-4">
-        Messages printed on the cards you slip into parcels. Each card shows your logo and the message —
-        nothing else. Pick which message is used automatically for first-time buyers and for returning customers;
+        Messages printed on the cards you slip into parcels — printed for orders in <strong>Processing</strong>,
+        the ones you’re packing right now. Each card shows your logo and the message — nothing else. Pick which message is used automatically for first-time buyers and for returning customers;
         you can override it at print time, or rewrite any single customer's card on the print preview.
         <a href="{{ route('admin.orders.cards') }}" target="_blank" class="text-gold-700 underline">Preview / print</a>
     </p>

@@ -658,12 +658,14 @@ class ProductController extends Controller
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
             'quantity_offers' => ['nullable', 'array'],
-            'quantity_offers.*.min_qty' => ['nullable', 'integer', 'min:2', 'max:999'],
+            // 1 = applies to every order of this product, no bundle needed.
+            'quantity_offers.*.min_qty' => ['nullable', 'integer', 'min:1', 'max:999'],
             'quantity_offers.*.type' => ['nullable', 'in:'.implode(',', \App\Models\Product::OFFER_TYPES)],
             'quantity_offers.*.value' => ['nullable', 'numeric', 'min:0.01', 'max:9999999'],
             'quantity_offers.*.title' => ['nullable', 'string', 'max:60'],
             'quantity_offers.*.badge' => ['nullable', 'string', 'max:24'],
             'quantity_offers.*.highlight' => ['nullable'],
+            'quantity_offers.*.preorder_only' => ['nullable'],
             'upsell_ids' => ['nullable', 'array'],
             'upsell_ids.*' => ['integer', 'exists:products,id'],
             'cross_sell_ids' => ['nullable', 'array'],
@@ -737,12 +739,13 @@ class ProductController extends Controller
                 $highlighted = $highlighted || $mine;
 
                 return [
-                    'min_qty' => (int) $t['min_qty'],
+                    'min_qty' => max(1, (int) $t['min_qty']),
                     'type' => in_array($t['type'] ?? null, \App\Models\Product::OFFER_TYPES, true) ? $t['type'] : 'percent',
                     'value' => (float) $t['value'],
                     'title' => trim((string) ($t['title'] ?? '')),
                     'badge' => trim((string) ($t['badge'] ?? '')),
                     'highlight' => $mine,
+                    'preorder_only' => ! empty($t['preorder_only']),
                 ];
             })
             ->sortBy('min_qty')->values()->all();

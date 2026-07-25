@@ -70,6 +70,12 @@
     <span class="count">{{ $cards->count() }} card{{ $cards->count() === 1 ? '' : 's' }} · {{ $w }} × {{ $h }} mm · {{ $perSheet }} per A4</span>
 </div>
 
+@if($skipped > 0)
+    <p class="hint" style="color:#9a6c2e;">
+        {{ $skipped }} selected order{{ $skipped === 1 ? '' : 's' }} skipped — cards print for orders being <strong>processed</strong> only.
+    </p>
+@endif
+
 <p class="hint">Click any message to edit it for that customer, then “Save messages”. Clear it to fall back to the default template.</p>
 
 <div class="sheet">
@@ -89,7 +95,9 @@
             <div class="msg {{ $cls }}" contenteditable="true" spellcheck="false">{{ $c['text'] }}</div>
         </div>
     @empty
-        <p style="grid-column:1/-1;padding:20mm;text-align:center;color:#777;">No orders selected.</p>
+        <p style="grid-column:1/-1;padding:20mm;text-align:center;color:#777;">
+            No cards to print — thank-you cards are printed for orders in <strong>Processing</strong>.
+        </p>
     @endforelse
 </div>
 

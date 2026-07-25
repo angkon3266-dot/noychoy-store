@@ -16,14 +16,14 @@ class QuantityOfferTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function product(array $offers): Product
+    protected function product(array $offers, bool $preorder = false): Product
     {
         $category = Category::create(['name' => 'Rings', 'slug' => 'rings']);
 
         return Product::create([
             'name' => 'Test Ring', 'slug' => 'test-ring', 'sku' => 'TR-1',
             'price' => 1000, 'category_id' => $category->id, 'is_published' => true,
-            'stock_quantity' => 100, 'quantity_offers' => $offers,
+            'stock_quantity' => 100, 'quantity_offers' => $offers, 'is_preorder' => $preorder,
         ]);
     }
 
@@ -64,12 +64,11 @@ class QuantityOfferTest extends TestCase
         $this->assertSame('percent', $tiers[0]['type']);
     }
 
-    public function test_best_tier_wins_and_invalid_rows_are_dropped(): void
+    public function test_best_tier_wins_and_worthless_rows_are_dropped(): void
     {
         $product = $this->product([
             ['min_qty' => 2, 'type' => 'percent', 'value' => 5],
             ['min_qty' => 3, 'type' => 'percent', 'value' => 12],
-            ['min_qty' => 1, 'type' => 'percent', 'value' => 50],   // min_qty < 2 → dropped
             ['min_qty' => 4, 'type' => 'unit_price', 'value' => 1200], // above price → no discount
         ]);
 
@@ -78,5 +77,39 @@ class QuantityOfferTest extends TestCase
         $this->assertSame(5.0, $product->offerPercentForQty(2));
         $this->assertSame(12.0, $product->offerPercentForQty(9));
         $this->assertSame(880.0, $product->unitPriceForQty(3));
+    }
+
+    public function test_a_single_unit_offer_discounts_every_order(): void
+    {
+        // "5% off, no bundle needed" — min_qty 1 applies from the first item.
+        $product = $this->product([['min_qty' => 1, 'type' => 'percent', 'value' => 5]]);
+
+        $this->assertSame(5.0, $product->offerPercentForQty(1));
+        $this->assertSame(950.0, $product->unitPriceForQty(1));
+        $this->assertSame('Get 5% off', $product->offerTiers()[0]['label']);
+    }
+
+    public function test_preorder_only_offers_appear_only_while_the_product_is_a_preorder(): void
+    {
+        $offers = [['min_qty' => 1, 'type' => 'percent', 'value' => 5, 'preorder_only' => true]];
+
+        $live = $this->product($offers);
+        $this->assertSame([], $live->offerTiers());
+        $this->assertSame(0.0, $live->offerPercentForQty(3));
+
+        $live->forceFill(['is_preorder' => true])->save();
+        $tiers = $live->fresh()->offerTiers();
+
+        $this->assertCount(1, $tiers);
+        $this->assertSame('Pre-order now and get 5% off', $tiers[0]['label']);
+        $this->assertTrue($tiers[0]['preorder_only']);
+    }
+
+    public function test_a_preorder_category_also_activates_preorder_offers(): void
+    {
+        $product = $this->product([['min_qty' => 1, 'type' => 'percent', 'value' => 8, 'preorder_only' => true]]);
+        $product->category->forceFill(['is_preorder' => true])->save();
+
+        $this->assertCount(1, $product->fresh()->offerTiers());
     }
 }

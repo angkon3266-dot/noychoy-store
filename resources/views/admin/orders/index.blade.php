@@ -20,7 +20,8 @@
             <a href="{{ route('admin.orders.index') }}" class="btn-outline whitespace-nowrap ml-auto">← Back to active orders</a>
         @else
             <a href="{{ route('admin.orders.labels') }}" target="_blank" class="btn-outline whitespace-nowrap ml-auto">🖨 Print all labels</a>
-            <a href="{{ route('admin.orders.cards') }}" target="_blank" class="btn-outline whitespace-nowrap">💌 Thank-you cards</a>
+            <a href="{{ route('admin.orders.cards') }}" target="_blank" class="btn-outline whitespace-nowrap"
+               title="Cards for every order currently being processed">💌 Thank-you cards</a>
             <a href="{{ route('admin.orders.index', ['trashed' => 1]) }}" class="btn-outline whitespace-nowrap">🗑 Trash{{ $trashCount ? ' ('.$trashCount.')' : '' }}</a>
         @endif
     </form>

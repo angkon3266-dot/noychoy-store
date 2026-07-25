@@ -275,9 +275,17 @@
                 @endif
                 <div class="grid grid-cols-2 gap-2">
                     <button class="btn-outline w-full">Save message</button>
-                    <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank"
-                       class="btn-outline w-full text-center">🖨 Print card</a>
+                    @if($order->status === 'processing')
+                        <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank"
+                           class="btn-outline w-full text-center">🖨 Print card</a>
+                    @else
+                        <span class="btn-outline w-full text-center opacity-50 cursor-not-allowed"
+                              title="Cards print once the order moves to Processing">🖨 Print card</span>
+                    @endif
                 </div>
+                @unless($order->status === 'processing')
+                    <p class="text-[11px] text-ink-700/50">Cards print once this order is moved to <strong>Processing</strong>.</p>
+                @endunless
             </form>
         </div>
 

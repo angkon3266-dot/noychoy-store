@@ -237,17 +237,22 @@ document.addEventListener('alpine:init', () => {
         get margin() { return this.price > 0 ? (this.profit / this.price * 100) : 0; },
         fmt(n) { return '৳' + Number(n).toLocaleString('en-BD', { maximumFractionDigits: 2 }); },
 
-        // ── Quantity offers ─────────────────────────────────────────────
+        // ── Product offers ──────────────────────────────────────────────
+        blankOffer(minQty) {
+            return { min_qty: minQty, type: 'percent', value: '', title: '', badge: '', highlight: false, preorder_only: false };
+        },
         addOffer() {
             const next = this.offers.length ? Number(this.offers[this.offers.length - 1].min_qty || 1) + 1 : 2;
-            this.offers.push({ min_qty: next, type: 'percent', value: '', title: '', badge: '', highlight: false });
+            this.offers.push(this.blankOffer(next));
         },
+        /** A plain discount on this product — no bundle required. */
+        addFlatOffer() { this.offers.push(this.blankOffer(1)); },
         /** A proven 2/3/5 ladder to start from, sized to this product's price. */
         offerPreset() {
             this.offers = [
-                { min_qty: 2, type: 'percent', value: 5, title: '', badge: '', highlight: false },
-                { min_qty: 3, type: 'percent', value: 10, title: '', badge: 'MOST POPULAR', highlight: true },
-                { min_qty: 5, type: 'percent', value: 15, title: '', badge: 'BEST VALUE', highlight: false },
+                { ...this.blankOffer(2), value: 5 },
+                { ...this.blankOffer(3), value: 10, badge: 'MOST POPULAR', highlight: true },
+                { ...this.blankOffer(5), value: 15, badge: 'BEST VALUE' },
             ];
         },
         /** Only one tier may be the hero card. */
@@ -264,19 +269,29 @@ document.addEventListener('alpine:init', () => {
         },
         /** Mirrors Product::autoOfferLabel so the placeholder matches the storefront. */
         autoOfferLabel(o) {
-            const q = o.min_qty || 2;
+            const q = Number(o.min_qty) || 1;
             const v = Number(o.value) || 0;
-            if (o.type === 'amount') return `Buy ${q}+ & save ${this.fmt(v)} each`;
-            if (o.type === 'unit_price') return `Buy ${q}+ at ${this.fmt(v)} each`;
-            return `Buy ${q}+ & get ${Math.round(v * 100) / 100}% off`;
+            const pre = !!o.preorder_only;
+            if (q <= 1) {
+                if (o.type === 'amount') return `${pre ? 'Pre-order and save' : 'Save'} ${this.fmt(v)} each`;
+                if (o.type === 'unit_price') return `${pre ? 'Pre-order price:' : 'Yours at'} ${this.fmt(v)} each`;
+                return `${pre ? 'Pre-order now and get' : 'Get'} ${Math.round(v * 100) / 100}% off`;
+            }
+            const buy = `${pre ? 'Pre-order' : 'Buy'} ${q}+`;
+            if (o.type === 'amount') return `${buy} & save ${this.fmt(v)} each`;
+            if (o.type === 'unit_price') return `${buy} at ${this.fmt(v)} each`;
+            return `${buy} & get ${Math.round(v * 100) / 100}% off`;
         },
         offerSummary(o) {
             const pct = this.offerPercent(o);
             if (!pct) return 'Enter a value to see what the customer pays.';
             const each = Math.round(this.price * (1 - pct / 100) * 100) / 100;
-            const qty = Number(o.min_qty) || 2;
-            return `${this.fmt(each)} each (${Math.round(pct * 10) / 10}% off) · ${qty} for ${this.fmt(each * qty)}`
-                + ` · you keep ${this.fmt(each - this.cost - this.transport)} margin per unit`;
+            const qty = Number(o.min_qty) || 1;
+            const margin = ` · you keep ${this.fmt(each - this.cost - this.transport)} margin per unit`;
+
+            return qty <= 1
+                ? `${this.fmt(each)} on every order (${Math.round(pct * 10) / 10}% off)${margin}`
+                : `${this.fmt(each)} each (${Math.round(pct * 10) / 10}% off) · ${qty} for ${this.fmt(each * qty)}${margin}`;
         },
 
         addAttribute() { this.attributes.push({ name: '', values: '' }); },

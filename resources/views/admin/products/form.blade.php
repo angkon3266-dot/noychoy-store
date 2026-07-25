@@ -36,7 +36,9 @@
             'title' => $t['title'] ?? '',
             'badge' => $t['badge'] ?? '',
             'highlight' => (bool) ($t['highlight'] ?? false),
+            'preorder_only' => (bool) ($t['preorder_only'] ?? false),
         ])->values(),
+        'isPreorder' => (bool) old('is_preorder', $product->is_preorder ?? false),
         'price' => (float) old('price', $product->price ?: 0),
         'cost' => (float) old('cost_price', $product->cost_price ?: 0),
         'transport' => (float) old('transport_cost', $product->transport_cost ?: 0),
@@ -233,23 +235,29 @@
             <div class="card p-6">
                 <div class="flex items-center justify-between mb-3">
                     <div>
-                        <h2 class="font-semibold">Quantity offers</h2>
-                        <p class="text-xs text-ink-700/60">Tiered pricing shown on the product page and applied automatically in cart &amp; checkout.</p>
+                        <h2 class="font-semibold">Product offers</h2>
+                        <p class="text-xs text-ink-700/60">
+                            Discounts shown on the product page and applied automatically in cart &amp; checkout.
+                            Set the quantity to <strong>1</strong> for a plain discount on every order.
+                        </p>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2 justify-end">
+                        <button type="button" @click="addFlatOffer()" class="btn-outline py-1.5">+ Simple discount</button>
+                        <button type="button" @click="addOffer()" class="btn-outline py-1.5">+ Quantity tier</button>
                         <button type="button" @click="offerPreset()" class="btn-outline py-1.5" x-show="!offers.length">✨ Suggest tiers</button>
-                        <button type="button" @click="addOffer()" class="btn-outline py-1.5">+ Add offer</button>
                     </div>
                 </div>
 
                 <template x-if="offers.length">
                     <div class="space-y-3">
                         <template x-for="(o, i) in offers" :key="i">
-                            <div class="rounded-lg border p-3" :class="o.highlight ? 'border-gold-400 bg-gold-50/50' : 'border-ink-100'">
+                            <div class="rounded-lg border p-3"
+                                 :class="o.preorder_only ? 'border-violet-300 bg-violet-50/40' : (o.highlight ? 'border-gold-400 bg-gold-50/50' : 'border-ink-100')">
                                 <div class="grid grid-cols-12 gap-2 items-end">
                                     <div class="col-span-3">
-                                        <label class="label text-[11px]">Buy quantity (min)</label>
-                                        <input :name="`quantity_offers[${i}][min_qty]`" x-model.number="o.min_qty" type="number" min="2" class="input py-2" placeholder="2">
+                                        <label class="label text-[11px]">Minimum quantity</label>
+                                        <input :name="`quantity_offers[${i}][min_qty]`" x-model.number="o.min_qty" type="number" min="1" class="input py-2" placeholder="1">
+                                        <p class="text-[10px] text-ink-700/45 mt-0.5" x-text="Number(o.min_qty) <= 1 ? 'Applies to every order' : `Needs ${o.min_qty} in the cart`"></p>
                                     </div>
                                     <div class="col-span-4">
                                         <label class="label text-[11px]">Offer type</label>
@@ -277,20 +285,33 @@
                                         <label class="label text-[11px]">Badge <span class="text-ink-700/40">(optional)</span></label>
                                         <input :name="`quantity_offers[${i}][badge]`" x-model="o.badge" class="input py-2" maxlength="24" placeholder="MOST POPULAR">
                                     </div>
-                                    <label class="col-span-3 flex items-center gap-2 text-xs pb-2.5">
-                                        <input type="checkbox" :name="`quantity_offers[${i}][highlight]`" value="1"
-                                               :checked="o.highlight" @change="setHighlight(i, $event.target.checked)" class="rounded">
-                                        Highlight this tier
-                                    </label>
+                                    <div class="col-span-3 flex flex-col gap-1 pb-1">
+                                        <label class="flex items-center gap-2 text-xs">
+                                            <input type="checkbox" :name="`quantity_offers[${i}][highlight]`" value="1"
+                                                   :checked="o.highlight" @change="setHighlight(i, $event.target.checked)" class="rounded">
+                                            Highlight this offer
+                                        </label>
+                                        <label class="flex items-center gap-2 text-xs">
+                                            <input type="checkbox" :name="`quantity_offers[${i}][preorder_only]`" value="1"
+                                                   x-model="o.preorder_only" class="rounded">
+                                            Pre-order only
+                                        </label>
+                                    </div>
                                 </div>
 
                                 <p class="text-[11px] mt-2" :class="offerPercent(o) > 0 ? 'text-green-700' : 'text-ink-700/45'"
                                    x-text="offerSummary(o)"></p>
+                                <p x-show="o.preorder_only && !isPreorder" class="text-[11px] mt-1 text-amber-700">
+                                    ⚠ This product isn’t marked as a pre-order, so this offer stays hidden until you tick
+                                    “Pre-order” above (or its category is a pre-order category).
+                                </p>
                             </div>
                         </template>
                         <p class="text-[11px] text-ink-700/45">
-                            Only one tier can be highlighted. “৳ off” and “fixed price” are converted to a percentage of this
-                            product’s price when the discount is applied, so variants priced differently discount proportionally.
+                            Only one offer can be highlighted. “Pre-order only” offers show while the product is a pre-order and
+                            switch themselves off once it isn’t — perfect for “prebook now and save”.
+                            “৳ off” and “fixed price” are converted to a percentage of this product’s price when the discount is
+                            applied, so variants priced differently discount proportionally.
                         </p>
                     </div>
                 </template>
@@ -504,10 +525,12 @@
             </div>
 
             <!-- Pre-order -->
-            <div class="card p-6 space-y-4" x-data="{ pre: {{ old('is_preorder', $product->is_preorder) ? 'true' : 'false' }} }">
-                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="is_preorder" value="1" x-model="pre" @checked(old('is_preorder', $product->is_preorder))> 📅 Pre-order item</label>
+            {{-- isPreorder lives on the parent productForm scope so the offers
+                 panel can warn when a pre-order-only offer would never show. --}}
+            <div class="card p-6 space-y-4">
+                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="is_preorder" value="1" x-model="isPreorder" @checked(old('is_preorder', $product->is_preorder))> 📅 Pre-order item</label>
                 <p class="text-xs text-ink-700/60 -mt-2">Shows a "Book now" button instead of the normal buy button. Sellable even with zero stock. Tip: you can also flag a whole category as pre-order under Categories.</p>
-                <div x-show="pre" x-cloak class="space-y-3">
+                <div x-show="isPreorder" x-cloak class="space-y-3">
                     <div>
                         <label class="label">Expected availability date</label>
                         <input name="preorder_release_date" type="date" value="{{ old('preorder_release_date', optional($product->preorder_release_date)->format('Y-m-d')) }}" class="input">

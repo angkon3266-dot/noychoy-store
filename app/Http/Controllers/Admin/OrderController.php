@@ -685,9 +685,15 @@ class OrderController extends Controller
     {
         $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
 
+        // Cards are packing-slip inserts, so only orders being packed get one.
         $orders = Order::with('customer')
+            ->where('status', 'processing')
             ->when($ids, fn ($q) => $q->whereIn('id', $ids))
             ->latest()->take(300)->get();
+
+        // If the admin selected orders that aren't being packed, say so rather
+        // than silently printing fewer cards than they expected.
+        $skipped = $ids ? count($ids) - $orders->count() : 0;
 
         $templates = collect(static::cardTemplates());
         $forced = $request->query('template');
@@ -715,6 +721,7 @@ class OrderController extends Controller
             'templates' => $templates,
             'forced' => $forced,
             'size' => static::cardSize(),
+            'skipped' => $skipped,
         ]);
     }
 
