@@ -152,12 +152,61 @@ class DashboardAnalytics
         });
     }
 
-    /** Where visitors came from (referrer host), direct traffic grouped. */
-    public function trafficSources(int $days = 30, int $limit = 6): \Illuminate\Support\Collection
+    /**
+     * Where visitors come from, by channel, joined to what each channel
+     * actually earned — so "Facebook sent 800 people" sits next to "and they
+     * spent ৳40,000", which is the number that decides the ad budget.
+     *
+     * @return \Illuminate\Support\Collection<int, array{channel:string,label:string,visitors:int,orders:int,revenue:float,rate:?float}>
+     */
+    public function trafficSources(int $days = 30, int $limit = 8): \Illuminate\Support\Collection
     {
-        return $this->remember("src.$days", fn () => Visit::where('created_at', '>=', now()->subDays($days))
-            ->selectRaw("COALESCE(NULLIF(referrer_host, ''), 'Direct / app') as src, COUNT(DISTINCT visitor_token) as c")
-            ->groupBy('src')->orderByDesc('c')->take($limit)->get());
+        return $this->remember("src.$days.$limit", function () use ($days, $limit) {
+            $from = now()->subDays($days);
+
+            $visitors = Visit::where('created_at', '>=', $from)
+                ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, COUNT(DISTINCT visitor_token) as c")
+                ->groupBy('channel')->pluck('c', 'channel');
+
+            $sales = $this->sold()->where('created_at', '>=', $from)
+                ->selectRaw("COALESCE(NULLIF(source_channel, ''), 'direct') as channel, COUNT(*) as orders, SUM(total) as revenue")
+                ->groupBy('channel')->get()->keyBy('channel');
+
+            return $visitors->keys()->merge($sales->keys())->unique()
+                ->map(function ($channel) use ($visitors, $sales) {
+                    $v = (int) ($visitors[$channel] ?? 0);
+                    $row = $sales[$channel] ?? null;
+                    $orders = (int) ($row->orders ?? 0);
+
+                    return [
+                        'channel' => $channel,
+                        'label' => \App\Support\TrafficSource::label($channel),
+                        'visitors' => $v,
+                        'orders' => $orders,
+                        'revenue' => round((float) ($row->revenue ?? 0), 2),
+                        // Conversion is only meaningful when we saw the visits.
+                        'rate' => $v > 0 ? round($orders / $v * 100, 1) : null,
+                    ];
+                })
+                ->sortByDesc(fn ($r) => [$r['revenue'], $r['visitors']])
+                ->take($limit)->values();
+        });
+    }
+
+    /**
+     * Campaigns (utm_campaign) that produced orders — tells you which specific
+     * ad or post is working, not just which platform.
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    public function topCampaigns(int $days = 30, int $limit = 6): \Illuminate\Support\Collection
+    {
+        return $this->remember("camp.$days", fn () => $this->sold()
+            ->where('created_at', '>=', now()->subDays($days))
+            ->whereNotNull('source_campaign')->where('source_campaign', '!=', '')
+            ->selectRaw('source_campaign, source_channel, COUNT(*) as orders, SUM(total) as revenue')
+            ->groupBy('source_campaign', 'source_channel')
+            ->orderByDesc('revenue')->take($limit)->get());
     }
 
     /**
@@ -176,7 +225,10 @@ class DashboardAnalytics
                 ->where('orders.created_at', '>=', $from)
                 ->whereNotNull('order_items.product_id')
                 ->groupBy('order_items.product_id')
-                ->pluck(DB::raw('SUM(order_items.quantity)'), 'order_items.product_id');
+                // Alias the aggregate: pluck() can't read a raw expression off
+                // the result rows (it throws "Undefined property").
+                ->selectRaw('order_items.product_id, SUM(order_items.quantity) as qty')
+                ->pluck('qty', 'product_id');
 
             $views = Visit::where('event', 'product')->where('created_at', '>=', $from)
                 ->whereNotNull('product_id')
@@ -291,7 +343,10 @@ class DashboardAnalytics
                 ->where('orders.created_at', '>=', $from)
                 ->whereNotNull('order_items.product_id')
                 ->groupBy('order_items.product_id')
-                ->pluck(DB::raw('SUM(order_items.quantity)'), 'order_items.product_id');
+                // Alias the aggregate: pluck() can't read a raw expression off
+                // the result rows (it throws "Undefined property").
+                ->selectRaw('order_items.product_id, SUM(order_items.quantity) as qty')
+                ->pluck('qty', 'product_id');
 
             $stocked = Product::where('manage_stock', true)->where('stock_quantity', '>', 0)
                 ->get(['id', 'name', 'slug', 'stock_quantity']);

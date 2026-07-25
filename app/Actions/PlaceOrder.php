@@ -68,7 +68,10 @@ class PlaceOrder
                 $customer->update(['email' => $data['email']]);
             }
 
-            $order = $this->createWithUniqueNumber([
+            // Where this buyer came from, read off their own visit history.
+            $attribution = \App\Models\Visit::attributionFor(request()->cookie('visitor_token'));
+
+            $order = $this->createWithUniqueNumber($attribution + [
                 'customer_id' => $customer->id,
                 'customer_name' => $data['name'],
                 'customer_phone' => $data['phone'],

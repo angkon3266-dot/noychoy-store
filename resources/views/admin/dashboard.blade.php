@@ -287,17 +287,49 @@
         </div>
 
         <div class="card p-5">
-            <h2 class="font-semibold mb-3">Where visitors come from</h2>
+            <h2 class="font-semibold mb-1">Where visitors come from</h2>
+            <p class="text-xs text-ink-700/55 mb-3">Visitors and what each channel earned — last 30 days.</p>
             @forelse($deep['sources'] as $s)
-                <div class="flex justify-between text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <span class="truncate">{{ $s->src }}</span>
-                    <span class="font-medium">{{ number_format($s->c) }}</span>
+                <div class="py-2 border-b border-ink-100 last:border-0">
+                    <div class="flex justify-between items-center text-sm gap-2">
+                        <span class="badge {{ \App\Support\TrafficSource::badgeClass($s['channel']) }} shrink-0">{{ $s['label'] }}</span>
+                        <span class="font-medium whitespace-nowrap">{{ number_format($s['visitors']) }} visitor{{ $s['visitors'] === 1 ? '' : 's' }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-ink-700/60 mt-1">
+                        <span>{{ $s['orders'] }} order{{ $s['orders'] === 1 ? '' : 's' }}{{ $s['rate'] !== null ? ' · '.$s['rate'].'% convert' : '' }}</span>
+                        <span class="font-medium text-ink-700/80">{{ money($s['revenue']) }}</span>
+                    </div>
                 </div>
             @empty
                 <p class="text-sm text-ink-700/50">No traffic data yet.</p>
             @endforelse
         </div>
     </div>
+
+    @if($deep['campaigns']->isNotEmpty())
+        <div class="card p-5 mt-6">
+            <h2 class="font-semibold mb-1">Campaigns that sold</h2>
+            <p class="text-xs text-ink-700/55 mb-3">
+                From <code>utm_campaign</code> on your ad and post links — tag every link and this tells you which
+                specific ad paid for itself.
+            </p>
+            <table class="w-full text-sm">
+                <thead class="text-left text-xs uppercase tracking-wide text-ink-700/50">
+                    <tr><th class="py-1">Campaign</th><th class="py-1">Channel</th><th class="py-1 text-right">Orders</th><th class="py-1 text-right">Revenue</th></tr>
+                </thead>
+                <tbody>
+                    @foreach($deep['campaigns'] as $c)
+                        <tr class="border-t border-ink-100">
+                            <td class="py-1.5 truncate max-w-[220px]">{{ $c->source_campaign }}</td>
+                            <td class="py-1.5"><span class="badge {{ \App\Support\TrafficSource::badgeClass($c->source_channel) }}">{{ \App\Support\TrafficSource::label($c->source_channel) }}</span></td>
+                            <td class="py-1.5 text-right">{{ number_format($c->orders) }}</td>
+                            <td class="py-1.5 text-right font-medium">{{ money($c->revenue) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 
     <div class="grid lg:grid-cols-2 gap-6 mt-6">
         <div class="card p-5">

@@ -74,7 +74,8 @@
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
                 <tr>
                     <th class="px-3 py-3 w-8"><input type="checkbox" :checked="allChecked" @change="toggleAll($event)"></th>
-                    <th class="px-4 py-3">Order</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Items</th>
+                    <th class="px-4 py-3">Order</th><th class="px-4 py-3">Customer</th>
+                    <th class="px-4 py-3">Source</th><th class="px-4 py-3">Items</th>
                     <th class="px-4 py-3">Total</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Date</th>
                 </tr>
             </thead>
@@ -94,6 +95,16 @@
                             @if($booked)<div class="text-[10px] text-emerald-700 mt-0.5">📦 {{ $order->shipment->consignment_id }}</div>@endif
                         </td>
                         <td class="px-4 py-3">{{ $order->customer_name }}<div class="text-xs text-ink-700/50">{{ $order->customer_phone }}</div></td>
+                        <td class="px-4 py-3">
+                            @if($order->source_channel)
+                                <span class="badge {{ \App\Support\TrafficSource::badgeClass($order->source_channel) }} text-[10px]"
+                                      title="{{ $order->source_campaign ? 'Campaign: '.$order->source_campaign : ($order->source_referrer ?: '') }}">
+                                    {{ \App\Support\TrafficSource::label($order->source_channel) }}
+                                </span>
+                            @else
+                                <span class="text-xs text-ink-700/35">—</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3">{{ $order->items_count }}</td>
                         <td class="px-4 py-3">{{ money($order->total) }}</td>
                         <td class="px-4 py-3" onclick="event.stopPropagation()">
@@ -117,7 +128,7 @@
                         <td class="px-4 py-3 text-ink-700/60">{{ $order->created_at->format('d M, g:i a') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No orders found.</td></tr>
+                    <tr><td colspan="8" class="px-4 py-10 text-center text-ink-700/50">No orders found.</td></tr>
                 @endforelse
             </tbody>
         </table>

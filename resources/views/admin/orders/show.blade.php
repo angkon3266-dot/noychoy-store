@@ -5,6 +5,36 @@
 @section('content')
 <a href="{{ route('admin.orders.index') }}" class="text-sm text-gold-700 hover:underline">← Back to orders</a>
 
+{{-- Where this customer came from — first touch found them, last touch closed. --}}
+@php
+    $srcClass = \App\Support\TrafficSource::class;
+    $last = $order->source_channel;
+    $first = $order->first_touch_channel;
+@endphp
+<div class="card p-4 mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+    <span class="text-ink-700/60">Came from</span>
+    @if($last)
+        <span class="badge {{ $srcClass::badgeClass($last) }}">{{ $srcClass::label($last) }}</span>
+        @if($order->source_campaign)
+            <span class="text-ink-700/70">Campaign: <strong>{{ $order->source_campaign }}</strong></span>
+        @endif
+        @if($first && $first !== $last)
+            <span class="text-ink-700/60">First found you via
+                <span class="badge {{ $srcClass::badgeClass($first) }}">{{ $srcClass::label($first) }}</span>
+            </span>
+        @endif
+        @if($order->source_referrer)
+            <span class="text-xs text-ink-700/45">via {{ $order->source_referrer }}</span>
+        @endif
+        @if($order->landing_path)
+            <span class="text-xs text-ink-700/45 truncate">landed on {{ \Illuminate\Support\Str::start(ltrim($order->landing_path, '/'), '/') }}</span>
+        @endif
+    @else
+        <span class="text-ink-700/50">
+            Not recorded — this order predates traffic tracking, or was created in the admin.
+        </span>
+    @endif
+</div>
 
 <div class="grid lg:grid-cols-3 gap-6 mt-4">
     <!-- main -->

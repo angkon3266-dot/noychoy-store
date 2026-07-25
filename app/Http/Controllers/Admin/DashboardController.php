@@ -139,6 +139,7 @@ class DashboardController extends Controller
             'funnel' => in_array('funnel', $panels, true) ? $analytics->funnel(30) : null,
             'visitorsByDay' => in_array('funnel', $panels, true) ? $analytics->visitorsByDay(14) : null,
             'sources' => in_array('funnel', $panels, true) ? $analytics->trafficSources(30) : null,
+            'campaigns' => in_array('funnel', $panels, true) ? $analytics->topCampaigns(30) : collect(),
             'viewedNotSold' => in_array('funnel', $panels, true) ? $analytics->viewedNotSold(30) : null,
             'retention' => in_array('retention', $panels, true) ? $analytics->retention(90) : null,
             'operations' => in_array('operations', $panels, true) ? $analytics->operations(30) : null,
