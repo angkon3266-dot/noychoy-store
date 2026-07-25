@@ -123,6 +123,20 @@ class CartService
         return $best;
     }
 
+    /** The offer tier currently applying to a line — used for its label. */
+    public function lineOfferTier(array $item): ?array
+    {
+        $best = null;
+        foreach ($item['offers'] ?? [] as $tier) {
+            if (($item['qty'] ?? 0) >= ($tier['min_qty'] ?? PHP_INT_MAX)
+                && (float) ($tier['percent'] ?? 0) >= (float) ($best['percent'] ?? 0)) {
+                $best = $tier;
+            }
+        }
+
+        return $best;
+    }
+
     /** Money saved on a single line by its quantity offer. */
     public function lineOfferSaving(array $item): float
     {

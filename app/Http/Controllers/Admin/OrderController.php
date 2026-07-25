@@ -600,12 +600,12 @@ class OrderController extends Controller
         ];
     }
 
-    /** Printed card dimensions in millimetres (admin-configurable). */
+    /** Printed card dimensions in millimetres (Appearance → Cards & print). */
     public static function cardSize(): array
     {
         return [
-            'w' => max(30, min(150, (int) \App\Models\Setting::get('thankyou_card_w', 60))),
-            'h' => max(30, min(200, (int) \App\Models\Setting::get('thankyou_card_h', 60))),
+            'w' => max(30, min(150, (int) theme('card_w', 60))),
+            'h' => max(30, min(200, (int) theme('card_h', 60))),
         ];
     }
 
@@ -656,8 +656,6 @@ class OrderController extends Controller
             'templates.*.text' => ['nullable', 'string', 'max:400'],
             'default_new' => ['nullable', 'string', 'max:60'],
             'default_repeat' => ['nullable', 'string', 'max:60'],
-            'card_w' => ['required', 'integer', 'min:30', 'max:150'],
-            'card_h' => ['required', 'integer', 'min:30', 'max:200'],
         ]);
 
         // Keep only fully-filled rows so an empty "add another" row can't create
@@ -674,10 +672,8 @@ class OrderController extends Controller
         \App\Models\Setting::put('thankyou_templates', $templates);
         \App\Models\Setting::put('thankyou_default_new', $data['default_new'] ?? $templates[0]['name']);
         \App\Models\Setting::put('thankyou_default_repeat', $data['default_repeat'] ?? $templates[0]['name']);
-        \App\Models\Setting::put('thankyou_card_w', (int) $data['card_w']);
-        \App\Models\Setting::put('thankyou_card_h', (int) $data['card_h']);
 
-        return back()->with('success', 'Thank-you card settings saved.');
+        return back()->with('success', 'Thank-you card messages saved.');
     }
 
     /**

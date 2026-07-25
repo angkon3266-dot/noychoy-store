@@ -59,16 +59,29 @@
     @endif
 
     {{-- Quantity / bundle offers --}}
-    @if(!empty($product->offerTiers()))
+    @php $offerTiers = $product->offerTiers(); @endphp
+    @if(!empty($offerTiers))
         <div class="mt-5 rounded-xl border border-gold-200 bg-gold-50/60 p-4">
             <p class="text-sm font-semibold text-ink-800 flex items-center gap-1.5">🎁 Buy more, save more</p>
             <div class="mt-3 grid gap-2">
-                @foreach($product->offerTiers() as $tier)
+                @foreach($offerTiers as $tier)
+                    @php $each = round((float) $product->price * (1 - $tier['percent'] / 100), 2); @endphp
                     <button type="button" @click="qty = Math.max(qty, {{ $tier['min_qty'] }})"
-                        class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition"
-                        :class="qty >= {{ $tier['min_qty'] }} ? 'border-green-500 bg-green-50' : 'border-ink-100 hover:border-gold-300 bg-white'">
-                        <span>Buy <strong>{{ $tier['min_qty'] }}+</strong> &amp; get <strong>{{ rtrim(rtrim(number_format($tier['percent'],2),'0'),'.') }}% off</strong></span>
-                        <span class="text-xs text-green-700 font-medium" x-show="qty >= {{ $tier['min_qty'] }}">✓ applied</span>
+                        class="relative w-full text-left rounded-lg border px-3 py-2.5 text-sm transition
+                               {{ $tier['highlight'] ? 'border-gold-400 shadow-sm' : 'border-ink-100' }}"
+                        :class="qty >= {{ $tier['min_qty'] }} ? 'border-green-500 bg-green-50' : 'hover:border-gold-300 bg-white'">
+                        @if($tier['badge'])
+                            <span class="absolute -top-2 right-3 rounded-full bg-gold-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                {{ $tier['badge'] }}
+                            </span>
+                        @endif
+                        <span class="flex items-center justify-between gap-3">
+                            <span class="font-medium">{{ $tier['label'] }}</span>
+                            <span class="text-xs text-green-700 font-medium shrink-0" x-show="qty >= {{ $tier['min_qty'] }}">✓ applied</span>
+                        </span>
+                        <span class="mt-0.5 block text-xs text-ink-700/60">
+                            {{ money($each) }} each · save {{ money($tier['save_each'] * $tier['min_qty']) }} on {{ $tier['min_qty'] }}
+                        </span>
                     </button>
                 @endforeach
             </div>

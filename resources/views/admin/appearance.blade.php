@@ -22,7 +22,7 @@
 
     {{-- ── Appearance tabs ──────────────────────────────────────────────── --}}
     <div class="flex flex-wrap gap-1 bg-ink-50 rounded-lg p-1 sticky top-2 z-30 text-sm">
-        @foreach(['branding'=>'Branding','homepage'=>'Homepage','sections'=>'Section Builder','filters'=>'Filters'] as $t => $lbl)
+        @foreach(['branding'=>'Branding','homepage'=>'Homepage','sections'=>'Section Builder','filters'=>'Filters','cards'=>'Cards & print'] as $t => $lbl)
             <button type="button" @click="tab='{{ $t }}'"
                     :class="tab==='{{ $t }}' ? 'bg-white shadow-sm text-gold-800 font-medium' : 'text-ink-700/60 hover:text-ink-700'"
                     class="px-4 py-2 rounded-md">{{ $lbl }}</button>
@@ -885,6 +885,188 @@
         </div>
         <button type="button" @click="badges.push({icon:'✓', title:'', text:''})" class="btn-outline mt-3 text-sm">+ Add badge</button>
         <p class="text-xs text-ink-700/50 mt-2">Tip: 3–4 badges look best. Use emojis for icons (🔒 🚚 ↩️ ⭐ 💎 ✨).</p>
+    </div>
+
+    {{-- ── Thank-you cards & print ───────────────────────────────────────── --}}
+    @php
+        $cardDefaults = config('theme.defaults');
+        $cardCfg = [
+            'w' => (int) ($theme['card_w'] ?? 60),
+            'h' => (int) ($theme['card_h'] ?? 60),
+            'font' => $theme['card_font'] ?? $cardDefaults['card_font'],
+            'font_custom' => $theme['card_font_custom'] ?? '',
+            'scale' => (int) ($theme['card_font_scale'] ?? $cardDefaults['card_font_scale']),
+            'line' => (int) ($theme['card_line_height'] ?? $cardDefaults['card_line_height']),
+            'tracking' => (int) ($theme['card_letter_spacing'] ?? $cardDefaults['card_letter_spacing']),
+            'gap' => (float) ($theme['card_gap'] ?? $cardDefaults['card_gap']),
+            'pad' => (float) ($theme['card_padding'] ?? $cardDefaults['card_padding']),
+            'align' => $theme['card_align'] ?? $cardDefaults['card_align'],
+            'valign' => $theme['card_valign'] ?? $cardDefaults['card_valign'],
+            'color' => $theme['card_text_color'] ?? $cardDefaults['card_text_color'],
+            'bg' => $theme['card_bg'] ?? $cardDefaults['card_bg'],
+            'border' => $theme['card_border'] ?? $cardDefaults['card_border'],
+            'borderColor' => $theme['card_border_color'] ?? $cardDefaults['card_border_color'],
+            'borderWidth' => (int) ($theme['card_border_width'] ?? $cardDefaults['card_border_width']),
+            'inset' => (float) ($theme['card_border_inset'] ?? $cardDefaults['card_border_inset']),
+            'logoH' => (int) ($theme['card_logo_height'] ?? $cardDefaults['card_logo_height']),
+            'upper' => (bool) ($theme['card_uppercase'] ?? false),
+            'showLogo' => (bool) ($theme['card_show_logo'] ?? true),
+            'logoUrl' => theme_asset($theme['logo'] ?? null) ?: theme_asset($theme['logo_mobile'] ?? null),
+            'store' => store_name(),
+            'fonts' => \App\Support\CardDesign::FONTS,
+        ];
+    @endphp
+    <div class="card p-6" x-show="tab==='cards'" x-data="cardDesigner(@js($cardCfg))" id="cards">
+        <h2 class="font-semibold mb-1">Thank-you card design</h2>
+        <p class="text-xs text-ink-700/60 mb-5">
+            The card you slip into every parcel. Everything here changes the printed card — the preview on the
+            right is to scale. Messages live in
+            <a href="{{ route('admin.orders.card-templates') }}" class="text-gold-700 underline">Orders → Thank-you cards</a>.
+        </p>
+
+        <div class="grid lg:grid-cols-[1fr_auto] gap-8 items-start">
+            {{-- Controls --}}
+            <div class="space-y-5">
+                <div>
+                    <h3 class="text-sm font-semibold mb-2">Size</h3>
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div><label class="label">Width (mm)</label>
+                            <input type="number" name="card_w" x-model.number="w" min="30" max="150" class="input w-24"></div>
+                        <div><label class="label">Height (mm)</label>
+                            <input type="number" name="card_h" x-model.number="h" min="30" max="200" class="input w-24"></div>
+                        <div class="text-xs text-ink-700/60 pb-2.5">
+                            <span x-text="cols * rows"></span> per A4 (<span x-text="cols"></span> × <span x-text="rows"></span>)
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <button type="button" @click="w=60;h=60" class="btn-outline py-1 text-xs">6 × 6 cm</button>
+                        <button type="button" @click="w=90;h=50" class="btn-outline py-1 text-xs">Business card</button>
+                        <button type="button" @click="w=100;h=70" class="btn-outline py-1 text-xs">A7</button>
+                        <button type="button" @click="w=105;h=148" class="btn-outline py-1 text-xs">A6</button>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold mb-2">Typography</h3>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="label">Font</label>
+                            <select name="card_font" x-model="font" class="input">
+                                <option value="serif">Classic serif (Georgia)</option>
+                                <option value="garamond">Garamond — elegant</option>
+                                <option value="sans">Clean sans (Helvetica)</option>
+                                <option value="geometric">Geometric sans</option>
+                                <option value="script">Script / handwritten</option>
+                                <option value="mono">Typewriter</option>
+                                <option value="custom">Custom font stack…</option>
+                            </select>
+                        </div>
+                        <div x-show="font === 'custom'">
+                            <label class="label">Custom font stack</label>
+                            <input name="card_font_custom" x-model="font_custom" class="input" placeholder="'Playfair Display', Georgia, serif">
+                        </div>
+                    </div>
+                    <div class="grid sm:grid-cols-3 gap-3 mt-3">
+                        <div><label class="label">Text size <span class="text-ink-700/50" x-text="scale + '%'"></span></label>
+                            <input type="range" name="card_font_scale" x-model.number="scale" min="50" max="200" step="5" class="w-full"></div>
+                        <div><label class="label">Line height <span class="text-ink-700/50" x-text="(line/100).toFixed(2)"></span></label>
+                            <input type="range" name="card_line_height" x-model.number="line" min="100" max="250" step="5" class="w-full"></div>
+                        <div><label class="label">Letter spacing <span class="text-ink-700/50" x-text="(tracking/100).toFixed(2) + 'em'"></span></label>
+                            <input type="range" name="card_letter_spacing" x-model.number="tracking" min="-10" max="50" step="1" class="w-full"></div>
+                    </div>
+                    <label class="flex items-center gap-2 mt-3 text-sm">
+                        <input type="checkbox" name="card_uppercase" value="1" x-model="upper" class="rounded"> Print the message in UPPERCASE
+                    </label>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold mb-2">Spacing &amp; alignment</h3>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="label">Gap under logo <span class="text-ink-700/50" x-text="gap + ' mm'"></span></label>
+                            <input type="range" name="card_gap" x-model.number="gap" min="0" max="20" step="0.5" class="w-full"></div>
+                        <div><label class="label">Inner padding <span class="text-ink-700/50" x-text="pad + ' mm'"></span></label>
+                            <input type="range" name="card_padding" x-model.number="pad" min="0" max="25" step="0.5" class="w-full"></div>
+                        <div><label class="label">Horizontal align</label>
+                            <select name="card_align" x-model="align" class="input">
+                                <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+                            </select></div>
+                        <div><label class="label">Vertical position</label>
+                            <select name="card_valign" x-model="valign" class="input">
+                                <option value="top">Top</option><option value="center">Middle</option><option value="bottom">Bottom</option>
+                            </select></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold mb-2">Border</h3>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="label">Style</label>
+                            <select name="card_border" x-model="border" class="input">
+                                <option value="dashed">Dashed</option>
+                                <option value="dotted">Dotted</option>
+                                <option value="solid">Solid</option>
+                                <option value="double">Double</option>
+                                <option value="none">None</option>
+                            </select></div>
+                        <div><label class="label">Colour</label>
+                            <div class="flex gap-2">
+                                <input type="color" x-model="borderColor" class="h-10 w-12 rounded border border-ink-200">
+                                <input name="card_border_color" x-model="borderColor" class="input flex-1">
+                            </div></div>
+                        <div><label class="label">Thickness <span class="text-ink-700/50" x-text="borderWidth + ' px'"></span></label>
+                            <input type="range" name="card_border_width" x-model.number="borderWidth" min="1" max="6" class="w-full"></div>
+                        <div><label class="label">Inset from edge <span class="text-ink-700/50" x-text="inset + ' mm'"></span></label>
+                            <input type="range" name="card_border_inset" x-model.number="inset" min="0" max="10" step="0.5" class="w-full"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold mb-2">Colours &amp; logo</h3>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="label">Text colour</label>
+                            <div class="flex gap-2">
+                                <input type="color" x-model="color" class="h-10 w-12 rounded border border-ink-200">
+                                <input name="card_text_color" x-model="color" class="input flex-1">
+                            </div></div>
+                        <div><label class="label">Card background</label>
+                            <div class="flex gap-2">
+                                <input type="color" x-model="bg" class="h-10 w-12 rounded border border-ink-200">
+                                <input name="card_bg" x-model="bg" class="input flex-1">
+                            </div></div>
+                        <div><label class="label">Logo height <span class="text-ink-700/50" x-text="logoH + '% of card'"></span></label>
+                            <input type="range" name="card_logo_height" x-model.number="logoH" min="5" max="60" class="w-full"></div>
+                        <label class="flex items-center gap-2 text-sm pt-6">
+                            <input type="checkbox" name="card_show_logo" value="1" x-model="showLogo" class="rounded"> Show the logo
+                        </label>
+                    </div>
+                    <p class="text-xs text-ink-700/50 mt-2">
+                        Printing on coloured stock? Leave the background white — printers won’t print a background fill by default.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Live preview, to scale --}}
+            <div class="lg:sticky lg:top-20">
+                <p class="text-xs text-ink-700/60 mb-2">Preview — actual size</p>
+                <div class="rounded-xl bg-ink-100 p-6 flex justify-center">
+                    <div :style="cardStyle" class="relative overflow-hidden shadow-sm">
+                        <span :style="frameStyle"></span>
+                        <template x-if="showLogo && logoUrl">
+                            <img :src="logoUrl" :style="logoStyle" alt="">
+                        </template>
+                        <template x-if="showLogo && !logoUrl">
+                            <div :style="brandStyle" x-text="store"></div>
+                        </template>
+                        <div :style="msgStyle" x-text="sample"></div>
+                    </div>
+                </div>
+                <p class="text-[11px] text-ink-700/45 mt-2 text-center max-w-[240px] mx-auto">
+                    Preview uses a sample message. Long messages shrink automatically so they never overflow.
+                </p>
+                <a href="{{ route('admin.orders.cards') }}" target="_blank" class="btn-outline w-full text-center mt-3 py-1.5 text-sm">
+                    Open print preview
+                </a>
+            </div>
+        </div>
     </div>
 
     <div class="flex justify-end">

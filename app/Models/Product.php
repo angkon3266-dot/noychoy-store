@@ -334,23 +334,66 @@ class Product extends Model
 
     // ── Quantity / bundle offers ────────────────────────────────────────────
 
+    /** Offer types an admin can pick per tier. */
+    public const OFFER_TYPES = ['percent', 'amount', 'unit_price'];
+
     /**
      * Normalised, validated offer tiers, sorted by min_qty ascending.
-     * Each tier: ['min_qty' => int>=2, 'percent' => float 0..90].
      *
-     * @return array<int, array{min_qty:int, percent:float}>
+     * Every tier resolves to a `percent` off the unit price whatever the admin
+     * chose — a ৳-amount or a fixed unit price is converted against the product's
+     * price — so the cart, checkout and product-page maths all stay percent-based.
+     * The display fields (title/badge/highlight) ride along for the storefront.
+     *
+     * @return array<int, array{min_qty:int, percent:float, type:string, value:float, title:string, badge:string, highlight:bool, label:string, save_each:float}>
      */
     public function offerTiers(): array
     {
+        $price = (float) $this->price;
+
         return collect($this->quantity_offers ?? [])
-            ->map(fn ($t) => [
-                'min_qty' => (int) ($t['min_qty'] ?? 0),
-                'percent' => round((float) ($t['percent'] ?? 0), 2),
-            ])
-            ->filter(fn ($t) => $t['min_qty'] >= 2 && $t['percent'] > 0 && $t['percent'] <= 90)
+            ->map(function ($t) use ($price) {
+                $type = in_array($t['type'] ?? null, self::OFFER_TYPES, true) ? $t['type'] : 'percent';
+                // Rows saved before offer types existed carry `percent` only.
+                $value = (float) ($t['value'] ?? $t['percent'] ?? 0);
+
+                $percent = match ($type) {
+                    'amount' => $price > 0 ? $value / $price * 100 : 0,
+                    'unit_price' => $price > 0 ? (1 - $value / $price) * 100 : 0,
+                    default => $value,
+                };
+                $percent = round(max(0, min(90, $percent)), 2);
+
+                $tier = [
+                    'min_qty' => (int) ($t['min_qty'] ?? 0),
+                    'type' => $type,
+                    'value' => round($value, 2),
+                    'percent' => $percent,
+                    'title' => trim((string) ($t['title'] ?? '')),
+                    'badge' => trim((string) ($t['badge'] ?? '')),
+                    'highlight' => (bool) ($t['highlight'] ?? false),
+                    'save_each' => round($price * $percent / 100, 2),
+                ];
+                $tier['label'] = $tier['title'] !== '' ? $tier['title'] : self::autoOfferLabel($tier);
+
+                return $tier;
+            })
+            ->filter(fn ($t) => $t['min_qty'] >= 2 && $t['percent'] > 0)
             ->sortBy('min_qty')
             ->values()
             ->all();
+    }
+
+    /** Fallback headline when the admin didn't write a title. */
+    protected static function autoOfferLabel(array $tier): string
+    {
+        $trim = fn (float $n) => rtrim(rtrim(number_format($n, 2), '0'), '.');
+
+        return match ($tier['type']) {
+            'amount' => 'Buy '.$tier['min_qty'].'+ & save '.money($tier['value']).' each',
+            'unit_price' => 'Buy '.$tier['min_qty'].'+ at '.money($tier['value']).' each',
+            default => 'Buy '.$tier['min_qty'].'+ & get '.$trim($tier['percent']).'% off',
+        };
     }
 
     /** Best discount percent that applies at a given quantity (0 if none). */

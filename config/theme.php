@@ -104,6 +104,27 @@ return [
         // Marketing
         'meta_pixel_id' => null,
 
+        // Printed thank-you card design (Appearance → Cards & print).
+        // Sizes in mm unless noted; font scale is a % applied to the size-derived base.
+        'card_font' => 'serif',
+        'card_font_custom' => null,          // used when card_font = 'custom'
+        'card_font_scale' => 100,
+        'card_line_height' => 150,           // % of font size
+        'card_letter_spacing' => 0,          // hundredths of an em
+        'card_gap' => 4,                     // space between logo and message
+        'card_padding' => 6,
+        'card_align' => 'center',
+        'card_valign' => 'center',
+        'card_text_color' => '#161618',
+        'card_bg' => '#ffffff',
+        'card_border' => 'dashed',           // none | dashed | dotted | solid | double
+        'card_border_color' => '#c9ad74',
+        'card_border_width' => 1,            // in printed pixels
+        'card_border_inset' => 2,            // mm gap between card edge and border
+        'card_logo_height' => 18,            // % of card height
+        'card_uppercase' => false,
+        'card_show_logo' => true,
+
         // Trust strip (editable in Appearance → Trust badges). Each: icon, title, text.
         'trust_badges' => [
             ['icon' => '💵', 'title' => 'Cash on delivery', 'text' => 'Pay when you receive'],

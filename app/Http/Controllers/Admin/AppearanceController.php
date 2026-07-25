@@ -131,6 +131,28 @@ class AppearanceController extends Controller
             'discover_image' => ['nullable', 'array'],
             'discover_image.*' => ['nullable', 'image', 'max:2048'],
 
+            // Printed thank-you cards
+            'card_w' => ['nullable', 'integer', 'min:30', 'max:150'],
+            'card_h' => ['nullable', 'integer', 'min:30', 'max:200'],
+            'card_font' => ['nullable', 'string', 'max:20'],
+            'card_font_custom' => ['nullable', 'string', 'max:120'],
+            'card_font_scale' => ['nullable', 'integer', 'min:50', 'max:200'],
+            'card_line_height' => ['nullable', 'integer', 'min:100', 'max:250'],
+            'card_letter_spacing' => ['nullable', 'integer', 'min:-10', 'max:50'],
+            'card_gap' => ['nullable', 'numeric', 'min:0', 'max:20'],
+            'card_padding' => ['nullable', 'numeric', 'min:0', 'max:25'],
+            'card_align' => ['nullable', 'in:left,center,right'],
+            'card_valign' => ['nullable', 'in:top,center,bottom'],
+            'card_text_color' => ['nullable', 'string', 'max:9'],
+            'card_bg' => ['nullable', 'string', 'max:9'],
+            'card_border' => ['nullable', 'in:none,dashed,dotted,solid,double'],
+            'card_border_color' => ['nullable', 'string', 'max:9'],
+            'card_border_width' => ['nullable', 'integer', 'min:1', 'max:6'],
+            'card_border_inset' => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'card_logo_height' => ['nullable', 'integer', 'min:5', 'max:60'],
+            'card_uppercase' => ['nullable', 'boolean'],
+            'card_show_logo' => ['nullable', 'boolean'],
+
             // Catalog
             'products_per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
             'default_sort' => ['nullable', 'in:new,popular,best_selling,price_asc,price_desc,name'],
@@ -305,7 +327,7 @@ class AppearanceController extends Controller
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust'] as $bool) {
+        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo'] as $bool) {
             $current[$bool] = $request->boolean($bool);
         }
 
@@ -329,7 +351,11 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright'] as $key) {
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
+            'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
+            'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
+            'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',
+            'card_border_inset', 'card_logo_height'] as $key) {
             if (array_key_exists($key, $data)) {
                 $current[$key] = $data[$key];
             }

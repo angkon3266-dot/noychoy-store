@@ -62,37 +62,13 @@
             </div>
         </div>
 
-        <div class="card p-5 mb-4">
-            <h2 class="font-semibold text-sm mb-1">Card size</h2>
-            <p class="text-xs text-ink-700/60 mb-3">
-                The printed size of each card in millimetres. The print sheet re-flows automatically —
-                the preview tells you how many fit on an A4.
-            </p>
-            <div class="flex flex-wrap items-end gap-4"
-                 x-data="{ w: {{ $size['w'] }}, h: {{ $size['h'] }},
-                           get cols() { return Math.max(1, Math.floor(198 / (this.w + 4))); },
-                           get rows() { return Math.max(1, Math.floor(285 / (this.h + 4))); } }">
-                <div>
-                    <label class="label">Width (mm)</label>
-                    <input type="number" name="card_w" x-model.number="w" min="30" max="150" class="input w-28">
-                </div>
-                <div>
-                    <label class="label">Height (mm)</label>
-                    <input type="number" name="card_h" x-model.number="h" min="30" max="200" class="input w-28">
-                </div>
-                <div class="text-xs text-ink-700/60 pb-2">
-                    <span x-text="cols * rows"></span> card(s) per A4 sheet
-                    (<span x-text="cols"></span> × <span x-text="rows"></span>)
-                </div>
-                <div class="flex gap-2 pb-1">
-                    <button type="button" @click="w = 60; h = 60" class="btn-outline py-1 text-xs">6 × 6 cm</button>
-                    <button type="button" @click="w = 90; h = 50" class="btn-outline py-1 text-xs">Business card</button>
-                    <button type="button" @click="w = 100; h = 70" class="btn-outline py-1 text-xs">A7</button>
-                </div>
-            </div>
+        <div class="rounded-lg border border-gold-200 bg-gold-50/60 p-4 mb-4 text-sm text-ink-700/80">
+            🎨 Card <strong>size, font, spacing, border and colours</strong> live in
+            <a href="{{ route('admin.appearance') }}#cards" class="text-gold-700 underline font-medium">Appearance → Cards &amp; print</a>,
+            with a live preview. Currently {{ $size['w'] }} × {{ $size['h'] }} mm.
         </div>
 
-        <button class="btn-primary">Save settings</button>
+        <button class="btn-primary">Save messages</button>
     </form>
 </div>
 @endsection

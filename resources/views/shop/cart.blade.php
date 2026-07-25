@@ -68,7 +68,10 @@
                             @endif
                             <p class="text-sm text-gold-700 font-semibold mt-1">{{ money($item['price']) }}</p>
                             @if(($pct = $cart->lineOfferPercent($item)) > 0)
-                                <p class="mt-1 inline-block badge bg-green-100 text-green-700 text-[11px]">Bundle offer: −{{ rtrim(rtrim(number_format($pct,2),'0'),'.') }}% &nbsp;(you save {{ money($cart->lineOfferSaving($item)) }})</p>
+                                @php $tier = $cart->lineOfferTier($item); @endphp
+                                <p class="mt-1 inline-block badge bg-green-100 text-green-700 text-[11px]">
+                                    {{ $tier['label'] ?? 'Bundle offer' }} &nbsp;(you save {{ money($cart->lineOfferSaving($item)) }})
+                                </p>
                             @endif
                         </div>
                         <form action="{{ route('cart.update') }}" method="POST" class="flex items-center">

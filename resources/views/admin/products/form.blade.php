@@ -27,7 +27,16 @@
         'attributes' => $vAttributes,
         'variants' => $vVariants,
         'images' => $product->images->map(fn ($i) => ['id' => $i->id, 'url' => $i->url])->values(),
-        'offers' => collect(old('quantity_offers', $product->quantity_offers ?? []))->map(fn ($t) => ['min_qty' => $t['min_qty'] ?? '', 'percent' => $t['percent'] ?? ''])->values(),
+        // Rows saved before offer types existed carry `percent` only — read them
+        // as a percent tier so nothing is lost when the product is re-saved.
+        'offers' => collect(old('quantity_offers', $product->quantity_offers ?? []))->map(fn ($t) => [
+            'min_qty' => $t['min_qty'] ?? '',
+            'type' => $t['type'] ?? 'percent',
+            'value' => $t['value'] ?? $t['percent'] ?? '',
+            'title' => $t['title'] ?? '',
+            'badge' => $t['badge'] ?? '',
+            'highlight' => (bool) ($t['highlight'] ?? false),
+        ])->values(),
         'price' => (float) old('price', $product->price ?: 0),
         'cost' => (float) old('cost_price', $product->cost_price ?: 0),
         'transport' => (float) old('transport_cost', $product->transport_cost ?: 0),
@@ -223,24 +232,69 @@
             <!-- Quantity / bundle offers -->
             <div class="card p-6">
                 <div class="flex items-center justify-between mb-3">
-                    <div><h2 class="font-semibold">Quantity offers</h2><p class="text-xs text-ink-700/60">e.g. “Buy 2 get 5% off”. Applies automatically in cart &amp; checkout.</p></div>
-                    <button type="button" @click="offers.push({min_qty:'',percent:''})" class="btn-outline py-1.5">+ Add offer</button>
+                    <div>
+                        <h2 class="font-semibold">Quantity offers</h2>
+                        <p class="text-xs text-ink-700/60">Tiered pricing shown on the product page and applied automatically in cart &amp; checkout.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" @click="offerPreset()" class="btn-outline py-1.5" x-show="!offers.length">✨ Suggest tiers</button>
+                        <button type="button" @click="addOffer()" class="btn-outline py-1.5">+ Add offer</button>
+                    </div>
                 </div>
+
                 <template x-if="offers.length">
-                    <div class="space-y-2">
-                        <div class="grid grid-cols-12 gap-2 text-xs text-ink-700/60 px-1">
-                            <span class="col-span-5">Buy quantity (min)</span><span class="col-span-5">Discount %</span>
-                        </div>
+                    <div class="space-y-3">
                         <template x-for="(o, i) in offers" :key="i">
-                            <div class="grid grid-cols-12 gap-2 items-center">
-                                <input :name="`quantity_offers[${i}][min_qty]`" x-model="o.min_qty" type="number" min="2" class="input py-2 col-span-5" placeholder="2">
-                                <input :name="`quantity_offers[${i}][percent]`" x-model="o.percent" type="number" step="0.01" min="0.1" max="90" class="input py-2 col-span-5" placeholder="5">
-                                <button type="button" @click="offers.splice(i,1)" class="col-span-2 text-red-600 text-lg">×</button>
+                            <div class="rounded-lg border p-3" :class="o.highlight ? 'border-gold-400 bg-gold-50/50' : 'border-ink-100'">
+                                <div class="grid grid-cols-12 gap-2 items-end">
+                                    <div class="col-span-3">
+                                        <label class="label text-[11px]">Buy quantity (min)</label>
+                                        <input :name="`quantity_offers[${i}][min_qty]`" x-model.number="o.min_qty" type="number" min="2" class="input py-2" placeholder="2">
+                                    </div>
+                                    <div class="col-span-4">
+                                        <label class="label text-[11px]">Offer type</label>
+                                        <select :name="`quantity_offers[${i}][type]`" x-model="o.type" class="input py-2">
+                                            <option value="percent">% off each</option>
+                                            <option value="amount">৳ off each</option>
+                                            <option value="unit_price">Fixed price each</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-4">
+                                        <label class="label text-[11px]" x-text="o.type === 'percent' ? 'Discount %' : (o.type === 'amount' ? 'Amount off each (৳)' : 'Price each (৳)')"></label>
+                                        <input :name="`quantity_offers[${i}][value]`" x-model.number="o.value" type="number" step="0.01" min="0.01" class="input py-2"
+                                               :placeholder="o.type === 'percent' ? '5' : (o.type === 'amount' ? '100' : '1900')">
+                                    </div>
+                                    <button type="button" @click="offers.splice(i,1)" class="col-span-1 text-red-600 text-xl pb-1.5" title="Remove">×</button>
+                                </div>
+
+                                <div class="grid grid-cols-12 gap-2 mt-2 items-end">
+                                    <div class="col-span-6">
+                                        <label class="label text-[11px]">Title shown to customers <span class="text-ink-700/40">(optional)</span></label>
+                                        <input :name="`quantity_offers[${i}][title]`" x-model="o.title" class="input py-2" maxlength="60"
+                                               :placeholder="autoOfferLabel(o)">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="label text-[11px]">Badge <span class="text-ink-700/40">(optional)</span></label>
+                                        <input :name="`quantity_offers[${i}][badge]`" x-model="o.badge" class="input py-2" maxlength="24" placeholder="MOST POPULAR">
+                                    </div>
+                                    <label class="col-span-3 flex items-center gap-2 text-xs pb-2.5">
+                                        <input type="checkbox" :name="`quantity_offers[${i}][highlight]`" value="1"
+                                               :checked="o.highlight" @change="setHighlight(i, $event.target.checked)" class="rounded">
+                                        Highlight this tier
+                                    </label>
+                                </div>
+
+                                <p class="text-[11px] mt-2" :class="offerPercent(o) > 0 ? 'text-green-700' : 'text-ink-700/45'"
+                                   x-text="offerSummary(o)"></p>
                             </div>
                         </template>
+                        <p class="text-[11px] text-ink-700/45">
+                            Only one tier can be highlighted. “৳ off” and “fixed price” are converted to a percentage of this
+                            product’s price when the discount is applied, so variants priced differently discount proportionally.
+                        </p>
                     </div>
                 </template>
-                <template x-if="!offers.length"><p class="text-sm text-ink-700/50">No quantity offers. Click “Add offer” to create tiered pricing.</p></template>
+                <template x-if="!offers.length"><p class="text-sm text-ink-700/50">No quantity offers. Click “Add offer” to create tiered pricing, or “Suggest tiers” for a proven 2/3/5 ladder.</p></template>
             </div>
 
             <!-- Upsell / cross-sell -->

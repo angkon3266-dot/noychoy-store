@@ -237,7 +237,48 @@ document.addEventListener('alpine:init', () => {
         get margin() { return this.price > 0 ? (this.profit / this.price * 100) : 0; },
         fmt(n) { return '৳' + Number(n).toLocaleString('en-BD', { maximumFractionDigits: 2 }); },
 
-        addOffer() { this.offers.push({ min_qty: '', percent: '' }); },
+        // ── Quantity offers ─────────────────────────────────────────────
+        addOffer() {
+            const next = this.offers.length ? Number(this.offers[this.offers.length - 1].min_qty || 1) + 1 : 2;
+            this.offers.push({ min_qty: next, type: 'percent', value: '', title: '', badge: '', highlight: false });
+        },
+        /** A proven 2/3/5 ladder to start from, sized to this product's price. */
+        offerPreset() {
+            this.offers = [
+                { min_qty: 2, type: 'percent', value: 5, title: '', badge: '', highlight: false },
+                { min_qty: 3, type: 'percent', value: 10, title: '', badge: 'MOST POPULAR', highlight: true },
+                { min_qty: 5, type: 'percent', value: 15, title: '', badge: 'BEST VALUE', highlight: false },
+            ];
+        },
+        /** Only one tier may be the hero card. */
+        setHighlight(i, on) {
+            this.offers.forEach((o, j) => { o.highlight = on && i === j; });
+        },
+        /** The tier's discount as a percent of this product's price. */
+        offerPercent(o) {
+            const v = Number(o.value) || 0;
+            if (v <= 0) return 0;
+            if (o.type === 'amount') return this.price > 0 ? Math.min(90, v / this.price * 100) : 0;
+            if (o.type === 'unit_price') return this.price > 0 ? Math.max(0, Math.min(90, (1 - v / this.price) * 100)) : 0;
+            return Math.min(90, v);
+        },
+        /** Mirrors Product::autoOfferLabel so the placeholder matches the storefront. */
+        autoOfferLabel(o) {
+            const q = o.min_qty || 2;
+            const v = Number(o.value) || 0;
+            if (o.type === 'amount') return `Buy ${q}+ & save ${this.fmt(v)} each`;
+            if (o.type === 'unit_price') return `Buy ${q}+ at ${this.fmt(v)} each`;
+            return `Buy ${q}+ & get ${Math.round(v * 100) / 100}% off`;
+        },
+        offerSummary(o) {
+            const pct = this.offerPercent(o);
+            if (!pct) return 'Enter a value to see what the customer pays.';
+            const each = Math.round(this.price * (1 - pct / 100) * 100) / 100;
+            const qty = Number(o.min_qty) || 2;
+            return `${this.fmt(each)} each (${Math.round(pct * 10) / 10}% off) · ${qty} for ${this.fmt(each * qty)}`
+                + ` · you keep ${this.fmt(each - this.cost - this.transport)} margin per unit`;
+        },
+
         addAttribute() { this.attributes.push({ name: '', values: '' }); },
         removeAttribute(i) { this.attributes.splice(i, 1); this.generate(); },
 
@@ -718,6 +759,8 @@ document.addEventListener('alpine:init', () => {
         // products — must match MetaProductMapper::retailerId on the server.
         contentId: 'prod-' + (config.id || ''),
         name: config.name || '',
+        // Every tier arrives with a resolved `percent`, whatever type the admin
+        // picked (see Product::offerTiers), so the maths here stays percent-based.
         offers: (config.offers || []).map(o => ({ min_qty: Number(o.min_qty), percent: Number(o.percent) })),
 
         init() {
@@ -822,6 +865,47 @@ document.addEventListener('alpine:init', () => {
                     currency: 'BDT',
                 }, { eventID: eventId });
             }
+        },
+    }));
+
+/**
+ * Live preview for the printed thank-you card (Appearance → Cards & print).
+ * The size/spacing maths mirrors App\Support\CardDesign so the preview and the
+ * printed sheet stay in agreement — change one, change the other.
+ */
+    window.Alpine.data('cardDesigner', (cfg) => ({
+        ...cfg,
+        sample: 'Dear Rahim,\n\nThank you for your order. We hope this piece brings you joy.',
+
+        // A4 minus the 8 mm print margin, 4 mm between cards.
+        get cols() { return Math.max(1, Math.floor(198 / (this.w + 4))); },
+        get rows() { return Math.max(1, Math.floor(285 / (this.h + 4))); },
+        get fontStack() {
+            return this.font === 'custom' && this.font_custom
+                ? this.font_custom
+                : (this.fonts[this.font] || this.fonts.serif);
+        },
+        get base() { return Math.round(Math.min(this.w, this.h) * 0.16 * (this.scale / 100) * 100) / 100; },
+
+        get cardStyle() {
+            const valign = this.valign === 'top' ? 'flex-start' : this.valign === 'bottom' ? 'flex-end' : 'center';
+            const halign = this.align === 'left' ? 'flex-start' : this.align === 'right' ? 'flex-end' : 'center';
+            return `width:${this.w}mm;height:${this.h}mm;padding:${this.pad}mm;background:${this.bg};`
+                + `color:${this.color};font-family:${this.fontStack};display:flex;flex-direction:column;`
+                + `align-items:${halign};justify-content:${valign};text-align:${this.align};`;
+        },
+        get frameStyle() {
+            const b = this.border === 'none' ? 'border:0;'
+                : `border:${this.borderWidth}px ${this.border} ${this.borderColor};`;
+            return `position:absolute;inset:${this.inset}mm;pointer-events:none;${b}`;
+        },
+        get logoStyle() { return `max-height:${this.logoH}%;max-width:70%;object-fit:contain;margin-bottom:${this.gap}mm;`; },
+        get brandStyle() {
+            return `font-size:${this.base + 2.5}pt;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:${this.gap}mm;`;
+        },
+        get msgStyle() {
+            return `font-size:${this.base}pt;line-height:${this.line / 100};letter-spacing:${this.tracking / 100}em;`
+                + `text-transform:${this.upper ? 'uppercase' : 'none'};white-space:pre-line;width:100%;`;
         },
     }));
 });

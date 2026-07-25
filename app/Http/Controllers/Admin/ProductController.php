@@ -659,7 +659,11 @@ class ProductController extends Controller
             'meta_description' => ['nullable', 'string', 'max:300'],
             'quantity_offers' => ['nullable', 'array'],
             'quantity_offers.*.min_qty' => ['nullable', 'integer', 'min:2', 'max:999'],
-            'quantity_offers.*.percent' => ['nullable', 'numeric', 'min:0.1', 'max:90'],
+            'quantity_offers.*.type' => ['nullable', 'in:'.implode(',', \App\Models\Product::OFFER_TYPES)],
+            'quantity_offers.*.value' => ['nullable', 'numeric', 'min:0.01', 'max:9999999'],
+            'quantity_offers.*.title' => ['nullable', 'string', 'max:60'],
+            'quantity_offers.*.badge' => ['nullable', 'string', 'max:24'],
+            'quantity_offers.*.highlight' => ['nullable'],
             'upsell_ids' => ['nullable', 'array'],
             'upsell_ids.*' => ['integer', 'exists:products,id'],
             'cross_sell_ids' => ['nullable', 'array'],
@@ -724,9 +728,23 @@ class ProductController extends Controller
         }
 
         // Normalise quantity offers: keep only complete rows, sorted by min_qty.
+        // Only one tier may carry the "highlight" flag — it's the hero card.
+        $highlighted = false;
         $validated['quantity_offers'] = collect($validated['quantity_offers'] ?? [])
-            ->filter(fn ($t) => filled($t['min_qty'] ?? null) && filled($t['percent'] ?? null))
-            ->map(fn ($t) => ['min_qty' => (int) $t['min_qty'], 'percent' => (float) $t['percent']])
+            ->filter(fn ($t) => filled($t['min_qty'] ?? null) && filled($t['value'] ?? null))
+            ->map(function ($t) use (&$highlighted) {
+                $mine = ! $highlighted && ! empty($t['highlight']);
+                $highlighted = $highlighted || $mine;
+
+                return [
+                    'min_qty' => (int) $t['min_qty'],
+                    'type' => in_array($t['type'] ?? null, \App\Models\Product::OFFER_TYPES, true) ? $t['type'] : 'percent',
+                    'value' => (float) $t['value'],
+                    'title' => trim((string) ($t['title'] ?? '')),
+                    'badge' => trim((string) ($t['badge'] ?? '')),
+                    'highlight' => $mine,
+                ];
+            })
             ->sortBy('min_qty')->values()->all();
 
         $validated['upsell_ids'] = array_values(array_unique(array_map('intval', $validated['upsell_ids'] ?? [])));

@@ -13,8 +13,9 @@
         $cols = max(1, (int) floor((194 + $gap) / ($w + $gap)));
         $rows = max(1, (int) floor((281 + $gap) / ($h + $gap)));
         $perSheet = $cols * $rows;
-        // Type scales with the card so a 40 mm and a 100 mm card both read well.
-        $base = round(min($w, $h) * 0.16, 1);
+        $design = \App\Support\CardDesign::class;
+        $budget = $design::textBudget($w, $h);
+        $showLogo = theme('card_show_logo', true) && $logo;
     @endphp
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,25 +33,20 @@
         /* A4 sheet holding as many cards of the configured size as fit. */
         .sheet { width: 210mm; margin: 10px auto; background: #fff; padding: 8mm; display: grid;
                  grid-template-columns: repeat({{ $cols }}, {{ $w }}mm); gap: {{ $gap }}mm; justify-content: center; align-content: start; }
-        .card { width: {{ $w }}mm; height: {{ $h }}mm; border: 1px dashed #bbb; padding: 6mm 5mm;
-                display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-                break-inside: avoid; page-break-inside: avoid; overflow: hidden; position: relative; }
-        .card .logo { max-height: {{ round($h * 0.18, 1) }}mm; max-width: {{ round($w * 0.7, 1) }}mm; object-fit: contain; margin-bottom: 3.5mm; }
-        .card .brand { font-size: {{ $base + 2.5 }}pt; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3.5mm; }
-        .card .msg { font-size: {{ $base }}pt; line-height: 1.5; white-space: pre-line; width: 100%; outline: none; }
-        /* Long messages shrink rather than overflow the card. */
-        .card .msg.long { font-size: {{ round($base * 0.9, 1) }}pt; line-height: 1.42; }
-        .card .msg.xlong { font-size: {{ round($base * 0.79, 1) }}pt; line-height: 1.35; }
-        .card .who { position: absolute; top: 1.5mm; left: 0; right: 0; font-family: Arial, Helvetica, sans-serif;
-                     font-size: 7pt; color: #b9b9b9; }
+        /* Card design comes from Appearance → Cards & print. */
+{!! $design::css($w, $h) !!}
+        /* Cut guides on screen only — the printed card shows the design border. */
+        .card { outline: 1px dashed #d8d8d8; }
         .card .msg:focus { background: #fffbe9; }
-        .card.edited .who::after { content: ' · edited'; color: #9a6c2e; }
+        .card.edited::after { content: 'edited'; position: absolute; top: 1mm; right: 2mm;
+                              font-family: Arial, Helvetica, sans-serif; font-size: 6.5pt; color: #c0a165; }
 
         @media print {
-            .toolbar, .hint, .who { display: none; }
+            .toolbar, .hint { display: none; }
             body { background: #fff; }
             .sheet { width: auto; margin: 0; padding: 0; gap: 0; grid-template-columns: repeat({{ $cols }}, {{ $w }}mm); justify-content: start; }
-            .card { border: 0; }
+            .card { outline: 0; }
+            .card.edited::after { display: none; }
             .card .msg:focus { background: none; }
             @page { size: A4; margin: 8mm; }
         }
@@ -80,14 +76,14 @@
     @forelse($cards as $c)
         @php
             $len = mb_strlen($c['text']);
-            $limitLong = (int) ($w * $h / 26);      // roughly how much text the card fits
-            $cls = $len > $limitLong * 1.6 ? 'xlong' : ($len > $limitLong ? 'long' : '');
+            $cls = $len > $budget * 1.6 ? 'xlong' : ($len > $budget ? 'long' : '');
         @endphp
-        <div class="card {{ $c['custom'] ? 'edited' : '' }}" data-order="{{ $c['order']->id }}">
-            <span class="who">{{ $c['order']->order_number }} · {{ \Illuminate\Support\Str::limit($c['order']->customer_name, 18) }}</span>
-            @if($logo)
+        <div class="card {{ $c['custom'] ? 'edited' : '' }}" data-order="{{ $c['order']->id }}"
+             title="{{ $c['order']->order_number }} · {{ $c['order']->customer_name }}">
+            <span class="frame"></span>
+            @if($showLogo)
                 <img class="logo" src="{{ $logo }}" alt="{{ store_name() }}">
-            @else
+            @elseif(theme('card_show_logo', true))
                 <div class="brand">{{ store_name() }}</div>
             @endif
             <div class="msg {{ $cls }}" contenteditable="true" spellcheck="false">{{ $c['text'] }}</div>
