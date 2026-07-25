@@ -342,21 +342,78 @@ class CustomerController extends Controller
         if (! $header) {
             return back()->with('error', 'The file appears to be empty.');
         }
-        $cols = array_map(fn ($h) => strtolower(trim((string) $h)), $header);
+        // Excel writes a UTF-8 BOM in front of the first header cell, which made
+        // that column "\u{FEFF}name" instead of "name" — every row then looked
+        // nameless and the whole import silently skipped.
+        $cols = array_map(
+            fn ($h) => strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $h))),
+            $header,
+        );
+
+        if (! in_array('name', $cols, true) || ! in_array('phone', $cols, true)) {
+            fclose($handle);
+
+            return back()->with('error', 'The file needs "name" and "phone" columns. Found: '.implode(', ', $cols).'.');
+        }
 
         $created = 0;
         $updated = 0;
-        $skipped = 0;
+        $reasons = ['no_name' => 0, 'no_phone' => 0, 'scientific' => 0, 'bad_phone' => 0, 'duplicate_in_file' => 0];
+        $badSamples = [];
+        $seen = [];
 
         while (($line = fgetcsv($handle)) !== false) {
-            $row = array_combine($cols, array_pad($line, count($cols), null));
-            $phone = preg_replace('/\D/', '', (string) ($row['phone'] ?? ''));
-            $name = trim((string) ($row['name'] ?? ''));
-
-            if (strlen($phone) < 10 || $name === '') {
-                $skipped++;
+            // Ignore the trailing blank line Excel leaves behind.
+            if (count(array_filter($line, fn ($v) => trim((string) $v) !== '')) === 0) {
                 continue;
             }
+
+            $row = array_combine($cols, array_pad($line, count($cols), null));
+            $rawPhone = trim((string) ($row['phone'] ?? ''));
+            $name = trim((string) ($row['name'] ?? ''));
+
+            if ($name === '') {
+                $reasons['no_name']++;
+
+                continue;
+            }
+            if ($rawPhone === '') {
+                $reasons['no_phone']++;
+
+                continue;
+            }
+
+            // Excel turns long numbers into "8.80192E+12" and the real digits are
+            // gone for good — worth calling out rather than lumping in with
+            // ordinary typos, because the fix is in the spreadsheet.
+            if (stripos($rawPhone, 'e+') !== false) {
+                $reasons['scientific']++;
+                if (count($badSamples) < 5) {
+                    $badSamples[] = $name.' — '.$rawPhone;
+                }
+
+                continue;
+            }
+
+            // Canonical 01XXXXXXXXX, so 8801…, +880 1…, 1… and 01… all become
+            // one customer and match the phone format orders are stored under.
+            $phone = bd_phone($rawPhone);
+
+            if (! preg_match(\App\Rules\BdPhone::PATTERN, $phone)) {
+                $reasons['bad_phone']++;
+                if (count($badSamples) < 5) {
+                    $badSamples[] = $name.' — '.$rawPhone;
+                }
+
+                continue;
+            }
+
+            if (isset($seen[$phone])) {
+                $reasons['duplicate_in_file']++;
+
+                continue;
+            }
+            $seen[$phone] = true;
 
             $existing = Customer::where('phone', $phone)->first();
             if ($existing) {
@@ -378,7 +435,36 @@ class CustomerController extends Controller
         }
         fclose($handle);
 
-        return redirect()->route('admin.customers.index')
-            ->with('success', "Imported {$created} new, updated {$updated}".($skipped ? ", skipped {$skipped} invalid row(s)" : '').'.');
+        // Tell the admin exactly what was dropped and why — "skipped 1107" on
+        // its own gives them nothing to act on.
+        $notes = [];
+        if ($reasons['scientific']) {
+            $notes[] = $reasons['scientific'].' phone(s) were mangled by Excel into scientific notation (e.g. 8.80192E+12) — '
+                .'format the phone column as Text in your spreadsheet and export again';
+        }
+        if ($reasons['bad_phone']) {
+            $notes[] = $reasons['bad_phone'].' phone(s) were not valid Bangladeshi mobile numbers';
+        }
+        if ($reasons['no_phone']) {
+            $notes[] = $reasons['no_phone'].' row(s) had no phone number';
+        }
+        if ($reasons['no_name']) {
+            $notes[] = $reasons['no_name'].' row(s) had no name';
+        }
+        if ($reasons['duplicate_in_file']) {
+            $notes[] = $reasons['duplicate_in_file'].' duplicate row(s) in the file were merged';
+        }
+
+        $flash = redirect()->route('admin.customers.index')
+            ->with('success', "Imported {$created} new customer(s), updated {$updated}.");
+
+        if ($notes) {
+            $flash->with('import_errors', array_merge(
+                $notes,
+                $badSamples ? ['Examples: '.implode(' · ', $badSamples)] : [],
+            ));
+        }
+
+        return $flash;
     }
 }
