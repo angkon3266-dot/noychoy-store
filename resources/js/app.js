@@ -146,6 +146,24 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Landing page countdown ───────────────────────────────────────────────
+    window.Alpine.data('countdownBox', (endsAtUnix) => ({
+        units: [],
+        start() {
+            const tick = () => {
+                const left = Math.max(0, endsAtUnix - Math.floor(Date.now() / 1000));
+                this.units = [
+                    { label: 'Days', value: Math.floor(left / 86400) },
+                    { label: 'Hours', value: Math.floor(left / 3600) % 24 },
+                    { label: 'Mins', value: Math.floor(left / 60) % 60 },
+                    { label: 'Secs', value: left % 60 },
+                ];
+            };
+            tick();
+            setInterval(tick, 1000);
+        },
+    }));
+
     // ── Share button: native sheet on mobile, menu everywhere else ───────────
     window.Alpine.data('shareBox', (url, title) => ({
         open: false,
@@ -285,6 +303,57 @@ document.addEventListener('alpine:init', () => {
         addImage(b) { if (!b.images) b.images = []; b.images.push({ image: '', link: '' }); },
         addVideo(b) { if (!b.videos) b.videos = []; b.videos.push({ title: '', url: '' }); },
         ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); b.review_ids = (b.review_ids || []).map(Number); return ''; },
+    }));
+
+    // ── Admin: landing page builder (homepage blocks + landing-only blocks) ──
+    window.Alpine.data('landingBuilder', (init) => ({
+        blocks: (init && init.blocks) || [],
+        products: (init && init.products) || [],
+        newType: 'hero_cta',
+        blank(type) {
+            return {
+                type, enabled: true, title: '', layout: 'single', images: [], videos: [],
+                source: 'attached', category_id: '', limit: 8, html: '', review_ids: [],
+                cta_label: 'Add to cart',
+                hero: { image: '', eyebrow: '', heading: '', subheading: '', cta_text: '', cta_link: '', cta2_text: '', cta2_link: '', note: '', dark: true },
+                benefits: [], faqs: [],
+                countdown: { title: '', ends_at: '', cta_text: '', cta_link: '' },
+                sticky: { text: '', button: '', link: '' },
+                cta: { image: '', eyebrow: '', heading: '', subheading: '', button_text: '', button_link: '', align: 'center', height: 'md' },
+                banner: { image: '', link: '' },
+            };
+        },
+        add() { this.blocks.push(this.blank(this.newType)); },
+        remove(i) { this.blocks.splice(i, 1); },
+        move(i, d) { const j = i + d; if (j < 0 || j >= this.blocks.length) return; [this.blocks[i], this.blocks[j]] = [this.blocks[j], this.blocks[i]]; },
+        ensure(b) {
+            const d = this.blank(b.type);
+            for (const k of Object.keys(d)) if (b[k] === undefined || b[k] === null) b[k] = d[k];
+            return '';
+        },
+        // A conversion-tested skeleton the user can edit rather than start blank.
+        preset() {
+            const mk = (type, over) => Object.assign(this.blank(type), over);
+            this.blocks = [
+                mk('hero_cta', { hero: Object.assign(this.blank('hero_cta').hero, {
+                    eyebrow: 'Limited collection', heading: 'Jewelry she\'ll never take off',
+                    subheading: 'Handpicked pieces, delivered across Bangladesh.',
+                    cta_text: 'Order now', cta_link: '#buy', note: 'Cash on delivery — pay when it arrives',
+                }) }),
+                mk('benefits', { title: 'Why customers choose us', benefits: [
+                    { icon: '🚚', title: 'Cash on delivery', text: 'Pay only when the parcel is in your hands.' },
+                    { icon: '💎', title: 'Quality checked', text: 'Every piece inspected before it ships.' },
+                    { icon: '🇧🇩', title: 'Nationwide delivery', text: 'Delivered anywhere in Bangladesh.' },
+                ] }),
+                mk('buy_box', { title: 'Pick yours' }),
+                mk('reviews', { title: 'What they\'re saying' }),
+                mk('faq', { title: 'Questions, answered', faqs: [
+                    { q: 'How do I pay?', a: 'Cash on delivery — you pay the courier when it arrives.' },
+                    { q: 'How long is delivery?', a: 'Delivered via Steadfast courier nationwide.' },
+                ] }),
+                mk('sticky_cta', { sticky: { text: 'Cash on delivery · nationwide', button: 'Order now', link: '#buy' } }),
+            ];
+        },
     }));
 
     // ── Admin: Discover page tile builder (image + name + link) ─────────────

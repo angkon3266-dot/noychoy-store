@@ -192,6 +192,8 @@
         .logo-center { height: {{ $centerH }}px; width: auto; }
         .menu-ico { height: {{ $menuIconH }}px; width: {{ $menuIconH }}px; }
     </style>
+    {{-- Landing pages can hide the shop chrome for a distraction-free funnel. --}}
+    @unless($hideChrome ?? false)
     <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ msearch: false, rot: {{ $menuRot }} }">
         <div class="mx-auto max-w-7xl px-4">
             <div class="relative flex h-16 items-center gap-2">
@@ -639,10 +641,13 @@
         <div class="mx-auto max-w-7xl px-4 mt-4"><div class="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">{{ session('error') }}</div></div>
     @endif
 
+    @endunless
+
     <main class="flex-1">
         @yield('content')
     </main>
 
+    @unless($hideFooter ?? false)
     <footer class="mt-16 bg-ink-900 text-gold-100">
         @php $footerTrust = collect(theme('trust_badges') ?? [])->filter(fn ($b) => filled($b['title'] ?? null)); @endphp
         @if(theme('footer_show_trust') && $footerTrust->isNotEmpty())
@@ -709,6 +714,7 @@
             {{ theme('footer_copyright') ?: '© '.date('Y').' '.store_name().'. All rights reserved.' }}
         </div>
     </footer>
+    @endunless
 
     {{-- Back-to-top + share-this-page (any page: category, collection, article…) --}}
     <div class="fixed left-5 z-40 flex flex-col items-center gap-3 bottom-20 md:bottom-5">

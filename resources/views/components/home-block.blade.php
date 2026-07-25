@@ -153,6 +153,153 @@
         </div>
     </section>
 
+@elseif($type === 'hero_cta')
+    {{-- Landing hero: big headline, sub, two CTAs, optional background image. --}}
+    @php
+        $h = $block['hero'] ?? [];
+        $bg = $img($h['image'] ?? null);
+        $dark = (bool) ($h['dark'] ?? true);
+    @endphp
+    <section class="relative overflow-hidden {{ $bg ? '' : 'bg-gold-50' }}">
+        @if($bg)<img src="{{ $bg }}" alt="" class="absolute inset-0 w-full h-full object-cover">@endif
+        @if($bg)<div class="absolute inset-0 {{ $dark ? 'bg-black/50' : 'bg-white/60' }}"></div>@endif
+        <div class="relative mx-auto max-w-5xl px-5 py-20 sm:py-28 text-center">
+            @if(filled($h['eyebrow'] ?? null))
+                <p class="uppercase tracking-[0.35em] text-xs mb-4 {{ $bg && $dark ? 'text-white/80' : 'text-gold-600' }}">{{ $h['eyebrow'] }}</p>
+            @endif
+            <h1 class="font-display text-4xl sm:text-6xl font-semibold leading-tight {{ $bg && $dark ? 'text-white' : 'text-ink-900' }}">
+                {{ $h['heading'] ?? '' }}
+            </h1>
+            @if(filled($h['subheading'] ?? null))
+                <p class="mt-5 text-lg max-w-2xl mx-auto {{ $bg && $dark ? 'text-white/85' : 'text-ink-700/75' }}">{{ $h['subheading'] }}</p>
+            @endif
+            <div class="mt-9 flex flex-wrap gap-3 justify-center">
+                @if(filled($h['cta_text'] ?? null))
+                    <a href="{{ $h['cta_link'] ?: '#buy' }}" class="inline-flex items-center rounded-full bg-gold-600 text-white px-9 py-4 text-sm font-medium tracking-wide hover:bg-gold-700 transition shadow-lg hover:shadow-xl hover:-translate-y-0.5 duration-300">{{ $h['cta_text'] }}</a>
+                @endif
+                @if(filled($h['cta2_text'] ?? null))
+                    <a href="{{ $h['cta2_link'] ?: '#' }}" class="inline-flex items-center rounded-full px-9 py-4 text-sm tracking-wide transition border {{ $bg && $dark ? 'border-white/70 text-white hover:bg-white/10' : 'border-gold-300 text-gold-800 hover:bg-gold-100' }}">{{ $h['cta2_text'] }}</a>
+                @endif
+            </div>
+            @if(filled($h['note'] ?? null))
+                <p class="mt-5 text-xs {{ $bg && $dark ? 'text-white/70' : 'text-ink-700/55' }}">{{ $h['note'] }}</p>
+            @endif
+        </div>
+    </section>
+
+@elseif($type === 'benefits')
+    @php $items = collect($block['benefits'] ?? [])->filter(fn ($b) => filled($b['title'] ?? null))->values(); @endphp
+    @if($items->isNotEmpty())
+        <section class="mx-auto max-w-6xl px-4 py-14">
+            @if(($block['title'] ?? '') !== '')
+                <h2 class="font-display text-3xl text-center mb-10">{{ $block['title'] }}</h2>
+            @endif
+            <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-{{ min(4, max(2, $items->count())) }}">
+                @foreach($items as $b)
+                    <div class="text-center px-4">
+                        <div class="text-3xl mb-3">{{ $b['icon'] ?? '✨' }}</div>
+                        <h3 class="font-semibold mb-1.5">{{ $b['title'] }}</h3>
+                        @if(filled($b['text'] ?? null))<p class="text-sm text-ink-700/70 leading-relaxed">{{ $b['text'] }}</p>@endif
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+@elseif($type === 'countdown')
+    @php
+        $c = $block['countdown'] ?? [];
+        $endsAt = filled($c['ends_at'] ?? null) ? \Illuminate\Support\Carbon::parse($c['ends_at']) : null;
+    @endphp
+    @if($endsAt && $endsAt->isFuture())
+        <section class="bg-ink-900 text-white py-10" x-data="countdownBox({{ $endsAt->getTimestamp() }})" x-init="start()">
+            <div class="mx-auto max-w-4xl px-4 text-center">
+                @if(filled($c['title'] ?? null))<p class="font-display text-2xl sm:text-3xl mb-5">{{ $c['title'] }}</p>@endif
+                <div class="flex justify-center gap-3 sm:gap-5">
+                    <template x-for="u in units" :key="u.label">
+                        <div class="min-w-[64px] rounded-xl bg-white/10 px-3 py-3">
+                            <div class="text-2xl sm:text-3xl font-semibold tabular-nums" x-text="String(u.value).padStart(2,'0')"></div>
+                            <div class="text-[10px] uppercase tracking-widest text-white/60 mt-1" x-text="u.label"></div>
+                        </div>
+                    </template>
+                </div>
+                @if(filled($c['cta_text'] ?? null))
+                    <a href="{{ $c['cta_link'] ?: '#buy' }}" class="inline-flex mt-7 rounded-full bg-gold-500 text-ink-900 px-8 py-3.5 text-sm font-medium hover:bg-gold-400 transition">{{ $c['cta_text'] }}</a>
+                @endif
+            </div>
+        </section>
+    @endif
+
+@elseif($type === 'buy_box')
+    @php $products = $block['products'] ?? collect(); @endphp
+    @if($products->isNotEmpty())
+        <section id="buy" class="mx-auto max-w-6xl px-4 py-14">
+            @if(($block['title'] ?? '') !== '')
+                <h2 class="font-display text-3xl text-center mb-10">{{ $block['title'] }}</h2>
+            @endif
+            <div class="grid gap-6 {{ $products->count() === 1 ? 'max-w-md mx-auto' : 'sm:grid-cols-2 lg:grid-cols-3' }}">
+                @foreach($products as $product)
+                    <div class="card p-4 text-center">
+                        <a href="{{ route('product.show', $product) }}" class="block overflow-hidden rounded-xl bg-gold-100 aspect-square">
+                            @if($product->thumbnail)
+                                <img src="{{ $product->thumbnail }}" alt="{{ $product->name }}" class="w-full h-full object-cover hover:scale-105 transition duration-700" loading="lazy">
+                            @endif
+                        </a>
+                        <h3 class="font-medium mt-4">{{ $product->name }}</h3>
+                        <p class="text-gold-700 text-lg font-semibold mt-1">
+                            {{ money($product->price) }}
+                            @if($product->compare_at_price > $product->price)
+                                <span class="text-ink-400 line-through text-sm ml-1">{{ money($product->compare_at_price) }}</span>
+                            @endif
+                        </p>
+                        <form action="{{ route('cart.add', $product->slug) }}" method="POST" class="mt-4"
+                              @submit.prevent="$store.cart.add($event.target)">
+                            @csrf
+                            <input type="hidden" name="qty" value="1">
+                            <button class="btn-primary w-full">{{ $block['cta_label'] ?? 'Add to cart' }}</button>
+                        </form>
+                        <p class="text-xs text-ink-700/50 mt-2">Cash on delivery · pay when it arrives</p>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+@elseif($type === 'faq')
+    @php $items = collect($block['faqs'] ?? [])->filter(fn ($f) => filled($f['q'] ?? null))->values(); @endphp
+    @if($items->isNotEmpty())
+        <section class="mx-auto max-w-3xl px-4 py-14">
+            <h2 class="font-display text-3xl text-center mb-8">{{ ($block['title'] ?? '') !== '' ? $block['title'] : 'Questions, answered' }}</h2>
+            <div class="divide-y divide-ink-100 border-y border-ink-100">
+                @foreach($items as $f)
+                    <details class="group py-4" x-data>
+                        <summary class="flex items-center justify-between cursor-pointer font-medium list-none">
+                            <span>{{ $f['q'] }}</span>
+                            <svg class="w-5 h-5 shrink-0 text-ink-700/40 transition-transform duration-300 group-open:rotate-45" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
+                        </summary>
+                        @if(filled($f['a'] ?? null))<p class="text-sm text-ink-700/75 mt-3 leading-relaxed">{{ $f['a'] }}</p>@endif
+                    </details>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+@elseif($type === 'sticky_cta')
+    @php $s = $block['sticky'] ?? []; @endphp
+    @if(filled($s['text'] ?? null) || filled($s['button'] ?? null))
+        <div x-data="{ show: false }"
+             x-init="window.addEventListener('scroll', () => show = window.scrollY > 500)"
+             x-show="show" x-cloak x-transition.opacity
+             class="fixed inset-x-0 bottom-0 z-[60] border-t border-ink-100 bg-white/95 backdrop-blur shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+            <div class="mx-auto max-w-5xl px-4 py-3 flex items-center gap-4">
+                <p class="text-sm font-medium flex-1 min-w-0 truncate">{{ $s['text'] ?? '' }}</p>
+                <a href="{{ $s['link'] ?: '#buy' }}" class="btn-primary whitespace-nowrap shrink-0">{{ $s['button'] ?: 'Order now' }}</a>
+            </div>
+        </div>
+        {{-- Spacer so the bar never covers the last of the page content. --}}
+        <div class="h-16"></div>
+    @endif
+
 @elseif($type === 'richtext')
     @if(filled($block['html'] ?? null))
         <section class="mx-auto max-w-4xl px-4 py-8 prose prose-sm sm:prose">{!! $block['html'] !!}</section>

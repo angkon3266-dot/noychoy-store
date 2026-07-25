@@ -21,6 +21,9 @@ Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('m
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/sitemap.xml', [\App\Http\Controllers\Shop\SitemapController::class, 'index'])->name('sitemap');
 Route::get('/site.webmanifest', \App\Http\Controllers\Shop\ManifestController::class)->name('manifest');
+
+// Marketing landing pages built in the admin section builder.
+Route::get('/lp/{slug}', [\App\Http\Controllers\Shop\LandingController::class, 'show'])->name('landing.show');
 Route::get('/robots.txt', fn () => response(
     "User-agent: *\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n\nSitemap: ".route('sitemap')."\n",
     200, ['Content-Type' => 'text/plain'],

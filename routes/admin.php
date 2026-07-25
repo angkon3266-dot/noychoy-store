@@ -38,6 +38,15 @@ Route::middleware('admin')->group(function () {
 
     Route::post('dashboard/panels', [\App\Http\Controllers\Admin\DashboardController::class, 'savePanels'])->name('dashboard.panels');
 
+    // Marketing landing pages
+    Route::get('landing', [\App\Http\Controllers\Admin\LandingPageController::class, 'index'])->name('landing.index');
+    Route::get('landing/create', [\App\Http\Controllers\Admin\LandingPageController::class, 'create'])->name('landing.create');
+    Route::post('landing', [\App\Http\Controllers\Admin\LandingPageController::class, 'store'])->name('landing.store');
+    Route::get('landing/{landing}/edit', [\App\Http\Controllers\Admin\LandingPageController::class, 'edit'])->name('landing.edit');
+    Route::put('landing/{landing}', [\App\Http\Controllers\Admin\LandingPageController::class, 'update'])->name('landing.update');
+    Route::post('landing/{landing}/duplicate', [\App\Http\Controllers\Admin\LandingPageController::class, 'duplicate'])->name('landing.duplicate');
+    Route::delete('landing/{landing}', [\App\Http\Controllers\Admin\LandingPageController::class, 'destroy'])->name('landing.destroy');
+
     // AI knowledge base browser/editor
     Route::get('knowledge', [\App\Http\Controllers\Admin\KnowledgeController::class, 'index'])->name('knowledge.index');
     Route::post('knowledge/save', [\App\Http\Controllers\Admin\KnowledgeController::class, 'save'])->name('knowledge.save');
