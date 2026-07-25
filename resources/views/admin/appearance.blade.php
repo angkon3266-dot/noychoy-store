@@ -586,6 +586,7 @@
             <label class="flex items-center gap-2"><input type="checkbox" name="show_call_button" value="1" @checked($theme['show_call_button'] ?? true)> Call now</label>
             <label class="flex items-center gap-2"><input type="checkbox" name="show_whatsapp_button" value="1" @checked($theme['show_whatsapp_button'] ?? true)> WhatsApp</label>
             <label class="flex items-center gap-2"><input type="checkbox" name="show_messenger_button" value="1" @checked($theme['show_messenger_button'] ?? false)> Messenger</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="show_share_button" value="1" @checked($theme['show_share_button'] ?? true)> Share this page</label>
         </div>
         <div><label class="label">Messenger link (m.me/yourpage)</label><input name="messenger_url" value="{{ $theme['messenger_url'] ?? '' }}" class="input" placeholder="https://m.me/yourpage"></div>
     </div>

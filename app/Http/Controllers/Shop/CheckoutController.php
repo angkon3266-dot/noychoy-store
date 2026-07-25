@@ -22,6 +22,9 @@ class CheckoutController extends Controller
         $customer = auth('customer')->user();
         $address = $customer?->defaultAddress;
 
+        // Funnel step for the dashboard's conversion report.
+        \App\Models\Visit::record('checkout_start');
+
         // InitiateCheckout — server-side (CAPI) + shared event id for the browser
         // Pixel. content_ids match the catalog retailer_id.
         $icEventId = MetaTrackingService::newEventId('InitiateCheckout');

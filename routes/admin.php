@@ -36,6 +36,8 @@ Route::middleware('admin')->group(function () {
     Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
     Route::post('products/bulk-serials', [ProductController::class, 'bulkSerials'])->name('products.bulk-serials');
 
+    Route::post('dashboard/panels', [\App\Http\Controllers\Admin\DashboardController::class, 'savePanels'])->name('dashboard.panels');
+
     // AI knowledge base browser/editor
     Route::get('knowledge', [\App\Http\Controllers\Admin\KnowledgeController::class, 'index'])->name('knowledge.index');
     Route::post('knowledge/save', [\App\Http\Controllers\Admin\KnowledgeController::class, 'save'])->name('knowledge.save');
@@ -65,6 +67,10 @@ Route::middleware('admin')->group(function () {
     // Orders
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('orders/labels', [OrderController::class, 'labels'])->name('orders.labels');
+    // Thank-you cards (6×6 cm parcel inserts) + their message templates
+    Route::get('orders/cards', [OrderController::class, 'cards'])->name('orders.cards');
+    Route::get('orders/card-templates', [OrderController::class, 'cardSettings'])->name('orders.card-templates');
+    Route::post('orders/card-templates', [OrderController::class, 'saveCardSettings'])->name('orders.card-templates.save');
     Route::post('orders/bulk-steadfast', [OrderController::class, 'bulkSteadfast'])->name('orders.bulk-steadfast');
     Route::post('orders/merge', [OrderController::class, 'merge'])->name('orders.merge');
     Route::post('orders/bulk-delete', [OrderController::class, 'bulkDelete'])->name('orders.bulk-delete');

@@ -19,8 +19,11 @@
         <span class="text-ink-700/50 group-hover:text-gold-700">{{ $reviewCount ? $avgRating.' · '.$reviewCount.' review'.($reviewCount > 1 ? 's' : '') : 'No reviews yet — be the first' }}</span>
     </a>
 
-    {{-- Love / heart reaction --}}
-    <x-love-button :product="$product" :loved="$loved ?? false" :count="$lovesCount ?? $product->loves_count" />
+    {{-- Love / heart reaction + share --}}
+    <div class="flex items-center gap-4 flex-wrap">
+        <x-love-button :product="$product" :loved="$loved ?? false" :count="$lovesCount ?? $product->loves_count" />
+        <x-share-button :url="route('product.show', $product)" :title="$product->name" label="Share" />
+    </div>
 
     <div class="mt-4 flex items-baseline gap-3 flex-wrap">
         <span class="text-2xl font-semibold text-gold-700" x-text="priceText()"></span>

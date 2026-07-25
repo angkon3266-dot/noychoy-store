@@ -20,6 +20,7 @@
             <a href="{{ route('admin.orders.index') }}" class="btn-outline whitespace-nowrap ml-auto">← Back to active orders</a>
         @else
             <a href="{{ route('admin.orders.labels') }}" target="_blank" class="btn-outline whitespace-nowrap ml-auto">🖨 Print all labels</a>
+            <a href="{{ route('admin.orders.cards') }}" target="_blank" class="btn-outline whitespace-nowrap">💌 Thank-you cards</a>
             <a href="{{ route('admin.orders.index', ['trashed' => 1]) }}" class="btn-outline whitespace-nowrap">🗑 Trash{{ $trashCount ? ' ('.$trashCount.')' : '' }}</a>
         @endif
     </form>
@@ -40,6 +41,11 @@
         <button type="button" class="btn-outline py-2 text-sm"
                 @click="window.open('{{ route('admin.orders.labels') }}?ids=' + sel.join(','), '_blank')">
             🖨 Print labels
+        </button>
+
+        <button type="button" class="btn-outline py-2 text-sm"
+                @click="window.open('{{ route('admin.orders.cards') }}?ids=' + sel.join(','), '_blank')">
+            💌 Print thank-you cards
         </button>
 
         <form action="{{ route('admin.orders.merge') }}" method="POST" class="inline"

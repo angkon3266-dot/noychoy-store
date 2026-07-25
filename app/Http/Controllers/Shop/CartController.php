@@ -38,6 +38,9 @@ class CartController extends Controller
 
         $this->cart->add($product, $variant, $data['qty'] ?? 1);
 
+        // Funnel step for the dashboard's conversion report.
+        \App\Models\Visit::record('cart_add', ['product_id' => $product->id]);
+
         // AddToCart — server-side (CAPI) with the SAME event id the browser Pixel
         // used, so Meta collapses the two into one deduplicated event.
         if (filled($data['event_id'] ?? null)) {

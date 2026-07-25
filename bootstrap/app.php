@@ -26,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'meta.gate' => MetaSecurityGate::class,
         ]);
 
+        // First-party storefront traffic tracking (dashboard visitors + funnel).
+        $middleware->web(append: [\App\Http\Middleware\TrackVisit::class]);
+
         // External webhooks post without a CSRF token.
         $middleware->validateCsrfTokens(except: ['webhooks/*']);
 

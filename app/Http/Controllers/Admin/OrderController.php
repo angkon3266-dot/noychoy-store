@@ -586,4 +586,97 @@ class OrderController extends Controller
 
         return back()->with($ok ? 'success' : 'error', $ok ? 'SMS sent.' : 'SMS failed (check SMS settings/logs).');
     }
+
+    // ── Thank-you cards (6×6 cm inserts printed with the parcel) ─────────────
+
+    /** Saved message templates, always including the two built-in defaults. */
+    public static function cardTemplates(): array
+    {
+        $saved = \App\Models\Setting::get('thankyou_templates', []);
+
+        return is_array($saved) && $saved !== [] ? $saved : [
+            ['name' => 'New customer', 'text' => "Thank you for your first order!\n\nWe hope this piece brings you joy. If you love it, we'd be delighted to see you again."],
+            ['name' => 'Repeat customer', 'text' => "Thank you for coming back!\n\nIt means the world to us. Enjoy your new piece — you have wonderful taste."],
+        ];
+    }
+
+    /** Template manager: edit the message library and pick the two defaults. */
+    public function cardSettings()
+    {
+        return view('admin.orders.card-templates', [
+            'templates' => static::cardTemplates(),
+            'defaultNew' => \App\Models\Setting::get('thankyou_default_new', 'New customer'),
+            'defaultRepeat' => \App\Models\Setting::get('thankyou_default_repeat', 'Repeat customer'),
+        ]);
+    }
+
+    public function saveCardSettings(Request $request)
+    {
+        $data = $request->validate([
+            'templates' => ['required', 'array', 'min:1'],
+            'templates.*.name' => ['nullable', 'string', 'max:60'],
+            'templates.*.text' => ['nullable', 'string', 'max:400'],
+            'default_new' => ['nullable', 'string', 'max:60'],
+            'default_repeat' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        // Keep only fully-filled rows so an empty "add another" row can't create
+        // a blank template that then prints blank cards.
+        $templates = collect($data['templates'])
+            ->filter(fn ($t) => filled($t['name'] ?? null) && filled($t['text'] ?? null))
+            ->map(fn ($t) => ['name' => trim($t['name']), 'text' => trim($t['text'])])
+            ->values()->all();
+
+        if ($templates === []) {
+            return back()->with('error', 'Keep at least one template with a name and a message.');
+        }
+
+        \App\Models\Setting::put('thankyou_templates', $templates);
+        \App\Models\Setting::put('thankyou_default_new', $data['default_new'] ?? $templates[0]['name']);
+        \App\Models\Setting::put('thankyou_default_repeat', $data['default_repeat'] ?? $templates[0]['name']);
+
+        return back()->with('success', 'Thank-you card templates saved.');
+    }
+
+    /**
+     * Printable 6×6 cm thank-you cards for the given orders (or all recent).
+     * Each card picks the new-customer or repeat-customer template based on
+     * how many orders that phone has placed, unless one is forced via ?template.
+     */
+    public function cards(Request $request)
+    {
+        $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
+
+        $orders = Order::with('customer')
+            ->when($ids, fn ($q) => $q->whereIn('id', $ids))
+            ->latest()->take(300)->get();
+
+        $templates = collect(static::cardTemplates());
+        $forced = $request->query('template');
+        $byName = fn ($name) => $templates->firstWhere('name', $name) ?? $templates->first();
+
+        $newTpl = $byName(\App\Models\Setting::get('thankyou_default_new', 'New customer'));
+        $repeatTpl = $byName(\App\Models\Setting::get('thankyou_default_repeat', 'Repeat customer'));
+        $forcedTpl = filled($forced) ? $byName($forced) : null;
+
+        $cards = $orders->map(function (Order $order) use ($forcedTpl, $newTpl, $repeatTpl) {
+            $isRepeat = (int) ($order->customer?->total_orders ?? 0) > 1;
+            $tpl = $forcedTpl ?: ($isRepeat ? $repeatTpl : $newTpl);
+
+            return [
+                'order' => $order,
+                'text' => strtr((string) ($tpl['text'] ?? ''), [
+                    '{name}' => trim((string) $order->customer_name),
+                    '{store}' => store_name(),
+                    '{order_number}' => (string) $order->order_number,
+                ]),
+            ];
+        });
+
+        return view('admin.orders.cards', [
+            'cards' => $cards,
+            'templates' => $templates,
+            'forced' => $forced,
+        ]);
+    }
 }

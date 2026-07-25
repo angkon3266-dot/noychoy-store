@@ -161,7 +161,7 @@
 
 @if(theme('show_frequently_bought') && isset($crossSells) && $crossSells->isNotEmpty())
     @php
-        $fbtItems = collect([$product])->merge($crossSells)->take(4);
+        $fbtItems = collect([$product])->merge($crossSells)->take(5);
     @endphp
     <section class="mt-16" x-data="{
         sel: { {{ $fbtItems->map(fn($p) => $p->id.': '.($p->isAvailable() && !$p->has_variants ? 'true' : 'false'))->implode(', ') }} },
@@ -211,7 +211,8 @@
 @if($related->isNotEmpty())
     <section class="mt-16">
         <h2 class="font-display text-2xl font-semibold mb-6">You may also like</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+        {{-- 5 across on large screens so a full row of recommendations fits. --}}
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-8">
             @foreach($related as $p)<x-product-card :product="$p" />@endforeach
         </div>
     </section>

@@ -146,6 +146,41 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Share button: native sheet on mobile, menu everywhere else ───────────
+    window.Alpine.data('shareBox', (url, title) => ({
+        open: false,
+        copied: false,
+        async trigger() {
+            // navigator.share is the best experience where it exists (phones):
+            // it offers WhatsApp / Messenger / everything the OS knows about.
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title, text: title, url });
+                    return;
+                } catch (e) {
+                    // User dismissed the sheet, or the browser refused — fall
+                    // through to our own menu rather than leaving them stuck.
+                    if (e && e.name === 'AbortError') return;
+                }
+            }
+            this.open = !this.open;
+        },
+        async copy() {
+            try {
+                await navigator.clipboard.writeText(url);
+            } catch (e) {
+                const t = document.createElement('textarea');
+                t.value = url;
+                document.body.appendChild(t);
+                t.select();
+                document.execCommand('copy');
+                t.remove();
+            }
+            this.copied = true;
+            setTimeout(() => { this.copied = false; this.open = false; }, 1400);
+        },
+    }));
+
     // ── Header search type-ahead ─────────────────────────────────────────────
     window.Alpine.data('searchBox', () => ({
         q: '',

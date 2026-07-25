@@ -235,6 +235,7 @@
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <form action="{{ route('admin.orders.steadfast.refresh', $order) }}" method="POST">@csrf<button class="btn-outline w-full">Refresh status</button></form>
                     <a href="{{ route('admin.orders.labels', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">🖨 Print label</a>
+                    <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">💌 Print thank-you card</a>
                 </div>
             @else
                 <p class="text-sm text-ink-700/60 mb-3">Create a courier consignment for COD ৳{{ number_format($order->total,0) }}.</p>

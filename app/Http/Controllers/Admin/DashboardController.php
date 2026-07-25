@@ -11,7 +11,27 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    /** Optional deep-analysis panels, in display order. */
+    public const PANELS = [
+        'profit' => 'Revenue & profit',
+        'funnel' => 'Traffic & conversion funnel',
+        'retention' => 'Customers & retention',
+        'operations' => 'Operations & inventory',
+    ];
+
+    /** Save which panels this admin wants to see. */
+    public function savePanels(\Illuminate\Http\Request $request)
+    {
+        $chosen = array_values(array_intersect(
+            array_keys(self::PANELS),
+            (array) $request->input('panels', [])
+        ));
+        \App\Models\Setting::put('dashboard_panels', $chosen);
+
+        return back()->with('success', 'Dashboard layout saved.');
+    }
+
+    public function index(\App\Services\DashboardAnalytics $analytics)
     {
         $today = now()->startOfDay();
         $monthStart = now()->startOfMonth();
@@ -110,10 +130,28 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->pluck('count', 'status');
 
+        // Deep-analysis panels (admin chooses which are visible; all on by default).
+        $saved = \App\Models\Setting::get('dashboard_panels', null);
+        $panels = is_array($saved) ? $saved : array_keys(self::PANELS);
+
+        $deep = [
+            'profit' => in_array('profit', $panels, true) ? $analytics->periodComparison(30) : null,
+            'funnel' => in_array('funnel', $panels, true) ? $analytics->funnel(30) : null,
+            'visitorsByDay' => in_array('funnel', $panels, true) ? $analytics->visitorsByDay(14) : null,
+            'sources' => in_array('funnel', $panels, true) ? $analytics->trafficSources(30) : null,
+            'viewedNotSold' => in_array('funnel', $panels, true) ? $analytics->viewedNotSold(30) : null,
+            'retention' => in_array('retention', $panels, true) ? $analytics->retention(90) : null,
+            'operations' => in_array('operations', $panels, true) ? $analytics->operations(30) : null,
+        ];
+
+        // Total (all-time) unique visitors — the headline traffic number.
+        $stats['visitors_total'] = (int) \App\Models\Visit::distinct()->count('visitor_token');
+        $stats['visitors_today'] = (int) \App\Models\Visit::whereDate('created_at', $today)->distinct()->count('visitor_token');
+
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
             'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability',
-            'unreadMessages', 'recentMessages'
+            'unreadMessages', 'recentMessages', 'deep', 'panels'
         ));
     }
 }

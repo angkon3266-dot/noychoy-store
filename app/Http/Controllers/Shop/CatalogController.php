@@ -154,14 +154,8 @@ class CatalogController extends Controller
             $loved = ProductLove::where('product_id', $product->id)->where('visitor_token', $token)->exists();
         }
 
-        // "You may also like" prefers manual upsells, falls back to same-category.
-        $related = $upsells->isNotEmpty()
-            ? $upsells
-            : Product::published()
-                ->where('category_id', $product->category_id)
-                ->where('id', '!=', $product->id)
-                ->with('images', 'approvedReviews', 'category')
-                ->take(4)->get();
+        // "You may also like": the admin's picks lead, then relevance fill to 5.
+        $related = $this->fillRelated($product, $upsells, 5);
 
         // Track recently viewed (session, max 8).
         $recent = collect(session('recently_viewed', []))
@@ -225,7 +219,59 @@ class CatalogController extends Controller
      * Products most often purchased in the same orders as $product.
      * Falls back to the admin's manual cross-sells, then same-category items.
      */
-    protected function frequentlyBoughtTogether(Product $product, int $limit = 4): \Illuminate\Support\Collection
+    /**
+     * Top a recommendation row up to $limit with genuinely relevant products,
+     * so the row is never short (or empty) when the admin hasn't picked enough.
+     *
+     * Tiers, best first: same category → shares a tag → most viewed. Each tier
+     * is ordered by a day-stable pseudo-random key, so the row looks freshly
+     * mixed and rotates daily without reshuffling on every refresh.
+     */
+    protected function fillRelated(Product $product, \Illuminate\Support\Collection $picked, int $limit = 5): \Illuminate\Support\Collection
+    {
+        $picked = $picked->take($limit)->values();
+        if ($picked->count() >= $limit) {
+            return $picked;
+        }
+
+        $exclude = $picked->pluck('id')->push($product->id)->all();
+        $tags = collect($product->tag_list ?? [])->filter()->take(5);
+        $seed = now()->toDateString().'|'.$product->id;
+
+        $tiers = [
+            fn () => Product::published()->where('category_id', $product->category_id),
+            fn () => $tags->isEmpty() ? null : Product::published()->where(function ($q) use ($tags) {
+                foreach ($tags as $t) {
+                    $q->orWhere('tags', 'like', '%'.$t.'%');
+                }
+            }),
+            fn () => Product::published()->orderByDesc('views'),
+        ];
+
+        foreach ($tiers as $makeQuery) {
+            if ($picked->count() >= $limit) {
+                break;
+            }
+            $query = $makeQuery();
+            if (! $query) {
+                continue;
+            }
+
+            $pool = $query->whereNotIn('id', $exclude)
+                ->with('images', 'approvedReviews', 'category')
+                ->take(24)->get()
+                ->sortBy(fn ($p) => crc32($seed.'|'.$p->id))
+                ->take($limit - $picked->count())
+                ->values();
+
+            $picked = $picked->concat($pool);
+            $exclude = array_merge($exclude, $pool->pluck('id')->all());
+        }
+
+        return $picked->values();
+    }
+
+    protected function frequentlyBoughtTogether(Product $product, int $limit = 5): \Illuminate\Support\Collection
     {
         $orderIds = OrderItem::where('product_id', $product->id)->pluck('order_id');
 
@@ -238,25 +284,18 @@ class CatalogController extends Controller
             ->limit($limit)
             ->pluck('product_id');
 
+        // The admin's manual cross-sells lead (they're a deliberate choice),
+        // then real co-purchase pairs, then relevance fill — always $limit items.
+        $picked = $product->crossSells();
+
         if ($ids->isNotEmpty()) {
-            $found = Product::published()->whereIn('id', $ids)->with('images', 'approvedReviews', 'category')->get()
+            $chosen = $picked->pluck('id')->all();
+            $coPurchased = Product::published()->whereIn('id', $ids)->whereNotIn('id', $chosen)
+                ->with('images', 'approvedReviews', 'category')->get()
                 ->sortBy(fn ($p) => $ids->search($p->id))->values();
-            if ($found->isNotEmpty()) {
-                return $found;
-            }
+            $picked = $picked->concat($coPurchased);
         }
 
-        // Fallback 1: manual cross-sells set on the product.
-        $manual = $product->crossSells();
-        if ($manual->isNotEmpty()) {
-            return $manual;
-        }
-
-        // Fallback 2: other products from the same category.
-        return Product::published()
-            ->where('category_id', $product->category_id)
-            ->where('id', '!=', $product->id)
-            ->with('images', 'approvedReviews', 'category')
-            ->take($limit)->get();
+        return $this->fillRelated($product, $picked, $limit);
     }
 }

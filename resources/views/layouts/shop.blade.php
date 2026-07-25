@@ -710,15 +710,22 @@
         </div>
     </footer>
 
-    {{-- Back-to-top button (appears after scrolling down) --}}
-    <button type="button" x-data="{ show: false }"
-            x-init="window.addEventListener('scroll', () => show = window.scrollY > 600)"
-            x-show="show" x-cloak x-transition
-            @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
-            aria-label="Back to top"
-            class="fixed bottom-20 md:bottom-5 left-5 z-40 w-11 h-11 rounded-full bg-ink-900/80 text-white shadow-lg backdrop-blur flex items-center justify-center hover:bg-ink-900 transition">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
-    </button>
+    {{-- Back-to-top + share-this-page (any page: category, collection, article…) --}}
+    <div class="fixed left-5 z-40 flex flex-col items-center gap-3 bottom-20 md:bottom-5">
+        @if(theme('show_share_button', true))
+            <div class="w-11 h-11 rounded-full bg-white shadow-lg border border-ink-100 flex items-center justify-center hover:border-gold-300 transition">
+                <x-share-button compact label="Share this page" placement="up-right" />
+            </div>
+        @endif
+        <button type="button" x-data="{ show: false }"
+                x-init="window.addEventListener('scroll', () => show = window.scrollY > 600)"
+                x-show="show" x-cloak x-transition
+                @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+                aria-label="Back to top"
+                class="w-11 h-11 rounded-full bg-ink-900/80 text-white shadow-lg backdrop-blur flex items-center justify-center hover:bg-ink-900 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+        </button>
+    </div>
 
     {{-- Floating contact stack: Offers, Call, Messenger, WhatsApp --}}
     @php

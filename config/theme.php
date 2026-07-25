@@ -70,6 +70,7 @@ return [
         'messenger_url' => null,              // e.g. https://m.me/yourpage
         'show_call_button' => true,           // floating "Call now" (uses store phone)
         'show_whatsapp_button' => true,
+        'show_share_button' => true,
         'show_messenger_button' => false,
         'free_shipping_bar' => true,
         'show_recently_viewed' => true,
