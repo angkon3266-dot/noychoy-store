@@ -46,6 +46,12 @@ class Order extends Model
         'points_earned' => 'integer',
     ];
 
+    /** Same canonical 01XXXXXXXXX form as Customer::phone, so the two always join. */
+    public function setCustomerPhoneAttribute($value): void
+    {
+        $this->attributes['customer_phone'] = blank($value) ? null : bd_phone((string) $value);
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

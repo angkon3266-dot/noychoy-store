@@ -45,6 +45,11 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        // Canonicalise before validating, or "unique" compares the typed string
+        // against stored 01… numbers and lets a duplicate through — which the
+        // model mutator would then turn into a database constraint error.
+        $request->merge(['phone' => bd_phone($request->input('phone'))]);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', new \App\Rules\BdPhone, 'unique:customers,phone'],

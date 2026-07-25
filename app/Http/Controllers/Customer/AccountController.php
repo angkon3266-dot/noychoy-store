@@ -157,10 +157,13 @@ class AccountController extends Controller
     public function updateProfile(Request $request)
     {
         $customer = $this->customer();
+        // Canonicalise first so "unique" compares like with like (see register()).
+        $request->merge(['phone' => bd_phone($request->input('phone'))]);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:160', Rule::unique('customers', 'email')->ignore($customer->id)],
-            'phone' => ['required', 'string', 'max:20', Rule::unique('customers', 'phone')->ignore($customer->id)],
+            'phone' => ['required', 'string', new \App\Rules\BdPhone, Rule::unique('customers', 'phone')->ignore($customer->id)],
             'gender' => ['nullable', 'in:male,female,other'],
         ]);
         $data['gender'] = $data['gender'] ?: null;

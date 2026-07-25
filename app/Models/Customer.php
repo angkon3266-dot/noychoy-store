@@ -28,6 +28,19 @@ class Customer extends Authenticatable
         'password' => 'hashed',
     ];
 
+    /**
+     * Every phone is stored canonically as 01XXXXXXXXX, whatever was typed —
+     * "+880 1711-195772", "8801711195772", "1711195772" and "01711-195772" are
+     * one customer. Done as a mutator so every write path is covered: checkout,
+     * registration, profile edit, admin, CSV import, seeds, tinker.
+     *
+     * Storage stays local-format; SmsService converts to 880… at the gateway.
+     */
+    public function setPhoneAttribute($value): void
+    {
+        $this->attributes['phone'] = blank($value) ? null : bd_phone((string) $value);
+    }
+
     public function addresses(): HasMany
     {
         return $this->hasMany(Address::class);
