@@ -28,7 +28,7 @@ class Order extends Model
         'subtotal', 'shipping_cost', 'discount', 'adjustments', 'member_discount', 'total',
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
-        'notes', 'admin_notes', 'source', 'woo_id', 'stock_restored',
+        'notes', 'admin_notes', 'card_message', 'source', 'woo_id', 'stock_restored',
     ];
 
     protected $casts = [

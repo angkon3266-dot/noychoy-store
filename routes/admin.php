@@ -76,8 +76,9 @@ Route::middleware('admin')->group(function () {
     // Orders
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('orders/labels', [OrderController::class, 'labels'])->name('orders.labels');
-    // Thank-you cards (6×6 cm parcel inserts) + their message templates
+    // Thank-you cards (parcel inserts) + their message templates
     Route::get('orders/cards', [OrderController::class, 'cards'])->name('orders.cards');
+    Route::post('orders/cards/messages', [OrderController::class, 'saveCardMessages'])->name('orders.cards.messages');
     Route::get('orders/card-templates', [OrderController::class, 'cardSettings'])->name('orders.card-templates');
     Route::post('orders/card-templates', [OrderController::class, 'saveCardSettings'])->name('orders.card-templates.save');
     Route::post('orders/bulk-steadfast', [OrderController::class, 'bulkSteadfast'])->name('orders.bulk-steadfast');
@@ -115,6 +116,12 @@ Route::middleware('admin')->group(function () {
     Route::post('notifications/vapid-keys', [\App\Http\Controllers\Admin\NotificationController::class, 'generateVapidKeys'])->name('notifications.vapid-keys');
     Route::post('notifications/test-push', [\App\Http\Controllers\Admin\NotificationController::class, 'testPush'])->name('notifications.test-push');
     Route::post('notifications/push-templates', [\App\Http\Controllers\Admin\NotificationController::class, 'savePushTemplates'])->name('notifications.push-templates');
+
+    // Staff device alerts (new order → push on your phone)
+    Route::post('push/subscribe', [\App\Http\Controllers\Admin\AdminPushController::class, 'subscribe'])->name('push.subscribe');
+    Route::post('push/unsubscribe', [\App\Http\Controllers\Admin\AdminPushController::class, 'unsubscribe'])->name('push.unsubscribe');
+    Route::post('push/test', [\App\Http\Controllers\Admin\AdminPushController::class, 'test'])->name('push.test');
+    Route::post('push/toggle', [\App\Http\Controllers\Admin\AdminPushController::class, 'toggle'])->name('push.toggle');
 
     // Drip campaigns (scheduled push sequences)
     Route::get('drips', [\App\Http\Controllers\Admin\DripController::class, 'index'])->name('drips.index');

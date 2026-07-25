@@ -595,9 +595,46 @@ class OrderController extends Controller
         $saved = \App\Models\Setting::get('thankyou_templates', []);
 
         return is_array($saved) && $saved !== [] ? $saved : [
-            ['name' => 'New customer', 'text' => "Thank you for your first order!\n\nWe hope this piece brings you joy. If you love it, we'd be delighted to see you again."],
-            ['name' => 'Repeat customer', 'text' => "Thank you for coming back!\n\nIt means the world to us. Enjoy your new piece — you have wonderful taste."],
+            ['name' => 'New customer', 'text' => "Dear {name},\n\nThank you for your first order with {store}. We hope this piece brings you joy — and we'd be delighted to see you again."],
+            ['name' => 'Repeat customer', 'text' => "Dear {name},\n\nThank you for coming back to {store}. It means the world to us. Enjoy your new piece — you have wonderful taste."],
         ];
+    }
+
+    /** Printed card dimensions in millimetres (admin-configurable). */
+    public static function cardSize(): array
+    {
+        return [
+            'w' => max(30, min(150, (int) \App\Models\Setting::get('thankyou_card_w', 60))),
+            'h' => max(30, min(200, (int) \App\Models\Setting::get('thankyou_card_h', 60))),
+        ];
+    }
+
+    /** Fill {name} / {store} / {order_number} for one order. */
+    public static function renderCardText(string $text, Order $order): string
+    {
+        return strtr($text, [
+            '{name}' => trim((string) $order->customer_name),
+            '{store}' => store_name(),
+            '{order_number}' => (string) $order->order_number,
+        ]);
+    }
+
+    /**
+     * The message that will print for this order: its own override if one was
+     * saved, otherwise the new- or repeat-customer default.
+     */
+    public static function cardMessageFor(Order $order): string
+    {
+        if (filled($order->card_message)) {
+            return static::renderCardText((string) $order->card_message, $order);
+        }
+
+        $templates = collect(static::cardTemplates());
+        $isRepeat = (int) ($order->customer?->total_orders ?? 0) > 1;
+        $name = \App\Models\Setting::get($isRepeat ? 'thankyou_default_repeat' : 'thankyou_default_new', $isRepeat ? 'Repeat customer' : 'New customer');
+        $tpl = $templates->firstWhere('name', $name) ?? $templates->first();
+
+        return static::renderCardText((string) ($tpl['text'] ?? ''), $order);
     }
 
     /** Template manager: edit the message library and pick the two defaults. */
@@ -607,6 +644,7 @@ class OrderController extends Controller
             'templates' => static::cardTemplates(),
             'defaultNew' => \App\Models\Setting::get('thankyou_default_new', 'New customer'),
             'defaultRepeat' => \App\Models\Setting::get('thankyou_default_repeat', 'Repeat customer'),
+            'size' => static::cardSize(),
         ]);
     }
 
@@ -618,6 +656,8 @@ class OrderController extends Controller
             'templates.*.text' => ['nullable', 'string', 'max:400'],
             'default_new' => ['nullable', 'string', 'max:60'],
             'default_repeat' => ['nullable', 'string', 'max:60'],
+            'card_w' => ['required', 'integer', 'min:30', 'max:150'],
+            'card_h' => ['required', 'integer', 'min:30', 'max:200'],
         ]);
 
         // Keep only fully-filled rows so an empty "add another" row can't create
@@ -634,8 +674,10 @@ class OrderController extends Controller
         \App\Models\Setting::put('thankyou_templates', $templates);
         \App\Models\Setting::put('thankyou_default_new', $data['default_new'] ?? $templates[0]['name']);
         \App\Models\Setting::put('thankyou_default_repeat', $data['default_repeat'] ?? $templates[0]['name']);
+        \App\Models\Setting::put('thankyou_card_w', (int) $data['card_w']);
+        \App\Models\Setting::put('thankyou_card_h', (int) $data['card_h']);
 
-        return back()->with('success', 'Thank-you card templates saved.');
+        return back()->with('success', 'Thank-you card settings saved.');
     }
 
     /**
@@ -653,23 +695,22 @@ class OrderController extends Controller
 
         $templates = collect(static::cardTemplates());
         $forced = $request->query('template');
-        $byName = fn ($name) => $templates->firstWhere('name', $name) ?? $templates->first();
+        $forcedTpl = filled($forced)
+            ? ($templates->firstWhere('name', $forced) ?? $templates->first())
+            : null;
 
-        $newTpl = $byName(\App\Models\Setting::get('thankyou_default_new', 'New customer'));
-        $repeatTpl = $byName(\App\Models\Setting::get('thankyou_default_repeat', 'Repeat customer'));
-        $forcedTpl = filled($forced) ? $byName($forced) : null;
-
-        $cards = $orders->map(function (Order $order) use ($forcedTpl, $newTpl, $repeatTpl) {
-            $isRepeat = (int) ($order->customer?->total_orders ?? 0) > 1;
-            $tpl = $forcedTpl ?: ($isRepeat ? $repeatTpl : $newTpl);
+        $cards = $orders->map(function (Order $order) use ($forcedTpl) {
+            // Forcing a template from the toolbar overrides everything (it's a
+            // deliberate one-off), otherwise the order's own saved message wins,
+            // then the new/repeat default.
+            $text = $forcedTpl
+                ? static::renderCardText((string) ($forcedTpl['text'] ?? ''), $order)
+                : static::cardMessageFor($order);
 
             return [
                 'order' => $order,
-                'text' => strtr((string) ($tpl['text'] ?? ''), [
-                    '{name}' => trim((string) $order->customer_name),
-                    '{store}' => store_name(),
-                    '{order_number}' => (string) $order->order_number,
-                ]),
+                'text' => $text,
+                'custom' => ! $forcedTpl && filled($order->card_message),
             ];
         });
 
@@ -677,6 +718,37 @@ class OrderController extends Controller
             'cards' => $cards,
             'templates' => $templates,
             'forced' => $forced,
+            'size' => static::cardSize(),
         ]);
+    }
+
+    /**
+     * Save per-order card messages edited straight on the print preview.
+     * An empty message clears the override so the order falls back to its
+     * new/repeat default template again.
+     */
+    public function saveCardMessages(Request $request)
+    {
+        $data = $request->validate([
+            'messages' => ['required', 'array'],
+            'messages.*' => ['nullable', 'string', 'max:600'],
+        ]);
+
+        $saved = 0;
+        foreach ($data['messages'] as $orderId => $text) {
+            $order = Order::find((int) $orderId);
+            if (! $order) {
+                continue;
+            }
+            // contenteditable hands back CRLF; normalise so the print and the
+            // admin textarea agree on line breaks.
+            $clean = filled($text) ? trim(str_replace("\r\n", "\n", (string) $text)) : null;
+            $order->forceFill(['card_message' => $clean ?: null])->save();
+            $saved++;
+        }
+
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'saved' => $saved])
+            : back()->with('success', 'Thank-you card message saved.');
     }
 }

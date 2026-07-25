@@ -80,7 +80,9 @@ class NotificationService
 
         // Segment sends go only to the targeted members; an "all" send reaches
         // every subscription — registered members AND opted-in guests.
-        $query = \App\Models\PushSubscription::query();
+        // ->customers() keeps staff devices (which subscribe for order alerts)
+        // out of every marketing send.
+        $query = \App\Models\PushSubscription::query()->customers();
         if ($n->audience === 'segment') {
             $ids = $recipientIds ?? $n->recipients()->pluck('customers.id')->all();
             $query->whereNotNull('customer_id')->whereIn('customer_id', $ids);
@@ -143,6 +145,47 @@ class NotificationService
         \App\Models\PushSubscription::where('customer_id', $customerId)
             ->pluck('id')->chunk(500)
             ->each(fn ($chunk) => \App\Jobs\SendWebPush::dispatch($chunk->all(), $payload));
+    }
+
+    /**
+     * Operational alert to every opted-in staff device the moment an order is
+     * placed. Silent no-op when push is off or nobody has subscribed, so it can
+     * be called unconditionally from the checkout pipeline.
+     *
+     * @return int staff devices the alert was queued to
+     */
+    public function alertAdminsNewOrder(\App\Models\Order $order): int
+    {
+        if (! \App\Models\Setting::get('admin_order_alerts', true)) {
+            return 0;
+        }
+
+        $push = app(\App\Services\WebPushService::class);
+        if (! $push->ready()) {
+            return 0;
+        }
+
+        $ids = \App\Models\PushSubscription::admins()->pluck('id');
+        if ($ids->isEmpty()) {
+            return 0;
+        }
+
+        $items = $order->items->sum('quantity');
+        $first = optional($order->items->first())->name;
+        $body = $order->customer_name.' · '.money($order->total)
+            .' · '.$items.' item'.($items === 1 ? '' : 's')
+            .($first ? "\n".\Illuminate\Support\Str::limit($first, 60) : '');
+
+        \App\Jobs\SendWebPush::dispatch($ids->all(), [
+            'title' => '🛍 New order '.$order->order_number,
+            'body' => $body,
+            'url' => route('admin.orders.show', $order),
+            'icon' => theme_asset(theme('logo')) ?: asset('favicon.ico'),
+            // Unique tag per order so a second order never replaces the first.
+            'tag' => 'order-'.$order->id,
+        ]);
+
+        return $ids->count();
     }
 
     /** Push directly to a set of subscription IDs (e.g. stock-watch list). */

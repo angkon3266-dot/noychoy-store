@@ -161,7 +161,8 @@
 
 @if(theme('show_frequently_bought') && isset($crossSells) && $crossSells->isNotEmpty())
     @php
-        $fbtItems = collect([$product])->merge($crossSells)->take(5);
+        // This product plus its companions, capped at 4 so the bundle stays readable.
+        $fbtItems = collect([$product])->merge($crossSells)->take(4);
     @endphp
     <section class="mt-16" x-data="{
         sel: { {{ $fbtItems->map(fn($p) => $p->id.': '.($p->isAvailable() && !$p->has_variants ? 'true' : 'false'))->implode(', ') }} },

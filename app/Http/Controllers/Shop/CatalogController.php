@@ -271,7 +271,12 @@ class CatalogController extends Controller
         return $picked->values();
     }
 
-    protected function frequentlyBoughtTogether(Product $product, int $limit = 5): \Illuminate\Support\Collection
+    /**
+     * Companions for the bundle. The block shows this product plus these, so
+     * the default of 3 keeps the whole "frequently bought together" row at 4
+     * items — past that the checkboxes stop reading as one buyable bundle.
+     */
+    protected function frequentlyBoughtTogether(Product $product, int $limit = 3): \Illuminate\Support\Collection
     {
         $orderIds = OrderItem::where('product_id', $product->id)->pluck('order_id');
 

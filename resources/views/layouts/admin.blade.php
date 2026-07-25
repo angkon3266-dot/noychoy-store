@@ -6,6 +6,13 @@
     <title>@yield('title', 'Admin') — {{ store_name() }} Admin</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    {{-- Installable admin app — iOS only delivers push to a Home-Screen install. --}}
+    <link rel="manifest" href="{{ url('/site.webmanifest?admin=1') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="{{ store_name() }} Admin">
+    @if($appleIcon = theme_asset(theme('favicon')))
+        <link rel="apple-touch-icon" href="{{ $appleIcon }}">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     {{-- Alpine is bundled via Vite (resources/js/app.js) — no CDN. --}}
 </head>
@@ -90,5 +97,6 @@
 </div>
 @include('admin.partials.media-picker')
 <style>[x-cloak]{display:none!important}</style>
+@stack('scripts')
 </body>
 </html>

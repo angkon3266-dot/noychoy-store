@@ -37,6 +37,13 @@ class SendOrderPlacedEffects implements ShouldQueue
         $order = $this->order->fresh('items') ?? $this->order;
 
         try {
+            // Staff alert first — it's the one thing someone is waiting on.
+            app(\App\Services\NotificationService::class)->alertAdminsNewOrder($order);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        try {
             $sms->sendTemplate('order_placed', $order);
         } catch (\Throwable $e) {
             report($e);

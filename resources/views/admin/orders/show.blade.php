@@ -258,6 +258,29 @@
             @endif
         </div>
 
+        <!-- Thank-you card message for this customer -->
+        <div class="card p-5">
+            <h2 class="font-semibold mb-1">💌 Thank-you card</h2>
+            <p class="text-xs text-ink-700/60 mb-3">
+                Printed message for this customer. Leave it empty to use the
+                {{ (int) ($order->customer?->total_orders ?? 0) > 1 ? 'repeat-customer' : 'new-customer' }} default.
+                <a href="{{ route('admin.orders.card-templates') }}" class="text-gold-700 underline">Edit defaults</a>
+            </p>
+            <form action="{{ route('admin.orders.cards.messages') }}" method="POST" class="space-y-2">
+                @csrf
+                <textarea name="messages[{{ $order->id }}]" rows="4" class="input text-sm"
+                          placeholder="Dear {{ $order->customer_name }}, thank you for…">{{ $order->card_message }}</textarea>
+                @if(blank($order->card_message))
+                    <p class="text-[11px] text-ink-700/50 whitespace-pre-line border-l-2 border-ink-100 pl-2">{{ \App\Http\Controllers\Admin\OrderController::cardMessageFor($order) }}</p>
+                @endif
+                <div class="grid grid-cols-2 gap-2">
+                    <button class="btn-outline w-full">Save message</button>
+                    <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank"
+                       class="btn-outline w-full text-center">🖨 Print card</a>
+                </div>
+            </form>
+        </div>
+
         <!-- Custom SMS -->
         <div class="card p-5">
             <h2 class="font-semibold mb-3">Send SMS</h2>

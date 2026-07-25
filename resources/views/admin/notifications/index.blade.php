@@ -14,6 +14,9 @@
     and on each member's dashboard. Message everyone or a specific group, automate win-backs, and track what each campaign earns.
 </p>
 
+{{-- ── Staff alerts: push to your own phone when an order lands ───────────── --}}
+<div class="mb-6">@include('admin.partials.order-alerts')</div>
+
 {{-- ── Campaign performance summary ───────────────────────────────────────── --}}
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
     <div class="card p-4"><p class="text-xs text-ink-700/50">Campaigns sent</p><p class="text-xl font-bold">{{ number_format($sum['campaigns']) }}</p></div>
