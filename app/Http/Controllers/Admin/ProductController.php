@@ -315,6 +315,67 @@ class ProductController extends Controller
     }
 
     /** Save the admin-typed product IDs (serials) from the list page in one go. */
+    /**
+     * Save one product's ID as it's typed in the list (auto-saves on blur).
+     *
+     * If the number is already taken, the two products swap rather than the
+     * save failing — renumbering by hand is otherwise a dead end, since every
+     * move would first need the other product cleared. The response names what
+     * it swapped with so nothing changes invisibly.
+     */
+    public function updateSerial(Request $request, Product $product)
+    {
+        // Validated by hand rather than $request->validate(): the app only
+        // renders JSON for exceptions on api/* paths (bootstrap/app.php), so a
+        // thrown ValidationException here would come back as an HTML redirect
+        // that the caller can't read.
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'serial' => ['nullable', 'integer', 'min:1', 'max:999999'],
+        ], [
+            'serial.min' => 'Product ID must be 1 or higher.',
+            'serial.integer' => 'Product ID must be a whole number.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'ok' => false,
+                'message' => $validator->errors()->first('serial'),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+        $new = filled($data['serial'] ?? null) ? (int) $data['serial'] : null;
+        $old = $product->serial;
+
+        if ($new === $old) {
+            return response()->json(['ok' => true, 'serial' => $new, 'message' => 'Saved']);
+        }
+
+        // withTrashed: a deleted product still holds its number in the unique index.
+        $holder = $new === null ? null : Product::withTrashed()
+            ->where('serial', $new)->where('id', '!=', $product->id)->first();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($product, $holder, $new, $old) {
+            // Free this row first so a swap can't trip the unique index.
+            Product::withTrashed()->whereKey($product->id)->update(['serial' => null]);
+
+            if ($holder) {
+                Product::withTrashed()->whereKey($holder->id)->update(['serial' => $old]);
+            }
+
+            Product::withTrashed()->whereKey($product->id)->update(['serial' => $new]);
+        });
+
+        return response()->json([
+            'ok' => true,
+            'serial' => $new,
+            'swapped_with' => $holder?->name,
+            'message' => $holder
+                ? 'Swapped with “'.\Illuminate\Support\Str::limit($holder->name, 30).'”'.($old ? ' (now #'.$old.')' : ' (ID cleared)')
+                : 'Saved',
+        ]);
+    }
+
     public function bulkSerials(Request $request)
     {
         $data = $request->validate([

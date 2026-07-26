@@ -222,6 +222,84 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: product ID (serial) that saves itself ────────────────────────
+    // Blur or Enter writes the number straight away. The server swaps numbers
+    // when one is taken, so the field reports back what it swapped with rather
+    // than the change happening invisibly.
+    window.Alpine.data('serialField', (url, initial) => ({
+        busy: false,
+        state: 'idle',
+        note: '',
+        last: initial ?? '',
+
+        async save() {
+            const value = this.$refs.input.value.trim();
+            if (this.busy || value === this.last) return;
+
+            this.busy = true;
+            this.note = '';
+            try {
+                const body = new FormData();
+                body.append('_method', 'PATCH');
+                body.append('serial', value);
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                    body,
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok || !data.ok) {
+                    this.state = 'error';
+                    this.note = data.message || (data.errors?.serial?.[0]) || 'Not saved';
+                    return;
+                }
+
+                this.last = value;
+                this.state = 'saved';
+                this.note = data.swapped_with ? data.message : '✓';
+                // A swap message is worth reading; a plain tick isn't.
+                setTimeout(() => { this.note = ''; this.state = 'idle'; }, data.swapped_with ? 6000 : 1800);
+
+                // The other row's number changed on the server — show that too.
+                if (data.swapped_with) this.refreshOthers();
+            } catch (e) {
+                this.state = 'error';
+                this.note = 'Not saved';
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        /**
+         * Pull the swapped product's new number into its own field. Matched by
+         * product id, not row position — sorting by ID reorders the list, so
+         * position would copy numbers onto the wrong products.
+         */
+        async refreshOthers() {
+            try {
+                const res = await fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+
+                const fresh = {};
+                doc.querySelectorAll('input[data-product-id]').forEach((el) => {
+                    fresh[el.dataset.productId] = el.value;
+                });
+
+                document.querySelectorAll('input[data-product-id]').forEach((el) => {
+                    // Never clobber the field being edited, or one in use.
+                    if (el === this.$refs.input || document.activeElement === el) return;
+                    if (fresh[el.dataset.productId] !== undefined) el.value = fresh[el.dataset.productId];
+                });
+            } catch (e) { /* the number is saved either way */ }
+        },
+    }));
+
     // ── Admin: inline price/stock save on the product list ──────────────────
     // Posts the row's form and patches the margin cell from the response, so
     // editing a price never reloads the page and loses the admin's place.

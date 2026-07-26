@@ -45,15 +45,10 @@
         <button class="btn-outline">Filter</button>
     </form>
     <div class="flex gap-2">
-        <button form="serialForm" class="btn-outline" title="Save the ID numbers typed in the list below">Save IDs</button>
         <a href="{{ route('admin.products.import') }}" class="btn-outline">Import CSV</a>
         <a href="{{ route('admin.products.create') }}" class="btn-primary">+ Add product</a>
     </div>
 </div>
-
-{{-- Row ID inputs below attach to this form via form="serialForm", so many
-     products' IDs can be typed and saved in one go. --}}
-<form id="serialForm" action="{{ route('admin.products.bulk-serials') }}" method="POST">@csrf</form>
 
 @php $pageIds = $products->pluck('id')->values(); @endphp
 <div x-data="{
@@ -125,7 +120,20 @@
                             <div>
                                 <div class="font-medium">{{ $product->name }} @if($product->is_featured)<span class="badge bg-gold-100 text-gold-700 text-[10px]">★</span>@endif</div>
                                 <div class="text-xs text-ink-700/50 flex items-center gap-1.5 flex-wrap">
-                                    <span class="inline-flex items-center gap-0.5 text-[10px] text-ink-600">ID #<input form="serialForm" name="serials[{{ $product->id }}]" type="number" min="1" value="{{ $product->serial }}" class="input py-0.5 px-1 w-14 text-[11px]" title="Product ID — edit and press “Save IDs” above"></span>
+                                    {{-- Saves itself on blur / Enter — no button, no reload. --}}
+                                    <span class="inline-flex items-center gap-1 text-[10px] text-ink-600"
+                                          x-data="serialField('{{ route('admin.products.serial', $product) }}', '{{ $product->serial }}')">
+                                        ID #<input type="number" min="1" x-ref="input" value="{{ $product->serial }}"
+                                                   data-product-id="{{ $product->id }}"
+                                                   class="input py-0.5 px-1 w-14 text-[11px] transition"
+                                                   :class="state === 'saved' ? 'ring-1 ring-green-400' : (state === 'error' ? 'ring-1 ring-red-400' : '')"
+                                                   @blur="save()" @keydown.enter.prevent="$el.blur()"
+                                                   title="Product ID — type a number, it saves when you click away">
+                                        <span x-show="busy" class="text-ink-700/40">…</span>
+                                        <span x-show="note" x-text="note" x-transition
+                                              :class="state === 'error' ? 'text-red-600' : 'text-green-700'"
+                                              class="whitespace-nowrap"></span>
+                                    </span>
                                     <span class="badge {{ $product->has_variants ? 'bg-violet-100 text-violet-700' : 'bg-ink-100 text-ink-600' }} text-[10px]">{{ $product->type_label }}</span>
                                     @if($product->sku)<span>{{ $product->sku }}</span>@endif
                                     @foreach($product->tag_list as $t)<span class="badge bg-gold-50 text-gold-700 text-[10px]">{{ $t }}</span>@endforeach

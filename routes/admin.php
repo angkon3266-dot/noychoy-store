@@ -35,6 +35,7 @@ Route::middleware('admin')->group(function () {
     Route::post('products/{product}/quick-media', [ProductController::class, 'quickMedia'])->name('products.quick-media');
     Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
     Route::post('products/bulk-serials', [ProductController::class, 'bulkSerials'])->name('products.bulk-serials');
+    Route::patch('products/{product}/serial', [ProductController::class, 'updateSerial'])->name('products.serial');
 
     Route::post('dashboard/panels', [\App\Http\Controllers\Admin\DashboardController::class, 'savePanels'])->name('dashboard.panels');
 
