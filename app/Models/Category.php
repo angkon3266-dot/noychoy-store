@@ -10,8 +10,29 @@ use Illuminate\Support\Str;
 class Category extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'parent_id', 'description', 'image', 'product_template',
+        'name', 'slug', 'parent_id', 'description', 'image', 'product_template', 'google_category',
         'position', 'is_active', 'is_preorder', 'meta_title', 'meta_description', 'woo_id',
+    ];
+
+    /**
+     * A few common Google taxonomy values offered in the admin picker. Any
+     * other value can be typed in — this list is a convenience, not a limit.
+     * Full taxonomy: google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
+     */
+    public const GOOGLE_CATEGORIES = [
+        '188' => 'Apparel & Accessories > Jewelry',
+        '191' => 'Apparel & Accessories > Jewelry > Earrings',
+        '192' => 'Apparel & Accessories > Jewelry > Necklaces',
+        '194' => 'Apparel & Accessories > Jewelry > Rings',
+        '189' => 'Apparel & Accessories > Jewelry > Bracelets',
+        '190' => 'Apparel & Accessories > Jewelry > Charms & Pendants',
+        '6463' => 'Apparel & Accessories > Jewelry > Anklets',
+        '5122' => 'Apparel & Accessories > Jewelry > Body Jewelry',
+        '6870' => 'Apparel & Accessories > Jewelry > Brooches & Lapel Pins',
+        '201' => 'Apparel & Accessories > Jewelry > Watches',
+        '6551' => 'Apparel & Accessories > Jewelry > Jewelry Sets',
+        '167' => 'Apparel & Accessories',
+        '6552' => 'Apparel & Accessories > Handbag & Wallet Accessories',
     ];
 
     protected $casts = [

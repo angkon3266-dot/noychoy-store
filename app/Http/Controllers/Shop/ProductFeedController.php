@@ -74,7 +74,7 @@ class ProductFeedController extends Controller
                             'product_type' => $cats->implode(' > '),   // your taxonomy
                             'custom_label_0' => $cats->get(0) ?? '',   // product set per category
                             'custom_label_1' => $cats->get(1) ?? '',
-                            'google_product_category' => '',
+                            'google_product_category' => $p->googleCategory() ?? '',
                         ], $over)));
 
                         // Variable products: one row per variant, matching the

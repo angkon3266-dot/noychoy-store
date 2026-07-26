@@ -49,6 +49,23 @@
                 <p class="text-xs text-ink-700/50 mt-1">Products in this category use this layout.</p>
             </div>
             <div>
+                <label class="label">Google product category</label>
+                @php $gc = old('google_category', $category->google_category ?? ''); @endphp
+                <select name="google_category" class="input">
+                    <option value="">Not set — inherit from parent category</option>
+                    @foreach(\App\Models\Category::GOOGLE_CATEGORIES as $id => $label)
+                        <option value="{{ $id }}" @selected((string) $gc === (string) $id)>{{ $label }}</option>
+                    @endforeach
+                    @if(filled($gc) && ! array_key_exists((string) $gc, \App\Models\Category::GOOGLE_CATEGORIES))
+                        <option value="{{ $gc }}" selected>{{ $gc }} (custom)</option>
+                    @endif
+                </select>
+                <p class="text-xs text-ink-700/50 mt-1">
+                    Used by the Facebook/Instagram catalogue feed to classify these products.
+                    Leaving it blank shows “Google product category: Missing” in Commerce Manager.
+                </p>
+            </div>
+            <div>
                 <label class="label">Sort position</label>
                 <input name="position" type="number" min="0" value="{{ old('position', $category->position ?? 0) }}" class="input">
                 <p class="text-xs text-ink-700/50 mt-1">Lower numbers appear first among siblings. (You can also use the ▲▼ arrows on the list.)</p>

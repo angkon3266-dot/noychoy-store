@@ -87,4 +87,31 @@ class MetaFeedTest extends TestCase
         $this->assertSame('Meridian Éclat', $rows[0]['brand']);
         $this->assertStringNotContainsStringIgnoringCase('noychoy', $rows[0]['brand']);
     }
+
+    public function test_google_category_comes_from_the_category_and_inherits_from_a_parent(): void
+    {
+        $parent = Category::create(['name' => 'Jewellery', 'slug' => 'jewellery', 'google_category' => '188']);
+        $child = Category::create(['name' => 'Earrings', 'slug' => 'earrings', 'parent_id' => $parent->id]);
+
+        $onChild = $this->product('Hoops');
+        $onChild->forceFill(['category_id' => $child->id])->save();
+
+        // The child has none of its own, so it inherits the parent's value.
+        $this->assertSame('188', $onChild->fresh()->googleCategory());
+
+        // Its own value wins once set.
+        $child->update(['google_category' => '191']);
+        $this->assertSame('191', $onChild->fresh()->googleCategory());
+
+        $rows = collect($this->rows())->firstWhere('id', meta_content_id($onChild));
+        $this->assertSame('191', $rows['google_product_category']);
+    }
+
+    public function test_a_product_with_no_google_category_leaves_the_column_blank(): void
+    {
+        $product = $this->product('Plain Ring');
+
+        $this->assertNull($product->googleCategory());
+        $this->assertSame('', collect($this->rows())->firstWhere('id', meta_content_id($product))['google_product_category']);
+    }
 }

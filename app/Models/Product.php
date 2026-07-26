@@ -203,6 +203,23 @@ class Product extends Model
         return $this->hasMany(Review::class)->where('status', 'approved')->latest();
     }
 
+    /**
+     * Google product taxonomy for the catalogue feeds: this product's category,
+     * then any parent category, then the store-wide default. Blank is valid —
+     * Meta just shows "Google product category: Missing" for the item.
+     */
+    public function googleCategory(): ?string
+    {
+        for ($cat = $this->category; $cat; $cat = $cat->parent) {
+            if (filled($cat->google_category)) {
+                return $cat->google_category;
+            }
+        }
+
+        return config('meta.defaults.google_product_category')
+            ?: (\App\Models\Setting::get('google_product_category') ?: null);
+    }
+
     /** Resolved pre-order state: product flag OR its category default. */
     public function isPreorder(): bool
     {
