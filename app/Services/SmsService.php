@@ -161,6 +161,7 @@ class SmsService
 
         $replacements = array_merge([
             '{name}' => $order->customer_name,
+            '{store}' => store_name(),
             '{order}' => $order->order_number,
             '{total}' => number_format((float) $order->total, 0),
             '{qty}' => (string) $order->total_quantity,

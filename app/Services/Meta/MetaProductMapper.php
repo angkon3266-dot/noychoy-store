@@ -187,7 +187,8 @@ class MetaProductMapper
             }
         }
 
-        return config('meta.defaults.brand') ?: null;
+        // Same fallback as the CSV feed, so both describe the same brand.
+        return config('meta.defaults.brand') ?: (store_name() ?: null);
     }
 
     private function link(Product $product): string

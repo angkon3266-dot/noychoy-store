@@ -16,11 +16,13 @@ class ProductFeedController extends Controller
 {
     public function meta(Request $request): StreamedResponse
     {
-        $brand = config('store.name', 'Noychoy');
+        // Brand follows the store's own name — never a hardcoded one, so this
+        // codebase stays correct for whatever store it's deployed for.
+        $brand = config('meta.defaults.brand') ?: store_name();
         $currency = config('store.currency', 'BDT');
 
         $columns = [
-            'id', 'title', 'description', 'availability', 'condition',
+            'id', 'item_group_id', 'title', 'description', 'availability', 'condition',
             'price', 'sale_price', 'link', 'image_link', 'additional_image_link',
             'brand', 'product_type', 'custom_label_0', 'custom_label_1', 'google_product_category',
         ];
@@ -35,7 +37,7 @@ class ProductFeedController extends Controller
             fputcsv($out, $columns);
 
             Product::published()
-                ->with(['images', 'category', 'categories'])
+                ->with(['images', 'category', 'categories', 'variants'])
                 ->when(request('category'), function ($q, $slug) {
                     $q->whereHas('categories', fn ($c) => $c->where('slug', $slug))
                       ->orWhereHas('category', fn ($c) => $c->where('slug', $slug));
@@ -48,28 +50,55 @@ class ProductFeedController extends Controller
                             continue; // Meta requires an image_link
                         }
 
-                        $available = $p->isAvailable() || $p->isPreorder();
                         $cats = $p->categories->pluck('name');
                         $additional = $images->where('id', '!=', $primary->id)->take(10)
                             ->map(fn ($i) => $this->absUrl($i->url))->implode(',');
 
-                        fputcsv($out, [
-                            $p->id,
-                            $p->name,
-                            \Illuminate\Support\Str::limit(strip_tags($p->description ?: $p->short_description ?: $p->name), 4900, ''),
-                            $available ? 'in stock' : 'out of stock',
-                            'new',
-                            number_format((float) ($p->compare_at_price ?: $p->price), 2, '.', '').' '.$currency,
-                            $p->is_on_sale ? number_format((float) $p->price, 2, '.', '').' '.$currency : '',
-                            route('product.show', $p),
-                            $this->absUrl($primary->url),
-                            $additional,
-                            $brand,
-                            $cats->implode(' > '),       // product_type (your taxonomy)
-                            $cats->get(0) ?? '',          // custom_label_0 → product set per category
-                            $cats->get(1) ?? '',          // custom_label_1
-                            '',                            // google_product_category (optional)
-                        ]);
+                        $row = fn (array $over = []) => fputcsv($out, array_values(array_replace([
+                            // id MUST equal the content_id the Pixel/CAPI sends
+                            // (meta_content_id → "prod-{id}"), or Meta counts
+                            // every view and purchase as unmatched and the
+                            // catalogue match rate sits at 0%.
+                            'id' => meta_content_id($p),
+                            'item_group_id' => '',
+                            'title' => $p->name,
+                            'description' => \Illuminate\Support\Str::limit(strip_tags($p->description ?: $p->short_description ?: $p->name), 4900, ''),
+                            'availability' => ($p->isAvailable() || $p->isPreorder()) ? 'in stock' : 'out of stock',
+                            'condition' => 'new',
+                            'price' => number_format((float) ($p->compare_at_price ?: $p->price), 2, '.', '').' '.$currency,
+                            'sale_price' => $p->is_on_sale ? number_format((float) $p->price, 2, '.', '').' '.$currency : '',
+                            'link' => route('product.show', $p),
+                            'image_link' => $this->absUrl($primary->url),
+                            'additional_image_link' => $additional,
+                            'brand' => $brand,
+                            'product_type' => $cats->implode(' > '),   // your taxonomy
+                            'custom_label_0' => $cats->get(0) ?? '',   // product set per category
+                            'custom_label_1' => $cats->get(1) ?? '',
+                            'google_product_category' => '',
+                        ], $over)));
+
+                        // Variable products: one row per variant, matching the
+                        // "prod-{id}-var-{vid}" ids that Purchase events send,
+                        // grouped under the parent via item_group_id.
+                        if ($p->has_variants && $p->variants->isNotEmpty()) {
+                            foreach ($p->variants as $v) {
+                                $price = $v->price !== null ? (float) $v->price : (float) $p->price;
+                                $row([
+                                    'id' => meta_content_id($p, $v),
+                                    'item_group_id' => meta_content_id($p),
+                                    'title' => trim($p->name.' '.$v->label),
+                                    'availability' => ((int) $v->stock_quantity > 0 || $p->isPreorder()) ? 'in stock' : 'out of stock',
+                                    'price' => number_format((float) ($p->compare_at_price ?: $price), 2, '.', '').' '.$currency,
+                                    'sale_price' => $p->compare_at_price && $price < (float) $p->compare_at_price
+                                        ? number_format($price, 2, '.', '').' '.$currency : '',
+                                    'image_link' => $this->absUrl($v->image?->url ?: $primary->url),
+                                ]);
+                            }
+
+                            continue;
+                        }
+
+                        $row();
                     }
                 });
 

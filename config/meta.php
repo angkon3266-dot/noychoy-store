@@ -82,7 +82,11 @@ return [
     'defaults' => [
         'condition' => 'new',
         'currency' => env('META_CURRENCY', 'BDT'),
-        'brand' => env('META_DEFAULT_BRAND', env('APP_NAME', 'Store')),
+        // Only an explicit override lives here. Left unset, the brand falls back
+        // to store_name() (the admin's own store name) — APP_NAME is the wrong
+        // source, it's often unset in production and leaks "Laravel" or a
+        // previous store's name into all 100+ catalogue items.
+        'brand' => env('META_DEFAULT_BRAND'),
         'google_product_category' => env('META_GOOGLE_CATEGORY'),
     ],
 ];

@@ -1,11 +1,11 @@
 <?php
 
 return [
-    'name' => env('APP_NAME', 'Noychoy'),
+    'name' => env('APP_NAME', 'Store'),
     'currency' => env('STORE_CURRENCY', 'BDT'),
     'currency_symbol' => env('STORE_CURRENCY_SYMBOL', '৳'),
     'phone' => env('STORE_PHONE'),
-    'email' => env('STORE_EMAIL', 'hello@noychoy.com'),
+    'email' => env('STORE_EMAIL'),
 
     // Flat-rate COD shipping (BDT). Overridable per-order in admin.
     'shipping' => [

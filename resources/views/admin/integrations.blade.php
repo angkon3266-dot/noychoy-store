@@ -40,8 +40,8 @@
                 </div>
                 <div><label class="label">API Key</label><input name="sms_api_key" value="{{ $int['sms_api_key'] ?? '' }}" class="input" autocomplete="off"></div>
                 <div><label class="label">Secret Key</label><input name="sms_secret_key" value="{{ $int['sms_secret_key'] ?? '' }}" class="input" autocomplete="off"></div>
-                <div><label class="label">Sender ID (callerID) — required</label><input name="sms_caller_id" value="{{ $int['sms_caller_id'] ?? '' }}" class="input" placeholder="Noychoy_Com">
-                    <p class="text-xs text-ink-700/50 mt-1">KhudeBarta <strong>requires a sender ID</strong>. Use your masking name (e.g. <code>Noychoy_Com</code>) or, for non-masking, the numeric sender ID KhudeBarta assigned you. It cannot be blank.</p>
+                <div><label class="label">Sender ID (callerID) — required</label><input name="sms_caller_id" value="{{ $int['sms_caller_id'] ?? '' }}" class="input" placeholder="YourStore_Com">
+                    <p class="text-xs text-ink-700/50 mt-1">KhudeBarta <strong>requires a sender ID</strong>. Use your masking name (e.g. <code>YourStore_Com</code>) or, for non-masking, the numeric sender ID KhudeBarta assigned you. It cannot be blank.</p>
                 </div>
                 @if($smsOk)<div class="flex items-end text-sm text-ink-700/60">Balance: <strong class="ml-1">{{ $smsBalance['statusInfo']['availablebalance'] ?? ($smsBalance['availablebalance'] ?? 'n/a') }}</strong></div>@endif
             </div>
@@ -68,7 +68,7 @@
         {{-- SMS templates --}}
         <div class="card p-6">
             <h2 class="font-semibold mb-1">SMS templates</h2>
-            <p class="text-xs text-ink-700/60 mb-4">Placeholders: <code>{name}</code> <code>{order}</code> <code>{total}</code> <code>{tracking}</code>. Order-placed sends automatically at checkout; delivered/cancelled can fire from the Steadfast webhook or when you change status.</p>
+            <p class="text-xs text-ink-700/60 mb-4">Placeholders: <code>&#123;name&#125;</code> <code>&#123;store&#125;</code> <code>&#123;order&#125;</code> <code>&#123;qty&#125;</code> <code>&#123;total&#125;</code> <code>&#123;items&#125;</code> <code>&#123;tracking&#125;</code>. Order-placed sends automatically at checkout; delivered/cancelled can fire from the Steadfast webhook or when you change status.</p>
             <div class="space-y-4">
                 @foreach($templateLabels as $key => $label)
                     <div>
