@@ -90,22 +90,39 @@ class AppServiceProvider extends ServiceProvider
         // Apply DB-stored System Configuration as runtime overrides (fails safe).
         app(ConfigApplier::class)->apply();
 
+        // Settings are held in memory for the life of the process. A web request
+        // ends in milliseconds, but a queue worker lives for up to a minute and
+        // would otherwise keep serving settings from before an admin's change.
+        \Illuminate\Support\Facades\Queue::looping(fn () => \App\Models\Setting::flushMemo());
+
         // Shared data for the storefront layout (nav menu + cart badge).
+        //
+        // This pattern matches every shop.* partial, so the composer fires once
+        // per view a page renders — a product page renders ~7. Building the data
+        // once per request and reusing it turns those repeated category queries
+        // into a single set.
         View::composer(['shop.*', 'components.shop.*', 'layouts.shop'], function ($view) {
-            $nav = Category::active()->whereNull('parent_id')
-                ->with(['children' => fn ($q) => $q->active()])
-                ->orderBy('position')->get();
-            $view->with('navCategories', $nav);
+            $shared = once(function () {
+                $nav = Category::active()->whereNull('parent_id')
+                    ->with(['children' => fn ($q) => $q->active()])
+                    ->orderBy('position')->get();
 
-            // Footer "Shop" column: admin-chosen categories in order, else the nav.
-            $footerIds = collect(theme('footer_category_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
-            $view->with('footerCategories', $footerIds->isEmpty()
-                ? $nav
-                : Category::active()->whereIn('id', $footerIds)->get()
-                    ->sortBy(fn ($c) => $footerIds->search($c->id))->values());
+                // Footer "Shop" column: admin-chosen categories in order, else the nav.
+                $footerIds = collect(theme('footer_category_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
 
-            $view->with('siteMenu', site_menu());
-            $view->with('cartCount', app(CartService::class)->count());
+                return [
+                    'navCategories' => $nav,
+                    'footerCategories' => $footerIds->isEmpty()
+                        ? $nav
+                        : Category::active()->whereIn('id', $footerIds)->get()
+                            ->sortBy(fn ($c) => $footerIds->search($c->id))->values(),
+                    'siteMenu' => site_menu(),
+                ];
+            });
+
+            // The cart badge is NOT memoized — it changes within a request when
+            // an item is added, and a stale count is visible to the customer.
+            $view->with($shared + ['cartCount' => app(CartService::class)->count()]);
         });
     }
 }
