@@ -57,7 +57,15 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Answer in the format the caller asked for. Restricting this to api/*
+        // (the skeleton default) meant a failed AJAX call anywhere else — the
+        // admin's inline price edit, thank-you card messages, push subscribe —
+        // came back as an HTML redirect the JavaScript couldn't read, so the
+        // UI could only say "not saved" instead of naming the problem.
+        //
+        // Browsers posting normal forms send Accept: text/html and are
+        // unaffected: they still get the redirect-with-errors they expect.
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
     })->create();

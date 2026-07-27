@@ -58,3 +58,8 @@ Schedule::command('push:abandoned-cart')->everyThirtyMinutes()->name('push-aband
 
 // Scheduled drip campaigns — send any due steps (hourly).
 Schedule::command('push:drip')->hourly()->name('push-drip')->withoutOverlapping();
+
+// Nightly: age out diagnostic logs (visits, SMS receipts, Meta sync attempts).
+// Runs at a quiet hour because the first pass over a long-neglected table is
+// the expensive one. Retention windows live in config/retention.php.
+Schedule::command('logs:prune')->dailyAt('04:10')->name('logs-prune')->withoutOverlapping();

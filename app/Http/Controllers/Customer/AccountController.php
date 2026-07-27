@@ -105,11 +105,40 @@ class AccountController extends Controller
     /** Count a notification click, then forward to its destination (campaign analytics). */
     public function trackNotification(\App\Models\CustomerNotification $notification)
     {
+        // Only count a click from someone the notification was actually sent to.
+        // Without this any signed-in customer could inflate any campaign's click
+        // count by walking the ids, which quietly corrupts campaign analytics.
+        $visible = app(\App\Services\NotificationService::class)
+            ->visibleFor($this->customer())
+            ->whereKey($notification->getKey())
+            ->exists();
+
+        abort_unless($visible, 404);
+
         $notification->increment('clicks');
 
         $to = $notification->url ?: route('account.notifications');
 
-        return str_starts_with($to, 'http') ? redirect()->away($to) : redirect()->to($to);
+        // Admin-authored URLs, but this endpoint sits on our domain, so an
+        // off-site hop would let the link borrow our credibility. Keep external
+        // redirects to hosts we actually control.
+        if (str_starts_with($to, 'http')) {
+            return $this->isOwnHost($to)
+                ? redirect()->away($to)
+                : redirect()->route('account.notifications')
+                    ->with('error', 'That link points off-site and was not followed.');
+        }
+
+        return redirect()->to($to);
+    }
+
+    /** Is this absolute URL on the storefront's own host? */
+    protected function isOwnHost(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $own = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+
+        return $host !== '' && $own !== '' && $host === $own;
     }
 
     public function order(string $orderNumber, \App\Services\SteadfastService $steadfast)
