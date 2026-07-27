@@ -134,20 +134,36 @@ class DashboardController extends Controller
         $saved = \App\Models\Setting::get('dashboard_panels', null);
         $panels = is_array($saved) ? $saved : array_keys(self::PANELS);
 
+        // Each panel is computed defensively: analytics are decoration, and one
+        // panel failing (a migration that hasn't run, an odd row) must not take
+        // the whole dashboard down with it. A panel that errors is reported and
+        // simply doesn't render.
+        $safe = function (callable $fn, $fallback = null) {
+            try {
+                return $fn();
+            } catch (\Throwable $e) {
+                report($e);
+
+                return $fallback;
+            }
+        };
+        $on = fn (string $panel) => in_array($panel, $panels, true);
+
         $deep = [
-            'profit' => in_array('profit', $panels, true) ? $analytics->periodComparison(30) : null,
-            'funnel' => in_array('funnel', $panels, true) ? $analytics->funnel(30) : null,
-            'visitorsByDay' => in_array('funnel', $panels, true) ? $analytics->visitorsByDay(14) : null,
-            'sources' => in_array('funnel', $panels, true) ? $analytics->trafficSources(30) : null,
-            'campaigns' => in_array('funnel', $panels, true) ? $analytics->topCampaigns(30) : collect(),
-            'viewedNotSold' => in_array('funnel', $panels, true) ? $analytics->viewedNotSold(30) : null,
-            'retention' => in_array('retention', $panels, true) ? $analytics->retention(90) : null,
-            'operations' => in_array('operations', $panels, true) ? $analytics->operations(30) : null,
+            'profit' => $on('profit') ? $safe(fn () => $analytics->periodComparison(30)) : null,
+            'funnel' => $on('funnel') ? $safe(fn () => $analytics->funnel(30)) : null,
+            // collect(), not null: the funnel panel @foreaches this directly.
+            'visitorsByDay' => $on('funnel') ? $safe(fn () => $analytics->visitorsByDay(14), collect()) : null,
+            'sources' => $on('funnel') ? $safe(fn () => $analytics->trafficSources(30), collect()) : null,
+            'campaigns' => $on('funnel') ? $safe(fn () => $analytics->topCampaigns(30), collect()) : collect(),
+            'viewedNotSold' => $on('funnel') ? $safe(fn () => $analytics->viewedNotSold(30), collect()) : null,
+            'retention' => $on('retention') ? $safe(fn () => $analytics->retention(90)) : null,
+            'operations' => $on('operations') ? $safe(fn () => $analytics->operations(30)) : null,
         ];
 
         // Total (all-time) unique visitors — the headline traffic number.
-        $stats['visitors_total'] = (int) \App\Models\Visit::distinct()->count('visitor_token');
-        $stats['visitors_today'] = (int) \App\Models\Visit::whereDate('created_at', $today)->distinct()->count('visitor_token');
+        $stats['visitors_total'] = (int) $safe(fn () => \App\Models\Visit::distinct()->count('visitor_token'), 0);
+        $stats['visitors_today'] = (int) $safe(fn () => \App\Models\Visit::whereDate('created_at', $today)->distinct()->count('visitor_token'), 0);
 
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
