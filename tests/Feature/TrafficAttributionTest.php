@@ -116,4 +116,34 @@ class TrafficAttributionTest extends TestCase
         $this->assertSame('eid-bridal', $order->source_campaign);
         $this->assertSame('facebook_ads', $order->first_touch_channel);
     }
+
+    public function test_an_order_still_places_when_the_attribution_columns_are_missing(): void
+    {
+        // Simulates a server whose migration hasn't run (or ran half-way).
+        // Attribution is optional; taking the customer's money is not.
+        app()->instance(Visit::READY_KEY, false);
+
+        $product = \App\Models\Product::create([
+            'name' => 'Ring', 'slug' => 'ring', 'status' => 'published', 'price' => 1000,
+            'manage_stock' => true, 'stock_quantity' => 5, 'in_stock' => true,
+        ]);
+
+        $this->post('/cart/add/'.$product->slug, ['qty' => 1]);
+        $res = $this->post('/checkout', [
+            'name' => 'Test Buyer', 'phone' => '01712345678',
+            'address' => '123 Road, Dhaka', 'is_inside_dhaka' => 1,
+        ]);
+
+        $res->assertRedirect();
+        $this->assertSame(1, \App\Models\Order::count());
+    }
+
+    public function test_an_unparseable_app_url_does_not_make_every_referrer_look_internal(): void
+    {
+        // str_contains($host, '') is true in PHP 8 — without a guard this
+        // reported all traffic as Direct.
+        config(['app.url' => '']);
+
+        $this->assertSame('facebook', $this->classify('/', ['referer' => 'https://m.facebook.com/'])['channel']);
+    }
 }

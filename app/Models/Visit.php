@@ -53,6 +53,14 @@ class Visit extends Model
             'first_touch_channel' => null, 'landing_path' => null,
         ];
 
+        // Attribution is a nice-to-have; an order is not. If the attribution
+        // columns aren't on `orders` yet — a migration that hasn't run, or ran
+        // half-way — return nothing rather than handing the caller keys that
+        // would make the INSERT fail and cost a sale.
+        if (! static::attributionColumnsReady()) {
+            return [];
+        }
+
         if (blank($token)) {
             return $blank;
         }
@@ -78,5 +86,28 @@ class Visit extends Model
 
             return $blank;
         }
+    }
+
+    /**
+     * Does `orders` actually have the attribution columns? Cached for the
+     * request — a schema lookup per order would be wasteful, and this can only
+     * change on deploy.
+     */
+    public const READY_KEY = 'visits.attribution_ready';
+
+    protected static function attributionColumnsReady(): bool
+    {
+        // Cached on the container rather than a static, so it lasts exactly one
+        // request (this can only change on deploy) and tests can set it.
+        if (! app()->bound(self::READY_KEY)) {
+            try {
+                $ready = \Illuminate\Support\Facades\Schema::hasColumn('orders', 'source_channel');
+            } catch (\Throwable $e) {
+                $ready = false;
+            }
+            app()->instance(self::READY_KEY, $ready);
+        }
+
+        return (bool) app(self::READY_KEY);
     }
 }

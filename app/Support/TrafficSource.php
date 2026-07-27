@@ -76,8 +76,12 @@ class TrafficSource
             ? strtolower((string) parse_url($ref, PHP_URL_HOST))
             : null;
 
-        // Our own pages aren't a source — that's internal navigation.
-        if ($referrerHost && str_contains($referrerHost, strtolower((string) parse_url(config('app.url'), PHP_URL_HOST)))) {
+        // Our own pages aren't a source — that's internal navigation. Guard the
+        // empty case: str_contains($x, '') is always true in PHP 8, so an
+        // unparseable APP_URL would have made every referrer look internal and
+        // reported all traffic as Direct.
+        $ownHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+        if ($referrerHost && $ownHost !== '' && str_contains($referrerHost, $ownHost)) {
             $referrerHost = null;
         }
 
