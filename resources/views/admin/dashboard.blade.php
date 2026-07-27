@@ -320,10 +320,10 @@
                 <tbody>
                     @foreach($deep['campaigns'] as $c)
                         <tr class="border-t border-ink-100">
-                            <td class="py-1.5 truncate max-w-[220px]">{{ $c->source_campaign }}</td>
-                            <td class="py-1.5"><span class="badge {{ \App\Support\TrafficSource::badgeClass($c->source_channel) }}">{{ \App\Support\TrafficSource::label($c->source_channel) }}</span></td>
-                            <td class="py-1.5 text-right">{{ number_format($c->orders) }}</td>
-                            <td class="py-1.5 text-right font-medium">{{ money($c->revenue) }}</td>
+                            <td class="py-1.5 truncate max-w-[220px]">{{ $c['source_campaign'] }}</td>
+                            <td class="py-1.5"><span class="badge {{ \App\Support\TrafficSource::badgeClass($c['source_channel']) }}">{{ \App\Support\TrafficSource::label($c['source_channel']) }}</span></td>
+                            <td class="py-1.5 text-right">{{ number_format($c['orders']) }}</td>
+                            <td class="py-1.5 text-right font-medium">{{ money($c['revenue']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -350,7 +350,7 @@
             <p class="text-xs text-ink-700/55 mb-3">Interest is there — the photos, price or copy are the blocker.</p>
             @forelse($deep['viewedNotSold'] as $r)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $r['product']->id) }}" class="truncate hover:text-gold-700">{{ $r['product']->name }}</a>
+                    <a href="{{ route('admin.products.edit', $r['id']) }}" class="truncate hover:text-gold-700">{{ $r['name'] }}</a>
                     <span class="text-ink-700/60 text-xs whitespace-nowrap ml-2">{{ $r['views'] }} views · 0 sold</span>
                 </div>
             @empty
@@ -431,9 +431,9 @@
             <p class="text-xs text-ink-700/55 mb-3">Days of stock left at the current sales rate.</p>
             @forelse($o['stock_cover'] as $c)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $c['product']->id) }}" class="truncate hover:text-gold-700">{{ $c['product']->name }}</a>
+                    <a href="{{ route('admin.products.edit', $c['id']) }}" class="truncate hover:text-gold-700">{{ $c['name'] }}</a>
                     <span class="whitespace-nowrap ml-2 {{ $c['days_left'] <= 7 ? 'text-red-600 font-medium' : 'text-ink-700/60' }}">
-                        {{ $c['days_left'] }}d · {{ $c['product']->stock_quantity }} left
+                        {{ $c['days_left'] }}d · {{ $c['stock_quantity'] }} left
                     </span>
                 </div>
             @empty
@@ -446,8 +446,8 @@
             <p class="text-xs text-ink-700/55 mb-3">In stock, zero sales in 30 days — cash sitting still.</p>
             @forelse($o['dead_stock'] as $p)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $p->id) }}" class="truncate hover:text-gold-700">{{ $p->name }}</a>
-                    <span class="text-ink-700/60 text-xs whitespace-nowrap ml-2">{{ $p->stock_quantity }} pcs</span>
+                    <a href="{{ route('admin.products.edit', $p['id']) }}" class="truncate hover:text-gold-700">{{ $p['name'] }}</a>
+                    <span class="text-ink-700/60 text-xs whitespace-nowrap ml-2">{{ $p['stock_quantity'] }} pcs</span>
                 </div>
             @empty
                 <p class="text-sm text-ink-700/50">Everything in stock is selling.</p>

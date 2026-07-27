@@ -37,4 +37,10 @@ return [
      | first run against a large table can't lock it or hit the host's timeout.
      */
     'chunk' => (int) env('RETAIN_CHUNK', 1000),
+
+    /*
+     | Size (MB) at which logs:prune mentions the pre-rotation laravel.log.
+     | It is only ever reported, never removed, unless --archive-legacy is given.
+     */
+    'legacy_log_mb' => (float) env('RETAIN_LEGACY_LOG_MB', 20),
 ];

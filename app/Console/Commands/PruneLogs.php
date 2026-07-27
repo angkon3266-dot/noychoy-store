@@ -21,7 +21,8 @@ class PruneLogs extends Command
 {
     protected $signature = 'logs:prune
         {--dry-run : Report what would be deleted without deleting it}
-        {--table= : Prune only this table}';
+        {--table= : Prune only this table}
+        {--archive-legacy : Compress and remove an oversized pre-rotation laravel.log}';
 
     protected $description = 'Delete diagnostic log rows older than their retention window';
 
@@ -76,10 +77,75 @@ class PruneLogs extends Command
             $total += $deleted;
         }
 
+        $this->legacyLogFile($dry);
+
         $this->info($dry
             ? "Dry run — {$total} row(s) would be removed."
             : "Done — {$total} row(s) removed.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The un-rotated laravel.log written before the daily channel was adopted.
+     * Rotation stops it growing but does not remove what already accumulated,
+     * and that file is not something to delete on a schedule — so it is only
+     * reported, and only archived when explicitly asked for.
+     */
+    protected function legacyLogFile(bool $dry): void
+    {
+        $path = storage_path('logs/laravel.log');
+
+        if (! is_file($path)) {
+            return;
+        }
+
+        $mb = round(filesize($path) / 1048576, 1);
+
+        if ($mb < (float) config('retention.legacy_log_mb', 20)) {
+            return;                       // small enough not to matter
+        }
+
+        if (! $this->option('archive-legacy')) {
+            $this->line('');
+            $this->warn("laravel.log is {$mb} MB — written before rotation was enabled, and now orphaned.");
+            $this->line('  Logging has moved to laravel-YYYY-MM-DD.log, so this file no longer grows.');
+            $this->line('  To compress and remove it: php artisan logs:prune --archive-legacy');
+
+            return;
+        }
+
+        if ($dry) {
+            $this->warn("Would archive laravel.log ({$mb} MB) to laravel.log.gz");
+
+            return;
+        }
+
+        // Keep the contents — gzip, verify, then remove the original.
+        $gz = $path.'.'.now()->format('Ymd-His').'.gz';
+
+        $in = fopen($path, 'rb');
+        $out = gzopen($gz, 'wb9');
+
+        if (! $in || ! $out) {
+            $this->error('Could not open the log for archiving; nothing removed.');
+
+            return;
+        }
+
+        while (! feof($in)) {
+            gzwrite($out, (string) fread($in, 1048576));
+        }
+        fclose($in);
+        gzclose($out);
+
+        if (! is_file($gz) || filesize($gz) === 0) {
+            $this->error('Archive looks empty; the original was left in place.');
+
+            return;
+        }
+
+        unlink($path);
+        $this->info('Archived laravel.log to '.basename($gz).' ('.round(filesize($gz) / 1048576, 1).' MB) and removed the original.');
     }
 }

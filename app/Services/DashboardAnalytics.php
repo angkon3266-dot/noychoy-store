@@ -25,9 +25,70 @@ class DashboardAnalytics
         return Order::whereNotIn('status', ['cancelled', 'returned']);
     }
 
+    /**
+     * Cache key prefix. Bumping the version makes every entry written by an
+     * older build unreachable, so a bad payload can't outlive the fix.
+     */
+    protected const CACHE_PREFIX = 'dash.v2.';
+
+    /**
+     * Cache a computed figure.
+     *
+     * config/cache.php sets serializable_classes = false, so the cache will not
+     * restore ANY object: a cached Collection, stdClass or Eloquent model comes
+     * back as __PHP_Incomplete_Class and blows up at the point of use. Every
+     * closure here must therefore return plain arrays and scalars.
+     *
+     * That contract is enforced on read rather than trusted: if a stored value
+     * contains an object (an entry from before this fix, or a future mistake),
+     * it is discarded and recomputed instead of being handed to the caller.
+     */
     protected function remember(string $key, \Closure $fn, int $seconds = 300)
     {
-        return \Illuminate\Support\Facades\Cache::remember('dash.'.$key, $seconds, $fn);
+        $cacheKey = self::CACHE_PREFIX.$key;
+        $miss = new \stdClass;
+
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey, $miss);
+
+        if ($cached !== $miss && self::isPlainData($cached)) {
+            return $cached;
+        }
+
+        $fresh = $fn();
+
+        if (! self::isPlainData($fresh)) {
+            // A closure returned objects: serve it, but don't poison the cache.
+            report(new \RuntimeException(
+                "DashboardAnalytics::remember('{$key}') produced objects; not cached. "
+                .'Return plain arrays — cache.serializable_classes is false.'
+            ));
+
+            return $fresh;
+        }
+
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $fresh, $seconds);
+
+        return $fresh;
+    }
+
+    /** True when $value is built only from scalars, null and arrays. */
+    protected static function isPlainData(mixed $value, int $depth = 0): bool
+    {
+        if ($depth > 6) {
+            return false;               // too deep to vouch for — treat as unsafe
+        }
+        if (is_object($value)) {
+            return false;               // includes __PHP_Incomplete_Class
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (! self::isPlainData($item, $depth + 1)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     // ── 1. Revenue & profit depth ───────────────────────────────────────────
@@ -140,7 +201,8 @@ class DashboardAnalytics
     /** Visitors per day for the last N days (mini chart). */
     public function visitorsByDay(int $days = 14): \Illuminate\Support\Collection
     {
-        return $this->remember("visitors.$days", function () use ($days) {
+        // Cached as a plain array, hydrated on the way out (see remember()).
+        return collect($this->remember("visitors.$days", function () use ($days) {
             $rows = Visit::where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
                 ->selectRaw('DATE(created_at) as d, COUNT(DISTINCT visitor_token) as c')
                 ->groupBy('d')->pluck('c', 'd');
@@ -148,8 +210,8 @@ class DashboardAnalytics
             return collect(range($days - 1, 0))->map(fn ($i) => [
                 'label' => now()->subDays($i)->format('d M'),
                 'value' => (int) ($rows[now()->subDays($i)->toDateString()] ?? 0),
-            ]);
-        });
+            ])->all();
+        }));
     }
 
     /**
@@ -161,7 +223,7 @@ class DashboardAnalytics
      */
     public function trafficSources(int $days = 30, int $limit = 8): \Illuminate\Support\Collection
     {
-        return $this->remember("src.$days.$limit", function () use ($days, $limit) {
+        return collect($this->remember("src.$days.$limit", function () use ($days, $limit) {
             $from = now()->subDays($days);
 
             $visitors = Visit::where('created_at', '>=', $from)
@@ -189,8 +251,8 @@ class DashboardAnalytics
                     ];
                 })
                 ->sortByDesc(fn ($r) => [$r['revenue'], $r['visitors']])
-                ->take($limit)->values();
-        });
+                ->take($limit)->values()->all();
+        }));
     }
 
     /**
@@ -201,12 +263,20 @@ class DashboardAnalytics
      */
     public function topCampaigns(int $days = 30, int $limit = 6): \Illuminate\Support\Collection
     {
-        return $this->remember("camp.$days", fn () => $this->sold()
+        // ->get() yields stdClass rows, which the cache cannot restore — map to
+        // plain arrays before storing.
+        return collect($this->remember("camp.$days", fn () => $this->sold()
             ->where('created_at', '>=', now()->subDays($days))
             ->whereNotNull('source_campaign')->where('source_campaign', '!=', '')
             ->selectRaw('source_campaign, source_channel, COUNT(*) as orders, SUM(total) as revenue')
             ->groupBy('source_campaign', 'source_channel')
-            ->orderByDesc('revenue')->take($limit)->get());
+            ->orderByDesc('revenue')->take($limit)->get()
+            ->map(fn ($r) => [
+                'source_campaign' => (string) $r->source_campaign,
+                'source_channel' => (string) $r->source_channel,
+                'orders' => (int) $r->orders,
+                'revenue' => (float) $r->revenue,
+            ])->all()));
     }
 
     /**
@@ -215,7 +285,7 @@ class DashboardAnalytics
      */
     public function viewedNotSold(int $days = 30, int $limit = 6): \Illuminate\Support\Collection
     {
-        return $this->remember("vns.$days", function () use ($days, $limit) {
+        return collect($this->remember("vns.$days", function () use ($days, $limit) {
             $from = now()->subDays($days);
 
             $sold = OrderItem::query()
@@ -236,18 +306,20 @@ class DashboardAnalytics
                 ->groupBy('product_id')->orderByDesc('v')->take(40)->pluck('v', 'product_id');
 
             if ($views->isEmpty()) {
-                return collect();
+                return [];
             }
 
             $products = Product::whereIn('id', $views->keys())->get(['id', 'name', 'slug', 'price'])->keyBy('id');
 
+            // Scalars only: an Eloquent model cannot survive this cache.
             return $views->map(fn ($v, $id) => [
-                'product' => $products->get($id),
+                'id' => (int) $id,
+                'name' => (string) ($products->get($id)->name ?? ''),
                 'views' => (int) $v,
                 'sold' => (int) ($sold[$id] ?? 0),
-            ])->filter(fn ($r) => $r['product'] && $r['sold'] === 0)
-                ->sortByDesc('views')->take($limit)->values();
-        });
+            ])->filter(fn ($r) => $r['name'] !== '' && $r['sold'] === 0)
+                ->sortByDesc('views')->take($limit)->values()->all();
+        }));
     }
 
     // ── 3. Customer & retention ─────────────────────────────────────────────
@@ -355,16 +427,24 @@ class DashboardAnalytics
                 $sold = (float) ($velocity[$p->id] ?? 0);
                 $perDay = $sold / max(1, $days);
 
+                // Scalars only — Product models cannot survive this cache.
                 return [
-                    'product' => $p,
+                    'id' => (int) $p->id,
+                    'name' => (string) $p->name,
+                    'stock_quantity' => (int) $p->stock_quantity,
                     'per_day' => round($perDay, 2),
                     'days_left' => $perDay > 0 ? (int) floor($p->stock_quantity / $perDay) : null,
                 ];
-            })->filter(fn ($r) => $r['days_left'] !== null)->sortBy('days_left')->take(6)->values();
+            })->filter(fn ($r) => $r['days_left'] !== null)->sortBy('days_left')->take(6)->values()->all();
 
             // Stock that hasn't sold at all in the window (cash sitting still).
             $deadStock = $stocked->filter(fn ($p) => ! isset($velocity[$p->id]))
-                ->sortByDesc('stock_quantity')->take(6)->values();
+                ->sortByDesc('stock_quantity')->take(6)
+                ->map(fn ($p) => [
+                    'id' => (int) $p->id,
+                    'name' => (string) $p->name,
+                    'stock_quantity' => (int) $p->stock_quantity,
+                ])->values()->all();
 
             return [
                 'cod_success' => $resolved ? round($delivered / $resolved * 100, 1) : null,

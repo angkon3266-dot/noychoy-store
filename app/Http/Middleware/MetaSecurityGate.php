@@ -24,11 +24,14 @@ class MetaSecurityGate
     {
         $user = $request->user();
 
-        \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate ENTER', [
-            'path' => $request->path(),
-            'user_role' => $user?->role,
-            'session_id' => $request->session()->getId(),
-        ]);
+        // Diagnostics only: this fires on every Meta admin request, so it is
+        // gated behind Meta debug mode rather than written to production logs.
+        if (app(\App\Modules\Meta\Services\MetaDebug::class)->enabled()) {
+            \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate ENTER', [
+                'path' => $request->path(),
+                'user_role' => $user?->role,
+            ]);
+        }
 
         // Only the Super Admin role may access this module at all.
         if (! $user || $user->role !== 'admin') {
@@ -60,7 +63,9 @@ class MetaSecurityGate
             return redirect()->route('admin.meta.unlock');
         }
 
-        \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate PASS → controller', ['path' => $request->path()]);
+        if (app(\App\Modules\Meta\Services\MetaDebug::class)->enabled()) {
+            \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate PASS → controller', ['path' => $request->path()]);
+        }
 
         return $next($request);
     }

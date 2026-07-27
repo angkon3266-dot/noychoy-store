@@ -54,7 +54,9 @@ class MetaOAuthService
             }
         }
 
-        Log::info("[meta-oauth] BEFORE {$label}", [
+        $verbose = $this->debug()->enabled();
+
+        $verbose and Log::info("[meta-oauth] BEFORE {$label}", [
             'method' => 'GET',
             'url' => $url,
             'params' => $safe,
@@ -73,7 +75,7 @@ class MetaOAuthService
             return null;
         }
 
-        Log::info("[meta-oauth] AFTER {$label}", [
+        $verbose and Log::info("[meta-oauth] AFTER {$label}", [
             'http_status' => $resp->status(),
             'response_headers' => $resp->headers(),
             'raw_body' => $resp->body(),

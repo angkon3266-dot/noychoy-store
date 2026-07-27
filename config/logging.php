@@ -54,7 +54,9 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            // 'daily', not 'single': a single file never rotates, which is how
+            // laravel.log reached 216 MB in production. Override with LOG_STACK.
+            'channels' => explode(',', (string) env('LOG_STACK', 'daily')),
             'ignore_exceptions' => false,
         ],
 
@@ -65,11 +67,13 @@ return [
             'replace_placeholders' => true,
         ],
 
-        // Meta Integration Debug Mode — kept separate from laravel.log.
+        // Meta Integration Debug Mode — kept separate from laravel.log, and
+        // rotated: it is verbose diagnostics, only useful while debugging.
         'meta-debug' => [
-            'driver' => 'single',
+            'driver' => 'daily',
             'path' => storage_path('logs/meta-debug.log'),
             'level' => 'debug',
+            'days' => env('LOG_META_DEBUG_DAYS', 5),
             'replace_placeholders' => true,
         ],
 
