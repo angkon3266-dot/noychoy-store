@@ -173,7 +173,20 @@ class WebPushService
         if (in_array($status, [404, 410], true)) {
             return true;
         }
-        if (in_array($status, [400, 403], true)) {
+
+        // 403 means the push service rejected our VAPID signature for this
+        // subscription — under RFC 8292 that is permanent for this key pair, so
+        // the subscription can never succeed again and must go. Matching on the
+        // body text alone only caught Google's wording ("VapidPkHashMismatch");
+        // Apple and Mozilla phrase it differently and those rows survived
+        // forever, failing on every send.
+        if ($status === 403) {
+            return true;
+        }
+
+        // 400 is ambiguous (it can mean a malformed request on our side), so
+        // only prune when the body names the key mismatch explicitly.
+        if ($status === 400) {
             return str_contains((string) ($this->lastResult['body'] ?? ''), 'VapidPkHashMismatch');
         }
 

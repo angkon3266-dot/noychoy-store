@@ -30,6 +30,15 @@ class SendOrderPlacedEffects implements ShouldQueue
 
     public int $timeout = 120;
 
+    /**
+     * If the order is gone by the time this runs, drop the job instead of
+     * failing it. Every step inside handle() catches its own errors, so this
+     * job can only fail while the queue restores the Order — which happens when
+     * the order was deleted while the job sat in the backlog. There are no side
+     * effects to send for an order that no longer exists.
+     */
+    public bool $deleteWhenMissingModels = true;
+
     public function __construct(public Order $order, public array $clientContext = []) {}
 
     public function handle(SmsService $sms, MetaTrackingService $capi): void
