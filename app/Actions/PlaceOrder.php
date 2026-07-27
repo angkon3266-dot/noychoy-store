@@ -241,13 +241,26 @@ class PlaceOrder
      * checkouts can generate the same sequential number; the unique index makes
      * the loser retry with the next one instead of 500ing).
      */
+    /**
+     * Create the order, stepping the number forward if it collides.
+     *
+     * The offset matters: generateNumber() is deterministic, so retrying it
+     * unchanged produced the identical number and the identical duplicate-key
+     * error every time — three attempts, three failures, a 500 for the customer.
+     * Passing the attempt number moves each retry to the next candidate, which
+     * is what makes it survive both a lost race and a gap in the sequence.
+     */
     protected function createWithUniqueNumber(array $attributes): Order
     {
-        for ($attempt = 1; ; $attempt++) {
+        $attempts = 8;
+
+        for ($attempt = 0; ; $attempt++) {
             try {
-                return Order::create(['order_number' => Order::generateNumber()] + $attributes);
+                return Order::create(
+                    ['order_number' => Order::generateNumber($attempt)] + $attributes
+                );
             } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
-                if ($attempt >= 3) {
+                if ($attempt >= $attempts - 1) {
                     throw $e;
                 }
             }

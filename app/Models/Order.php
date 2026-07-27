@@ -133,16 +133,32 @@ class Order extends Model
         return $this->priorOrderCount() > 0;
     }
 
-    public static function generateNumber(): string
+    /**
+     * Next plain sequential order number (10001, 10002…). Legacy "NOY-…"
+     * numbers are ignored by only considering numeric ones.
+     *
+     * withTrashed() is essential: order_number is UNIQUE, and a deleted order
+     * keeps its number in that index. Reading only live rows meant a deleted
+     * order's number was handed out again and every checkout died on
+     * "Duplicate entry … for key orders_order_number_unique".
+     *
+     * $attempt lets a caller step past a number that lost a race, so a retry
+     * tries a different one instead of the same one again.
+     */
+    public static function generateNumber(int $attempt = 0): string
     {
-        // Plain 5-digit sequential order number (e.g. 10001, 10002…).
-        // We ignore any legacy "NOY-…" numbers by only looking at numeric ones.
-        $last = static::where('order_number', 'not like', '%-%')
-            ->orderByDesc('id')->value('order_number');
+        $last = static::withTrashed()
+            ->where('order_number', 'not like', '%-%')
+            // Longest first, then highest: with zero-padded numbers this is the
+            // true maximum, and it works the same on MySQL and SQLite (CAST
+            // syntax does not).
+            ->orderByRaw('LENGTH(order_number) DESC')
+            ->orderByDesc('order_number')
+            ->value('order_number');
+
         $next = is_numeric($last) ? ((int) $last) + 1 : 10001;
-        if ($next < 10001) {
-            $next = 10001;
-        }
+        $next = max(10001, $next) + max(0, $attempt);
+
         return str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 }
