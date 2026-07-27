@@ -222,12 +222,23 @@ class NotificationService
             ->where('scheduled_at', '<=', now())
             ->get();
 
+        $sent = 0;
+
         foreach ($due as $n) {
-            $n->update(['sent_at' => now()]);
-            $this->deliverPush($n);
+            // One bad notification must not abort the run: this is called from a
+            // Schedule::call closure, and an exception there kills the whole
+            // scheduler tick — including the queue drain that delivers order
+            // SMS, invoices and staff alerts.
+            try {
+                $n->update(['sent_at' => now()]);
+                $this->deliverPush($n);
+                $sent++;
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
-        return $due->count();
+        return $sent;
     }
 
     /** Recent notifications visible to this customer (for the bell + dashboard). */

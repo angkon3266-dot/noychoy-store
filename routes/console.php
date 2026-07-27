@@ -37,8 +37,16 @@ Schedule::job(new VerifyCatalogSync)->dailyAt('03:30')->name('meta-verify-catalo
 Schedule::command('notifications:new-arrivals')->dailyAt('10:00')->name('notify-new-arrivals')->withoutOverlapping();
 
 // Deliver any admin notifications that were scheduled for a future time.
-Schedule::call(fn () => app(\App\Services\NotificationService::class)->deliverDue())
-    ->everyFiveMinutes()->name('notify-deliver-scheduled');
+// Wrapped: a closure task runs inside schedule:run itself, so an exception here
+// aborts the whole tick — taking the queue drain (order SMS, invoices, staff
+// alerts) down with it. Report and carry on instead.
+Schedule::call(function () {
+    try {
+        app(\App\Services\NotificationService::class)->deliverDue();
+    } catch (\Throwable $e) {
+        report($e);
+    }
+})->everyFiveMinutes()->name('notify-deliver-scheduled');
 
 // Win-back automation — re-engage lapsed members once a day (a no-op when the
 // automation is off or nobody is due).
