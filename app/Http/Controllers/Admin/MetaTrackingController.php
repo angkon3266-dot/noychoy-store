@@ -39,6 +39,8 @@ class MetaTrackingController extends Controller
             'advancedMatching' => $this->tracking->advancedMatching(),
             'events' => $this->tracking->enabledEventsMap(),
             'testEventCode' => $this->tracking->testEventCode(),
+            'country' => $this->tracking->country(),
+            'countries' => \App\Support\Countries::all(),
             'lastEventSent' => $this->settings->get('last_event_sent_at'),
             'recent' => $this->recentEvents(),
             'health' => $this->stats->health(),
@@ -56,7 +58,13 @@ class MetaTrackingController extends Controller
             'pixel_id' => ['nullable', 'string', 'max:64', 'regex:/^\d*$/'],
             'test_event_code' => ['nullable', 'string', 'max:64'],
             'capi_token' => ['nullable', 'string', 'max:1000'],
-        ], ['pixel_id.regex' => 'The Pixel ID must be numeric.']);
+            // Sent as user_data.country. Restricted to real ISO 3166-1 codes:
+            // anything else hashes to a value that matches nobody.
+            'country' => ['nullable', 'string', 'in:'.implode(',', array_keys(\App\Support\Countries::all()))],
+        ], [
+            'pixel_id.regex' => 'The Pixel ID must be numeric.',
+            'country.in' => 'Choose a country from the list, or leave it unset.',
+        ]);
 
         $flags = [
             'pixel_enabled', 'advanced_matching', 'capi_enabled',
@@ -66,7 +74,12 @@ class MetaTrackingController extends Controller
 
         $changes = [
             'pixel_id' => $data['pixel_id'] ?? null,
-            'test_event_code' => $data['test_event_code'] ?: null,
+            // `??` as well as `?:` — validate() omits a nullable key entirely
+            // when the field isn't in the request, so a POST that leaves one
+            // out (an API caller, or a form that grows a section) used to be an
+            // "Undefined array key" 500 rather than a saved setting.
+            'test_event_code' => ($data['test_event_code'] ?? null) ?: null,
+            'country' => ($data['country'] ?? null) ?: null,
         ];
         foreach ($flags as $f) {
             $changes[$f] = $request->boolean($f);

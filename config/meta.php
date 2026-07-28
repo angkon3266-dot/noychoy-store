@@ -94,10 +94,5 @@ return [
         // previous store's name into all 100+ catalogue items.
         'brand' => env('META_DEFAULT_BRAND'),
         'google_product_category' => env('META_GOOGLE_CATEGORY'),
-
-        // ISO 3166-1 alpha-2, used for user_data.country on server events.
-        // Left unset rather than guessed: this codebase runs more than one
-        // store, and a wrong country hash matches nobody.
-        'country' => env('META_DEFAULT_COUNTRY'),
     ],
 ];

@@ -169,7 +169,7 @@ class MetaTrackingService
             'ln' => $last,
             'ct' => $order->city,
             'st' => $order->district,
-            'country' => $this->defaultCountry(),
+            'country' => $this->country(),
         ]), [
             'content_type' => 'product',
             'contents' => $order->items->map(fn ($i) => [
@@ -217,7 +217,7 @@ class MetaTrackingService
             'ph' => $customer->phone ?? null,
             'fn' => $first,
             'ln' => $last,
-            'country' => $this->defaultCountry(),
+            'country' => $this->country(),
         ]);
     }
 
@@ -496,13 +496,15 @@ class MetaTrackingService
     }
 
     /**
-     * Country for user_data, when the store has declared one. Never guessed
-     * from the currency or the phone format — a wrong country hash matches
-     * nobody, and this codebase runs more than one store.
+     * Country for user_data, as chosen by the merchant in Meta → Tracking.
+     *
+     * Never guessed from the currency or the phone format, and deliberately not
+     * a config default: this codebase runs more than one store, and a wrong
+     * country is a hash that matches nobody — worse than omitting the field.
      */
-    protected function defaultCountry(): ?string
+    public function country(): ?string
     {
-        return config('meta.defaults.country') ?: null;
+        return MetaIdentity::normalize('country', $this->settings->get('country'));
     }
 
     /** retailer_id for an order line, mirroring MetaProductMapper's format. */

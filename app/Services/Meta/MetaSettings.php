@@ -40,6 +40,11 @@ class MetaSettings
         'capi_token_encrypted' => null,
         'test_event_code' => null,       // Events Manager "Test events" code
 
+        // ISO 3166-1 alpha-2 country sent as user_data.country on server events.
+        // Null until the merchant picks one: a guessed country is a hash that
+        // matches nobody, which is worse than sending the field at all.
+        'country' => null,
+
         // Browser Pixel + per-event tracking toggles (all default on).
         'pixel_enabled' => true,
         'advanced_matching' => true,

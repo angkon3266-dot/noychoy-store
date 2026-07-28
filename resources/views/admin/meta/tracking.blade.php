@@ -76,6 +76,16 @@
                     <p class="text-xs text-ink-700/50 mt-1">Stored encrypted (AES-256). Blank reuses the System User token.</p>
                 </div>
                 <div><label class="label">Test Event Code <span class="text-ink-700/40">(optional)</span></label><input name="test_event_code" value="{{ old('test_event_code', $testEventCode) }}" class="input" placeholder="TEST12345"></div>
+                <div>
+                    <label class="label">Store country <span class="text-ink-700/40">(optional)</span></label>
+                    <select name="country" class="input">
+                        <option value="">— Don’t send —</option>
+                        @foreach($countries as $code => $label)
+                            <option value="{{ $code }}" @selected(old('country', $country) === $code)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-ink-700/50 mt-1">Sent as <code>user_data.country</code> on server events, which lifts match quality on orders. Leave unset if your buyers aren’t in one country — a wrong country matches nobody.</p>
+                </div>
             </div>
             <div class="mt-3 flex items-center gap-3">
                 <button type="button" @click="validate()" class="btn-outline text-sm" :disabled="tokenLoading">

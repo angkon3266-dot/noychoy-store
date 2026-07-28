@@ -157,6 +157,75 @@ class MetaCapiPayloadTest extends TestCase
         );
     }
 
+    // ── Country ──────────────────────────────────────────────────────────────
+
+    public function test_no_country_is_sent_until_the_merchant_picks_one(): void
+    {
+        // Guessing it from the currency or the phone format would produce a
+        // hash that matches nobody — worse than omitting the field.
+        app(MetaTrackingService::class)->purchase($this->order(), '10001');
+
+        $this->assertArrayNotHasKey('country', $this->lastUserData());
+    }
+
+    public function test_the_chosen_country_is_hashed_into_the_payload(): void
+    {
+        $this->configureMeta(['country' => 'bd']);
+
+        app(MetaTrackingService::class)->purchase($this->order(), '10001');
+
+        $this->assertSame([hash('sha256', 'bd')], $this->lastUserData()['country']);
+    }
+
+    public function test_the_admin_can_choose_a_country_and_clear_it_again(): void
+    {
+        $admin = \App\Models\User::create([
+            'name' => 'Admin', 'email' => 'a@b.test', 'password' => bcrypt('x'), 'role' => 'admin',
+        ]);
+
+        $save = fn (array $extra) => $this->actingAs($admin)
+            ->withSession(['meta_unlocked_at' => now()->toIso8601String()])
+            ->post(route('admin.meta.tracking.save'), $extra + ['pixel_id' => '1234567890']);
+
+        $save(['country' => 'gb']);
+        $this->assertSame('gb', app(\App\Services\Meta\MetaSettings::class)->get('country'));
+
+        $save(['country' => '']);
+        $this->assertNull(app(\App\Services\Meta\MetaSettings::class)->get('country'));
+    }
+
+    public function test_the_settings_page_offers_the_country_picker(): void
+    {
+        $this->configureMeta(['country' => 'gb']);
+
+        $admin = \App\Models\User::create([
+            'name' => 'Admin', 'email' => 'a@b.test', 'password' => bcrypt('x'), 'role' => 'admin',
+        ]);
+
+        $html = $this->actingAs($admin)
+            ->withSession(['meta_unlocked_at' => now()->toIso8601String()])
+            ->get(route('admin.meta.tracking'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('name="country"', $html);
+        $this->assertStringContainsString('<option value="gb" selected>United Kingdom</option>', $html);
+        $this->assertStringContainsString('Don’t send', $html);
+        $this->assertStringContainsString('value="bd"', $html);
+    }
+
+    public function test_a_made_up_country_code_is_rejected(): void
+    {
+        $admin = \App\Models\User::create([
+            'name' => 'Admin', 'email' => 'a@b.test', 'password' => bcrypt('x'), 'role' => 'admin',
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['meta_unlocked_at' => now()->toIso8601String()])
+            ->post(route('admin.meta.tracking.save'), ['pixel_id' => '1234567890', 'country' => 'zz'])
+            ->assertSessionHasErrors('country');
+    }
+
     // ── Event shape ──────────────────────────────────────────────────────────
 
     public function test_website_events_declare_their_source(): void
@@ -267,6 +336,9 @@ class MetaCapiPayloadTest extends TestCase
             'pixel_enabled' => true,
             'capi_enabled' => true,
             'capi_token_encrypted' => \Illuminate\Support\Facades\Crypt::encryptString('test-token'),
+            // The admin Meta area sits behind a second password wall; the save
+            // tests below need it to exist before the gate will let them past.
+            'security_password' => bcrypt('meta-secret'),
         ], $extra));
 
         // MetaSettings memoises on first read; drop any instance built earlier.
