@@ -5,6 +5,14 @@
 
     RewriteEngine On
 
+    # Never serve editor/backup leftovers. `.bak` is not a PHP extension, so a
+    # stray public/test.php.bak or public/.htaccess.bak would be handed over as
+    # plain text rather than executed — source and server config disclosure. The
+    # real fix is not leaving them in the webroot; this makes sure the next one
+    # can't be read either. Kept as a RewriteRule rather than <FilesMatch> +
+    # Require so it relies only on mod_rewrite, which this file already needs.
+    RewriteRule "(?i)\.(bak|backup|old|orig|save|swp|swo|tmp|dist)$|~$" - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

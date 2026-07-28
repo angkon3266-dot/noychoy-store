@@ -5,6 +5,32 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
+/*
+|------------------------------------------------------------------------------
+| Effective log level
+|------------------------------------------------------------------------------
+|
+| `debug` is the framework's default and the right level while developing, but
+| on a live store it writes every framework and package debug line to disk on
+| every request — disk I/O on a shared host, and a log too noisy to find a real
+| error in. Nothing this application logs deliberately sits below `info`
+| (26 Log::info, 27 Log::warning, 6 Log::error calls, 1 Log::debug), so `info`
+| loses no diagnostics we actually wrote.
+|
+| Production therefore floors the level at `info` even when the .env still says
+| `debug` — a .env copied from a dev template shouldn't quietly cost a
+| production store its disk quota. Set LOG_DEBUG=true to opt back in while
+| chasing something, and remember to remove it afterwards.
+|
+*/
+$logLevel = (string) env('LOG_LEVEL', 'debug');
+
+if ($logLevel === 'debug'
+    && env('APP_ENV', 'production') === 'production'
+    && ! env('LOG_DEBUG', false)) {
+    $logLevel = 'info';
+}
+
 return [
 
     /*
@@ -63,7 +89,7 @@ return [
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => $logLevel,
             'replace_placeholders' => true,
         ],
 
@@ -80,7 +106,7 @@ return [
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => $logLevel,
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
         ],

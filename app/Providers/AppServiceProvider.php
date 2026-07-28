@@ -38,6 +38,15 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Generate every link, asset and form action as https:// once HTTPS is
+        // enforced. Without this a cached http:// APP_URL would have the site
+        // link to itself over plain HTTP — one redirect per click, and mixed
+        // -content warnings on any asset. Off outside production so local dev
+        // on http://localhost still works.
+        if (config('security.https.redirect')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // ── Rate limiters for public storefront endpoints ────────────────────
         // OTP: strict — this sends a paid SMS. Limited per phone AND per IP so
         // neither a phone can be bombed nor one IP can drain SMS credit.

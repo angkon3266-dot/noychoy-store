@@ -50,6 +50,16 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_PORT
             | Request::HEADER_X_FORWARDED_PROTO);
 
+        // Appended, never prepended: the global stack starts with TrustProxies,
+        // and ForceHttps must run after it or $request->isSecure() would read
+        // the Cloudflare→origin hop instead of the visitor's scheme and send
+        // every HTTPS visitor into a redirect loop. SecurityHeaders sits in the
+        // global stack so error and non-web responses are covered too.
+        $middleware->append([
+            \App\Http\Middleware\ForceHttps::class,
+            \App\Http\Middleware\SecurityHeaders::class,
+        ]);
+
         $middleware->redirectGuestsTo(function (Request $request) {
             return $request->is('admin', 'admin/*')
                 ? route('admin.login')

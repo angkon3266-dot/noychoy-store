@@ -456,7 +456,12 @@ class ProductController extends Controller
     {
         $product->load('images', 'variants');
 
-        $copy = $product->replicate(['slug', 'sku', 'views']);
+        // `serial` (the admin's Product ID) is UNIQUE, so copying it fails the
+        // insert outright — every duplicate attempt was a 500. Leaving it unset
+        // lets Product::creating() hand out the next free number instead.
+        // `woo_id` is dropped for the same reason it shouldn't be shared: the
+        // copy is not the WooCommerce product the original was imported from.
+        $copy = $product->replicate(['slug', 'sku', 'views', 'serial', 'woo_id']);
         $copy->name = $product->name.' (copy)';
         $copy->slug = Product::uniqueSlug($copy->name);
         $copy->sku = $product->sku ? $product->sku.'-COPY' : null;

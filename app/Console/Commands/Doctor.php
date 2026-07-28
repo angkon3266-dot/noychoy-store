@@ -51,6 +51,14 @@ class Doctor extends Command
         $problems += $this->checkQueue();
 
         $this->line('');
+        $this->line('<options=bold>Logging</>');
+        $problems += $this->checkLogging();
+
+        $this->line('');
+        $this->line('<options=bold>Security</>');
+        $problems += $this->checkSecurity();
+
+        $this->line('');
         if ($problems === 0) {
             $this->info('No problems found.');
 
@@ -191,6 +199,93 @@ class Doctor extends Command
 
             return 1;
         }
+    }
+
+    /**
+     * The log settings that decide whether storage/logs quietly eats the disk.
+     *
+     * Config defaults are not enough to check: a .env copied from the dev
+     * template pins LOG_STACK=single and LOG_LEVEL=debug, and an explicit .env
+     * value beats every default in config/logging.php. That is exactly how
+     * laravel.log reached 216 MB, and it is invisible from the code alone.
+     */
+    protected function checkLogging(): int
+    {
+        $problems = 0;
+
+        $channels = (array) config('logging.channels.stack.channels', []);
+        $nonRotating = array_values(array_filter(
+            $channels,
+            fn ($c) => (config("logging.channels.{$c}.driver") ?? $c) === 'single'
+        ));
+
+        if ($nonRotating && app()->isProduction()) {
+            $this->fail_('log channel "'.implode(', ', $nonRotating).'" never rotates — set LOG_STACK=daily in .env');
+            $problems++;
+        } elseif ($nonRotating) {
+            $this->ok('log channel "'.implode(', ', $nonRotating).'" (no rotation — fine outside production)');
+        } else {
+            $this->ok('log rotation on ('.implode(', ', $channels).', keeping '.config('logging.channels.daily.days').' days)');
+        }
+
+        $level = config('logging.channels.daily.level');
+        if ($level === 'debug' && app()->isProduction()) {
+            $this->fail_('log level is debug in production — remove LOG_DEBUG=true from .env');
+            $problems++;
+        } else {
+            $this->ok('log level: '.$level);
+        }
+
+        $dir = storage_path('logs');
+        $bytes = array_sum(array_map('filesize', glob($dir.'/*') ?: []));
+        $mb = round($bytes / 1048576, 1);
+
+        if ($mb > 200) {
+            $this->fail_("storage/logs is {$mb} MB — run: php artisan logs:prune --archive-legacy");
+            $problems++;
+        } else {
+            $this->ok("storage/logs: {$mb} MB");
+        }
+
+        return $problems;
+    }
+
+    /** HTTPS enforcement and the response headers, as the app will actually send them. */
+    protected function checkSecurity(): int
+    {
+        $problems = 0;
+
+        if (config('security.https.redirect')) {
+            $this->ok('HTTPS enforced (plain HTTP is redirected)');
+        } elseif (app()->isProduction()) {
+            $this->fail_('HTTPS not enforced — FORCE_HTTPS is off in .env');
+            $problems++;
+        } else {
+            $this->ok('HTTPS not enforced (correct outside production)');
+        }
+
+        if (! config('security.csp.enabled')) {
+            $this->fail_('Content-Security-Policy disabled (CSP_ENABLED=false)');
+            $problems++;
+        } elseif (config('security.csp.report_only')) {
+            $this->ok('CSP in report-only mode — violations are logged, not blocked');
+        } else {
+            $this->ok('CSP enforced');
+        }
+
+        $missing = array_keys(array_filter(
+            (array) config('security.headers', []),
+            fn ($v) => blank($v)
+        ));
+
+        if ($missing) {
+            $this->fail_('empty security header(s): '.implode(', ', $missing));
+            $problems++;
+        } else {
+            $this->ok(count((array) config('security.headers')).' security headers configured');
+        }
+
+        return $problems;
     }
 
     protected function ok(string $msg): void
