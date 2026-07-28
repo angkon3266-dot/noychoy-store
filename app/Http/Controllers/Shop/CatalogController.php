@@ -210,9 +210,9 @@ class CatalogController extends Controller
      */
     protected function trackingUser(Request $request): array
     {
-        $c = $request->user('customer') ?? auth('customer')->user();
-
-        return $c ? ['em' => $c->email, 'ph' => $c->phone, 'fn' => $c->name] : [];
+        return $this->tracking->customerMatchData(
+            $request->user('customer') ?? auth('customer')->user(),
+        );
     }
 
     /**

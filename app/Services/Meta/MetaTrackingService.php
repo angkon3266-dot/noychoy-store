@@ -5,6 +5,7 @@ namespace App\Services\Meta;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Support\MetaIdentity;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -133,20 +134,23 @@ class MetaTrackingService
 
     /**
      * Snapshot the browser signals Meta uses for ad attribution (IP, user agent,
-     * click/browser cookies, page URL). Capture this inside the HTTP request and
-     * hand it to queued senders — a queue worker has no request to read from.
+     * click/browser cookies, page URL, external ids). Capture this inside the
+     * HTTP request and hand it to queued senders — a queue worker has no
+     * request to read from, and reconstructing any of this later would be
+     * guesswork.
      *
-     * @return array{ip:?string,ua:?string,fbc:?string,fbp:?string,url:string,time:int}
+     * @return array{ip:?string,ua:?string,fbc:?string,fbp:?string,url:string,time:int,external_id:array<int,string>}
      */
     public static function captureClientContext(): array
     {
         return [
             'ip' => request()->ip(),
             'ua' => request()->userAgent(),
-            'fbc' => request()->cookie('_fbc'),
-            'fbp' => request()->cookie('_fbp'),
+            'fbc' => MetaIdentity::fbc(),
+            'fbp' => MetaIdentity::fbp(),
             'url' => url()->current(),
             'time' => time(),
+            'external_id' => MetaIdentity::externalIds(),
         ];
     }
 
@@ -154,10 +158,18 @@ class MetaTrackingService
     {
         $order->loadMissing('items');
 
+        // Split the single stored name: Meta matches first and last separately,
+        // and a full name in `fn` matches neither.
+        [$first, $last] = $this->splitName($order->customer_name);
+
         $this->send('Purchase', $this->hashUser([
             'em' => $order->customer_email,
             'ph' => $order->customer_phone,
-            'fn' => $order->customer_name,
+            'fn' => $first,
+            'ln' => $last,
+            'ct' => $order->city,
+            'st' => $order->district,
+            'country' => $this->defaultCountry(),
         ]), [
             'content_type' => 'product',
             'contents' => $order->items->map(fn ($i) => [
@@ -174,7 +186,39 @@ class MetaTrackingService
 
     public function lead(string $phone, ?string $name, string $eventId): void
     {
-        $this->send('Lead', $this->hashUser(['ph' => $phone, 'fn' => $name]), [], $eventId);
+        [$first, $last] = $this->splitName($name);
+
+        $this->send('Lead', $this->hashUser(['ph' => $phone, 'fn' => $first, 'ln' => $last]), [], $eventId);
+    }
+
+    /**
+     * The matching fields a signed-in customer contributes to any event.
+     *
+     * One place rather than three: the product page, the cart and checkout all
+     * used to build this inline, which meant a full name landed in `fn` (where
+     * it matches nobody) on every one of them. Values are raw here — hashUser()
+     * normalises and hashes on the way out.
+     *
+     * Guests return [] and that is fine: IP, user agent, fbp/fbc and
+     * external_id still carry the event.
+     *
+     * @return array<string,?string>
+     */
+    public function customerMatchData(?object $customer): array
+    {
+        if (! $customer) {
+            return [];
+        }
+
+        [$first, $last] = $this->splitName($customer->name ?? null);
+
+        return array_filter([
+            'em' => $customer->email ?? null,
+            'ph' => $customer->phone ?? null,
+            'fn' => $first,
+            'ln' => $last,
+            'country' => $this->defaultCountry(),
+        ]);
     }
 
     // ── Transport ────────────────────────────────────────────────────────────
@@ -208,6 +252,17 @@ class MetaTrackingService
 
         $started = microtime(true);
         try {
+            // Queued senders pass a $context snapshot taken during the request;
+            // synchronous ones fall back to the live request. fbp/fbc/IP/UA are
+            // sent as-is — Meta rejects hashed values for all four.
+            $userData = array_merge(array_filter($userData), array_filter([
+                'client_ip_address' => $context['ip'] ?? request()->ip(),
+                'client_user_agent' => $context['ua'] ?? request()->userAgent(),
+                'fbc' => $context['fbc'] ?? MetaIdentity::fbc(),
+                'fbp' => $context['fbp'] ?? MetaIdentity::fbp(),
+                'external_id' => $context['external_id'] ?? MetaIdentity::externalIds(),
+            ]));
+
             $payload = [
                 'data' => [[
                     'event_name' => $eventName,
@@ -215,17 +270,12 @@ class MetaTrackingService
                     'event_id' => $eventId,
                     'action_source' => 'website',
                     'event_source_url' => $context['url'] ?? url()->current(),
-                    'user_data' => array_merge(array_filter($userData), array_filter([
-                        'client_ip_address' => $context['ip'] ?? request()->ip(),
-                        'client_user_agent' => $context['ua'] ?? request()->userAgent(),
-                        'fbc' => $context['fbc'] ?? request()->cookie('_fbc'),
-                        'fbp' => $context['fbp'] ?? request()->cookie('_fbp'),
-                    ])),
+                    'user_data' => $userData,
                     'custom_data' => array_filter($customData, fn ($v) => $v !== null && $v !== []),
                 ]],
             ];
 
-            if ($code = $this->testEventCode()) {
+            if ($code = $this->testEventCode($test)) {
                 $payload['test_event_code'] = $code;
             }
 
@@ -239,27 +289,95 @@ class MetaTrackingService
             $ms = (int) round((microtime(true) - $started) * 1000);
 
             if ($res->failed()) {
-                Log::warning('Meta CAPI event failed', ['event' => $eventName, 'body' => $res->body()]);
+                $this->logEvent($eventName, $eventId, $userData, $res->status(), $ms,
+                    $res->json('error.message') ?? 'HTTP '.$res->status(),
+                    $res->json('error.fbtrace_id'));
 
                 return ['ok' => false, 'status' => $res->status(), 'body' => $res->json() ?? $res->body(),
                     'error' => $res->json('error.message') ?? 'HTTP '.$res->status(), 'ms' => $ms];
             }
 
+            $this->logEvent($eventName, $eventId, $userData, $res->status(), $ms, null, $res->json('fbtrace_id'));
             $this->settings->update(['last_event_sent_at' => now()->toIso8601String()]);
 
             return ['ok' => true, 'status' => $res->status(), 'body' => $res->json(), 'error' => null, 'ms' => $ms];
         } catch (\Throwable $e) {
-            Log::error('Meta CAPI error', ['event' => $eventName, 'error' => $e->getMessage()]);
+            $this->logEvent($eventName, $eventId, [], 0, (int) round((microtime(true) - $started) * 1000), $e->getMessage());
 
             return ['ok' => false, 'status' => 0, 'body' => null, 'error' => $e->getMessage(),
                 'ms' => (int) round((microtime(true) - $started) * 1000)];
         }
     }
 
-    /** Test-event code from the database, falling back to config (env). */
-    public function testEventCode(): ?string
+    /**
+     * One line per CAPI call, with enough to diagnose match quality and
+     * deduplication and nothing that identifies a customer.
+     *
+     * Only the *names* of the user_data keys are recorded — never their values,
+     * hashed or otherwise. A SHA-256 of an email is still a stable identifier
+     * for that person, so a log full of them is a log full of PII.
+     */
+    protected function logEvent(string $event, string $eventId, array $userData, int $status, int $ms, ?string $error = null, ?string $trace = null): void
     {
-        return $this->settings->get('test_event_code') ?: config('meta.test_event_code');
+        $matchKeys = array_values(array_diff(
+            array_keys($userData),
+            ['client_ip_address', 'client_user_agent', 'fbc', 'fbp'],
+        ));
+
+        $line = [
+            'event' => $event,
+            'event_id' => $eventId,
+            'status' => $status,
+            'ms' => $ms,
+            'fbp' => isset($userData['fbp']),
+            'fbc' => isset($userData['fbc']),
+            'ip' => isset($userData['client_ip_address']),
+            'ua' => isset($userData['client_user_agent']),
+            'match_keys' => $matchKeys,
+            // The browser Pixel fires the same four events with the same
+            // event_id; anything else has no browser copy to collapse with.
+            'dedup_expected' => $this->pixelEnabled()
+                && in_array($event, ['ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase'], true),
+        ];
+
+        if ($trace) {
+            $line['fbtrace_id'] = $trace;
+        }
+
+        if ($error !== null) {
+            Log::warning('Meta CAPI event failed', $line + ['error' => $error]);
+
+            return;
+        }
+
+        // Successes are the noisy case — one per page view. Keep them out of
+        // laravel.log and in the Meta channel, which rotates on a short window.
+        Log::channel('meta-debug')->info('Meta CAPI event sent', $line);
+    }
+
+    /**
+     * Test-event code from the database, falling back to config (env).
+     *
+     * Real production events deliberately ignore it. A code left behind in the
+     * settings after a debugging session would otherwise keep diverting live
+     * traffic into Events Manager's Test Events tab, where it does not feed
+     * attribution or optimisation — a silent failure that looks like working
+     * tracking. The admin Test panel ($test) always gets the code, and outside
+     * production so does everything else.
+     */
+    public function testEventCode(bool $test = true): ?string
+    {
+        $code = $this->settings->get('test_event_code') ?: config('meta.test_event_code');
+
+        if (! $code) {
+            return null;
+        }
+
+        if ($test || ! app()->isProduction() || config('meta.test_events_in_production')) {
+            return $code;
+        }
+
+        return null;
     }
 
     // ── Diagnostics / test panel support ─────────────────────────────────────
@@ -317,41 +435,74 @@ class MetaTrackingService
     // ── Hashing / normalisation ──────────────────────────────────────────────
 
     /**
-     * SHA256-hash the identifiable user fields Meta expects (em/ph/fn/ln),
-     * normalising first. Empty fields are dropped. Non-PII fields are ignored.
+     * Normalise then SHA256-hash the identifiable user fields Meta expects.
+     * Empty fields are dropped — a blank hash matches nobody and only makes the
+     * payload look better than it is.
      *
-     * @param  array<string,mixed>  $raw  e.g. ['em'=>email, 'ph'=>phone, 'fn'=>name]
+     * Normalisation rules live in MetaIdentity because getting them wrong fails
+     * silently: Meta reports a lower match rate rather than an error.
+     *
+     * @param  array<string,mixed>  $raw  e.g. ['em'=>email, 'ph'=>phone, 'fn'=>first]
      * @return array<string,array<int,string>>
      */
     protected function hashUser(array $raw): array
     {
         $out = [];
 
-        foreach (['em' => 'email', 'ph' => 'phone', 'fn' => 'name', 'ln' => 'name'] as $key => $type) {
-            $value = $raw[$key] ?? null;
-            if (! filled($value)) {
+        foreach ($raw as $key => $value) {
+            if (! MetaIdentity::mustHash((string) $key) || ! filled($value)) {
                 continue;
             }
 
-            $normalised = $type === 'phone' ? $this->normalizePhone((string) $value) : strtolower(trim((string) $value));
-            if ($normalised === '') {
-                continue;
-            }
+            foreach ((array) $value as $single) {
+                // Something upstream may already have hashed this; hashing a
+                // digest again produces a value that matches nothing.
+                if (is_string($single) && MetaIdentity::isHashed($single)) {
+                    $out[$key][] = mb_strtolower($single);
 
-            $out[$key] = [hash('sha256', $normalised)];
+                    continue;
+                }
+
+                if ($normalised = MetaIdentity::normalize((string) $key, $single)) {
+                    $out[$key][] = hash('sha256', $normalised);
+                }
+            }
         }
 
-        return $out;
+        return array_map(fn ($v) => array_values(array_unique($v)), $out);
     }
 
-    protected function normalizePhone(string $phone): string
+    /**
+     * Best-effort split of one stored name into first and last.
+     *
+     * The app only ever collects a single "name" at checkout, so this is a
+     * guess — but "first word / rest" is the convention Meta's own examples
+     * use, and a first name alone still matches better than a full name in the
+     * fn field, which matches nothing.
+     *
+     * @return array{0:?string,1:?string}
+     */
+    protected function splitName(?string $name): array
     {
-        $d = preg_replace('/\D/', '', $phone) ?? '';
-        if (str_starts_with($d, '0')) {
-            $d = '88'.$d; // local (BD) → E.164 country code, matching existing behaviour
+        $parts = preg_split('/\s+/', trim((string) $name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if ($parts === []) {
+            return [null, null];
         }
 
-        return $d;
+        $first = array_shift($parts);
+
+        return [$first, $parts ? implode(' ', $parts) : null];
+    }
+
+    /**
+     * Country for user_data, when the store has declared one. Never guessed
+     * from the currency or the phone format — a wrong country hash matches
+     * nobody, and this codebase runs more than one store.
+     */
+    protected function defaultCountry(): ?string
+    {
+        return config('meta.defaults.country') ?: null;
     }
 
     /** retailer_id for an order line, mirroring MetaProductMapper's format. */

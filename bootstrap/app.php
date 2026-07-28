@@ -26,8 +26,25 @@ return Application::configure(basePath: dirname(__DIR__))
             'meta.gate' => MetaSecurityGate::class,
         ]);
 
-        // First-party storefront traffic tracking (dashboard visitors + funnel).
-        $middleware->web(append: [\App\Http\Middleware\TrackVisit::class]);
+        // _fbp and _fbc are written by Meta's pixel.js in the browser, in plain
+        // text. EncryptCookies decrypts every cookie in the web group and nulls
+        // the ones it can't, so without this exemption the server read null and
+        // the Conversions API sent no fbp/fbc at all — which is what Events
+        // Manager was reporting as "your server is not sending Click ID (fbc)".
+        // Exempting them also keeps the _fbc this app writes readable by the
+        // Pixel, so browser and server agree on one value.
+        $middleware->encryptCookies(except: [
+            \App\Support\MetaIdentity::FBP_COOKIE,
+            \App\Support\MetaIdentity::FBC_COOKIE,
+        ]);
+
+        // First-party storefront traffic tracking (dashboard visitors + funnel),
+        // then the Meta click id (?fbclid= → _fbc) so later events in the same
+        // journey can still be attributed to the ad that started it.
+        $middleware->web(append: [
+            \App\Http\Middleware\TrackVisit::class,
+            \App\Http\Middleware\CaptureMetaClickId::class,
+        ]);
 
         // External webhooks post without a CSRF token.
         $middleware->validateCsrfTokens(except: ['webhooks/*']);

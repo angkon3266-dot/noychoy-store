@@ -26,6 +26,13 @@ class TrackVisit
             $token = Str::random(40);
             // 2-year cookie so returning visitors are recognised as one person.
             Cookie::queue(cookie('visitor_token', $token, 60 * 24 * 730));
+
+            // The queued cookie isn't readable until the next request, so
+            // publish it on this one too. Meta's external_id is derived from
+            // this token, and a landing page is exactly where an ad click ends
+            // up — without this the first (most attributable) event of the
+            // journey would be the one event carrying no external_id.
+            $request->cookies->set('visitor_token', $token);
         }
 
         if ($this->shouldTrack($request)) {

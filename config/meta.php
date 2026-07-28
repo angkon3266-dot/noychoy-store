@@ -8,6 +8,12 @@ return [
     'capi_enabled' => filter_var(env('META_CAPI_ENABLED', false), FILTER_VALIDATE_BOOL),
     'access_token' => env('META_CAPI_TOKEN'),
     'test_event_code' => env('META_TEST_EVENT_CODE'), // optional, for Events Manager testing
+
+    // In production a test event code applies ONLY to the admin's Test panel.
+    // Real traffic ignores it, so a code left behind after debugging can't
+    // quietly divert live events into the Test Events tab (where they don't
+    // feed attribution or optimisation). Set true to opt real events back in.
+    'test_events_in_production' => filter_var(env('META_TEST_EVENTS_IN_PRODUCTION', false), FILTER_VALIDATE_BOOL),
     'graph_version' => env('META_GRAPH_VERSION', 'v21.0'),
 
     /*
@@ -88,5 +94,10 @@ return [
         // previous store's name into all 100+ catalogue items.
         'brand' => env('META_DEFAULT_BRAND'),
         'google_product_category' => env('META_GOOGLE_CATEGORY'),
+
+        // ISO 3166-1 alpha-2, used for user_data.country on server events.
+        // Left unset rather than guessed: this codebase runs more than one
+        // store, and a wrong country hash matches nobody.
+        'country' => env('META_DEFAULT_COUNTRY'),
     ],
 ];

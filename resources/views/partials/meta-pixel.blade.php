@@ -4,11 +4,20 @@
     $pixelOn = $pixelId && $tracking->pixelEnabled();
     $events = $tracking->enabledEventsMap();
 
-    // Advanced Matching: pass the logged-in customer's details so the Pixel can
-    // hash + match them client-side (improves attribution). Off = automatic AM only.
+    // Advanced Matching: pass the visitor's details so the Pixel can hash and
+    // match them client-side. The fields mirror what MetaTrackingService sends
+    // over CAPI — deduplication joins the two copies on event_id, but matching
+    // only benefits if both carry the same identifiers.
+    //
+    // external_id goes out even for guests: it's the two-year visitor_token,
+    // pseudonymised, so an anonymous ViewContent still joins to the Purchase
+    // that same browser makes later. It is not personal data on its own.
     $am = [];
-    if ($pixelOn && $tracking->advancedMatching() && ($c = auth('customer')->user())) {
-        $am = array_filter(['em' => $c->email ?: null, 'ph' => $c->phone ?: null, 'fn' => $c->name ?: null]);
+    if ($pixelOn && $tracking->advancedMatching()) {
+        $am = array_filter([
+            ...$tracking->customerMatchData(auth('customer')->user()),
+            'external_id' => \App\Support\MetaIdentity::externalIds() ?: null,
+        ]);
     }
 @endphp
 @if($pixelOn)

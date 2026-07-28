@@ -44,12 +44,11 @@ class CartController extends Controller
         // AddToCart — server-side (CAPI) with the SAME event id the browser Pixel
         // used, so Meta collapses the two into one deduplicated event.
         if (filled($data['event_id'] ?? null)) {
-            $c = auth('customer')->user();
             $tracking->addToCart(
                 $product,
                 (int) ($data['qty'] ?? 1),
                 $data['event_id'],
-                $c ? ['em' => $c->email, 'ph' => $c->phone, 'fn' => $c->name] : [],
+                $tracking->customerMatchData(auth('customer')->user()),
                 $variant,
             );
         }

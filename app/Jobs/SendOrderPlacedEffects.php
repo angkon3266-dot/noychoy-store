@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
@@ -71,7 +72,18 @@ class SendOrderPlacedEffects implements ShouldQueue
 
         try {
             // Deduplicated with the browser Pixel via order_number as event_id.
-            $capi->purchase($order, $order->order_number, $this->clientContext ?: null);
+            //
+            // Cache::add is the application-level guard: it only succeeds the
+            // first time, so a job retry (tries = 2) or a second dispatch for
+            // the same order doesn't re-send. Meta would collapse the copies
+            // anyway — the event_id is the order number, so it's stable across
+            // retries by construction — but not sending them at all is better
+            // than relying on that, and this needs no schema change.
+            $once = Cache::add('meta.purchase.'.$order->order_number, true, now()->addDay());
+
+            if ($once) {
+                $capi->purchase($order, $order->order_number, $this->clientContext ?: null);
+            }
         } catch (\Throwable $e) {
             report($e);
         }

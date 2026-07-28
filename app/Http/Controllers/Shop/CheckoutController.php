@@ -32,7 +32,7 @@ class CheckoutController extends Controller
             ? "prod-{$i['product_id']}-var-{$i['variant_id']}"
             : "prod-{$i['product_id']}")->values()->all();
         $icValue = (float) ($this->cart->subtotal() - $this->cart->discount());
-        $user = $customer ? ['em' => $customer->email, 'ph' => $customer->phone, 'fn' => $customer->name] : [];
+        $user = $tracking->customerMatchData($customer);
         $tracking->initiateCheckout($icContentIds, $icValue, (int) $this->cart->count(), $icEventId, $user);
 
         return view('shop.checkout', [
