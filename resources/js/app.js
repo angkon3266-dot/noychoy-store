@@ -352,6 +352,11 @@ document.addEventListener('alpine:init', () => {
         variants: config.variants || [],       // [{ attrs:{Size:'7'}, price, stock, sku, image_id }]
         images: config.images || [],           // product gallery [{id, url}] for per-variant images
         offers: config.offers || [],
+        // Bound by the "Pre-order item" checkbox, and read by the offer rows to
+        // warn when a pre-order-only tier sits on a product that isn't one.
+        // Blade has always passed it in the config; without this line the
+        // property never existed and every x-model/x-show on it threw.
+        isPreorder: !! config.isPreorder,
         price: Number(config.price) || 0,
         cost: Number(config.cost) || 0,
         transport: Number(config.transport) || 0,
