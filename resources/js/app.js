@@ -320,6 +320,7 @@ document.addEventListener('alpine:init', () => {
                 if (!res.ok) throw new Error(res.status);
                 const data = await res.json();
                 this.paintMargin(form, data);
+                this.paintStatus(form, data);
                 this.state = 'saved';
                 setTimeout(() => { if (this.state === 'saved') this.state = 'idle'; }, 2500);
             } catch (e) {
@@ -342,6 +343,204 @@ document.addEventListener('alpine:init', () => {
                 : (data.margin_percent < 20 ? 'text-amber-600' : 'text-green-700');
             cell.innerHTML = `<span class="font-medium ${tone}">${data.margin_percent}%</span>`
                 + `<div class="text-xs text-ink-700/50">${data.margin_amount ?? ''}/unit</div>`;
+        },
+
+        /**
+         * Keep the row's Published/Draft badge and thumbnail honest after a save.
+         * Both live outside this component's cell, so they are found from the
+         * row rather than bound — the badge is server-rendered on load.
+         */
+        paintStatus(form, data) {
+            const row = form.closest('tr');
+            if (!row) return;
+
+            if (data.status) {
+                const badge = row.querySelector('[data-status-badge]');
+                if (badge) {
+                    const on = data.status === 'published';
+                    badge.textContent = data.status;
+                    badge.className = 'badge capitalize '
+                        + (on ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700');
+                }
+            }
+
+            if (data.primary_image) {
+                const thumb = row.querySelector('[data-row-thumb]');
+                if (thumb) thumb.src = data.primary_image;
+            }
+        },
+    }));
+
+    /**
+     * Admin: the expanded quick-edit panel under a product row.
+     *
+     * Saves over fetch — including the file inputs, which FormData carries
+     * fine — so a full-page reload doesn't throw away the admin's filters, page
+     * number and scroll position just to change a price.
+     */
+    window.Alpine.data('quickPanel', (url) => ({
+        busy: false,
+        state: 'idle',
+        note: '',
+
+        pickPrimary(id) {
+            this.$refs.primary.value = id;
+            // $root, not $el: called from a button's @click, where Alpine binds
+            // $el to that button rather than to the component's root element.
+            this.$root.querySelectorAll('[data-primary-pick]').forEach(btn => {
+                const on = String(btn.dataset.primaryPick) === String(id);
+                btn.classList.toggle('border-gold-600', on);
+                btn.classList.toggle('border-transparent', !on);
+                btn.querySelector('[data-primary-star]')?.classList.toggle('hidden', !on);
+            });
+        },
+
+        async save(form) {
+            if (this.busy) return;
+            this.busy = true;
+            this.state = 'idle';
+            this.note = '';
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new FormData(form),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.message || res.status);
+
+                this.paintRow(form, data);
+                // The file inputs keep their selection otherwise, and saving
+                // again would upload the same pictures a second time.
+                form.querySelectorAll('input[type="file"]').forEach(i => { i.value = ''; });
+
+                this.state = 'saved';
+                this.note = data.message || 'Saved.';
+                setTimeout(() => { if (this.state === 'saved') { this.state = 'idle'; this.note = ''; } }, 3000);
+            } catch (e) {
+                this.state = 'error';
+                this.note = String(e.message || e).slice(0, 120);
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        /** The collapsed row above still shows the old numbers — update it. */
+        paintRow(form, data) {
+            const row = form.closest('tbody')?.querySelector('tr');
+            if (!row) return;
+
+            const badge = row.querySelector('[data-status-badge]');
+            if (badge && data.status) {
+                const on = data.status === 'published';
+                badge.textContent = data.status;
+                badge.className = 'badge capitalize ' + (on ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700');
+            }
+
+            const thumb = row.querySelector('[data-row-thumb]');
+            if (thumb && data.primary_image) {
+                thumb.src = data.primary_image;
+                thumb.classList.remove('hidden');
+            }
+
+            const price = row.querySelector('input[name="price"]');
+            if (price && data.price !== undefined) price.value = data.price;
+
+            const stock = row.querySelector('input[name="stock_quantity"]');
+            if (stock && data.stock_quantity !== undefined) stock.value = data.stock_quantity;
+
+            const cell = row.querySelector('[data-margin-cell]');
+            if (cell && data.margin_percent !== undefined) {
+                if (data.margin_percent === null) {
+                    cell.innerHTML = '<span class="text-xs text-ink-700/40">—</span>';
+                } else {
+                    const tone = data.margin_percent < 0 ? 'text-red-600'
+                        : (data.margin_percent < 20 ? 'text-amber-600' : 'text-green-700');
+                    cell.innerHTML = `<span class="font-medium ${tone}">${data.margin_percent}%</span>`
+                        + `<div class="text-xs text-ink-700/50">${data.margin_amount ?? ''}/unit</div>`;
+                }
+            }
+        },
+    }));
+
+    /**
+     * Admin: the product editor's image gallery.
+     *
+     * Starring or deleting an image used to submit a hidden form, which reloaded
+     * the editor and threw away every unsaved change on the rest of the page —
+     * the name, price and description someone had just typed. These act over
+     * fetch and repaint the affected cards instead.
+     */
+    window.Alpine.data('imageGrid', () => ({
+        busy: null,
+
+        async makePrimary(id, url) {
+            if (this.busy) return;
+            this.busy = id;
+            try {
+                const res = await this.post(url);
+                if (!res.ok) throw new Error(res.status);
+                this.paintPrimary(id);
+            } catch (e) {
+                window.alert('Could not set the primary image. Please try again.');
+            } finally {
+                this.busy = null;
+            }
+        },
+
+        async remove(id, url) {
+            if (this.busy || !window.confirm('Delete this image?')) return;
+
+            // Held now, deliberately. $root resolves by walking up from the
+            // clicked button, and that button lives inside the card about to be
+            // removed — once it is detached there is no x-data ancestor left to
+            // find, and every later lookup would silently match nothing.
+            const root = this.$root;
+
+            this.busy = id;
+            try {
+                const res = await this.post(url, 'DELETE');
+                if (!res.ok) throw new Error(res.status);
+                const data = await res.json();
+
+                root.querySelector(`[data-img-id="${id}"]`)?.remove();
+                // Deleting the primary promotes the next image server-side;
+                // mirror that here so the star doesn't vanish from the grid.
+                if (data.primary_id) this.paintPrimary(data.primary_id, root);
+            } catch (e) {
+                window.alert('Could not delete that image. Please try again.');
+            } finally {
+                this.busy = null;
+            }
+        },
+
+        post(url, method = 'POST') {
+            const body = new FormData();
+            body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+            if (method !== 'POST') body.append('_method', method);
+
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body,
+            });
+        },
+
+        /**
+         * Exactly one card wears the star and the ring.
+         *
+         * $root, not $el: these run from a card button's @click, and Alpine
+         * binds $el to the button that was clicked rather than to the grid.
+         * Callers that are about to detach that button pass the root in.
+         */
+        paintPrimary(id, root = null) {
+            (root ?? this.$root).querySelectorAll('.img-card').forEach(card => {
+                const on = String(card.dataset.imgId) === String(id);
+                card.querySelector('[data-img]')?.classList.toggle('ring-2', on);
+                card.querySelector('[data-img]')?.classList.toggle('ring-gold-500', on);
+                card.querySelector('[data-star]')?.classList.toggle('hidden', !on);
+                card.querySelector('[data-make-primary]')?.classList.toggle('hidden', on);
+            });
         },
     }));
 

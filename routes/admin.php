@@ -22,6 +22,10 @@ Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('admin')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Notification bell (alerts are computed live; only read state is stored)
+    Route::post('alerts/read', [\App\Http\Controllers\Admin\AlertController::class, 'read'])->name('alerts.read');
+    Route::post('alerts/read-all', [\App\Http\Controllers\Admin\AlertController::class, 'readAll'])->name('alerts.read-all');
+
     // Products
     Route::get('products', [ProductController::class, 'index'])->name('products.index');
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create');

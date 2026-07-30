@@ -115,7 +115,8 @@
                     <td class="px-4 py-3">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded bg-gold-100 overflow-hidden shrink-0">
-                                @if($product->thumbnail)<img src="{{ $product->thumbnail }}" class="w-full h-full object-cover" alt="">@endif
+                                <img src="{{ $product->thumbnail }}" data-row-thumb
+                                     class="w-full h-full object-cover {{ $product->thumbnail ? '' : 'hidden' }}" alt="">
                             </div>
                             <div>
                                 <div class="font-medium">{{ $product->name }} @if($product->is_featured)<span class="badge bg-gold-100 text-gold-700 text-[10px]">★</span>@endif</div>
@@ -155,6 +156,12 @@
                                    @keydown.enter.prevent="save($el.form)">
                             <input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input py-1 w-16 text-xs" title="Stock"
                                    @disabled(!$product->manage_stock) placeholder="∞" @keydown.enter.prevent="save($el.form)">
+                            {{-- Publish/draft without opening the editor. Saves with
+                                 the row, so the status badge updates in place. --}}
+                            <select name="status" class="input py-1 w-24 text-xs" title="Published or draft" @change="save($el.form)">
+                                <option value="published" @selected($product->status === 'published')>Published</option>
+                                <option value="draft" @selected($product->status === 'draft')>Draft</option>
+                            </select>
                             <button class="text-xs text-gold-700 hover:underline whitespace-nowrap" :disabled="busy"
                                     x-text="busy ? '…' : (state === 'saved' ? '✓ Saved' : (state === 'error' ? 'Retry' : 'Save'))"
                                     :class="state === 'error' && 'text-red-600'"></button>
@@ -168,7 +175,7 @@
                             <span class="text-xs text-ink-700/40">—</span>
                         @endif
                     </td>
-                    <td class="px-4 py-3"><span class="badge {{ $product->status=='published' ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} capitalize">{{ $product->status }}</span></td>
+                    <td class="px-4 py-3"><span data-status-badge class="badge {{ $product->status=='published' ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} capitalize">{{ $product->status }}</span></td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         <button type="button" @click="q=!q" class="text-gold-700 hover:underline" x-text="q ? 'Close' : 'Quick edit'"></button>
                         <a href="{{ route('admin.products.edit', $product) }}" class="text-ink-700/70 hover:underline ml-2">Edit</a>
@@ -181,9 +188,18 @@
                 {{-- Inline quick-edit: price, stock, add images & video links without opening the full editor --}}
                 <tr x-show="q" x-cloak>
                     <td colspan="7" class="bg-ink-50/60 px-4 py-4">
-                        <form action="{{ route('admin.products.quick-media', $product) }}" method="POST" enctype="multipart/form-data" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
+                        <form x-data="quickPanel('{{ route('admin.products.quick-media', $product) }}')"
+                              @submit.prevent="save($event.target)"
+                              enctype="multipart/form-data" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
                             @csrf
                             <div><label class="label">Selling price (৳)</label><input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input"></div>
+                            <div>
+                                <label class="label">Status</label>
+                                <select name="status" class="input">
+                                    <option value="published" @selected($product->status === 'published')>Published</option>
+                                    <option value="draft" @selected($product->status === 'draft')>Draft</option>
+                                </select>
+                            </div>
                             <div><label class="label">Stock</label><input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input" @disabled(!$product->manage_stock) placeholder="{{ $product->manage_stock ? '' : 'Not tracked' }}"></div>
                             <div><label class="label">Product cost (৳)</label><input name="cost_price" type="number" step="0.01" value="{{ $product->cost_price }}" class="input" placeholder="Supplier cost"></div>
                             <div><label class="label">Transport / packaging (৳)</label><input name="transport_cost" type="number" step="0.01" value="{{ $product->transport_cost }}" class="input" placeholder="Per unit"></div>
@@ -206,8 +222,33 @@
                             <div class="lg:col-span-2"><label class="label">Upload video <span class="text-ink-700/40 font-normal">(MP4/WebM/MOV, max {{ upload_limit_mb() }} MB)</span></label><input type="file" name="video_files[]" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" multiple class="input text-sm"></div>
                             <div><label class="label">Tags</label><input name="tags" value="{{ $product->tags }}" class="input" placeholder="bestseller, eid"></div>
                             <div><label class="label">Colours</label><input name="colors" value="{{ implode(', ', $product->color_list ?? []) }}" class="input" placeholder="Gold, Silver"></div>
+                            {{-- Choose the gallery photo customers see first. Only
+                                 pictures already saved appear — one uploaded above
+                                 becomes selectable after this save. --}}
+                            @if($product->images->isNotEmpty())
+                                <div class="lg:col-span-4">
+                                    <label class="label">Primary image <span class="text-ink-700/40 font-normal">(click to choose)</span></label>
+                                    <input type="hidden" name="primary_image_id" x-ref="primary" value="">
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach($product->images as $image)
+                                            <button type="button" data-primary-pick="{{ $image->id }}"
+                                                    @click="pickPrimary({{ $image->id }})"
+                                                    class="relative h-14 w-14 rounded-lg overflow-hidden border-2 transition
+                                                           {{ $image->is_primary ? 'border-gold-600' : 'border-transparent hover:border-gold-300' }}"
+                                                    title="Make this the primary image">
+                                                <img src="{{ $image->url }}" class="h-full w-full object-cover" alt="">
+                                                <span data-primary-star class="absolute top-0 right-0 bg-gold-500 text-white text-[9px] px-1 rounded-bl {{ $image->is_primary ? '' : 'hidden' }}">★</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                             <div class="lg:col-span-2 flex items-center gap-3">
-                                <button class="btn-primary">Save</button>
+                                <button class="btn-primary" :disabled="busy"
+                                        x-text="busy ? 'Saving…' : (state === 'saved' ? '✓ Saved' : (state === 'error' ? 'Retry' : 'Save'))"
+                                        :class="state === 'error' && 'bg-red-600'"></button>
+                                <span x-show="note" x-cloak x-text="note" x-transition
+                                      class="text-xs" :class="state === 'error' ? 'text-red-600' : 'text-green-700'"></span>
                                 <a href="{{ route('admin.products.edit', $product) }}" class="text-xs text-ink-700/60 hover:underline">Open full editor (related products, variants, SEO, reorder…)</a>
                             </div>
                         </form>

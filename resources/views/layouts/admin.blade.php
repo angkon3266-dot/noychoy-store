@@ -21,8 +21,66 @@
     <!-- Sidebar -->
     <aside class="fixed inset-y-0 left-0 z-40 w-60 bg-ink-900 text-gold-100/80 transform transition md:translate-x-0 flex flex-col"
            :class="sidebar ? 'translate-x-0' : '-translate-x-full'">
-        <div class="h-16 flex items-center px-5 border-b border-white/10 shrink-0">
-            <a href="{{ route('admin.dashboard') }}" class="font-display text-xl font-bold text-gold-300">{{ store_name() }}</a>
+        @php
+            $alertList = app(\App\Services\AdminAlerts::class)->for(auth()->user());
+            $alertUnread = $alertList->reject(fn ($a) => $a['read'])->count();
+            $alertTone = [
+                'urgent' => 'bg-red-500',
+                'warning' => 'bg-amber-500',
+                'info' => 'bg-sky-500',
+            ];
+        @endphp
+        <div class="h-16 flex items-center justify-between gap-2 px-5 border-b border-white/10 shrink-0">
+            <a href="{{ route('admin.dashboard') }}" class="font-display text-xl font-bold text-gold-300 truncate">{{ store_name() }}</a>
+
+            {{-- Everything wanting attention, in one place. Alerts are derived
+                 from live data, so one disappears by itself once it's dealt
+                 with — the read state only silences things you can't fix now. --}}
+            <div class="relative shrink-0" x-data="{ bell: false }" @click.outside="bell = false" @keydown.escape.window="bell = false">
+                <button type="button" @click="bell = !bell"
+                        class="relative grid h-9 w-9 place-items-center rounded-lg text-gold-100/70 hover:text-white hover:bg-white/10 transition"
+                        :aria-expanded="bell" aria-label="Notifications">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+                    </svg>
+                    @if($alertUnread > 0)
+                        <span class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold inline-flex items-center justify-center">{{ $alertUnread > 9 ? '9+' : $alertUnread }}</span>
+                    @endif
+                </button>
+
+                <div x-show="bell" x-cloak x-transition
+                     class="absolute left-0 top-11 z-50 w-[22rem] max-h-[70vh] overflow-y-auto rounded-xl border border-ink-100 bg-white text-ink-900 shadow-2xl">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-ink-100 sticky top-0 bg-white">
+                        <span class="text-sm font-semibold">Notifications</span>
+                        @if($alertUnread > 0)
+                            <form method="POST" action="{{ route('admin.alerts.read-all') }}">
+                                @csrf
+                                <button class="text-xs text-gold-700 hover:underline">Mark all read</button>
+                            </form>
+                        @endif
+                    </div>
+
+                    @forelse($alertList as $a)
+                        <form method="POST" action="{{ route('admin.alerts.read') }}" class="block border-b border-ink-50 last:border-0">
+                            @csrf
+                            <input type="hidden" name="key" value="{{ $a['key'] }}">
+                            <input type="hidden" name="url" value="{{ $a['url'] }}">
+                            <button class="w-full text-left px-4 py-3 hover:bg-ink-50 transition flex gap-3 {{ $a['read'] ? 'opacity-45' : '' }}">
+                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $a['read'] ? 'bg-ink-300' : ($alertTone[$a['level']] ?? 'bg-ink-400') }}"></span>
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-medium">{{ $a['title'] }}</span>
+                                    <span class="block text-xs text-ink-700/60 mt-0.5">{{ $a['body'] }}</span>
+                                    @if($a['at'])
+                                        <span class="block text-[11px] text-ink-700/40 mt-1">{{ $a['at']->diffForHumans() }}</span>
+                                    @endif
+                                </span>
+                            </button>
+                        </form>
+                    @empty
+                        <p class="px-4 py-8 text-center text-sm text-ink-700/50">Nothing needs your attention.</p>
+                    @endforelse
+                </div>
+            </div>
         </div>
         @php $nav = [
             ['dashboard','Dashboard','M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],

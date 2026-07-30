@@ -491,12 +491,15 @@ class ProductController extends Controller
         return redirect()->route('admin.products.edit', $copy)->with('success', 'Product duplicated — now editing the copy (saved as draft).');
     }
 
-    /** Inline quick-edit of price and/or stock from the list. */
+    /** Inline quick-edit of price, stock and published/draft state from the list. */
     public function quickUpdate(Request $request, Product $product)
     {
         $data = $request->validate([
             'price' => ['nullable', 'numeric', 'min:0'],
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
+            'status' => ['nullable', 'in:published,draft'],
+            // Set the gallery's primary image without opening the full editor.
+            'primary_image_id' => ['nullable', 'integer'],
         ]);
 
         $wasAvailable = $product->isAvailable();
@@ -511,6 +514,15 @@ class ProductController extends Controller
                 $product->in_stock = $data['stock_quantity'] > 0;
             }
         }
+        if (filled($data['status'] ?? null)) {
+            $product->status = $data['status'];
+        }
+        if (filled($data['primary_image_id'] ?? null)) {
+            // Scoped to this product's own gallery: the id arrives from the
+            // browser, and an unscoped update would let one product's quick-edit
+            // repoint another product's primary image.
+            $this->makePrimary($product, (int) $data['primary_image_id']);
+        }
         $product->save();
         $product = $product->fresh();
         app(\App\Services\StockAlertService::class)->handleProductChange($product, $wasAvailable, $oldPrice);
@@ -524,6 +536,8 @@ class ProductController extends Controller
                 'price' => (float) $product->price,
                 'stock_quantity' => (int) $product->stock_quantity,
                 'in_stock' => (bool) $product->in_stock,
+                'status' => $product->status,
+                'primary_image' => $product->images()->where('is_primary', true)->first()?->url,
                 'margin_percent' => $product->margin_percent,
                 'margin_amount' => $product->margin_amount === null ? null : money($product->margin_amount),
                 'message' => $product->name.' updated.',
@@ -531,6 +545,25 @@ class ProductController extends Controller
         }
 
         return back()->with('success', $product->name.' updated.');
+    }
+
+    /**
+     * Promote one of a product's own images to primary.
+     *
+     * Always scoped through the product's relation rather than by image id
+     * alone: the id comes from the browser, and an unscoped update would let a
+     * request repoint a different product's gallery.
+     */
+    protected function makePrimary(Product $product, int $imageId): bool
+    {
+        if (! $product->images()->whereKey($imageId)->exists()) {
+            return false;
+        }
+
+        $product->images()->update(['is_primary' => false]);
+        $product->images()->whereKey($imageId)->update(['is_primary' => true]);
+
+        return true;
     }
 
     /**
@@ -555,6 +588,8 @@ class ProductController extends Controller
             'video_urls.*' => ['nullable', 'string', 'max:255'],
             'video_files' => ['nullable', 'array'],
             'video_files.*' => ['nullable', 'file', 'mimes:mp4,webm,mov,m4v,ogg', 'max:51200'],
+            'status' => ['nullable', 'in:published,draft'],
+            'primary_image_id' => ['nullable', 'integer'],
         ]);
 
         if (filled($data['price'] ?? null)) {
@@ -593,11 +628,40 @@ class ProductController extends Controller
             $product->video_urls = collect($product->video_urls ?? [])->merge($newVideos)->filter()->unique()->values()->all();
         }
 
+        if (filled($data['status'] ?? null)) {
+            $product->status = $data['status'];
+        }
+
         $product->save();
 
         // Append uploaded images & videos to the gallery (reuses the full-form logic).
         $this->syncImages($request, $product);
         $this->syncVideos($request, $product);
+
+        // After syncImages, so a picture uploaded in this same save can be the
+        // one chosen as primary.
+        if (filled($data['primary_image_id'] ?? null)) {
+            $this->makePrimary($product, (int) $data['primary_image_id']);
+        }
+
+        $product = $product->fresh();
+
+        // Answered as JSON when the panel saves over fetch, so the admin keeps
+        // their filters, page number and scroll position.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'status' => $product->status,
+                'price' => (float) $product->price,
+                'stock_quantity' => (int) $product->stock_quantity,
+                'primary_image' => $product->images()->where('is_primary', true)->first()?->url,
+                'images' => $product->images()->orderBy('position')->get()
+                    ->map(fn ($i) => ['id' => $i->id, 'url' => $i->url, 'is_primary' => (bool) $i->is_primary])->all(),
+                'margin_percent' => $product->margin_percent,
+                'margin_amount' => $product->margin_amount === null ? null : money($product->margin_amount),
+                'message' => $product->name.' updated.',
+            ]);
+        }
 
         return back()->with('success', $product->name.' updated.');
     }
@@ -668,20 +732,49 @@ class ProductController extends Controller
         return back()->with('success', $images->count().' image(s) removed.');
     }
 
-    public function deleteImage(ProductImage $image)
+    public function deleteImage(Request $request, ProductImage $image)
     {
+        $productId = $image->product_id;
+        $wasPrimary = (bool) $image->is_primary;
+
         if (! str_starts_with($image->path, 'http')) {
             Storage::disk('public')->delete($image->path);
         }
         $image->delete();
 
+        // A gallery with no primary shows nothing on the storefront, so the
+        // next image inherits the star when the primary one is deleted.
+        $promoted = null;
+        if ($wasPrimary) {
+            $promoted = ProductImage::where('product_id', $productId)->orderBy('position')->first();
+            $promoted?->update(['is_primary' => true]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'deleted' => $image->getKey(),
+                'primary_id' => $promoted?->getKey(),
+                'message' => 'Image removed.',
+            ]);
+        }
+
         return back()->with('success', 'Image removed.');
     }
 
-    public function setPrimaryImage(ProductImage $image)
+    public function setPrimaryImage(Request $request, ProductImage $image)
     {
         ProductImage::where('product_id', $image->product_id)->update(['is_primary' => false]);
         $image->update(['is_primary' => true]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'primary_id' => $image->getKey(),
+                'url' => $image->url,
+                'message' => 'Primary image set.',
+            ]);
+        }
 
         return back()->with('success', 'Primary image set.');
     }

@@ -550,18 +550,24 @@
                         <p class="text-xs text-ink-700/50">Drag to reorder. The ★ image is the primary. Tick boxes to delete several at once.</p>
                         <button type="button" id="imgBulkDelBtn" class="text-xs text-red-600 hover:underline hidden">Delete selected (<span id="imgSelCount">0</span>)</button>
                     </div>
-                    <div id="imgGrid" class="grid grid-cols-3 gap-2 mb-3">
+                    {{-- Star and Del act over fetch, so choosing a primary image
+                         or removing one doesn't reload the page and lose the
+                         rest of the half-filled product form. --}}
+                    <div id="imgGrid" class="grid grid-cols-3 gap-2 mb-3" x-data="imageGrid()">
                         @foreach($product->images as $image)
-                            <div class="img-card relative group cursor-move" draggable="true" data-img-id="{{ $image->id }}">
-                                <img src="{{ $image->url }}" class="aspect-square w-full object-cover rounded-lg pointer-events-none {{ $image->is_primary ? 'ring-2 ring-gold-500' : '' }}" alt="">
+                            <div class="img-card relative group cursor-move" draggable="true" data-img-id="{{ $image->id }}"
+                                 :class="busy === {{ $image->id }} && 'opacity-40 pointer-events-none'">
+                                <img src="{{ $image->url }}" data-img
+                                     class="aspect-square w-full object-cover rounded-lg pointer-events-none {{ $image->is_primary ? 'ring-2 ring-gold-500' : '' }}" alt="">
                                 <input type="checkbox" class="img-sel-cb absolute top-1.5 left-1.5 w-4 h-4 z-10" value="{{ $image->id }}" title="Select for bulk delete">
-                                @if($image->is_primary)<span class="absolute top-1 right-1 text-xs bg-gold-500 text-white rounded px-1">★</span>@endif
-                                {{-- Buttons target standalone forms (below) via form="" so they are NOT nested in the product form --}}
+                                <span data-star class="absolute top-1 right-1 text-xs bg-gold-500 text-white rounded px-1 {{ $image->is_primary ? '' : 'hidden' }}">★</span>
                                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 rounded-lg">
-                                    @unless($image->is_primary)
-                                        <button type="submit" form="img-primary-{{ $image->id }}" class="text-[10px] bg-white rounded px-1.5 py-0.5">Primary</button>
-                                    @endunless
-                                    <button type="submit" form="img-del-{{ $image->id }}" class="text-[10px] bg-red-600 text-white rounded px-1.5 py-0.5">Del</button>
+                                    <button type="button" data-make-primary
+                                            @click="makePrimary({{ $image->id }}, '{{ route('admin.products.images.primary', $image) }}')"
+                                            class="text-[10px] bg-white rounded px-1.5 py-0.5 {{ $image->is_primary ? 'hidden' : '' }}">Primary</button>
+                                    <button type="button"
+                                            @click="remove({{ $image->id }}, '{{ route('admin.products.images.delete', $image) }}')"
+                                            class="text-[10px] bg-red-600 text-white rounded px-1.5 py-0.5">Del</button>
                                 </div>
                             </div>
                         @endforeach
@@ -631,14 +637,10 @@
     </div>
 </form>
 
-{{-- Standalone image-action forms (kept OUTSIDE the product form to avoid nested-form bugs) --}}
+{{-- Bulk delete still submits normally: it removes several images at once and a
+     reload afterwards is the clearer outcome. The single-image actions moved to
+     fetch (see the imageGrid component). --}}
 @if($product->exists && $product->images->isNotEmpty())
-    @foreach($product->images as $image)
-        @unless($image->is_primary)
-            <form id="img-primary-{{ $image->id }}" action="{{ route('admin.products.images.primary', $image) }}" method="POST" class="hidden">@csrf</form>
-        @endunless
-        <form id="img-del-{{ $image->id }}" action="{{ route('admin.products.images.delete', $image) }}" method="POST" class="hidden" onsubmit="return confirm('Delete this image?')">@csrf @method('DELETE')</form>
-    @endforeach
     <form id="img-bulk-del" action="{{ route('admin.products.images.bulk-delete', $product) }}" method="POST" class="hidden">@csrf @method('DELETE')<div id="imgBulkInputs"></div></form>
 @endif
 
