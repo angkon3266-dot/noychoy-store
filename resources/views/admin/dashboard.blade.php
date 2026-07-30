@@ -3,6 +3,37 @@
 @section('heading', 'Dashboard')
 
 @section('content')
+{{-- Reporting window. Every time-based figure below follows this; live counts
+     (to process, stock, customer base) deliberately do not. --}}
+<div class="flex flex-wrap items-center gap-2 mb-4" x-data="{ custom: @js($range->isCustom()) }">
+    @foreach(\App\Support\DateRange::PRESETS as $key => $label)
+        <a href="{{ route('admin.dashboard', ['period' => $key]) }}"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium border transition
+                  {{ $range->key === $key
+                        ? 'bg-ink-900 text-white border-ink-900'
+                        : 'bg-white text-ink-700/70 border-ink-100 hover:border-ink-300' }}">{{ $label }}</a>
+    @endforeach
+
+    <button type="button" @click="custom = !custom"
+            class="rounded-lg px-3 py-1.5 text-xs font-medium border transition
+                   {{ $range->isCustom()
+                        ? 'bg-ink-900 text-white border-ink-900'
+                        : 'bg-white text-ink-700/70 border-ink-100 hover:border-ink-300' }}">
+        {{ $range->isCustom() ? $range->label : 'Custom…' }}
+    </button>
+
+    <form x-show="custom" x-cloak method="GET" action="{{ route('admin.dashboard') }}"
+          class="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="period" value="custom">
+        <input type="date" name="from" value="{{ $range->isCustom() ? $range->start->toDateString() : '' }}"
+               class="input py-1 text-xs w-auto" required>
+        <span class="text-xs text-ink-700/40">to</span>
+        <input type="date" name="to" value="{{ $range->isCustom() ? $range->end->toDateString() : '' }}"
+               class="input py-1 text-xs w-auto" required>
+        <button class="btn-primary py-1.5 px-3 text-xs">Apply</button>
+    </form>
+</div>
+
 {{-- Which deep-analysis panels to show --}}
 <div class="flex justify-end mb-3" x-data="{ open: false }" @click.outside="open = false">
     <button type="button" @click="open = !open" class="btn-outline py-1.5 text-xs">⚙ Customize dashboard</button>
@@ -22,16 +53,24 @@
 
 {{-- KPI cards --}}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-    @php $cards = [
-        ['Visitors', number_format($stats['visitors_total']), 'text-ink-800', number_format($stats['visitors_today']).' today'],
-        ['Orders today', $stats['orders_today'], 'text-gold-700', money($stats['sales_today']).' sales'],
-        ['To process', $stats['pending'] + $stats['processing'], 'text-amber-600', $stats['shipped'].' shipped'],
-        ['Sales (month)', money($stats['sales_month']), 'text-ink-800', money($stats['revenue_month']).' delivered'],
-        ['Avg. order value', money($stats['aov']), 'text-ink-800', 'last 30 days'],
-        ['COD success', $stats['cod_success'] === null ? '—' : $stats['cod_success'].'%', 'text-green-700', 'delivered / resolved'],
+    @php
+        // Lowercased to sit as a caption under the number — except a custom
+        // range, whose label is a pair of dates ("10 Jul 2026 – 20 Jul 2026")
+        // that strtolower would turn into "10 jul 2026".
+        $per = $range->isAllTime()
+            ? 'all time'
+            : ($range->isCustom() ? $range->label : strtolower($range->label));
+
+        $cards = [
+        ['Visitors', number_format($stats['visitors_period']), 'text-ink-800', number_format($stats['visitors_today']).' today'],
+        ['Orders', $stats['orders_period'], 'text-gold-700', $per],
+        ['To process', $stats['pending'] + $stats['processing'], 'text-amber-600', $stats['shipped'].' shipped · now'],
+        ['Sales', money($stats['sales_period']), 'text-ink-800', money($stats['revenue_period']).' delivered'],
+        ['Avg. order value', money($stats['aov']), 'text-ink-800', $per],
+        ['COD success', $stats['cod_success'] === null ? '—' : $stats['cod_success'].'%', 'text-green-700', 'delivered / resolved · all time'],
         ['Customers', $stats['customers'], 'text-ink-800', $stats['repeat_rate'].'% repeat'],
-        ['New customers', $stats['new_customers_month'], 'text-ink-800', 'this month'],
-        ['Low stock', $stats['low_stock'], 'text-red-600', '≤ 3 left'],
+        ['New customers', $stats['new_customers_period'], 'text-ink-800', $per],
+        ['Low stock', $stats['low_stock'], 'text-red-600', '≤ 3 left · now'],
         ['Stock on hand', number_format($stats['stock_units']).' pcs', 'text-ink-800', money($stats['stock_cost_value']).' at cost'],
     ]; @endphp
     @foreach($cards as [$label, $value, $color, $sub])
@@ -44,9 +83,9 @@
 </div>
 
 <div class="grid lg:grid-cols-3 gap-6 mt-6">
-    {{-- 7-day revenue chart --}}
+    {{-- Revenue over the selected window (days grouped once it gets long) --}}
     <div class="card p-5 lg:col-span-2">
-        <h2 class="font-semibold mb-4">Sales · last 7 days</h2>
+        <h2 class="font-semibold mb-4">Sales · {{ $range->label }}</h2>
         <div class="flex items-end justify-between gap-3 h-44">
             @foreach($daily as $d)
                 <div class="flex-1 flex flex-col items-center justify-end h-full">
@@ -75,20 +114,20 @@
 <div class="grid lg:grid-cols-2 gap-6 mt-6">
     {{-- Top products --}}
     <div class="card p-5">
-        <h2 class="font-semibold mb-3">Top products · 30 days</h2>
+        <h2 class="font-semibold mb-3">Top products · {{ $range->label }}</h2>
         @forelse($topProducts as $p)
             <div class="flex items-center justify-between py-2 border-b border-ink-50 last:border-0 text-sm">
                 <span class="truncate pr-3">{{ $p->name }}</span>
                 <span class="shrink-0 text-ink-700/60">{{ $p->qty }} sold · {{ money($p->revenue) }}</span>
             </div>
         @empty
-            <p class="text-sm text-ink-700/50">No sales in the last 30 days yet.</p>
+            <p class="text-sm text-ink-700/50">No sales in this period yet.</p>
         @endforelse
     </div>
 
     {{-- Best-selling categories --}}
     <div class="card p-5">
-        <h2 class="font-semibold mb-3">Best-selling categories · 30 days</h2>
+        <h2 class="font-semibold mb-3">Best-selling categories · {{ $range->label }}</h2>
         @forelse($topCategories as $cat)
             <div class="py-1.5">
                 <div class="flex items-center justify-between text-sm mb-1">
@@ -98,7 +137,7 @@
                 <div class="h-1.5 rounded-full bg-ink-100 overflow-hidden"><div class="h-full bg-gold-500" style="width: {{ round($cat->qty / $catMax * 100) }}%"></div></div>
             </div>
         @empty
-            <p class="text-sm text-ink-700/50">No category sales in the last 30 days yet.</p>
+            <p class="text-sm text-ink-700/50">No category sales in this period yet.</p>
         @endforelse
     </div>
 </div>
@@ -219,24 +258,29 @@
     };
 @endphp
 
-{{-- ── Revenue & profit (last 30 days vs the 30 before) ─────────────────── --}}
+{{-- ── Revenue & profit (selected window vs the one before it) ─────────── --}}
 @if($deep['profit'])
     @php $p = $deep['profit']; [$revTxt, $revCls] = $chg($p['revenue_change']); [$proTxt, $proCls] = $chg($p['profit_change']); @endphp
     <div class="card p-5 mt-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold">Revenue &amp; profit</h2>
-            <span class="text-xs text-ink-700/50">last 30 days vs previous 30</span>
+            <span class="text-xs text-ink-700/50">{{ $range->label }}{{ $range->isAllTime() ? '' : ' vs previous period' }}</span>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
                 <div class="text-xs text-ink-700/60">Revenue</div>
                 <div class="text-xl font-semibold">{{ money($p['current']['revenue']) }}</div>
-                <div class="text-xs {{ $revCls }}">{{ $revTxt }} <span class="text-ink-700/40">vs {{ money($p['previous']['revenue']) }}</span></div>
+                {{-- "Maximum" has no earlier period to compare against. --}}
+                <div class="text-xs {{ $revCls }}">{{ $revTxt }}
+                    @if($p['previous'])<span class="text-ink-700/40">vs {{ money($p['previous']['revenue']) }}</span>@endif
+                </div>
             </div>
             <div>
                 <div class="text-xs text-ink-700/60">Profit</div>
                 <div class="text-xl font-semibold text-green-700">{{ money($p['current']['profit']) }}</div>
-                <div class="text-xs {{ $proCls }}">{{ $proTxt }} <span class="text-ink-700/40">vs {{ money($p['previous']['profit']) }}</span></div>
+                <div class="text-xs {{ $proCls }}">{{ $proTxt }}
+                    @if($p['previous'])<span class="text-ink-700/40">vs {{ money($p['previous']['profit']) }}</span>@endif
+                </div>
             </div>
             <div>
                 <div class="text-xs text-ink-700/60">Margin</div>
@@ -264,7 +308,7 @@
         <div class="card p-5 lg:col-span-2">
             <div class="flex items-center justify-between mb-1">
                 <h2 class="font-semibold">Conversion funnel</h2>
-                <span class="text-xs text-ink-700/50">last 30 days · unique visitors</span>
+                <span class="text-xs text-ink-700/50">{{ $range->label }} · unique visitors</span>
             </div>
             @unless($f['tracking'])
                 <p class="text-xs text-ink-700/50 mb-3">No traffic recorded yet — figures fill in as customers visit the storefront.</p>
@@ -288,7 +332,7 @@
 
         <div class="card p-5">
             <h2 class="font-semibold mb-1">Where visitors come from</h2>
-            <p class="text-xs text-ink-700/55 mb-3">Visitors and what each channel earned — last 30 days.</p>
+            <p class="text-xs text-ink-700/55 mb-3">Visitors and what each channel earned — {{ $per }}.</p>
             @forelse($deep['sources'] as $s)
                 <div class="py-2 border-b border-ink-100 last:border-0">
                     <div class="flex justify-between items-center text-sm gap-2">
@@ -333,7 +377,7 @@
 
     <div class="grid lg:grid-cols-2 gap-6 mt-6">
         <div class="card p-5">
-            <h2 class="font-semibold mb-3">Visitors — last 14 days</h2>
+            <h2 class="font-semibold mb-3">Visitors — {{ $per }}</h2>
             @php $vMax = max(1, collect($deep['visitorsByDay'])->max('value')); @endphp
             <div class="flex items-end gap-1.5 h-32">
                 @foreach($deep['visitorsByDay'] as $d)
@@ -366,7 +410,7 @@
     <div class="card p-5 mt-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold">Customers &amp; retention</h2>
-            <span class="text-xs text-ink-700/50">last 90 days</span>
+            <span class="text-xs text-ink-700/50">{{ $range->label }}</span>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div>
@@ -412,7 +456,7 @@
         <div class="card p-5">
             <h2 class="font-semibold mb-3">Delivery outcomes</h2>
             <div class="text-3xl font-semibold text-green-700">{{ $o['cod_success'] === null ? '—' : $o['cod_success'].'%' }}</div>
-            <p class="text-xs text-ink-700/50 mb-3">COD success, last 30 days</p>
+            <p class="text-xs text-ink-700/50 mb-3">COD success, {{ $per }}</p>
             <div class="text-sm space-y-1">
                 <div class="flex justify-between"><span>Delivered</span><span class="font-medium">{{ $o['delivered'] }}</span></div>
                 <div class="flex justify-between"><span>Cancelled</span><span class="font-medium text-amber-600">{{ $o['cancelled'] }}</span></div>
@@ -443,7 +487,7 @@
 
         <div class="card p-5">
             <h2 class="font-semibold mb-1">Dead stock</h2>
-            <p class="text-xs text-ink-700/55 mb-3">In stock, zero sales in 30 days — cash sitting still.</p>
+            <p class="text-xs text-ink-700/55 mb-3">In stock, zero sales in this period — cash sitting still.</p>
             @forelse($o['dead_stock'] as $p)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
                     <a href="{{ route('admin.products.edit', $p['id']) }}" class="truncate hover:text-gold-700">{{ $p['name'] }}</a>

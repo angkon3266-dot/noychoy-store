@@ -112,8 +112,17 @@
                                     <div class="truncate">{{ $order->customer_name }}</div>
                                     <div class="text-xs text-ink-700/50">{{ $order->customer_phone }}</div>
                                 </div>
-                                @if($wa = wa_link($order->customer_phone, $waMessage($order)))
+                                @if($tel = tel_link($order->customer_phone))
                                     {{-- stopPropagation: the row itself opens the order. --}}
+                                    <a href="{{ $tel }}" onclick="event.stopPropagation()"
+                                       class="shrink-0 grid h-7 w-7 place-items-center rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                                       title="Call {{ $order->customer_name }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2Z"/>
+                                        </svg>
+                                    </a>
+                                @endif
+                                @if($wa = wa_link($order->customer_phone, $waMessage($order)))
                                     <a href="{{ $wa }}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
                                        class="shrink-0 grid h-7 w-7 place-items-center rounded-full bg-green-100 text-green-700 hover:bg-green-200 transition"
                                        title="WhatsApp {{ $order->customer_name }}">

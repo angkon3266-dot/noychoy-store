@@ -31,19 +31,23 @@ class DashboardController extends Controller
         return back()->with('success', 'Dashboard layout saved.');
     }
 
-    public function index(\App\Services\DashboardAnalytics $analytics)
+    public function index(\App\Services\DashboardAnalytics $analytics, \Illuminate\Http\Request $request)
     {
         $today = now()->startOfDay();
-        $monthStart = now()->startOfMonth();
-        $last30 = now()->subDays(30);
+
+        // The window every time-based figure below reports on. Live queue
+        // counts (pending/processing/shipped), stock and the customer base are
+        // deliberately NOT filtered: they describe the state of the shop right
+        // now, and "0 pending" because you picked "Today" would be a lie.
+        $range = \App\Support\DateRange::fromRequest($request);
 
         // Orders that count as "real sales" (exclude cancelled / returned).
-        $sold = fn () => Order::whereNotIn('status', ['cancelled', 'returned']);
+        $sold = fn () => $range->constrain(Order::whereNotIn('status', ['cancelled', 'returned']));
 
-        $deliveredMonth = (clone $sold)()->where('status', 'delivered')->where('created_at', '>=', $monthStart)->sum('total');
-        $salesMonth = $sold()->where('created_at', '>=', $monthStart)->sum('total');
-        $orders30 = $sold()->where('created_at', '>=', $last30)->get(['total']);
-        $aov = $orders30->count() ? round($orders30->avg('total'), 0) : 0;
+        $deliveredPeriod = $sold()->where('status', 'delivered')->sum('total');
+        $salesPeriod = $sold()->sum('total');
+        $periodOrders = $sold()->get(['total']);
+        $aov = $periodOrders->count() ? round($periodOrders->avg('total'), 0) : 0;
 
         // COD delivery success across resolved shipments.
         $resolved = Order::whereIn('status', ['delivered', 'cancelled', 'returned'])->count();
@@ -54,19 +58,25 @@ class DashboardController extends Controller
         $repeatCustomers = Customer::where('total_orders', '>', 1)->count();
 
         $stats = [
+            // Orders/sales for the chosen window. Still called *_period rather
+            // than *_month now that the window is the admin's to pick.
+            'orders_period' => $sold()->count(),
+            'sales_period' => $salesPeriod,
+            'revenue_period' => $deliveredPeriod,
+            // Today's figures stay pinned to today whatever the filter says —
+            // they are the "how is it going right now" pair.
             'orders_today' => Order::whereDate('created_at', $today)->count(),
-            'sales_today' => $sold()->whereDate('created_at', $today)->sum('total'),
+            'sales_today' => Order::whereNotIn('status', ['cancelled', 'returned'])
+                ->whereDate('created_at', $today)->sum('total'),
             'pending' => Order::where('status', 'pending')->count(),
             'processing' => Order::where('status', 'processing')->count(),
             'shipped' => Order::where('status', 'shipped')->count(),
-            'sales_month' => $salesMonth,
-            'revenue_month' => $deliveredMonth,
             'aov' => $aov,
             'cod_success' => $codSuccess,
             'products' => Product::count(),
             'customers' => $totalCustomers,
             'repeat_rate' => $totalCustomers ? round($repeatCustomers / $totalCustomers * 100) : 0,
-            'new_customers_month' => Customer::where('created_at', '>=', $monthStart)->count(),
+            'new_customers_period' => $range->constrain(Customer::query())->count(),
             'low_stock' => Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)->count(),
             // Inventory on hand: units + what that stock cost (landed = cost + transport).
             'stock_units' => (int) Product::where('manage_stock', true)->where('stock_quantity', '>', 0)->sum('stock_quantity'),
@@ -75,26 +85,23 @@ class DashboardController extends Controller
                 ->value('v'),
         ];
 
-        // Last 7 days revenue (for a mini bar chart).
-        $revenueByDay = $sold()
-            ->where('created_at', '>=', now()->subDays(6)->startOfDay())
-            ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
-            ->groupBy('d')->pluck('t', 'd');
-        $daily = collect(range(6, 0))->map(function ($i) use ($revenueByDay) {
-            $date = now()->subDays($i)->toDateString();
-            return ['label' => now()->subDays($i)->format('D'), 'total' => (float) ($revenueByDay[$date] ?? 0)];
-        });
+        // Revenue over the window, as a mini bar chart. Days are grouped once
+        // the window is longer than the chart can usefully draw — see
+        // DashboardAnalytics::CHART_BUCKETS for the same treatment of visitors.
+        $daily = $this->revenueSeries($range);
         $dailyMax = max(1, $daily->max('total'));
 
-        // Top products (last 30 days, by units sold on non-cancelled orders).
+        // Top products in the window, by units sold on non-cancelled orders.
+        $inRange = fn ($q) => $range->constrain($q->whereNotIn('status', ['cancelled', 'returned']));
+
         $topProducts = OrderItem::query()
-            ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['cancelled', 'returned'])->where('created_at', '>=', $last30))
+            ->whereHas('order', $inRange)
             ->select('name', DB::raw('SUM(quantity) as qty'), DB::raw('SUM(subtotal) as revenue'))
             ->groupBy('name')->orderByDesc('qty')->take(5)->get();
 
-        // Best-selling categories (last 30 days, by units sold).
+        // Best-selling categories in the window, by units sold.
         $topCategories = OrderItem::query()
-            ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['cancelled', 'returned'])->where('created_at', '>=', $last30))
+            ->whereHas('order', $inRange)
             ->join('products', 'order_items.product_id', '=', 'products.id')
             ->join('categories', 'products.category_id', '=', 'categories.id')
             ->select('categories.name', DB::raw('SUM(order_items.quantity) as qty'), DB::raw('SUM(order_items.subtotal) as revenue'))
@@ -150,25 +157,64 @@ class DashboardController extends Controller
         $on = fn (string $panel) => in_array($panel, $panels, true);
 
         $deep = [
-            'profit' => $on('profit') ? $safe(fn () => $analytics->periodComparison(30)) : null,
-            'funnel' => $on('funnel') ? $safe(fn () => $analytics->funnel(30)) : null,
+            'profit' => $on('profit') ? $safe(fn () => $analytics->periodComparison($range)) : null,
+            'funnel' => $on('funnel') ? $safe(fn () => $analytics->funnel($range)) : null,
             // collect(), not null: the funnel panel @foreaches this directly.
-            'visitorsByDay' => $on('funnel') ? $safe(fn () => $analytics->visitorsByDay(14), collect()) : null,
-            'sources' => $on('funnel') ? $safe(fn () => $analytics->trafficSources(30), collect()) : null,
-            'campaigns' => $on('funnel') ? $safe(fn () => $analytics->topCampaigns(30), collect()) : collect(),
-            'viewedNotSold' => $on('funnel') ? $safe(fn () => $analytics->viewedNotSold(30), collect()) : null,
-            'retention' => $on('retention') ? $safe(fn () => $analytics->retention(90)) : null,
-            'operations' => $on('operations') ? $safe(fn () => $analytics->operations(30)) : null,
+            'visitorsByDay' => $on('funnel') ? $safe(fn () => $analytics->visitorsByDay($range), collect()) : null,
+            'sources' => $on('funnel') ? $safe(fn () => $analytics->trafficSources($range), collect()) : null,
+            'campaigns' => $on('funnel') ? $safe(fn () => $analytics->topCampaigns($range), collect()) : collect(),
+            'viewedNotSold' => $on('funnel') ? $safe(fn () => $analytics->viewedNotSold($range), collect()) : null,
+            'retention' => $on('retention') ? $safe(fn () => $analytics->retention($range)) : null,
+            'operations' => $on('operations') ? $safe(fn () => $analytics->operations($range)) : null,
         ];
 
-        // Total (all-time) unique visitors — the headline traffic number.
+        // Unique visitors: all-time as the headline, plus the chosen window.
         $stats['visitors_total'] = (int) $safe(fn () => \App\Models\Visit::distinct()->count('visitor_token'), 0);
         $stats['visitors_today'] = (int) $safe(fn () => \App\Models\Visit::whereDate('created_at', $today)->distinct()->count('visitor_token'), 0);
+        $stats['visitors_period'] = (int) $safe(fn () => $range->constrain(\App\Models\Visit::query())->distinct()->count('visitor_token'), 0);
 
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
             'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability',
-            'unreadMessages', 'recentMessages', 'deep', 'panels'
+            'unreadMessages', 'recentMessages', 'deep', 'panels', 'range'
         ));
+    }
+
+    /**
+     * Revenue per bucket across the window, for the mini bar chart.
+     *
+     * Unlike visitor counts, revenue sums cleanly across grouped days, so a
+     * long window loses no accuracy from bucketing — only resolution.
+     *
+     * @return \Illuminate\Support\Collection<int,array{label:string,total:float}>
+     */
+    protected function revenueSeries(\App\Support\DateRange $range): \Illuminate\Support\Collection
+    {
+        $byDay = $range->constrain(Order::whereNotIn('status', ['cancelled', 'returned']))
+            ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
+            ->groupBy('d')->pluck('t', 'd');
+
+        $start = $range->start ?? \Illuminate\Support\Carbon::parse(
+            Order::min('created_at') ?: now()
+        )->startOfDay();
+        $end = $range->end ?? now()->endOfDay();
+
+        $days = max(1, (int) $start->diffInDays($end) + 1);
+        $buckets = (int) max(1, ceil($days / 30));   // at most 30 bars
+
+        return collect(range(0, $days - 1))
+            ->chunk($buckets)
+            ->map(function ($chunk) use ($start, $byDay, $buckets) {
+                $first = $start->copy()->addDays($chunk->first());
+
+                return [
+                    // One day per bar keeps the weekday initial the chart used
+                    // to show; grouped bars need the date to stay readable.
+                    'label' => $buckets === 1 ? $first->format('D') : $first->format('j M'),
+                    'total' => (float) $chunk->sum(
+                        fn ($i) => (float) ($byDay[$start->copy()->addDays($i)->toDateString()] ?? 0)
+                    ),
+                ];
+            })->values();
     }
 }

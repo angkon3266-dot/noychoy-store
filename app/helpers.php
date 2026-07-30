@@ -341,6 +341,22 @@ if (! function_exists('wa_phone')) {
     }
 }
 
+if (! function_exists('tel_link')) {
+    /**
+     * A tel: link for a customer.
+     *
+     * Uses the full international form with a leading + so the number dials
+     * correctly from a desktop softphone or a phone roaming abroad, where a
+     * local 01… number has no country to belong to.
+     */
+    function tel_link(?string $phone): ?string
+    {
+        $to = wa_phone($phone);
+
+        return $to === '' ? null : 'tel:+'.$to;
+    }
+}
+
 if (! function_exists('wa_link')) {
     /** A wa.me link for a customer, optionally pre-filling the first message. */
     function wa_link(?string $phone, ?string $message = null): ?string

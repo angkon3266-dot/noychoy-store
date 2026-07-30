@@ -15,6 +15,17 @@
             '{total}' => money($order->total),
         ]));
     @endphp
+    <div class="flex items-center gap-2">
+    @if($telHref = tel_link($order->customer_phone))
+        <a href="{{ $telHref }}"
+           class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition"
+           title="{{ $order->customer_phone }}">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2Z"/>
+            </svg>
+            Call
+        </a>
+    @endif
     @if($waHref)
         <a href="{{ $waHref }}" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 transition">
@@ -24,6 +35,7 @@
             WhatsApp {{ \Illuminate\Support\Str::before($order->customer_name, ' ') ?: 'customer' }}
         </a>
     @endif
+    </div>
 </div>
 
 {{-- Where this customer came from — first touch found them, last touch closed. --}}

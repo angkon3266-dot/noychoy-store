@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Visit;
+use App\Support\DateRange;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -100,15 +101,14 @@ class DashboardAnalytics
      *
      * @return array{revenue:float,cost:float,profit:float,margin:?float,items:int,orders:int}
      */
-    public function profit(Carbon $from, ?Carbon $to = null): array
+    public function profit(DateRange $range): array
     {
-        $to ??= now();
-
-        $row = OrderItem::query()
+        $query = OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->whereNull('orders.deleted_at')
-            ->whereNotIn('orders.status', ['cancelled', 'returned'])
-            ->whereBetween('orders.created_at', [$from, $to])
+            ->whereNotIn('orders.status', ['cancelled', 'returned']);
+
+        $row = $range->constrain($query, 'orders.created_at')
             ->selectRaw('COALESCE(SUM(order_items.subtotal), 0) as revenue')
             ->selectRaw('COALESCE(SUM((COALESCE(order_items.cost_price,0) + COALESCE(order_items.transport_cost,0)) * order_items.quantity), 0) as cost')
             ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as items')
@@ -134,28 +134,29 @@ class DashboardAnalytics
      *
      * @return array{current:array,previous:array,revenue_change:?float,profit_change:?float,aov:float,items_per_order:float}
      */
-    public function periodComparison(int $days = 30): array
+    public function periodComparison(DateRange $range): array
     {
-        return $this->remember("cmp.$days", function () use ($days) {
-            $now = now();
-            $curFrom = $now->copy()->subDays($days);
-            $prevFrom = $now->copy()->subDays($days * 2);
+        return $this->remember('cmp.'.$range->cacheKey(), function () use ($range) {
+            $previous = $range->previous();
 
-            $cur = $this->profit($curFrom, $now);
-            $prev = $this->profit($prevFrom, $curFrom);
+            $cur = $this->profit($range);
+            $prev = $previous ? $this->profit($previous) : null;
 
             $pct = fn ($a, $b) => $b > 0 ? round(($a - $b) / $b * 100, 1) : ($a > 0 ? null : 0.0);
 
             return [
                 'current' => $cur,
                 'previous' => $prev,
-                'revenue_change' => $pct($cur['revenue'], $prev['revenue']),
-                'profit_change' => $pct($cur['profit'], $prev['profit']),
+                // Null rather than 0 when there is nothing to compare against —
+                // "Maximum" has no earlier period, and 0% would read as "flat"
+                // when the honest answer is "not applicable".
+                'revenue_change' => $prev ? $pct($cur['revenue'], $prev['revenue']) : null,
+                'profit_change' => $prev ? $pct($cur['profit'], $prev['profit']) : null,
                 'aov' => $cur['orders'] ? round($cur['revenue'] / $cur['orders']) : 0,
                 'items_per_order' => $cur['orders'] ? round($cur['items'] / $cur['orders'], 1) : 0,
-                'discount_given' => (float) $this->sold()->where('created_at', '>=', $curFrom)->sum('discount'),
+                'discount_given' => (float) $range->constrain($this->sold())->sum('discount'),
             ];
-        });
+        }, $range->cacheSeconds());
     }
 
     // ── 2. Traffic & conversion funnel ──────────────────────────────────────
@@ -166,12 +167,10 @@ class DashboardAnalytics
      *
      * @return array{steps:array<int,array{label:string,value:int,pct:?float}>,visitors:int,conversion:?float,tracking:bool}
      */
-    public function funnel(int $days = 30): array
+    public function funnel(DateRange $range): array
     {
-        return $this->remember("funnel.$days", function () use ($days) {
-            $from = now()->subDays($days);
-
-            $distinct = fn (?string $event = null) => Visit::where('created_at', '>=', $from)
+        return $this->remember('funnel.'.$range->cacheKey(), function () use ($range) {
+            $distinct = fn (?string $event = null) => $range->constrain(Visit::query())
                 ->when($event, fn ($q) => $q->where('event', $event))
                 ->distinct()->count('visitor_token');
 
@@ -179,13 +178,13 @@ class DashboardAnalytics
             $viewed = $distinct('product');
             $carted = $distinct('cart_add');
             $checkout = $distinct('checkout_start');
-            $orders = (int) $this->sold()->where('created_at', '>=', $from)->count();
+            $orders = (int) $range->constrain($this->sold())->count();
 
             $pct = fn ($v) => $visitors > 0 ? round($v / $visitors * 100, 1) : null;
 
             return [
                 'visitors' => $visitors,
-                'tracking' => Visit::where('created_at', '>=', $from)->exists(),
+                'tracking' => $range->constrain(Visit::query())->exists(),
                 'conversion' => $visitors > 0 ? round($orders / $visitors * 100, 2) : null,
                 'steps' => [
                     ['label' => 'Visitors', 'value' => $visitors, 'pct' => $visitors ? 100.0 : null],
@@ -195,23 +194,57 @@ class DashboardAnalytics
                     ['label' => 'Ordered', 'value' => $orders, 'pct' => $pct($orders)],
                 ],
             ];
-        });
+        }, $range->cacheSeconds());
     }
 
-    /** Visitors per day for the last N days (mini chart). */
-    public function visitorsByDay(int $days = 14): \Illuminate\Support\Collection
+    /** Most bars the visitors chart will draw before it starts grouping days. */
+    protected const CHART_BUCKETS = 60;
+
+    /**
+     * Visitors over the window, as a small bar chart.
+     *
+     * Days are grouped once the window is longer than the chart can show —
+     * "Maximum" on a store with two years of data would otherwise be 700
+     * one-pixel bars. Grouping sums each day's distinct visitors, so a bucket
+     * counts someone twice if they returned on two different days within it;
+     * that is fine for a shape-of-traffic chart and wrong for a headline
+     * figure, which is why the unique total is counted separately.
+     */
+    public function visitorsByDay(DateRange $range): \Illuminate\Support\Collection
     {
         // Cached as a plain array, hydrated on the way out (see remember()).
-        return collect($this->remember("visitors.$days", function () use ($days) {
-            $rows = Visit::where('created_at', '>=', now()->subDays($days - 1)->startOfDay())
+        return collect($this->remember('visitors.'.$range->cacheKey(), function () use ($range) {
+            $rows = $range->constrain(Visit::query())
                 ->selectRaw('DATE(created_at) as d, COUNT(DISTINCT visitor_token) as c')
                 ->groupBy('d')->pluck('c', 'd');
 
-            return collect(range($days - 1, 0))->map(fn ($i) => [
-                'label' => now()->subDays($i)->format('d M'),
-                'value' => (int) ($rows[now()->subDays($i)->toDateString()] ?? 0),
-            ])->all();
-        }));
+            $start = $range->start
+                ?? Carbon::parse(Visit::min('created_at') ?: now())->startOfDay();
+            $end = $range->end ?? now()->endOfDay();
+
+            $days = max(1, (int) $start->diffInDays($end) + 1);
+            $perBucket = (int) max(1, ceil($days / self::CHART_BUCKETS));
+
+            $out = [];
+            for ($i = 0; $i < $days; $i += $perBucket) {
+                $bucketStart = $start->copy()->addDays($i);
+                $bucketEnd = min($days - 1, $i + $perBucket - 1);
+
+                $value = 0;
+                for ($d = $i; $d <= $bucketEnd; $d++) {
+                    $value += (int) ($rows[$start->copy()->addDays($d)->toDateString()] ?? 0);
+                }
+
+                $out[] = [
+                    'label' => $perBucket === 1
+                        ? $bucketStart->format('d M')
+                        : $bucketStart->format('d M').'–'.$start->copy()->addDays($bucketEnd)->format('d M'),
+                    'value' => $value,
+                ];
+            }
+
+            return $out;
+        }, $range->cacheSeconds()));
     }
 
     /**
@@ -221,16 +254,14 @@ class DashboardAnalytics
      *
      * @return \Illuminate\Support\Collection<int, array{channel:string,label:string,visitors:int,orders:int,revenue:float,rate:?float}>
      */
-    public function trafficSources(int $days = 30, int $limit = 8): \Illuminate\Support\Collection
+    public function trafficSources(DateRange $range, int $limit = 8): \Illuminate\Support\Collection
     {
-        return collect($this->remember("src.$days.$limit", function () use ($days, $limit) {
-            $from = now()->subDays($days);
-
-            $visitors = Visit::where('created_at', '>=', $from)
+        return collect($this->remember('src.'.$range->cacheKey().'.'.$limit, function () use ($range, $limit) {
+            $visitors = $range->constrain(Visit::query())
                 ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, COUNT(DISTINCT visitor_token) as c")
                 ->groupBy('channel')->pluck('c', 'channel');
 
-            $sales = $this->sold()->where('created_at', '>=', $from)
+            $sales = $range->constrain($this->sold())
                 ->selectRaw("COALESCE(NULLIF(source_channel, ''), 'direct') as channel, COUNT(*) as orders, SUM(total) as revenue")
                 ->groupBy('channel')->get()->keyBy('channel');
 
@@ -252,7 +283,7 @@ class DashboardAnalytics
                 })
                 ->sortByDesc(fn ($r) => [$r['revenue'], $r['visitors']])
                 ->take($limit)->values()->all();
-        }));
+        }, $range->cacheSeconds()));
     }
 
     /**
@@ -261,12 +292,11 @@ class DashboardAnalytics
      *
      * @return \Illuminate\Support\Collection<int, object>
      */
-    public function topCampaigns(int $days = 30, int $limit = 6): \Illuminate\Support\Collection
+    public function topCampaigns(DateRange $range, int $limit = 6): \Illuminate\Support\Collection
     {
         // ->get() yields stdClass rows, which the cache cannot restore — map to
         // plain arrays before storing.
-        return collect($this->remember("camp.$days", fn () => $this->sold()
-            ->where('created_at', '>=', now()->subDays($days))
+        return collect($this->remember('camp.'.$range->cacheKey(), fn () => $range->constrain($this->sold())
             ->whereNotNull('source_campaign')->where('source_campaign', '!=', '')
             ->selectRaw('source_campaign, source_channel, COUNT(*) as orders, SUM(total) as revenue')
             ->groupBy('source_campaign', 'source_channel')
@@ -276,23 +306,23 @@ class DashboardAnalytics
                 'source_channel' => (string) $r->source_channel,
                 'orders' => (int) $r->orders,
                 'revenue' => (float) $r->revenue,
-            ])->all()));
+            ])->all(), $range->cacheSeconds()));
     }
 
     /**
      * Products getting attention but not selling — the highest-leverage fix
      * list (better photos, price, or copy).
      */
-    public function viewedNotSold(int $days = 30, int $limit = 6): \Illuminate\Support\Collection
+    public function viewedNotSold(DateRange $range, int $limit = 6): \Illuminate\Support\Collection
     {
-        return collect($this->remember("vns.$days", function () use ($days, $limit) {
-            $from = now()->subDays($days);
-
-            $sold = OrderItem::query()
-                ->join('orders', 'orders.id', '=', 'order_items.order_id')
-                ->whereNull('orders.deleted_at')
-                ->whereNotIn('orders.status', ['cancelled', 'returned'])
-                ->where('orders.created_at', '>=', $from)
+        return collect($this->remember('vns.'.$range->cacheKey(), function () use ($range, $limit) {
+            $sold = $range->constrain(
+                OrderItem::query()
+                    ->join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->whereNull('orders.deleted_at')
+                    ->whereNotIn('orders.status', ['cancelled', 'returned']),
+                'orders.created_at',
+            )
                 ->whereNotNull('order_items.product_id')
                 ->groupBy('order_items.product_id')
                 // Alias the aggregate: pluck() can't read a raw expression off
@@ -300,7 +330,7 @@ class DashboardAnalytics
                 ->selectRaw('order_items.product_id, SUM(order_items.quantity) as qty')
                 ->pluck('qty', 'product_id');
 
-            $views = Visit::where('event', 'product')->where('created_at', '>=', $from)
+            $views = $range->constrain(Visit::where('event', 'product'))
                 ->whereNotNull('product_id')
                 ->selectRaw('product_id, COUNT(*) as v')
                 ->groupBy('product_id')->orderByDesc('v')->take(40)->pluck('v', 'product_id');
@@ -319,7 +349,7 @@ class DashboardAnalytics
                 'sold' => (int) ($sold[$id] ?? 0),
             ])->filter(fn ($r) => $r['name'] !== '' && $r['sold'] === 0)
                 ->sortByDesc('views')->take($limit)->values()->all();
-        }));
+        }, $range->cacheSeconds()));
     }
 
     // ── 3. Customer & retention ─────────────────────────────────────────────
@@ -328,13 +358,14 @@ class DashboardAnalytics
      * @return array{new_revenue:float,repeat_revenue:float,repeat_share:?float,clv:float,
      *               repeat_customers:int,one_time:int,avg_days_to_second:?float,at_risk:int}
      */
-    public function retention(int $days = 90): array
+    public function retention(DateRange $range): array
     {
-        return $this->remember("ret.$days", function () use ($days) {
-            $from = now()->subDays($days);
-
-            // An order is "repeat" when that customer had an earlier order.
-            $orders = $this->sold()->where('created_at', '>=', $from)
+        return $this->remember('ret.'.$range->cacheKey(), function () use ($range) {
+            // Only the new-vs-repeat revenue split is windowed. Lifetime value,
+            // repeat counts and the at-risk list are properties of the customer
+            // base rather than of a period, so they stay global whatever the
+            // dashboard filter says.
+            $orders = $range->constrain($this->sold())
                 ->whereNotNull('customer_id')
                 ->get(['customer_id', 'total', 'created_at']);
 
@@ -380,7 +411,7 @@ class DashboardAnalytics
                 'avg_days_to_second' => $avgDays,
                 'at_risk' => $atRisk,
             ];
-        });
+        }, $range->cacheSeconds());
     }
 
     // ── 4. Operations & inventory ───────────────────────────────────────────
@@ -389,14 +420,14 @@ class DashboardAnalytics
      * @return array{cod_success:?float,cancelled:int,returned:int,delivered:int,
      *               pending_aging:array,dead_stock:\Illuminate\Support\Collection,stock_cover:\Illuminate\Support\Collection}
      */
-    public function operations(int $days = 30): array
+    public function operations(DateRange $range): array
     {
-        return $this->remember("ops.$days", function () use ($days) {
-            $from = now()->subDays($days);
+        return $this->remember('ops.'.$range->cacheKey(), function () use ($range) {
+            $counted = fn (string $status) => $range->constrain(Order::where('status', $status))->count();
 
-            $delivered = Order::where('status', 'delivered')->where('created_at', '>=', $from)->count();
-            $cancelled = Order::where('status', 'cancelled')->where('created_at', '>=', $from)->count();
-            $returned = Order::where('status', 'returned')->where('created_at', '>=', $from)->count();
+            $delivered = $counted('delivered');
+            $cancelled = $counted('cancelled');
+            $returned = $counted('returned');
             $resolved = $delivered + $cancelled + $returned;
 
             // How long unfulfilled orders have been sitting.
@@ -408,11 +439,13 @@ class DashboardAnalytics
             ];
 
             // Units sold per product in the window → days of stock remaining.
-            $velocity = OrderItem::query()
-                ->join('orders', 'orders.id', '=', 'order_items.order_id')
-                ->whereNull('orders.deleted_at')
-                ->whereNotIn('orders.status', ['cancelled', 'returned'])
-                ->where('orders.created_at', '>=', $from)
+            $velocity = $range->constrain(
+                OrderItem::query()
+                    ->join('orders', 'orders.id', '=', 'order_items.order_id')
+                    ->whereNull('orders.deleted_at')
+                    ->whereNotIn('orders.status', ['cancelled', 'returned']),
+                'orders.created_at',
+            )
                 ->whereNotNull('order_items.product_id')
                 ->groupBy('order_items.product_id')
                 // Alias the aggregate: pluck() can't read a raw expression off
@@ -423,9 +456,16 @@ class DashboardAnalytics
             $stocked = Product::where('manage_stock', true)->where('stock_quantity', '>', 0)
                 ->get(['id', 'name', 'slug', 'stock_quantity']);
 
-            $cover = $stocked->map(function ($p) use ($velocity, $days) {
+            // "Days left" needs a per-day rate, so an unbounded window has to
+            // measure itself: fall back to the age of the oldest order rather
+            // than dividing by a made-up number.
+            $spanDays = $range->days() ?? max(1, (int) Carbon::parse(
+                Order::min('created_at') ?: now()
+            )->diffInDays(now()) + 1);
+
+            $cover = $stocked->map(function ($p) use ($velocity, $spanDays) {
                 $sold = (float) ($velocity[$p->id] ?? 0);
-                $perDay = $sold / max(1, $days);
+                $perDay = $sold / max(1, $spanDays);
 
                 // Scalars only — Product models cannot survive this cache.
                 return [
