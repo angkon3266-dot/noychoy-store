@@ -52,6 +52,57 @@ class Order extends Model
         $this->attributes['customer_phone'] = blank($value) ? null : bd_phone((string) $value);
     }
 
+    // ── Courier-driven status ───────────────────────────────────────────────
+
+    /**
+     * The order status a courier outcome forces, or null if it forces nothing.
+     *
+     * The courier is the source of truth for what physically happened, so once
+     * it reports a settled outcome the order follows it automatically.
+     *
+     * Order of checks matters. Steadfast's `partial_delivered` contains *both*
+     * "partial" and "delivered": the rider handed over some items and brought
+     * the rest back. For the shop that is a partial cancellation someone has to
+     * deal with, so it maps to `cancelled` and stays editable — unlike a clean
+     * delivery, which is final.
+     *
+     * `*_approval_pending` states are deliberately ignored: the rider has
+     * proposed an outcome but the courier hasn't settled it, so acting on them
+     * would lock an order that can still change.
+     */
+    public static function statusForCourierStatus(?string $raw): ?string
+    {
+        $s = strtolower(trim((string) $raw));
+
+        if ($s === '' || str_ends_with($s, 'approval_pending')) {
+            return null;
+        }
+
+        return match (true) {
+            str_contains($s, 'cancel') => 'cancelled',
+            str_contains($s, 'partial') => 'cancelled',
+            str_contains($s, 'delivered') => 'delivered',
+            default => null,
+        };
+    }
+
+    /**
+     * True once the courier has confirmed a clean delivery. The money is
+     * collected and the goods are gone, so the status is final and the admin
+     * dropdown is locked. A cancellation is NOT locked — the shop still has to
+     * decide whether to re-ship, refund or write it off.
+     */
+    public function isStatusLocked(): bool
+    {
+        return static::statusForCourierStatus($this->shipment?->status) === 'delivered';
+    }
+
+    /** Raw courier status for display, e.g. "partial_delivered". */
+    public function courierStatus(): ?string
+    {
+        return $this->shipment?->status;
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

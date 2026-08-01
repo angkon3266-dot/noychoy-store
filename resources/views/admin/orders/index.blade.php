@@ -88,7 +88,8 @@
                     <th class="px-3 py-3 w-8"><input type="checkbox" :checked="allChecked" @change="toggleAll($event)"></th>
                     <th class="px-4 py-3">Order</th><th class="px-4 py-3">Customer</th>
                     <th class="px-4 py-3">Source</th><th class="px-4 py-3">Items</th>
-                    <th class="px-4 py-3">Total</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Date</th>
+                    <th class="px-4 py-3">Total</th><th class="px-4 py-3">Courier</th>
+                    <th class="px-4 py-3">Status</th><th class="px-4 py-3">Date</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-ink-100">
@@ -96,6 +97,18 @@
                     @php
                         $repeat = ($orderCounts[$order->customer_phone] ?? 1) > 1;
                         $booked = $order->shipment && $order->shipment->consignment_id;
+                        // Read off the stored shipment row (already eager-loaded) —
+                        // never the live API, or a page of 20 orders would fire 20
+                        // courier calls. The webhook and Refresh keep it current.
+                        $courierRaw = $order->courierStatus();
+                        [$courierLabel, , $courierTone] = \App\Services\SteadfastService::describeStatus($courierRaw);
+                        $locked = $order->isStatusLocked();
+                        $courierTones = [
+                            'green' => 'bg-green-100 text-green-700',
+                            'amber' => 'bg-amber-100 text-amber-700',
+                            'red' => 'bg-red-100 text-red-700',
+                            'gold' => 'bg-gold-100 text-gold-700',
+                        ];
                     @endphp
                     <tr class="{{ $trashed ? 'opacity-70' : 'cursor-pointer' }} {{ $repeat ? 'bg-violet-50 hover:bg-violet-100' : 'hover:bg-ink-50' }}" @unless($trashed) onclick="window.location='{{ route('admin.orders.show', $order) }}'" @endunless>
                         <td class="px-3 py-3" onclick="event.stopPropagation()">
@@ -145,6 +158,16 @@
                         </td>
                         <td class="px-4 py-3">{{ $order->items_count }}</td>
                         <td class="px-4 py-3">{{ money($order->total) }}</td>
+                        <td class="px-4 py-3">
+                            @if(filled($courierRaw))
+                                <span class="badge {{ $courierTones[$courierTone] ?? 'bg-ink-100 text-ink-700' }} text-[10px] whitespace-nowrap"
+                                      title="Steadfast: {{ $courierRaw }}">{{ $courierLabel }}</span>
+                            @elseif($booked)
+                                <span class="text-xs text-ink-700/35" title="Booked, no status yet">Booked</span>
+                            @else
+                                <span class="text-xs text-ink-700/35">—</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3" onclick="event.stopPropagation()">
                             @if($trashed)
                                 <div class="flex items-center gap-3">
@@ -152,21 +175,31 @@
                                     <form action="{{ route('admin.orders.force-delete', $order) }}" method="POST" onsubmit="return confirm('Permanently delete order {{ $order->order_number }}? This cannot be undone.')">@csrf @method('DELETE')<button class="text-xs text-red-700 hover:underline">Delete forever</button></form>
                                 </div>
                             @else
-                                <form action="{{ route('admin.orders.status', $order) }}" method="POST">
-                                    @csrf
-                                    <select name="status" onchange="this.form.submit()"
-                                            class="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs capitalize">
-                                        @foreach($statuses as $key => $label)
-                                            <option value="{{ $key }}" @selected($order->status==$key)>{{ $label }}</option>
-                                        @endforeach
+                                @if($locked)
+                                    {{-- Courier confirmed delivery: goods gone, COD collected, status final. --}}
+                                    <select disabled
+                                            class="rounded-md border border-ink-200 bg-ink-100 px-2 py-1 text-xs capitalize text-ink-700/60 cursor-not-allowed"
+                                            title="Locked — the courier confirmed delivery.">
+                                        <option>{{ $statuses[$order->status] ?? $order->status }}</option>
                                     </select>
-                                </form>
+                                    <div class="text-[10px] text-ink-700/40 mt-0.5">🔒 confirmed by courier</div>
+                                @else
+                                    <form action="{{ route('admin.orders.status', $order) }}" method="POST">
+                                        @csrf
+                                        <select name="status" onchange="this.form.submit()"
+                                                class="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs capitalize">
+                                            @foreach($statuses as $key => $label)
+                                                <option value="{{ $key }}" @selected($order->status==$key)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                    </form>
+                                @endif
                             @endif
                         </td>
                         <td class="px-4 py-3 text-ink-700/60">{{ $order->created_at->format('d M, g:i a') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="px-4 py-10 text-center text-ink-700/50">No orders found.</td></tr>
+                    <tr><td colspan="9" class="px-4 py-10 text-center text-ink-700/50">No orders found.</td></tr>
                 @endforelse
             </tbody>
         </table>

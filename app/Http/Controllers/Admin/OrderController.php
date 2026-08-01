@@ -80,6 +80,12 @@ class OrderController extends Controller
                 if (! empty($status['delivery_status'])) {
                     $order->shipment->update(['status' => $status['delivery_status'], 'response' => $status]);
                     $order->setRelation('shipment', $order->shipment->fresh());
+
+                    // A settled courier outcome moves the order with it.
+                    if (app(TransitionOrderStatus::class)
+                        ->applyCourierStatus($order, $status['delivery_status'], 'Courier sync')) {
+                        $order->refresh()->load('items', 'history', 'shipment', 'customer');
+                    }
                 }
             } catch (\Throwable $e) {
                 // keep last known status
@@ -337,6 +343,14 @@ class OrderController extends Controller
             'notify' => ['nullable', 'boolean'],
         ]);
 
+        // The courier confirmed delivery: the goods are gone and the COD is
+        // collected, so the status is final. The dropdown is disabled in the UI,
+        // but enforce it here too — a disabled <select> stops nobody.
+        if ($order->load('shipment')->isStatusLocked() && $data['status'] !== $order->status) {
+            return back()->with('error',
+                'This order is locked: the courier has confirmed delivery. Its status can no longer be changed.');
+        }
+
         // Stock release/re-reserve, loyalty award, history and web push all live
         // in the shared action, so the Steadfast webhook applies exactly the same
         // effects when the courier moves an order.
@@ -519,10 +533,18 @@ class OrderController extends Controller
         }
 
         $status = $steadfast->statusByConsignmentId($order->shipment->consignment_id);
+        $raw = $status['delivery_status'] ?? null;
+
         $order->shipment->update([
-            'status' => $status['delivery_status'] ?? $order->shipment->status,
+            'status' => $raw ?? $order->shipment->status,
             'response' => $status,
         ]);
+        $order->setRelation('shipment', $order->shipment->fresh());
+
+        // A settled courier outcome moves the order with it.
+        if (app(TransitionOrderStatus::class)->applyCourierStatus($order, $raw, 'Courier sync')) {
+            return back()->with('success', 'Delivery status refreshed — order marked '.$order->fresh()->status.'.');
+        }
 
         return back()->with('success', 'Delivery status refreshed.');
     }

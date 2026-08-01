@@ -62,6 +62,37 @@ class TransitionOrderStatus
     }
 
     /**
+     * Follow the courier's verdict.
+     *
+     * The courier knows what physically happened, so a settled outcome moves the
+     * order by itself — a clean delivery to `delivered` (final, locked), a
+     * cancellation or partial delivery to `cancelled` (still editable, because
+     * the shop has to decide what to do about it).
+     *
+     * Called from all three places the courier status can arrive: the Steadfast
+     * webhook, the "Refresh status" button, and the best-effort refresh when an
+     * admin opens the order. Idempotent — a repeat of the same verdict is a
+     * no-op.
+     *
+     * @return bool True if the order's status actually moved.
+     */
+    public function applyCourierStatus(Order $order, ?string $rawCourierStatus, string $by = 'Courier'): bool
+    {
+        $target = Order::statusForCourierStatus($rawCourierStatus);
+
+        if ($target === null || $order->status === $target) {
+            return false;
+        }
+
+        return $this->handle(
+            $order,
+            $target,
+            'Courier reported: '.$rawCourierStatus,
+            $by,
+        );
+    }
+
+    /**
      * Release stock back to inventory when an order enters "cancelled", and
      * re-deduct it if it is moved back out. The stock_restored flag makes both
      * directions idempotent.

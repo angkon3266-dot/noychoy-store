@@ -59,31 +59,32 @@ class SteadfastWebhookController extends Controller
             $shipment->update(['status' => $deliveryStatus ?: $shipment->status, 'response' => $payload]);
         }
 
-        // Map Steadfast delivery status -> store order status.
-        $map = [
-            'delivered' => 'delivered',
-            'partial_delivered' => 'delivered',
-            'cancelled' => 'cancelled',
-            'hold' => 'processing',
-            'in_review' => 'shipped',
-            'pending' => 'shipped',
-        ];
-        $newStatus = $map[$deliveryStatus] ?? null;
+        // Settled courier outcomes (delivered / cancelled / partial) move the
+        // order by themselves — see Order::statusForCourierStatus(). In-flight
+        // states just track progress and never force a final status.
+        $moved = app(TransitionOrderStatus::class)
+            ->applyCourierStatus($order, $deliveryStatus, 'Steadfast webhook');
 
-        if ($newStatus && $order->status !== $newStatus) {
-            // Go through the shared action, not a bare status write: a courier
-            // cancellation has to return its stock to inventory and a courier
-            // delivery has to award loyalty points, exactly as the admin panel
-            // does. Writing `status` directly here silently skipped both.
-            app(TransitionOrderStatus::class)->handle(
-                $order, $newStatus, "Steadfast update: {$deliveryStatus}", 'Steadfast webhook',
-            );
+        if (! $moved) {
+            $progress = match ($deliveryStatus) {
+                'hold' => 'processing',
+                'in_review', 'pending' => 'shipped',
+                default => null,
+            };
+            if ($progress && $order->status !== $progress) {
+                app(TransitionOrderStatus::class)->handle(
+                    $order, $progress, "Steadfast update: {$deliveryStatus}", 'Steadfast webhook',
+                );
+            }
+        }
 
-            // Notify customer on delivery / cancellation.
-            if ($newStatus === 'delivered') {
-                $sms->sendTemplate('order_delivered', $order->fresh());
-            } elseif ($newStatus === 'cancelled') {
-                $sms->sendTemplate('order_cancelled', $order->fresh());
+        // Notify the customer once the outcome is settled.
+        if ($moved) {
+            $final = $order->fresh();
+            if ($final->status === 'delivered') {
+                $sms->sendTemplate('order_delivered', $final);
+            } elseif ($final->status === 'cancelled') {
+                $sms->sendTemplate('order_cancelled', $final);
             }
         }
 

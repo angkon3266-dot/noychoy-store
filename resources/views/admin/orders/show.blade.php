@@ -263,15 +263,32 @@
         <!-- Update status -->
         <div class="card p-5">
             <h2 class="font-semibold mb-3">Update status</h2>
-            <form action="{{ route('admin.orders.status', $order) }}" method="POST" class="space-y-3">
-                @csrf
-                <select name="status" class="input">
-                    @foreach($statuses as $key => $label)<option value="{{ $key }}" @selected($order->status==$key)>{{ $label }}</option>@endforeach
-                </select>
-                <input name="note" placeholder="Note (optional)" class="input">
-                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify" value="1"> Send SMS to customer</label>
-                <button class="btn-dark w-full">Update</button>
-            </form>
+            @if($order->isStatusLocked())
+                {{-- Courier confirmed delivery: goods handed over, COD collected. --}}
+                <div class="rounded-lg border border-green-200 bg-green-50 px-3 py-3 text-sm">
+                    <p class="font-medium text-green-800">🔒 Delivered — status locked</p>
+                    <p class="mt-1 text-green-900/70 text-xs">
+                        Steadfast has confirmed this order was delivered, so its status is final
+                        and can no longer be changed.
+                    </p>
+                </div>
+            @else
+                <form action="{{ route('admin.orders.status', $order) }}" method="POST" class="space-y-3">
+                    @csrf
+                    <select name="status" class="input">
+                        @foreach($statuses as $key => $label)<option value="{{ $key }}" @selected($order->status==$key)>{{ $label }}</option>@endforeach
+                    </select>
+                    <input name="note" placeholder="Note (optional)" class="input">
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify" value="1"> Send SMS to customer</label>
+                    <button class="btn-dark w-full">Update</button>
+                </form>
+                @if(\App\Models\Order::statusForCourierStatus($order->courierStatus()) === 'cancelled')
+                    <p class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                        The courier reported <strong>{{ str_replace('_', ' ', $order->courierStatus()) }}</strong>,
+                        so this order was set to Cancelled automatically. You can still change it.
+                    </p>
+                @endif
+            @endif
         </div>
 
         <!-- Steadfast -->
