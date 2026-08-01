@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\TransitionOrderStatus;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Shipment;
@@ -70,12 +71,13 @@ class SteadfastWebhookController extends Controller
         $newStatus = $map[$deliveryStatus] ?? null;
 
         if ($newStatus && $order->status !== $newStatus) {
-            $order->update(['status' => $newStatus]);
-            $order->history()->create([
-                'status' => $newStatus,
-                'note' => "Steadfast update: {$deliveryStatus}",
-                'created_by' => 'Steadfast webhook',
-            ]);
+            // Go through the shared action, not a bare status write: a courier
+            // cancellation has to return its stock to inventory and a courier
+            // delivery has to award loyalty points, exactly as the admin panel
+            // does. Writing `status` directly here silently skipped both.
+            app(TransitionOrderStatus::class)->handle(
+                $order, $newStatus, "Steadfast update: {$deliveryStatus}", 'Steadfast webhook',
+            );
 
             // Notify customer on delivery / cancellation.
             if ($newStatus === 'delivered') {

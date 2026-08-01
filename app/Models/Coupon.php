@@ -67,18 +67,27 @@ class Coupon extends Model
         return true;
     }
 
-    /** Discount amount for the current subtotal / cart (excludes free shipping). */
+    /**
+     * Discount amount for the current subtotal / cart (excludes free shipping).
+     *
+     * $subtotal is the caller's remaining discountable base — what is still left
+     * to discount after quantity offers, auto offers, member and personalised
+     * discounts. The coupon's own scope narrows that further, but it can never
+     * widen it: taking a percentage of the raw eligible subtotal meant a 20%
+     * coupon stacked on a 20% offer took 20% of the ORIGINAL price, and enough
+     * stacked discounts drove the order total below zero.
+     */
     public function discountFor(float $subtotal, $cart = null): float
     {
         $base = $cart instanceof CartService
-            ? (float) $this->eligibleSubtotal($cart)
+            ? min((float) $this->eligibleSubtotal($cart), max(0, $subtotal))
             : $subtotal;
 
         $discount = $this->type === 'percent'
             ? $base * ((float) $this->value / 100)
             : (float) $this->value;
 
-        return (float) round(min($discount, $base), 2);
+        return (float) round(max(0, min($discount, $base)), 2);
     }
 
     /** Whether a per-customer usage cap has been reached for the given phone. */

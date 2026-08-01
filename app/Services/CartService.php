@@ -7,7 +7,6 @@ use App\Models\CustomerOffer;
 use App\Models\Offer;
 use App\Models\Order;
 use App\Models\Product;
-use App\Services\MemberPricingService;
 use App\Models\ProductVariant;
 use App\Models\Setting;
 use Illuminate\Support\Collection;
@@ -18,8 +17,33 @@ use Illuminate\Support\Collection;
 class CartService
 {
     protected string $sessionKey = 'cart';
+
     protected string $couponKey = 'cart_coupon';
+
     protected string $pointsKey = 'cart_points';
+
+    /**
+     * Per-request memo. This service is a singleton, so one cart render used to
+     * recompute the whole discount cascade a dozen times — `discount()` alone
+     * cost 11 queries, six of them the identical member-usage count, because
+     * couponBase() and baseBeforePoints() each re-derived every earlier stage.
+     * Every mutating method clears this.
+     */
+    protected array $memo = [];
+
+    protected function memo(string $key, \Closure $fn)
+    {
+        return $this->memo[$key] ??= $fn();
+    }
+
+    /** Drop memoised totals — called by every method that changes the cart. */
+    protected function forgetMemo(): void
+    {
+        $this->memo = [];
+        $this->offerCache = null;
+        $this->resolvedCustomerOffer = null;
+        $this->customerOfferResolved = false;
+    }
 
     public function items(): Collection
     {
@@ -55,6 +79,7 @@ class CartService
         }
 
         session([$this->sessionKey => $items]);
+        $this->forgetMemo();
     }
 
     /** Overwrite a line's snapshotted unit price (checkout re-validation). */
@@ -64,6 +89,7 @@ class CartService
         if (isset($items[$key])) {
             $items[$key]['price'] = $price;
             session([$this->sessionKey => $items]);
+            $this->forgetMemo();
         }
     }
 
@@ -79,6 +105,7 @@ class CartService
             $items[$key]['qty'] = $qty;
         }
         session([$this->sessionKey => $items]);
+        $this->forgetMemo();
     }
 
     public function remove(string $key): void
@@ -86,11 +113,13 @@ class CartService
         $items = session($this->sessionKey, []);
         unset($items[$key]);
         session([$this->sessionKey => $items]);
+        $this->forgetMemo();
     }
 
     public function clear(): void
     {
         session()->forget([$this->sessionKey, $this->couponKey, $this->pointsKey]);
+        $this->forgetMemo();
     }
 
     public function count(): int
@@ -177,13 +206,21 @@ class CartService
      * Auto-offer discount: best non-member percentage offer (on its eligible items)
      * plus the best members-only offer (stacks). Scoped offers only discount their items.
      */
+    protected function rawPromoDiscount(): float
+    {
+        return $this->memo('promo_raw', function () {
+            $offers = $this->matchingOffers()->where('type', 'order_percent');
+            $best = (float) $offers->where('members_only', false)->max(fn (Offer $o) => $o->discountAmount($this));
+            $member = (float) $offers->where('members_only', true)->max(fn (Offer $o) => $o->discountAmount($this));
+
+            return round(min($this->promoBase(), $best + $member), 2);
+        });
+    }
+
+    /** Auto-offer discount actually applied (capped to the remaining base). */
     public function promoDiscount(): float
     {
-        $offers = $this->matchingOffers()->where('type', 'order_percent');
-        $best = (float) $offers->where('members_only', false)->max(fn (Offer $o) => $o->discountAmount($this));
-        $member = (float) $offers->where('members_only', true)->max(fn (Offer $o) => $o->discountAmount($this));
-
-        return round(min($this->promoBase(), $best + $member), 2);
+        return $this->cascade()['promo'];
     }
 
     /** Effective discount percentage (for display only). */
@@ -200,42 +237,107 @@ class CartService
     }
 
     /**
+     * The full discount cascade, computed once per request.
+     *
+     * Discounts apply in order, and each is capped to whatever is LEFT of the
+     * subtotal. That cap is the point: every stage used to compute against the
+     * raw subtotal independently, so a 20% quantity offer plus a 20% coupon
+     * took 20% of the original price twice, and a large enough stack drove
+     * `discount` past `subtotal` — storing a negative profit and a total
+     * floored at zero, i.e. a free order with free shipping.
+     *
+     * @return array{offer:float, promo:float, member:float, customer:float,
+     *               coupon:float, coupon_model:?Coupon, points:float,
+     *               points_redeemed:int, base_before_coupon:float, total:float}
+     */
+    protected function cascade(): array
+    {
+        return $this->memo('cascade', function () {
+            $remaining = $this->subtotal();
+
+            // Take an amount off the remaining base, never more than is left.
+            $take = function (float $amount) use (&$remaining): float {
+                $amount = round(max(0, min($amount, $remaining)), 2);
+                $remaining -= $amount;
+
+                return $amount;
+            };
+
+            $offer = $take($this->offerDiscount());
+            $promo = $take($this->rawPromoDiscount());
+            $member = $take($this->rawMemberSignupDiscount());
+            $customer = $take($this->rawCustomerOfferDiscount());
+
+            // The coupon is validated against — and limited to — what is left,
+            // so "20% off" never means 20% of a price already discounted away.
+            $baseBeforeCoupon = $remaining;
+            $couponModel = $this->couponFor($baseBeforeCoupon);
+            $coupon = $take($couponModel ? $couponModel->discountFor($baseBeforeCoupon, $this) : 0.0);
+
+            // Points are clamped to their own remaining base, in whole steps.
+            $redeemed = $this->clampPoints($remaining);
+            $points = $take(app(LoyaltyService::class)->pointsValue($redeemed));
+
+            return [
+                'offer' => $offer,
+                'promo' => $promo,
+                'member' => $member,
+                'customer' => $customer,
+                'coupon' => $coupon,
+                'coupon_model' => $couponModel,
+                'points' => $points,
+                'points_redeemed' => $redeemed,
+                'base_before_coupon' => round($baseBeforeCoupon, 2),
+                'total' => round($offer + $promo + $member + $customer + $coupon + $points, 2),
+            ];
+        });
+    }
+
+    /**
      * Extra "thanks for registering" discount for logged-in customers (Admin →
      * Offers). Capped to 2 orders per rolling 7 days per customer.
      */
-    public function memberSignupDiscount(): float
+    protected function rawMemberSignupDiscount(): float
     {
-        $customer = auth('customer')->user();
-        if (! $customer) {
-            return 0.0;
-        }
-        $pricing = app(MemberPricingService::class);
-        if (! $pricing->enabled()) {
-            return 0.0;
-        }
-        // Cap: at most `max_uses` orders in a rolling `window_days` window per
-        // customer (both editable in Admin → Offers). max_uses = 0 → no limit.
-        $maxUses = (int) Setting::get('register_offer_max_uses', 2);
-        if ($maxUses > 0) {
-            $windowDays = max(1, (int) Setting::get('register_offer_window_days', 7));
-            $usedInWindow = Order::where('customer_id', $customer->id)
-                ->where('created_at', '>=', now()->subDays($windowDays))
-                ->count();
-            if ($usedInWindow >= $maxUses) {
+        return $this->memo('member_raw', function () {
+            $customer = auth('customer')->user();
+            if (! $customer) {
                 return 0.0;
             }
-        }
-
-        // Per-line member discount so per-category / per-product overrides apply.
-        $total = 0.0;
-        foreach ($this->items() as $item) {
-            $pct = $pricing->percentForLine((int) $item['product_id'], $item['category_id'] ?? null);
-            if ($pct > 0) {
-                $total += $item['price'] * $item['qty'] * $pct / 100;
+            $pricing = app(MemberPricingService::class);
+            if (! $pricing->enabled()) {
+                return 0.0;
             }
-        }
+            // Cap: at most `max_uses` orders in a rolling `window_days` window per
+            // customer (both editable in Admin → Offers). max_uses = 0 → no limit.
+            $maxUses = (int) Setting::get('register_offer_max_uses', 2);
+            if ($maxUses > 0) {
+                $windowDays = max(1, (int) Setting::get('register_offer_window_days', 7));
+                $usedInWindow = Order::where('customer_id', $customer->id)
+                    ->where('created_at', '>=', now()->subDays($windowDays))
+                    ->count();
+                if ($usedInWindow >= $maxUses) {
+                    return 0.0;
+                }
+            }
 
-        return round($total, 2);
+            // Per-line member discount so per-category / per-product overrides apply.
+            $total = 0.0;
+            foreach ($this->items() as $item) {
+                $pct = $pricing->percentForLine((int) $item['product_id'], $item['category_id'] ?? null);
+                if ($pct > 0) {
+                    $total += $item['price'] * $item['qty'] * $pct / 100;
+                }
+            }
+
+            return round($total, 2);
+        });
+    }
+
+    /** Member discount actually applied (capped to the remaining base). */
+    public function memberSignupDiscount(): float
+    {
+        return $this->cascade()['member'];
     }
 
     // ── Personalized customer offers (auto-applied best eligible) ──────────────
@@ -268,9 +370,15 @@ class CartService
         return $this->resolvedCustomerOffer = $best;
     }
 
-    public function customerOfferDiscount(): float
+    protected function rawCustomerOfferDiscount(): float
     {
         return round((float) ($this->customerOffer()?->discountFor($this) ?? 0), 2);
+    }
+
+    /** Personalised offer discount actually applied (capped to the remaining base). */
+    public function customerOfferDiscount(): float
+    {
+        return $this->cascade()['customer'];
     }
 
     public function hasCustomerFreeShipping(): bool
@@ -286,34 +394,48 @@ class CartService
     public function applyCoupon(Coupon $coupon): void
     {
         session([$this->couponKey => $coupon->code]);
+        $this->forgetMemo();
     }
 
     public function removeCoupon(): void
     {
         session()->forget($this->couponKey);
+        $this->forgetMemo();
     }
 
-    /** Base the coupon is calculated against: subtotal after product + auto offers. */
-    protected function couponBase(): float
+    /**
+     * What a coupon is actually calculated against: the subtotal after quantity
+     * offers, auto offers, member and personalised discounts. Public so the
+     * apply-coupon endpoint can validate against the SAME base the cart will
+     * use — it used to check the raw subtotal, report "Coupon applied", then
+     * silently drop the coupon when this lower base failed its minimum spend.
+     */
+    public function couponBase(): float
     {
-        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount() - $this->customerOfferDiscount());
+        return $this->cascade()['base_before_coupon'];
     }
 
-    public function coupon(): ?Coupon
+    /** The stored coupon, if it is valid against the given remaining base. */
+    protected function couponFor(float $base): ?Coupon
     {
         $code = session($this->couponKey);
         if (! $code) {
             return null;
         }
-        $coupon = Coupon::where('code', $code)->first();
-        return ($coupon && $coupon->isValidFor($this->couponBase(), $this)) ? $coupon : null;
+        $coupon = $this->memo('coupon_row', fn () => Coupon::where('code', $code)->first());
+
+        return ($coupon && $coupon->isValidFor($base, $this)) ? $coupon : null;
+    }
+
+    public function coupon(): ?Coupon
+    {
+        return $this->cascade()['coupon_model'];
     }
 
     /** Discount from the applied coupon only. */
     public function couponDiscount(): float
     {
-        $coupon = $this->coupon();
-        return $coupon ? $coupon->discountFor($this->couponBase(), $this) : 0.0;
+        return $this->cascade()['coupon'];
     }
 
     // ── Loyalty points redemption ───────────────────────────────────────────
@@ -322,21 +444,17 @@ class CartService
     public function redeemPoints(int $points): void
     {
         session([$this->pointsKey => max(0, $points)]);
+        $this->forgetMemo();
     }
 
     public function clearPoints(): void
     {
         session()->forget($this->pointsKey);
+        $this->forgetMemo();
     }
 
-    /** Discountable base before any points are applied. */
-    protected function baseBeforePoints(): float
-    {
-        return max(0, $this->subtotal() - $this->offerDiscount() - $this->promoDiscount() - $this->memberSignupDiscount() - $this->customerOfferDiscount() - $this->couponDiscount());
-    }
-
-    /** Whole points that will actually be redeemed for this cart (0 for guests). */
-    public function redeemablePoints(): int
+    /** Whole points redeemable against a given remaining base (0 for guests). */
+    protected function clampPoints(float $base): int
     {
         $loyalty = app(LoyaltyService::class);
         if (! $loyalty->enabled()) {
@@ -348,19 +466,25 @@ class CartService
             return 0;
         }
 
-        return $loyalty->clampRedeemable($requested, (int) $customer->points, $this->baseBeforePoints());
+        return $loyalty->clampRedeemable($requested, (int) $customer->points, $base);
+    }
+
+    /** Whole points that will actually be redeemed for this cart (0 for guests). */
+    public function redeemablePoints(): int
+    {
+        return $this->cascade()['points_redeemed'];
     }
 
     /** Taka value of the redeemed points. */
     public function pointsDiscount(): float
     {
-        return app(LoyaltyService::class)->pointsValue($this->redeemablePoints());
+        return $this->cascade()['points'];
     }
 
-    /** Total discount = quantity offers + auto promo offers + member + personalized + coupon + points. */
+    /** Total discount — capped, so it can never exceed the subtotal. */
     public function discount(): float
     {
-        return round($this->offerDiscount() + $this->promoDiscount() + $this->memberSignupDiscount() + $this->customerOfferDiscount() + $this->couponDiscount() + $this->pointsDiscount(), 2);
+        return $this->cascade()['total'];
     }
 
     /**
@@ -373,19 +497,28 @@ class CartService
     {
         $lines = [];
         $offers = $this->matchingOffers()->where('type', 'order_percent');
+        $cascade = $this->cascade();
 
+        // The auto-offer lines are shown at the amount actually applied: when the
+        // cap bites, the raw offer amounts are scaled down so the breakdown still
+        // adds up to discount() instead of over-explaining the saving.
         $bestNon = $offers->where('members_only', false)->sortByDesc(fn (Offer $o) => $o->discountAmount($this))->first();
-        if ($bestNon && $bestNon->discountAmount($this) > 0) {
-            $lines[] = ['label' => $bestNon->title ?: (rtrim(rtrim((string) $bestNon->percent, '0'), '.').'% off'), 'amount' => round($bestNon->discountAmount($this), 2)];
-        }
-
         $bestMember = $offers->where('members_only', true)->sortByDesc(fn (Offer $o) => $o->discountAmount($this))->first();
-        if ($bestMember && $bestMember->discountAmount($this) > 0) {
-            $lines[] = ['label' => ($bestMember->title ?: 'Member discount').' · members', 'amount' => round($bestMember->discountAmount($this), 2)];
+        $rawNon = $bestNon ? round($bestNon->discountAmount($this), 2) : 0.0;
+        $rawMember = $bestMember ? round($bestMember->discountAmount($this), 2) : 0.0;
+        $rawPromo = $rawNon + $rawMember;
+        $scale = $rawPromo > 0 ? $cascade['promo'] / $rawPromo : 0.0;
+
+        if ($rawNon > 0 && round($rawNon * $scale, 2) > 0) {
+            $lines[] = ['label' => $bestNon->title ?: (rtrim(rtrim((string) $bestNon->percent, '0'), '.').'% off'), 'amount' => round($rawNon * $scale, 2)];
         }
 
-        if ($this->offerDiscount() > 0) {
-            $lines[] = ['label' => 'Quantity / bundle offer', 'amount' => round($this->offerDiscount(), 2)];
+        if ($rawMember > 0 && round($rawMember * $scale, 2) > 0) {
+            $lines[] = ['label' => ($bestMember->title ?: 'Member discount').' · members', 'amount' => round($rawMember * $scale, 2)];
+        }
+
+        if ($cascade['offer'] > 0) {
+            $lines[] = ['label' => 'Quantity / bundle offer', 'amount' => $cascade['offer']];
         }
 
         if ($this->memberSignupDiscount() > 0) {
@@ -461,6 +594,7 @@ class CartService
         if ($threshold !== null && $this->subtotal() >= $threshold) {
             return 0.0;
         }
+
         // Rates come from Admin → Settings (so they always match what the
         // checkout page shows), with config/.env as the fallback default.
         return (float) ($insideDhaka

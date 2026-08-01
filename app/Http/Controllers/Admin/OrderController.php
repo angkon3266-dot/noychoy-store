@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\TransitionOrderStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Services\CustomerInsight;
+use App\Services\NotificationService;
+use App\Services\PushTemplateService;
 use App\Services\SmsService;
 use App\Services\SteadfastService;
 use Illuminate\Http\Request;
@@ -226,11 +231,13 @@ class OrderController extends Controller
         foreach ($orders as $order) {
             if ($order->shipment && $order->shipment->consignment_id) {
                 $skipped++;
+
                 continue;
             }
             $shipment = $steadfast->createForOrder($order);
             if (! $shipment) {
                 $failed++;
+
                 continue;
             }
             if (in_array($order->status, ['pending', 'confirmed', 'processing'], true)) {
@@ -330,23 +337,12 @@ class OrderController extends Controller
             'notify' => ['nullable', 'boolean'],
         ]);
 
-        $previousStatus = $order->status;
-        $order->update(['status' => $data['status']]);
-        $order->history()->create([
-            'status' => $data['status'],
-            'note' => $data['note'] ?? null,
-            'created_by' => auth()->user()->name,
-        ]);
-
-        // Return stock to inventory when an order is cancelled (and re-deduct if
-        // it is later moved back to an active status). Idempotent via the
-        // stock_restored flag, so repeated saves never double-count.
-        $this->syncStockForStatus($order, $previousStatus, $data['status']);
-
-        // Award loyalty points once the order is delivered (idempotent).
-        if ($data['status'] === 'delivered') {
-            app(\App\Services\LoyaltyService::class)->awardForOrder($order->fresh('customer'));
-        }
+        // Stock release/re-reserve, loyalty award, history and web push all live
+        // in the shared action, so the Steadfast webhook applies exactly the same
+        // effects when the courier moves an order.
+        app(TransitionOrderStatus::class)->handle(
+            $order, $data['status'], $data['note'] ?? null, auth()->user()->name,
+        );
 
         if ($request->boolean('notify')) {
             $template = match ($data['status']) {
@@ -361,61 +357,13 @@ class OrderController extends Controller
             }
         }
 
-        // Fire a web push for the status change (template-gated; free, so not tied
-        // to the SMS "notify" checkbox).
-        if ($previousStatus !== $data['status']) {
-            $this->pushOrderStatus($order->fresh(), $data['status']);
-        }
-
         return back()->with('success', 'Order status updated.');
-    }
-
-    /**
-     * Release stock back to inventory when an order enters "cancelled", and
-     * re-deduct it if the order is moved back out of "cancelled". The
-     * stock_restored flag makes both directions idempotent.
-     */
-    protected function syncStockForStatus(Order $order, string $from, string $to): void
-    {
-        // Statuses that free the reserved stock. Returned goods are intentionally
-        // NOT auto-restocked (they may be damaged / need inspection).
-        $releaseStatuses = ['cancelled'];
-
-        $wasReleased = in_array($from, $releaseStatuses, true);
-        $nowReleased = in_array($to, $releaseStatuses, true);
-
-        if ($nowReleased && ! $wasReleased && ! $order->stock_restored) {
-            $this->adjustStock($order, +1); // return to inventory
-            $order->update(['stock_restored' => true]);
-        } elseif (! $nowReleased && $wasReleased && $order->stock_restored) {
-            $this->adjustStock($order, -1); // re-reserve (moved back to active)
-            $order->update(['stock_restored' => false]);
-        }
     }
 
     /** Add ($sign=+1) or remove ($sign=-1) this order's line quantities from stock. */
     protected function adjustStock(Order $order, int $sign): void
     {
-        $order->loadMissing('items');
-
-        foreach ($order->items as $item) {
-            if (! $item->product_id) {
-                continue; // deleted product — nothing to adjust
-            }
-
-            $delta = $sign * (int) $item->quantity;
-
-            if ($item->variant_id) {
-                \App\Models\ProductVariant::where('id', $item->variant_id)->increment('stock_quantity', $delta);
-            }
-
-            $product = Product::find($item->product_id);
-            if ($product && $product->manage_stock) {
-                $product->increment('stock_quantity', $delta);
-                $product->refresh();
-                $product->update(['in_stock' => $product->stock_quantity > 0]);
-            }
-        }
+        app(TransitionOrderStatus::class)->adjustStock($order, $sign);
     }
 
     // ── Delete / restore (soft delete) ──────────────────────────────────────
@@ -505,7 +453,7 @@ class OrderController extends Controller
     }
 
     /** Recompute a customer's order/spend rollups from their remaining orders. */
-    protected function recomputeCustomer(?\App\Models\Customer $customer): void
+    protected function recomputeCustomer(?Customer $customer): void
     {
         if (! $customer) {
             return;
@@ -558,9 +506,9 @@ class OrderController extends Controller
         if (! $trigger) {
             return;
         }
-        $payload = app(\App\Services\PushTemplateService::class)->forOrder($trigger, $order);
+        $payload = app(PushTemplateService::class)->forOrder($trigger, $order);
         if ($payload) {
-            app(\App\Services\NotificationService::class)->pushToCustomer((int) $order->customer_id, $payload);
+            app(NotificationService::class)->pushToCustomer((int) $order->customer_id, $payload);
         }
     }
 
@@ -592,7 +540,7 @@ class OrderController extends Controller
     /** Saved message templates, always including the two built-in defaults. */
     public static function cardTemplates(): array
     {
-        $saved = \App\Models\Setting::get('thankyou_templates', []);
+        $saved = Setting::get('thankyou_templates', []);
 
         return is_array($saved) && $saved !== [] ? $saved : [
             ['name' => 'New customer', 'text' => "Dear {name},\n\nThank you for your first order with {store}. We hope this piece brings you joy — and we'd be delighted to see you again."],
@@ -631,7 +579,7 @@ class OrderController extends Controller
 
         $templates = collect(static::cardTemplates());
         $isRepeat = (int) ($order->customer?->total_orders ?? 0) > 1;
-        $name = \App\Models\Setting::get($isRepeat ? 'thankyou_default_repeat' : 'thankyou_default_new', $isRepeat ? 'Repeat customer' : 'New customer');
+        $name = Setting::get($isRepeat ? 'thankyou_default_repeat' : 'thankyou_default_new', $isRepeat ? 'Repeat customer' : 'New customer');
         $tpl = $templates->firstWhere('name', $name) ?? $templates->first();
 
         return static::renderCardText((string) ($tpl['text'] ?? ''), $order);
@@ -642,8 +590,8 @@ class OrderController extends Controller
     {
         return view('admin.orders.card-templates', [
             'templates' => static::cardTemplates(),
-            'defaultNew' => \App\Models\Setting::get('thankyou_default_new', 'New customer'),
-            'defaultRepeat' => \App\Models\Setting::get('thankyou_default_repeat', 'Repeat customer'),
+            'defaultNew' => Setting::get('thankyou_default_new', 'New customer'),
+            'defaultRepeat' => Setting::get('thankyou_default_repeat', 'Repeat customer'),
             'size' => static::cardSize(),
         ]);
     }
@@ -669,9 +617,9 @@ class OrderController extends Controller
             return back()->with('error', 'Keep at least one template with a name and a message.');
         }
 
-        \App\Models\Setting::put('thankyou_templates', $templates);
-        \App\Models\Setting::put('thankyou_default_new', $data['default_new'] ?? $templates[0]['name']);
-        \App\Models\Setting::put('thankyou_default_repeat', $data['default_repeat'] ?? $templates[0]['name']);
+        Setting::put('thankyou_templates', $templates);
+        Setting::put('thankyou_default_new', $data['default_new'] ?? $templates[0]['name']);
+        Setting::put('thankyou_default_repeat', $data['default_repeat'] ?? $templates[0]['name']);
 
         return back()->with('success', 'Thank-you card messages saved.');
     }

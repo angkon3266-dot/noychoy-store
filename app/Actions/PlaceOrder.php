@@ -2,10 +2,19 @@
 
 namespace App\Actions;
 
+use App\Exceptions\CheckoutException;
+use App\Jobs\SendOrderPlacedEffects;
+use App\Models\AbandonedCart;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\Visit;
 use App\Services\CartService;
+use App\Services\LoyaltyService;
+use App\Services\Meta\MetaTrackingService;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PlaceOrder
@@ -51,16 +60,14 @@ class PlaceOrder
             // CheckoutException (rolling back) if anything no longer holds.
             [$products, $variants] = $this->validateLines();
 
-            // Attach to a customer record (find-or-create by phone) even for guests.
-            $customer = Customer::firstOrCreate(
+            // A logged-in customer always owns their own order. Check this FIRST:
+            // running firstOrCreate() unconditionally created a junk customer row
+            // (0 orders, never used) whenever a member shipped to a different
+            // number — a gift — which then skewed segments and CRM counts.
+            $customer = auth('customer')->user() ?? Customer::firstOrCreate(
                 ['phone' => $data['phone']],
                 ['name' => $data['name'], 'email' => $data['email'] ?? null],
             );
-
-            // If a customer is logged in, prefer that record.
-            if (auth('customer')->check()) {
-                $customer = auth('customer')->user();
-            }
 
             // Backfill an email a repeat guest provides on a later order —
             // firstOrCreate only sets it on creation.
@@ -69,7 +76,7 @@ class PlaceOrder
             }
 
             // Where this buyer came from, read off their own visit history.
-            $attribution = \App\Models\Visit::attributionFor(request()->cookie('visitor_token'));
+            $attribution = Visit::attributionFor(request()->cookie('visitor_token'));
 
             $order = $this->createWithUniqueNumber($attribution + [
                 'customer_id' => $customer->id,
@@ -133,7 +140,7 @@ class PlaceOrder
 
             // Deduct any redeemed loyalty points (logged-in customers only).
             if ($pointsRedeemed > 0 && auth('customer')->check()) {
-                app(\App\Services\LoyaltyService::class)->award(
+                app(LoyaltyService::class)->award(
                     $customer, -$pointsRedeemed, 'redeem',
                     'Redeemed on order '.$order->order_number, $order,
                 );
@@ -150,16 +157,16 @@ class PlaceOrder
         $order = $order->fresh('items');
 
         // Mark any abandoned-cart lead for this phone/session as recovered.
-        \App\Models\AbandonedCart::where('recovered', false)
+        AbandonedCart::where('recovered', false)
             ->where(fn ($q) => $q->where('phone', $data['phone'])->orWhere('session_id', session()->getId()))
             ->update(['recovered' => true]);
 
         // Confirmation SMS, invoice email and Meta CAPI Purchase are queued so a
         // slow gateway never delays the buyer's redirect. The browser context is
         // captured now — the queue worker has no request to read it from.
-        \App\Jobs\SendOrderPlacedEffects::dispatch(
+        SendOrderPlacedEffects::dispatch(
             $order,
-            \App\Services\Meta\MetaTrackingService::captureClientContext(),
+            MetaTrackingService::captureClientContext(),
         );
 
         $this->cart->clear();
@@ -173,9 +180,9 @@ class PlaceOrder
      * price hasn't changed since it was added to the cart. On a price change the
      * cart line is repriced so the customer sees current numbers on the bounce.
      *
-     * @return array{0:\Illuminate\Support\Collection, 1:\Illuminate\Support\Collection} [products, variants] keyed by id
+     * @return array{0:Collection, 1:Collection} [products, variants] keyed by id
      *
-     * @throws \App\Exceptions\CheckoutException
+     * @throws CheckoutException
      */
     protected function validateLines(): array
     {
@@ -186,7 +193,11 @@ class PlaceOrder
         $products = Product::with('category')
             ->whereIn('id', $items->pluck('product_id')->filter()->unique())
             ->lockForUpdate()->get()->keyBy('id');
-        $variants = \App\Models\ProductVariant::whereIn('id', $items->pluck('variant_id')->filter()->unique())
+        // `with('product')` matters: ProductVariant::effective_price falls back to
+        // the parent price, so without it each variant line fired a lazy query
+        // while this transaction was holding row locks.
+        $variants = ProductVariant::with('product')
+            ->whereIn('id', $items->pluck('variant_id')->filter()->unique())
             ->lockForUpdate()->get()->keyBy('id');
 
         $repriced = [];
@@ -195,11 +206,14 @@ class PlaceOrder
             $product = $products->get($item['product_id']);
             $variant = $item['variant_id'] ? $variants->get($item['variant_id']) : null;
 
-            // Product (or chosen variant) has been removed / unpublished.
-            if (! $product || $product->status !== 'published' || ($item['variant_id'] && ! $variant)) {
+            // Product (or chosen variant) has been removed, unpublished, or the
+            // variant retired. A variant that is no longer active is as gone as
+            // one that was deleted.
+            if (! $product || $product->status !== 'published'
+                || ($item['variant_id'] && (! $variant || ! $variant->is_active))) {
                 $this->cart->remove($item['key']);
 
-                throw new \App\Exceptions\CheckoutException(
+                throw new CheckoutException(
                     '"'.$item['name'].'" is no longer available and was removed from your cart.'
                 );
             }
@@ -207,13 +221,24 @@ class PlaceOrder
             // Stock check (pre-orders intentionally sell past zero).
             if (! $product->isPreorder()) {
                 $qty = (int) $item['qty'];
+
+                // Untracked stock: the manual "sold out" toggle is the only signal
+                // there is, and it was never checked here — so an item marked sold
+                // out while it sat in a cart still went through checkout.
+                if (! $product->manage_stock && ! $product->in_stock) {
+                    $this->cart->remove($item['key']);
+
+                    throw new CheckoutException(
+                        '"'.$item['name'].'" is sold out and was removed from your cart.'
+                    );
+                }
                 if ($variant && (int) $variant->stock_quantity < $qty) {
-                    throw new \App\Exceptions\CheckoutException(
+                    throw new CheckoutException(
                         'Only '.max(0, (int) $variant->stock_quantity).' of "'.$item['name'].'" left in stock — please adjust the quantity.'
                     );
                 }
                 if (! $variant && $product->manage_stock && (int) $product->stock_quantity < $qty) {
-                    throw new \App\Exceptions\CheckoutException(
+                    throw new CheckoutException(
                         'Only '.max(0, (int) $product->stock_quantity).' of "'.$item['name'].'" left in stock — please adjust the quantity.'
                     );
                 }
@@ -228,7 +253,7 @@ class PlaceOrder
         }
 
         if ($repriced !== []) {
-            throw new \App\Exceptions\CheckoutException(
+            throw new CheckoutException(
                 'Prices were updated for: '.implode(', ', $repriced).'. Please review your cart before ordering.'
             );
         }
@@ -259,7 +284,7 @@ class PlaceOrder
                 return Order::create(
                     ['order_number' => Order::generateNumber($attempt)] + $attributes
                 );
-            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            } catch (UniqueConstraintViolationException $e) {
                 if ($attempt >= $attempts - 1) {
                     throw $e;
                 }
@@ -268,7 +293,7 @@ class PlaceOrder
     }
 
     /** Decrement stock on the already-locked models (validated ≥ qty above). */
-    protected function decrementStock(?Product $product, ?\App\Models\ProductVariant $variant, int $qty): void
+    protected function decrementStock(?Product $product, ?ProductVariant $variant, int $qty): void
     {
         if ($variant) {
             $variant->decrement('stock_quantity', $qty);

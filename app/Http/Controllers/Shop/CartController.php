@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Coupon;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Visit;
 use App\Services\CartService;
+use App\Services\LoyaltyService;
 use App\Services\Meta\MetaTrackingService;
 use Illuminate\Http\Request;
 
@@ -28,10 +30,16 @@ class CartController extends Controller
             'event_id' => ['nullable', 'string', 'max:100'],
         ]);
 
+        // Route-model binding resolves by slug without the published scope, so an
+        // unpublished product's name and price could be pulled into a cart by
+        // anyone who knew (or guessed) its slug. addMany() already scoped this.
+        abort_unless($product->status === 'published', 404);
+
         $variant = null;
         if (! empty($data['variant_id'])) {
             $variant = ProductVariant::where('product_id', $product->id)
-                ->where('id', $data['variant_id'])->firstOrFail();
+                ->where('id', $data['variant_id'])
+                ->where('is_active', true)->firstOrFail();
         } elseif ($product->has_variants) {
             return back()->with('error', 'Please choose the available options first.');
         }
@@ -39,7 +47,7 @@ class CartController extends Controller
         $this->cart->add($product, $variant, $data['qty'] ?? 1);
 
         // Funnel step for the dashboard's conversion report.
-        \App\Models\Visit::record('cart_add', ['product_id' => $product->id]);
+        Visit::record('cart_add', ['product_id' => $product->id]);
 
         // AddToCart — server-side (CAPI) with the SAME event id the browser Pixel
         // used, so Meta collapses the two into one deduplicated event.
@@ -96,10 +104,16 @@ class CartController extends Controller
             'qty' => ['nullable', 'integer', 'min:1', 'max:99'],
         ]);
 
+        // Route-model binding resolves by slug without the published scope, so an
+        // unpublished product's name and price could be pulled into a cart by
+        // anyone who knew (or guessed) its slug. addMany() already scoped this.
+        abort_unless($product->status === 'published', 404);
+
         $variant = null;
         if (! empty($data['variant_id'])) {
             $variant = ProductVariant::where('product_id', $product->id)
-                ->where('id', $data['variant_id'])->firstOrFail();
+                ->where('id', $data['variant_id'])
+                ->where('is_active', true)->firstOrFail();
         } elseif ($product->has_variants) {
             return back()->with('error', 'Please choose the available options first.');
         }
@@ -170,7 +184,11 @@ class CartController extends Controller
 
         $coupon = Coupon::where('code', strtoupper(trim($request->string('code'))))->first();
 
-        if (! $coupon || ! $coupon->isValidFor($this->cart->subtotal(), $this->cart)) {
+        // Validate against the base the cart will actually apply it to (subtotal
+        // after offers and member/personalised discounts), not the raw subtotal —
+        // otherwise a coupon whose minimum spend only clears the raw figure gets
+        // accepted here and then silently dropped, discounting nothing.
+        if (! $coupon || ! $coupon->isValidFor($this->cart->couponBase(), $this->cart)) {
             return back()->with('error', 'This coupon can’t be applied to your cart (check the items, minimum spend or quantity).');
         }
 
@@ -207,12 +225,14 @@ class CartController extends Controller
 
         if ($applied <= 0) {
             $this->cart->clearPoints();
-            $min = app(\App\Services\LoyaltyService::class)->minRedeem();
+            $min = app(LoyaltyService::class)->minRedeem();
             $msg = 'Not enough points to redeem (minimum '.$min.').';
+
             return $request->wantsJson() ? response()->json(['ok' => false, 'message' => $msg]) : back()->with('error', $msg);
         }
 
         $msg = $applied.' points applied — '.money($this->cart->pointsDiscount()).' off.';
+
         return $request->wantsJson()
             ? response()->json(['ok' => true, 'message' => $msg, 'applied' => $applied])
             : back()->with('success', $msg);
