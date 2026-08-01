@@ -135,7 +135,7 @@ In rough order of value.
 
 ## 5. Production notes (checked 2026-08-01 over SSH)
 
-- 109 products, 635 customers (mostly Woo-imported), 1 real order — effectively
+- 109 products, 635 customers, 1 real order — effectively
   pre-launch.
 - **0 active coupons and 0 products with quantity offers**, so §1.1 was armed but
   never fired in production. It would have on the first campaign.

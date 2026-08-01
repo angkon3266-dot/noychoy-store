@@ -27,6 +27,39 @@
             </div>
         </div>
 
+        {{-- BDCourier — COD fraud check --}}
+        <div class="card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-semibold">BDCourier — COD risk check</h2>
+                <span class="badge {{ $bdCourierOk ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }}">{{ $bdCourierOk ? 'Connected' : 'Not configured' }}</span>
+            </div>
+            <p class="text-xs text-ink-700/60 mb-4">
+                Looks a customer's phone number up across every major Bangladeshi courier to show how
+                many parcels they have accepted versus refused. Checks run only when you press
+                <strong>Check courier history</strong> on an order, and each one uses your plan quota —
+                the result is then cached for {{ \App\Services\BdCourierService::CACHE_TTL_HOURS }} hours per number.
+            </p>
+            <label class="flex items-center gap-2 text-sm mb-4">
+                <input type="checkbox" name="bdcourier_enabled" value="1" @checked($int['bdcourier_enabled'] ?? false)>
+                Enable BDCourier lookups
+            </label>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2"><label class="label">Base URL</label><input name="bdcourier_base_url" value="{{ $int['bdcourier_base_url'] ?? 'https://api.bdcourier.com' }}" class="input"></div>
+                <div class="sm:col-span-2"><label class="label">API Key</label><input name="bdcourier_api_key" value="{{ $int['bdcourier_api_key'] ?? '' }}" class="input" autocomplete="off" placeholder="Sent as: Authorization: Bearer …"></div>
+                <div>
+                    <label class="label">“Safe” at or above (%)</label>
+                    <input name="bdcourier_safe_threshold" type="number" step="0.1" min="0" max="100"
+                           value="{{ $int['bdcourier_safe_threshold'] ?? 80 }}" class="input">
+                </div>
+                <div>
+                    <label class="label">“Warning” at or above (%)</label>
+                    <input name="bdcourier_warning_threshold" type="number" step="0.1" min="0" max="100"
+                           value="{{ $int['bdcourier_warning_threshold'] ?? 50 }}" class="input">
+                    <p class="text-[11px] text-ink-700/50 mt-1">Below this counts as Risky.</p>
+                </div>
+            </div>
+        </div>
+
         {{-- KhudeBarta SMS --}}
         <div class="card p-6">
             <div class="flex items-center justify-between mb-4">

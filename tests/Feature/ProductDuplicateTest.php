@@ -81,15 +81,6 @@ class ProductDuplicateTest extends TestCase
         $this->assertSame(3, Product::count());
     }
 
-    public function test_the_copy_does_not_claim_the_originals_woocommerce_id(): void
-    {
-        // Two products pointing at the same imported Woo product would make the
-        // next import overwrite whichever it found first.
-        $product = $this->product(['woo_id' => 9001]);
-
-        $this->assertNull($this->duplicate($product)->woo_id);
-    }
-
     protected function duplicate(Product $product): Product
     {
         $before = Product::pluck('id')->all();

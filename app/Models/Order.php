@@ -28,7 +28,7 @@ class Order extends Model
         'subtotal', 'shipping_cost', 'discount', 'adjustments', 'member_discount', 'total',
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
-        'notes', 'admin_notes', 'card_message', 'source', 'woo_id', 'stock_restored',
+        'notes', 'admin_notes', 'card_message', 'source', 'stock_restored',
         'source_channel', 'source_campaign', 'source_referrer', 'first_touch_channel', 'landing_path',
     ];
 

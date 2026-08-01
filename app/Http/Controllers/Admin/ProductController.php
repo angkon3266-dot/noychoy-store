@@ -4,12 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\ContentTemplate;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Services\ImageOptimizer;
+use App\Services\NotificationService;
+use App\Services\StockAlertService;
+use App\Services\WatermarkService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -116,6 +123,7 @@ class ProductController extends Controller
                 $name = trim((string) ($data['name'] ?? ''));
                 if ($name === '') {
                     $skipped++;
+
                     continue;
                 }
 
@@ -202,7 +210,7 @@ class ProductController extends Controller
             'product' => new Product(['status' => 'published', 'manage_stock' => true, 'in_stock' => true]),
             'categories' => Category::orderBy('name')->get(),
             'allProducts' => Product::with('primaryImage')->orderBy('name')->get(['id', 'name']),
-            'contentTemplates' => \App\Models\ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
+            'contentTemplates' => ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
         ]);
     }
 
@@ -232,7 +240,7 @@ class ProductController extends Controller
         if ($product->status !== 'published') {
             return;
         }
-        $notify = app(\App\Services\NotificationService::class);
+        $notify = app(NotificationService::class);
 
         if ($product->isPreorder() && $product->preorder_announced_at === null && $notify->autoEnabled('notify_preorders')) {
             $notify->broadcast([
@@ -254,7 +262,7 @@ class ProductController extends Controller
             'product' => $product,
             'categories' => Category::orderBy('name')->get(),
             'allProducts' => Product::with('primaryImage')->where('id', '!=', $product->id)->orderBy('name')->get(['id', 'name']),
-            'contentTemplates' => \App\Models\ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
+            'contentTemplates' => ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
         ]);
     }
 
@@ -274,7 +282,7 @@ class ProductController extends Controller
         $this->syncVariants($request, $product);
         $this->syncContentSections($request, $product);
         $this->maybeAnnounceProduct($product->fresh());
-        app(\App\Services\StockAlertService::class)->handleProductChange($product->fresh(), $wasAvailable, $oldPrice);
+        app(StockAlertService::class)->handleProductChange($product->fresh(), $wasAvailable, $oldPrice);
 
         return redirect()->route('admin.products.edit', $product)
             ->with('success', 'Product updated.');
@@ -302,7 +310,7 @@ class ProductController extends Controller
             return back()->with('error', "Can’t renumber 1–{$n}: “{$conflict->name}” (not selected) already uses ID #{$conflict->serial}. Select all products, or change that one first.");
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($ids) {
+        DB::transaction(function () use ($ids) {
             Product::onlyTrashed()->whereBetween('serial', [1, $ids->count()])->update(['serial' => null]);
             Product::whereIn('id', $ids)->update(['serial' => null]);
             $serial = 0;
@@ -329,7 +337,7 @@ class ProductController extends Controller
         // renders JSON for exceptions on api/* paths (bootstrap/app.php), so a
         // thrown ValidationException here would come back as an HTML redirect
         // that the caller can't read.
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'serial' => ['nullable', 'integer', 'min:1', 'max:999999'],
         ], [
             'serial.min' => 'Product ID must be 1 or higher.',
@@ -355,7 +363,7 @@ class ProductController extends Controller
         $holder = $new === null ? null : Product::withTrashed()
             ->where('serial', $new)->where('id', '!=', $product->id)->first();
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($product, $holder, $new, $old) {
+        DB::transaction(function () use ($product, $holder, $new, $old) {
             // Free this row first so a swap can't trip the unique index.
             Product::withTrashed()->whereKey($product->id)->update(['serial' => null]);
 
@@ -371,7 +379,7 @@ class ProductController extends Controller
             'serial' => $new,
             'swapped_with' => $holder?->name,
             'message' => $holder
-                ? 'Swapped with “'.\Illuminate\Support\Str::limit($holder->name, 30).'”'.($old ? ' (now #'.$old.')' : ' (ID cleared)')
+                ? 'Swapped with “'.Str::limit($holder->name, 30).'”'.($old ? ' (now #'.$old.')' : ' (ID cleared)')
                 : 'Saved',
         ]);
     }
@@ -400,7 +408,7 @@ class ProductController extends Controller
             return back()->with('error', 'ID #'.$conflict->serial.' is already used by “'.$conflict->name.'”'.($conflict->trashed() ? ' (deleted)' : '').'. Pick another number.');
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($serials) {
+        DB::transaction(function () use ($serials) {
             // Two-phase write so swapping numbers can't trip the unique index.
             Product::withTrashed()->whereIn('id', $serials->keys())->update(['serial' => null]);
             foreach ($serials->filter() as $id => $serial) {
@@ -419,7 +427,7 @@ class ProductController extends Controller
         }
 
         $raw = json_decode((string) $request->input('content_sections_json'), true);
-        $product->content_sections = \App\Models\ContentTemplate::cleanSections($raw);
+        $product->content_sections = ContentTemplate::cleanSections($raw);
         $product->save();
     }
 
@@ -428,9 +436,9 @@ class ProductController extends Controller
     {
         $request->validate(['image' => ['required', 'image', 'max:8192']]);
 
-        $path = app(\App\Services\ImageOptimizer::class)->storeWebp($request->file('image'), 'sections', 1600, 82);
+        $path = app(ImageOptimizer::class)->storeWebp($request->file('image'), 'sections', 1600, 82);
 
-        return response()->json(['url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path)]);
+        return response()->json(['url' => Storage::disk('public')->url($path)]);
     }
 
     /** Save a product's current sections as a reusable content template. */
@@ -438,7 +446,7 @@ class ProductController extends Controller
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:120']]);
 
-        $sections = \App\Models\ContentTemplate::cleanSections(
+        $sections = ContentTemplate::cleanSections(
             json_decode((string) $request->input('content_sections_json'), true)
         );
 
@@ -446,7 +454,7 @@ class ProductController extends Controller
             return back()->with('error', 'Add at least one section before saving it as a template.');
         }
 
-        \App\Models\ContentTemplate::create(['name' => $data['name'], 'sections' => $sections]);
+        ContentTemplate::create(['name' => $data['name'], 'sections' => $sections]);
 
         return back()->with('success', 'Saved as template “'.$data['name'].'”.');
     }
@@ -459,9 +467,7 @@ class ProductController extends Controller
         // `serial` (the admin's Product ID) is UNIQUE, so copying it fails the
         // insert outright — every duplicate attempt was a 500. Leaving it unset
         // lets Product::creating() hand out the next free number instead.
-        // `woo_id` is dropped for the same reason it shouldn't be shared: the
-        // copy is not the WooCommerce product the original was imported from.
-        $copy = $product->replicate(['slug', 'sku', 'views', 'serial', 'woo_id']);
+        $copy = $product->replicate(['slug', 'sku', 'views', 'serial']);
         $copy->name = $product->name.' (copy)';
         $copy->slug = Product::uniqueSlug($copy->name);
         $copy->sku = $product->sku ? $product->sku.'-COPY' : null;
@@ -525,7 +531,7 @@ class ProductController extends Controller
         }
         $product->save();
         $product = $product->fresh();
-        app(\App\Services\StockAlertService::class)->handleProductChange($product, $wasAvailable, $oldPrice);
+        app(StockAlertService::class)->handleProductChange($product, $wasAvailable, $oldPrice);
 
         // Saved inline from the product list: hand back the recomputed figures
         // so the row updates in place instead of reloading the whole page
@@ -702,7 +708,7 @@ class ProductController extends Controller
         };
 
         $msg = $data['action'] === 'category'
-            ? "$count product(s) set to ".count($catIds)." selected category(ies)."
+            ? "$count product(s) set to ".count($catIds).' selected category(ies).'
             : "$count product(s) updated.";
 
         return back()->with('success', $msg);
@@ -789,7 +795,7 @@ class ProductController extends Controller
             // Admin-managed display ID. The unique check must include trashed
             // products — they still hold their number in the DB unique index.
             'serial' => ['nullable', 'integer', 'min:1',
-                \Illuminate\Validation\Rule::unique('products', 'serial')->ignore($product?->id)],
+                Rule::unique('products', 'serial')->ignore($product?->id)],
             'sku' => ['nullable', 'string', 'max:80'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'category_ids' => ['nullable', 'array'],
@@ -835,7 +841,7 @@ class ProductController extends Controller
             'quantity_offers' => ['nullable', 'array'],
             // 1 = applies to every order of this product, no bundle needed.
             'quantity_offers.*.min_qty' => ['nullable', 'integer', 'min:1', 'max:999'],
-            'quantity_offers.*.type' => ['nullable', 'in:'.implode(',', \App\Models\Product::OFFER_TYPES)],
+            'quantity_offers.*.type' => ['nullable', 'in:'.implode(',', Product::OFFER_TYPES)],
             'quantity_offers.*.value' => ['nullable', 'numeric', 'min:0.01', 'max:9999999'],
             'quantity_offers.*.title' => ['nullable', 'string', 'max:60'],
             'quantity_offers.*.badge' => ['nullable', 'string', 'max:24'],
@@ -915,7 +921,7 @@ class ProductController extends Controller
 
                 return [
                     'min_qty' => max(1, (int) $t['min_qty']),
-                    'type' => in_array($t['type'] ?? null, \App\Models\Product::OFFER_TYPES, true) ? $t['type'] : 'percent',
+                    'type' => in_array($t['type'] ?? null, Product::OFFER_TYPES, true) ? $t['type'] : 'percent',
                     'value' => (float) $t['value'],
                     'title' => trim((string) ($t['title'] ?? '')),
                     'badge' => trim((string) ($t['badge'] ?? '')),
@@ -997,7 +1003,7 @@ class ProductController extends Controller
 
         if ($request->hasFile('images')) {
             $optimizer = app(ImageOptimizer::class);
-            $watermark = app(\App\Services\WatermarkService::class);
+            $watermark = app(WatermarkService::class);
             $autoStamp = ! empty($watermark->settings()['auto_products']) && $watermark->isReady();
             foreach ($request->file('images') as $file) {
                 $stored = $optimizer->storeWebp($file, 'products');
@@ -1044,6 +1050,7 @@ class ProductController extends Controller
         // Simple product → no variants.
         if ($request->input('product_type') !== 'variable') {
             $product->variants()->delete();
+
             return;
         }
 

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Customer\GoogleController;
 use App\Models\Setting;
+use App\Services\BdCourierService;
 use App\Services\SmsService;
 use App\Services\SteadfastService;
 use Illuminate\Http\Request;
@@ -38,8 +40,9 @@ class IntegrationController extends Controller
             'smsOk' => $sms->isEnabled(),
             'webhookUrl' => route('steadfast.webhook'),
             'smsBalance' => $sms->isEnabled() ? $sms->getBalance() : [],
-            'googleOk' => \App\Http\Controllers\Customer\GoogleController::isEnabled(),
+            'googleOk' => GoogleController::isEnabled(),
             'googleRedirect' => route('customer.google.callback'),
+            'bdCourierOk' => app(BdCourierService::class)->isConfigured(),
         ]);
     }
 
@@ -60,6 +63,12 @@ class IntegrationController extends Controller
             // Google OAuth
             'google_client_id' => ['nullable', 'string', 'max:200'],
             'google_client_secret' => ['nullable', 'string', 'max:200'],
+            // BDCourier (COD fraud check)
+            'bdcourier_enabled' => ['nullable', 'boolean'],
+            'bdcourier_base_url' => ['nullable', 'string', 'max:200'],
+            'bdcourier_api_key' => ['nullable', 'string', 'max:300'],
+            'bdcourier_safe_threshold' => ['nullable', 'numeric', 'between:0,100'],
+            'bdcourier_warning_threshold' => ['nullable', 'numeric', 'between:0,100'],
             // Templates
             'templates' => ['nullable', 'array'],
             'templates.*' => ['nullable', 'string', 'max:600'],
@@ -70,11 +79,19 @@ class IntegrationController extends Controller
         $int = is_array($int) ? $int : [];
 
         foreach (['steadfast_base_url', 'steadfast_api_key', 'steadfast_secret_key', 'steadfast_webhook_secret',
-                  'sms_base_url', 'sms_api_key', 'sms_secret_key', 'sms_caller_id',
-                  'google_client_id', 'google_client_secret'] as $key) {
+            'sms_base_url', 'sms_api_key', 'sms_secret_key', 'sms_caller_id',
+            'google_client_id', 'google_client_secret',
+            'bdcourier_base_url', 'bdcourier_api_key'] as $key) {
             $int[$key] = $data[$key] ?? null;
         }
         $int['sms_enabled'] = $request->boolean('sms_enabled');
+        $int['bdcourier_enabled'] = $request->boolean('bdcourier_enabled');
+        // Blank means "use the default", so store null rather than 0 — a 0 here
+        // would silently mark every customer Safe.
+        $int['bdcourier_safe_threshold'] = filled($data['bdcourier_safe_threshold'] ?? null)
+            ? (float) $data['bdcourier_safe_threshold'] : null;
+        $int['bdcourier_warning_threshold'] = filled($data['bdcourier_warning_threshold'] ?? null)
+            ? (float) $data['bdcourier_warning_threshold'] : null;
 
         Setting::put('integrations', $int);
 

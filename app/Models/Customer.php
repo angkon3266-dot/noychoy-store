@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
@@ -9,7 +10,7 @@ class Customer extends Authenticatable
 {
     protected $fillable = [
         'name', 'phone', 'email', 'password', 'total_orders',
-        'total_spent', 'points', 'points_lifetime', 'last_order_at', 'blacklisted', 'notes', 'woo_id',
+        'total_spent', 'points', 'points_lifetime', 'last_order_at', 'blacklisted', 'notes',
         'google_id', 'avatar', 'referral_code', 'referred_by', 'referral_rewarded', 'gender',
     ];
 
@@ -76,7 +77,7 @@ class Customer extends Authenticatable
         return $this->hasMany(CustomerOffer::class)->latest();
     }
 
-    public function segments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function segments(): BelongsToMany
     {
         return $this->belongsToMany(CustomerSegment::class, 'customer_segment_members');
     }

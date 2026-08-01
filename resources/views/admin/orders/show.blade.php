@@ -291,6 +291,120 @@
             @endif
         </div>
 
+        <!-- BDCourier — COD risk check across every courier -->
+        @if($bdCourierOn)
+            @php
+                $tones = [
+                    'green' => ['bg-green-50 border-green-200', 'bg-green-100 text-green-700', 'text-green-900/70'],
+                    'amber' => ['bg-amber-50 border-amber-200', 'bg-amber-100 text-amber-700', 'text-amber-900/70'],
+                    'red'   => ['bg-red-50 border-red-200',     'bg-red-100 text-red-700',     'text-red-900/70'],
+                    'ink'   => ['bg-ink-50 border-ink-200',     'bg-ink-100 text-ink-700',     'text-ink-700/70'],
+                ];
+            @endphp
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold">Courier history (BDCourier)</h2>
+                    @if($bdCourier)
+                        <span class="text-[11px] text-ink-700/45"
+                              title="Cached — press again to refresh">checked {{ \Illuminate\Support\Carbon::parse($bdCourier['checked_at'])->diffForHumans() }}</span>
+                    @endif
+                </div>
+
+                @if(! $bdCourier)
+                    <p class="text-sm text-ink-700/60 mb-3">
+                        Check how many parcels <strong>{{ $order->customer_phone }}</strong> has accepted
+                        versus refused across every major courier, before you ship COD.
+                    </p>
+                @else
+                    @php [$panelTone, $badgeTone, $noteTone] = $tones[$bdCourier['risk']['tone']] ?? $tones['ink']; @endphp
+
+                    <div class="rounded-lg border {{ $panelTone }} px-3 py-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="badge {{ $badgeTone }}">{{ $bdCourier['risk']['label'] }}</span>
+                            <span class="text-lg font-semibold">{{ $bdCourier['summary']['success_ratio'] }}%</span>
+                            <span class="text-xs text-ink-700/50">success rate</span>
+                        </div>
+                        <p class="mt-1 text-xs {{ $noteTone }}">{{ $bdCourier['risk']['note'] }}</p>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 text-center mb-4">
+                        <div class="rounded-lg bg-ink-50 py-2">
+                            <div class="text-lg font-semibold">{{ number_format($bdCourier['summary']['total_parcel']) }}</div>
+                            <div class="text-[11px] text-ink-700/55">Total orders</div>
+                        </div>
+                        <div class="rounded-lg bg-green-50 py-2">
+                            <div class="text-lg font-semibold text-green-700">{{ number_format($bdCourier['summary']['success_parcel']) }}</div>
+                            <div class="text-[11px] text-ink-700/55">Delivered</div>
+                        </div>
+                        <div class="rounded-lg bg-red-50 py-2">
+                            <div class="text-lg font-semibold text-red-700">{{ number_format($bdCourier['summary']['cancelled_parcel']) }}</div>
+                            <div class="text-[11px] text-ink-700/55">Cancelled</div>
+                        </div>
+                    </div>
+
+                    @if(! empty($bdCourier['couriers']))
+                        <details class="mb-3">
+                            <summary class="cursor-pointer text-xs font-medium text-ink-700/70 hover:text-ink-900">
+                                Breakdown by courier ({{ count($bdCourier['couriers']) }})
+                            </summary>
+                            <table class="mt-2 w-full text-xs">
+                                <thead class="text-ink-700/50 text-left">
+                                    <tr><th class="py-1">Courier</th><th class="py-1 text-right">Total</th><th class="py-1 text-right">OK</th><th class="py-1 text-right">Cancel</th><th class="py-1 text-right">Rate</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-ink-100">
+                                    @foreach($bdCourier['couriers'] as $c)
+                                        <tr>
+                                            <td class="py-1.5">
+                                                <span class="flex items-center gap-1.5">
+                                                    @if($c['logo'])<img src="{{ $c['logo'] }}" alt="" class="h-4 w-4 rounded object-contain" loading="lazy">@endif
+                                                    {{ $c['name'] }}
+                                                </span>
+                                            </td>
+                                            <td class="py-1.5 text-right">{{ $c['total_parcel'] }}</td>
+                                            <td class="py-1.5 text-right text-green-700">{{ $c['success_parcel'] }}</td>
+                                            <td class="py-1.5 text-right text-red-700">{{ $c['cancelled_parcel'] }}</td>
+                                            <td class="py-1.5 text-right font-medium">{{ $c['success_ratio'] }}%</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </details>
+                    @endif
+
+                    @if(! empty($bdCourier['reports']))
+                        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-3 mb-3">
+                            <p class="text-sm font-semibold text-red-800">
+                                ⚠️ Fraud reports ({{ count($bdCourier['reports']) }})
+                            </p>
+                            <ul class="mt-2 space-y-2">
+                                @foreach($bdCourier['reports'] as $r)
+                                    <li class="text-xs text-red-900/80">
+                                        <div class="flex items-center gap-1.5 font-medium">
+                                            @if(! empty($r['courierLogo']))<img src="{{ $r['courierLogo'] }}" alt="" class="h-3.5 w-3.5 rounded object-contain" loading="lazy">@endif
+                                            {{ $r['name'] ?? 'Reported' }}
+                                            @if(! empty($r['courierName']))<span class="text-red-900/50">· {{ $r['courierName'] }}</span>@endif
+                                        </div>
+                                        @if(! empty($r['details']))<p class="mt-0.5">{{ $r['details'] }}</p>@endif
+                                        @if(! empty($r['created_at']))
+                                            <p class="text-red-900/45">{{ \Illuminate\Support\Carbon::parse($r['created_at'])->format('d M Y') }}</p>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                @endif
+
+                <form action="{{ route('admin.orders.courier-check', $order) }}" method="POST">
+                    @csrf
+                    <button class="btn-outline w-full">
+                        {{ $bdCourier ? '↻ Re-check courier history' : '🔍 Check courier history' }}
+                    </button>
+                </form>
+                <p class="mt-2 text-[11px] text-ink-700/40 text-center">Uses one BDCourier credit.</p>
+            </div>
+        @endif
+
         <!-- Steadfast -->
         <div class="card p-5">
             <div class="flex items-center justify-between mb-3">

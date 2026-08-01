@@ -330,7 +330,6 @@ Add that IP to the KhudeBarta panel's allowed-IP list.
 - [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) — current state of the codebase, open items.
 
 > The WooCommerce migration guide and the Namecheap deploy guide were removed on
-> 2026-08-01: the catalog migration is complete, and the site does not run on
-> Namecheap. The `woo:import` command still exists
-> (`app/Console/Commands/WooImport.php`) — run `php artisan woo:import --help`
-> if you ever need it again.
+> 2026-08-01, and WooCommerce support itself was removed on 2026-08-02: the
+> `woo:import` command, its config and its database columns are all gone. The
+> site does not run on Namecheap.

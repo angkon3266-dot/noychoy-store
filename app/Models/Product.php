@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Jobs\SyncProductKnowledge;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class Product extends Model
@@ -19,7 +22,7 @@ class Product extends Model
         'serial', 'name', 'slug', 'sku', 'category_id', 'short_description', 'description',
         'price', 'compare_at_price', 'cost_price', 'transport_cost', 'manage_stock', 'stock_quantity',
         'in_stock', 'weight', 'has_variants', 'options', 'status', 'is_featured',
-        'views', 'meta_title', 'meta_description', 'woo_id',
+        'views', 'meta_title', 'meta_description',
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
         'is_preorder', 'preorder_release_date', 'preorder_note', 'tags', 'colors',
         'custom_label', 'custom_value', 'custom_show', 'custom_fields', 'loves_count',
@@ -113,7 +116,7 @@ class Product extends Model
         // (queued; skipped in tests so suites don't write files).
         static::saved(function (Product $product) {
             if (! app()->environment('testing')) {
-                \App\Jobs\SyncProductKnowledge::dispatch($product->id);
+                SyncProductKnowledge::dispatch($product->id);
             }
         });
     }
@@ -126,6 +129,7 @@ class Product extends Model
         while (static::withTrashed()->where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
             $slug = $base.'-'.(++$i);
         }
+
         return $slug;
     }
 
@@ -191,11 +195,11 @@ class Product extends Model
     }
 
     /** Most recent Meta sync timestamp, or null. */
-    public function metaLastSyncedAt(): ?\Illuminate\Support\Carbon
+    public function metaLastSyncedAt(): ?Carbon
     {
         $states = $this->relationLoaded('metaSyncStates') ? $this->metaSyncStates : $this->metaSyncStates()->get();
 
-        return $states->max('last_synced_at') ? \Illuminate\Support\Carbon::parse($states->max('last_synced_at')) : null;
+        return $states->max('last_synced_at') ? Carbon::parse($states->max('last_synced_at')) : null;
     }
 
     public function approvedReviews(): HasMany
@@ -217,7 +221,7 @@ class Product extends Model
         }
 
         return config('meta.defaults.google_product_category')
-            ?: (\App\Models\Setting::get('google_product_category') ?: null);
+            ?: (Setting::get('google_product_category') ?: null);
     }
 
     /** Resolved pre-order state: product flag OR its category default. */
@@ -257,10 +261,11 @@ class Product extends Model
         if (blank($term)) {
             return $query;
         }
+
         return $query->where(function ($q) use ($term) {
             $q->where('name', 'like', "%{$term}%")
-              ->orWhere('sku', 'like', "%{$term}%")
-              ->orWhere('short_description', 'like', "%{$term}%");
+                ->orWhere('sku', 'like', "%{$term}%")
+                ->orWhere('short_description', 'like', "%{$term}%");
         });
     }
 
@@ -283,6 +288,7 @@ class Product extends Model
         if (! $this->is_on_sale) {
             return null;
         }
+
         return (int) round(100 - ($this->price / $this->compare_at_price * 100));
     }
 
@@ -294,6 +300,7 @@ class Product extends Model
         if (! $this->manage_stock) {
             return $this->in_stock;
         }
+
         return $this->stock_quantity > 0;
     }
 
@@ -456,18 +463,18 @@ class Product extends Model
     // ── Manual relationships (upsell / cross-sell) ──────────────────────────
 
     /** Published products listed as upsells ("You may also like"). */
-    public function upsells(): \Illuminate\Support\Collection
+    public function upsells(): Collection
     {
         return $this->loadRelatedByIds($this->upsell_ids);
     }
 
     /** Published products listed as cross-sells ("Frequently bought together"). */
-    public function crossSells(): \Illuminate\Support\Collection
+    public function crossSells(): Collection
     {
         return $this->loadRelatedByIds($this->cross_sell_ids);
     }
 
-    protected function loadRelatedByIds($ids): \Illuminate\Support\Collection
+    protected function loadRelatedByIds($ids): Collection
     {
         $ids = collect($ids ?? [])->filter()->map(fn ($i) => (int) $i)->reject(fn ($i) => $i === $this->id)->values();
         if ($ids->isEmpty()) {

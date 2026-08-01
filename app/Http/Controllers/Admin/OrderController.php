@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Services\BdCourierService;
 use App\Services\CustomerInsight;
 use App\Services\NotificationService;
 use App\Services\PushTemplateService;
@@ -126,12 +127,18 @@ class OrderController extends Controller
             }
         }
 
+        // BDCourier: render only what a previous click already fetched. Never
+        // call the API here — lookups cost plan quota and this is a page view.
+        $bdCourier = app(BdCourierService::class);
+
         return view('admin.orders.show', [
             'order' => $order,
             'statuses' => Order::STATUSES,
             'insight' => $insight->forPhone($order->customer_phone, $order->id),
             'courier' => $courier,
             'balance' => $balance,
+            'bdCourierOn' => $bdCourier->isConfigured(),
+            'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
         ]);
     }
 
@@ -524,6 +531,26 @@ class OrderController extends Controller
         if ($payload) {
             app(NotificationService::class)->pushToCustomer((int) $order->customer_id, $payload);
         }
+    }
+
+    /**
+     * Look this customer's phone up on BDCourier (on demand — it costs plan
+     * quota, so nothing here runs on a plain page view). The result is cached
+     * per phone by the service, and the order page renders it from that cache.
+     */
+    public function courierCheck(Order $order, BdCourierService $bdCourier)
+    {
+        if (blank($order->customer_phone)) {
+            return back()->with('error', 'This order has no phone number to check.');
+        }
+
+        $result = $bdCourier->check($order->customer_phone);
+
+        if (! ($result['ok'] ?? false)) {
+            return back()->with('error', $result['error'] ?? 'Courier check failed.');
+        }
+
+        return back()->with('success', 'Courier history updated for '.$order->customer_phone.'.');
     }
 
     public function refreshShipment(Order $order, SteadfastService $steadfast)

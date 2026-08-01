@@ -11,7 +11,7 @@ class Category extends Model
 {
     protected $fillable = [
         'name', 'slug', 'parent_id', 'description', 'image', 'product_template', 'google_category',
-        'position', 'is_active', 'is_preorder', 'meta_title', 'meta_description', 'woo_id',
+        'position', 'is_active', 'is_preorder', 'meta_title', 'meta_description',
     ];
 
     /**
@@ -58,6 +58,7 @@ class Category extends Model
         while (static::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
             $slug = $base.'-'.(++$i);
         }
+
         return $slug;
     }
 
