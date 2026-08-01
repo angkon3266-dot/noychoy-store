@@ -1,8 +1,8 @@
 # Working agreement
 
 Operational rules for Claude on this repository. Project documentation lives in
-`README.md`, `DEPLOY.md`, `NAMECHEAP-DEPLOY.md`, `WOO-IMPORT.md` and `docs/` —
-this file does not repeat any of it.
+`README.md`, `DEPLOY.md`, `GITHUB-GUIDE.md` and `docs/` — this file does not
+repeat any of it.
 
 ## Working copy
 

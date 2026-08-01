@@ -24,6 +24,63 @@ server and the current code on **2026-08-01**.
 
 ---
 
+## Deployment flow — the 5-minute checklist
+
+Everything you need for a routine deploy. The rest of this guide is background;
+if you're in a hurry, this section is enough.
+
+**1 · Push your work from your PC**
+```bash
+git push origin main
+```
+Changed any CSS or JS first? `npm run build`, then commit `public/build` — there
+is no `npm` step on the server. *(You don't pull on the server: `deploy.sh` does
+that for you in step 2.)*
+
+**2 · Run the deploy script**
+```bash
+ssh hostnin "cd ~/repositories/noychoy-store && bash deploy.sh"
+```
+It stops on the first error. If it stops, fix that before going on.
+
+**3 · Verify migrations ran**
+```bash
+ssh hostnin "cd ~/repositories/noychoy-store && php artisan migrate:status | tail -5"
+```
+Every row should read `Ran`. `deploy.sh` prints `Nothing to migrate` when there
+was nothing new — that's fine.
+
+**4 · Verify queue health**
+```bash
+ssh hostnin "cd ~/repositories/noychoy-store && php artisan queue:monitor default && php artisan queue:why"
+```
+Expect `[database] default … [0] OK`. A pending count that keeps climbing means
+the scheduler isn't running ([§4](#4-how-queued-jobs-actually-run)).
+`queue:why` prints the exception behind anything that failed.
+
+**5 · Flush the LiteSpeed page cache** — cPanel → **LiteSpeed Web Cache Manager
+→ Flush All**. Needed whenever visible page output changed (Blade, content,
+assets).
+
+**6 · Reset OPcache** — cPanel → **MultiPHP Manager** → toggle the PHP version
+away and back. Needed whenever **any `.php` file changed**, which is most
+deploys. Skipping this is the #1 reason "my change didn't go live" — the CLI and
+the web server run separate PHP processes, and the web one is still holding your
+old code.
+
+**7 · Browser smoke test** — open <https://meridianeclat.shop> and check:
+home page loads → a product page → add to cart → cart totals look right. Then
+`/admin` still logs in. Two minutes, and it catches almost everything.
+
+> **Rollback:** if something is badly wrong, redeploy the previous commit:
+> ```bash
+> ssh hostnin "cd ~/repositories/noychoy-store && git reset --hard <previous-sha> && composer install --no-dev --optimize-autoloader && php artisan optimize:clear && php artisan optimize"
+> ```
+> Then repeat steps 5 and 6. Note this does **not** undo a migration — check
+> whether the bad deploy ran one before rolling back.
+
+---
+
 ## 1. Deploying an update — the normal case
 
 This is the whole thing. From your PC, push your work:
@@ -268,6 +325,12 @@ Add that IP to the KhudeBarta panel's allowed-IP list.
 ## Related guides
 
 - [GITHUB-GUIDE.md](GITHUB-GUIDE.md) — pushing from your PC, for absolute beginners.
-- [WOO-IMPORT.md](WOO-IMPORT.md) — migrating the old WooCommerce catalog and orders.
 - [docs/SYSTEM_CONFIG.md](docs/SYSTEM_CONFIG.md) — managing config from the admin panel instead of `.env`.
-- [NAMECHEAP-DEPLOY.md](NAMECHEAP-DEPLOY.md) — **superseded.** Kept for reference only; the site no longer runs on Namecheap.
+- [docs/META_INTEGRATION.md](docs/META_INTEGRATION.md) — Meta catalog sync, Pixel and Conversions API.
+- [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) — current state of the codebase, open items.
+
+> The WooCommerce migration guide and the Namecheap deploy guide were removed on
+> 2026-08-01: the catalog migration is complete, and the site does not run on
+> Namecheap. The `woo:import` command still exists
+> (`app/Console/Commands/WooImport.php`) — run `php artisan woo:import --help`
+> if you ever need it again.
