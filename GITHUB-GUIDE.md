@@ -71,10 +71,14 @@ That's it. Repeat forever.
 
 After you `git push` from your PC, log into the server (cPanel → Terminal / SSH) and run:
 ```bash
-cd ~/noychoy-store
+cd ~/repositories/noychoy-store
 bash deploy.sh
 ```
 That pulls your changes and refreshes the site. (See [DEPLOY.md](DEPLOY.md) for what it does.)
+
+> Two things `deploy.sh` cannot do: flush the **LiteSpeed page cache** and reset
+> the **PHP OPcache**. Do both in cPanel afterwards or your changes won't be
+> live — see [DEPLOY.md §2](DEPLOY.md#2-after-every-deploy-two-manual-steps).
 
 So the full loop is:
 ```

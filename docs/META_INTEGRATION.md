@@ -196,16 +196,18 @@ can suppress the corresponding fields.
 
 ## 7. Queue setup
 
-Sync runs on Laravel queues (this app uses the **database** driver). Run a
-worker as a persistent process:
+Sync runs on Laravel queues (this app uses the **database** driver).
 
-```bash
-php artisan queue:work --tries=5 --backoff=60,300,900,1800 --timeout=120
-```
+**No separate worker setup is needed.** The scheduler already runs one every
+minute — `routes/console.php` schedules
+`queue:work database --queue=default --stop-when-empty --max-time=50`, which
+drains the same `default` queue these sync jobs use. All you need is the single
+`schedule:run` cron entry from §8. See
+[DEPLOY.md §4](../DEPLOY.md#4-how-queued-jobs-actually-run) for the full picture.
 
-On shared cPanel, add it as a **Cron job** that keeps the worker alive, or use
-`queue:work --stop-when-empty` on a frequent schedule. Batches and failed jobs
-use the `job_batches` / `failed_jobs` tables (already migrated).
+Each job carries its own `tries()` / `backoff()`, so retry behaviour comes from
+the job rather than from worker flags. Batches and failed jobs use the
+`job_batches` / `failed_jobs` tables (already migrated).
 
 Retry failed jobs manually any time:
 
@@ -219,16 +221,21 @@ php artisan queue:retry all
 
 ## 8. Cron setup (scheduler)
 
-Add the single Laravel scheduler entry to your server's crontab:
+Add the single Laravel scheduler entry to your server's crontab. Use the absolute
+path to the PHP binary — cron's `PATH` often points at an older PHP:
 
 ```cron
-* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1
+* * * * * /opt/alt/php83/usr/bin/php /home/noycuuae/repositories/noychoy-store/artisan schedule:run >> /dev/null 2>&1
 ```
 
-This drives:
+This one entry drives everything Meta needs:
 
+- **Every minute** — the queue worker that actually processes sync jobs (§7).
 - **Hourly** — `RetryFailedMetaSyncs` (re-queues failed products).
 - **Daily 03:30** — `VerifyCatalogSync` (re-queues anything not in sync).
+
+…plus the store's other scheduled work (notifications, win-back, abandoned-cart
+pushes, drip campaigns, log pruning). `php artisan schedule:list` shows the lot.
 
 ---
 

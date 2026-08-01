@@ -1,5 +1,18 @@
 # Deploying to Namecheap Shared Hosting (cPanel + SSH)
 
+> ## ⚠️ Superseded — do not follow this guide
+>
+> The site does **not** run on Namecheap. It runs on **Hostnin**, at
+> `~/repositories/noychoy-store`, serving `meridianeclat.shop`.
+>
+> **Use [DEPLOY.md](DEPLOY.md) instead.**
+>
+> Everything below is kept for reference only, and is known to be out of date:
+> it uses the old `~/noychoy-store` path, the old `nocyhoy.com` domain, a
+> `public_html` symlink the live site does not use, and a second `queue:work`
+> cron entry that is **redundant** — the scheduler starts the queue worker
+> itself (see [DEPLOY.md §4](DEPLOY.md#4-how-queued-jobs-actually-run)).
+
 Step-by-step for **nocyhoy.com** on Namecheap shared hosting. Assets are
 pre-built and committed, so **no `npm` is needed on the server**.
 

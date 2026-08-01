@@ -141,9 +141,9 @@ In rough order of value.
   never fired in production. It would have on the first campaign.
 - Steadfast is fully configured with a live consignment, so §1.2 *was* live.
 - Queue drains via the scheduler (`queue:work --stop-when-empty --max-time=50`
-  every minute), not a second cron entry — `DEPLOY.md` still says otherwise and
-  still uses the old `~/noychoy-store` path. Production lives at
-  `~/repositories/noychoy-store`.
+  every minute) on the `default` queue, not a second cron entry. Production lives
+  at `~/repositories/noychoy-store` and serves `meridianeclat.shop`.
+  `DEPLOY.md` was rewritten on 2026-08-01 to match all of this.
 - Cache is Redis, sessions and queue are database, `APP_DEBUG=false`. Correct.
 - 8 failed jobs are pre-fix residue from 2026-07-27 (all `SendOrderPlacedEffects`
   `ModelNotFoundException`, from before `$deleteWhenMissingModels` landed the
