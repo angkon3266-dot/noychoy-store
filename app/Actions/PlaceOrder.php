@@ -34,31 +34,36 @@ class PlaceOrder
 
         $insideDhaka = (bool) ($data['is_inside_dhaka'] ?? false);
 
-        // Enforce per-customer coupon limit now that we know the phone.
-        if (($coupon = $this->cart->coupon()) && $coupon->customerLimitReached($data['phone'])) {
-            $this->cart->removeCoupon();
-        }
-
-        $subtotal = $this->cart->subtotal();
-        $discount = $this->cart->discount();
-        $shipping = $this->cart->shipping($insideDhaka);
-        $coupon = $this->cart->coupon();
-
-        // Loyalty points the customer chose to redeem (already reflected in $discount).
-        $pointsRedeemed = $this->cart->redeemablePoints();
-        $pointsDiscount = $this->cart->pointsDiscount();
-
-        // Personalized offer applied to this order (marked redeemed after placing).
-        $customerOffer = $this->cart->customerOffer();
-
-        // Member-pricing portion of the discount (for "saved as a member" totals).
-        $memberDiscount = $this->cart->memberSignupDiscount();
-
-        $order = DB::transaction(function () use ($data, $insideDhaka, $subtotal, $discount, $shipping, $coupon, $pointsRedeemed, $pointsDiscount, $customerOffer, $memberDiscount) {
+        $order = DB::transaction(function () use ($data, $insideDhaka) {
             // Re-validate every line against live data, holding row locks so two
             // simultaneous checkouts can't both take the last unit. Throws
             // CheckoutException (rolling back) if anything no longer holds.
             [$products, $variants] = $this->validateLines();
+
+            // Enforce per-customer coupon limit now that we know the phone.
+            if (($coupon = $this->cart->coupon()) && $coupon->customerLimitReached($data['phone'])) {
+                $this->cart->removeCoupon();
+            }
+
+            // Totals are read AFTER validation, not before: validateLines() can
+            // reprice a line or refresh a stale offer snapshot, and totals taken
+            // beforehand would bake in the values it just corrected. It also
+            // closes the window where the cart could change between pricing the
+            // order and writing it.
+            $subtotal = $this->cart->subtotal();
+            $discount = $this->cart->discount();
+            $shipping = $this->cart->shipping($insideDhaka);
+            $coupon = $this->cart->coupon();
+
+            // Loyalty points the customer chose to redeem (already in $discount).
+            $pointsRedeemed = $this->cart->redeemablePoints();
+            $pointsDiscount = $this->cart->pointsDiscount();
+
+            // Personalized offer applied to this order (marked redeemed below).
+            $customerOffer = $this->cart->customerOffer();
+
+            // Member-pricing portion of the discount (for "saved as a member").
+            $memberDiscount = $this->cart->memberSignupDiscount();
 
             // A logged-in customer always owns their own order. Check this FIRST:
             // running firstOrCreate() unconditionally created a junk customer row
@@ -201,6 +206,7 @@ class PlaceOrder
             ->lockForUpdate()->get()->keyBy('id');
 
         $repriced = [];
+        $offersReduced = [];
 
         foreach ($items as $item) {
             $product = $products->get($item['product_id']);
@@ -250,11 +256,34 @@ class PlaceOrder
                 $this->cart->repriceLine($item['key'], $current);
                 $repriced[] = $item['name'];
             }
+
+            // Offer check — quantity/bundle tiers are snapshotted when the item is
+            // added, so a cart could keep claiming a discount the admin has since
+            // cut or withdrawn. Refresh the snapshot either way; only make the
+            // customer re-confirm when the offer got WORSE, since a better one
+            // costs them nothing.
+            $liveTiers = $product->offerTiers();
+            $snapshot = $item['offers'] ?? [];
+
+            if (CartService::offerSignature($liveTiers) !== CartService::offerSignature($snapshot)) {
+                $this->cart->refreshLineOffers($item['key'], $liveTiers);
+
+                $qty = (int) $item['qty'];
+                if (round($product->offerPercentForQty($qty), 2) < round($this->cart->lineOfferPercent($item), 2)) {
+                    $offersReduced[] = $item['name'];
+                }
+            }
         }
 
         if ($repriced !== []) {
             throw new CheckoutException(
                 'Prices were updated for: '.implode(', ', $repriced).'. Please review your cart before ordering.'
+            );
+        }
+
+        if ($offersReduced !== []) {
+            throw new CheckoutException(
+                'The offer on '.implode(', ', $offersReduced).' has changed. Please review your cart before ordering.'
             );
         }
 

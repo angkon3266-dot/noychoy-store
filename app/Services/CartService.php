@@ -93,6 +93,34 @@ class CartService
         }
     }
 
+    /**
+     * Overwrite a line's snapshotted quantity-offer tiers (checkout re-validation).
+     *
+     * Tiers are captured when the item is added, so a cart could otherwise carry
+     * a withdrawn "buy 2, save 30%" offer for as long as the session lived.
+     */
+    public function refreshLineOffers(string $key, array $offers): void
+    {
+        $items = session($this->sessionKey, []);
+        if (isset($items[$key])) {
+            $items[$key]['offers'] = $offers;
+            session([$this->sessionKey => $items]);
+            $this->forgetMemo();
+        }
+    }
+
+    /**
+     * Stable signature of a line's offer tiers — min_qty and percent only, so a
+     * JSON round-trip through the session (ints becoming floats and back) does
+     * not read as a change.
+     */
+    public static function offerSignature(array $tiers): string
+    {
+        return collect($tiers)
+            ->map(fn ($t) => ((int) ($t['min_qty'] ?? 1)).':'.number_format((float) ($t['percent'] ?? 0), 2, '.', ''))
+            ->sort()->implode(',');
+    }
+
     public function update(string $key, int $qty): void
     {
         $items = session($this->sessionKey, []);

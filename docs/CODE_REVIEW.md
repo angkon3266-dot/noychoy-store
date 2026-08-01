@@ -1,93 +1,162 @@
 # Code Review — noychoy-store
-*Re-reviewed: 2026-07-16 (original 2026-07-15) · Laravel 13 / PHP 8.3 / Tailwind 4 / Alpine.js*
+*v3: 2026-08-01 (v1 2026-07-15 · v2 2026-07-16) · Laravel 13 / PHP 8.3 / Tailwind 4 / Alpine.js*
 
-**Overall verdict:** Well-built codebase, and materially hardened since the first review. All five critical issues from the original report are now **fixed and verified** (commit `2bb5f01` + follow-ups). What remains is mostly tests, refactoring polish, and feature gaps.
+**Overall verdict:** A solid, well-commented codebase. The five critical security
+issues from v1 remain fixed. This round audited the **money and inventory paths**
+end to end — code, HTTP tests, a real browser, and production over SSH — and
+found six live defects, all now fixed and covered by regression tests.
 
----
-
-## 1. Critical issues — ALL RESOLVED ✅
-
-Re-verified in code on 2026-07-16:
-
-| # | Original issue | Status |
-|---|----------------|--------|
-| 1.1 | No rate limiting on public endpoints | ✅ Fixed — named `otp` limiter (2/min per phone/email + 6/hr + 5/min per IP), `login` limiter (per account+IP with IP ceiling), admin login 5/min, checkout 5/min, reviews 5/10min, register, cart writes, push, love, lead all throttled |
-| 1.2 | Order confirmation enumerable (sequential numbers, no auth) | ✅ Fixed — page now requires the placing session (`placed_orders`), the logged-in owner, or a signed URL; others bounce to the phone-verified `/track` page. `generateNumber()` race handled with retry on unique-constraint violation |
-| 1.3 | Oversell — stock never checked, no locks | ✅ Fixed — `PlaceOrder::validateLines()` runs inside the transaction with `lockForUpdate()`, checks published status + stock ≥ qty (pre-orders exempt), throws `CheckoutException` with a friendly bounce to cart |
-| 1.4 | Stale session prices charged at checkout | ✅ Fixed — live price compared per line; mismatches reprice the cart and bounce the customer to review |
-| 1.5 | `LIKE '%phone%'` loose matching | ✅ Fixed — canonical `bd_phone()` exact matches in customer login, OTP (both flows), order tracking, verified-buyer check, CustomerInsight |
-
-Also nice: the locked product rows now double as the cost snapshot (removed the duplicate fetch and per-line `Product::find`), and the view counter only increments once per session via query-builder (no model events → no cache-bust/Meta-sync churn).
-
-### New minor notes on the fixes
-- **`GET /track` is unthrottled.** It's the fallback for viewing orders and takes order_number + phone. Order numbers are sequential, so an attacker who knows a target's phone can find their order in a few hundred requests. Low risk, one-line fix: `throttle:20,1`.
-- **No signed confirmation links are generated anywhere yet** — the `hasValidSignature()` branch is dead code until you add a signed URL to the invoice email/SMS ("view your order" link). Worth wiring up so email recipients can open the page on another device.
-- Canonical uses `url()->current()` — fine, just be aware paginated pages all canonicalize to page 1 of themselves (acceptable, arguably ideal).
+> **How to read this file.** Every claim below was verified on 2026-08-01 against
+> the code, the test suite, a browser session, and production. v2 of this document
+> had drifted badly out of date (it claimed tests were absent when 212 were
+> passing), so treat any undated assertion here as stale on sight and re-check it.
 
 ---
 
-## 2. Performance & SEO — mostly resolved ✅
+## 1. Fixed this round (commit `b75af87` + follow-up)
+
+Each of these was reproduced before being fixed, and each has a regression test
+that fails without its fix.
+
+### 1.1 Discounts could exceed the subtotal — free orders 🔴
+Every discount stage computed against the **raw** subtotal independently, so a
+20% quantity offer plus a 20% coupon took 20% of the original price *twice*.
+`Coupon::discountFor()` accepted a base and then ignored it whenever a cart was
+passed. Stacked far enough the checkout page rendered **"Total ৳-270 · saving
+৳1,400 (140% off)"** and stored a free order — shipping included, gross profit
+−৳400.
+
+**Fix:** `CartService::cascade()` applies discounts in order, each capped to what
+remains of the subtotal; `Coupon::discountFor()` now respects its base. A coupon
+can narrow its base, never widen it.
+
+### 1.2 Courier status changes skipped every side effect 🔴
+Stock restoration and the loyalty award lived inside `Admin\OrderController`,
+while `SteadfastWebhookController` wrote `status` directly. A courier
+cancellation therefore **never returned its stock** and a courier delivery
+**never paid the customer's points** — and courier callbacks are the normal path
+for a COD store.
+
+**Fix:** `App\Actions\TransitionOrderStatus` owns history, stock
+release/re-reserve, the loyalty award and the web push. Both the admin panel and
+the webhook call it, so the two cannot drift again.
+
+### 1.3 Sold-out items sold from a stale cart 🟠
+The stock check only ran inside `if ($product->manage_stock)`, so the manual
+`in_stock` toggle was never consulted at checkout. An item added while available
+and then marked sold out still went through. Retired variants (`is_active =
+false`) sold the same way. *(The product page has always hidden "Add to cart"
+correctly — this was only reachable via a cart that predated the change.)*
+
+### 1.4 Stale quantity-offer snapshots 🟠
+Offer tiers are captured into the cart line when an item is added, and checkout
+re-validated the price but never the tiers — so a session could keep claiming a
+discount the admin had withdrawn. Checkout now refreshes the snapshot and makes
+the customer re-confirm **only when the offer got worse**; a better offer applies
+silently. Totals also moved to *after* validation, so a corrected price or offer
+is reflected in the order rather than baked in beforehand.
+
+### 1.5 "Coupon applied." with no discount 🟠
+`applyCoupon()` validated against the raw subtotal while `CartService`
+re-validated against the real (lower) base, so a coupon over its minimum spend
+was accepted, reported as applied, and then silently discounted nothing.
+`couponBase()` is now public and both sides use it.
+
+### 1.6 Orphan customer records 🟠
+`Customer::firstOrCreate()` ran *before* the `auth()` check, so a logged-in
+member ordering to a different number — a gift — created a junk customer row with
+zero orders, polluting segments and CRM counts.
+
+### Also fixed
+- Cart-add resolved products by slug **without** the published scope (`addMany()`
+  already scoped correctly).
+- `ProductVariant::effective_price` lazy-loaded its parent product **inside the
+  row-locked checkout transaction**; the relation is now eager-loaded.
+- One `discount()` call cost **11 queries**, six of them the identical
+  member-usage count. The cascade is memoised per request (`CartService` is a
+  singleton); every mutating method clears it.
+
+---
+
+## 2. Still fixed from earlier rounds ✅
+
+Re-verified 2026-08-01:
 
 | Item | Status |
-|------|--------|
-| Homepage query caching | ✅ 10-min cache of the section plan (ids only — plays nice with the DB cache store) |
-| `.htaccess` compression + browser caching | ✅ deflate + expires rules added |
-| Double font download (Vite Bunny + Google) | ✅ Bundled families rejected from the Google Fonts URL |
-| View-count write per pageview | ✅ Once per session, event-less increment |
-| `sitemap.xml` | ✅ Route + controller, cached 1 hour; robots.txt references it |
-| Canonical tags | ✅ In the shop layout |
-| CRM/analytics indexes, memoised analytics | ✅ (commit `d09d8dc`) |
-
-### Still open (from §3 of the original)
-1. **Post-checkout side effects run inline** — SMS, invoice email, and Meta CAPI still execute synchronously inside `POST /checkout` (PlaceOrder.php:153–166). A slow SMS/HTTP call delays the customer's redirect. You already run a DB queue with a per-minute drain — fire an `OrderPlaced` event and queue these three.
-2. **Search is still `LIKE '%term%'`** across name/sku/short_description. Fine at current catalog size; revisit (FULLTEXT or Scout+Meilisearch) past a few thousand products.
-3. **Images** — WebP pipeline is good; `loading="lazy"` and explicit width/height are still inconsistent across storefront views; no `srcset`. Audit when convenient.
-4. **DB-backed sessions/cache/queue** — fine on shared hosting; Redis is the first upgrade if you move to a VPS.
+|---|---|
+| Rate limiting on public endpoints | ✅ named `otp`/`login` limiters, checkout 10/min, reviews 5/10min, cart writes 60/min |
+| Order confirmation not enumerable | ✅ session, owner, or signed URL |
+| **Signed confirmation links are now actually generated** | ✅ `SendOrderPlacedEffects` emails a `URL::signedRoute` — no longer dead code |
+| Oversell / row locks at checkout | ✅ `lockForUpdate()` inside the transaction |
+| Stale session prices | ✅ repriced and bounced |
+| `bd_phone()` exact matching | ✅ no `LIKE '%phone%'` left |
+| **`GET /track` throttled** | ✅ `throttle:20,1` |
+| **Post-checkout SMS / invoice / CAPI queued** | ✅ `SendOrderPlacedEffects`, with `$deleteWhenMissingModels` |
+| **`BdPhone` rule extracted** | ✅ one rule class, 7 call sites — no inline regex left |
+| Guest email backfill | ✅ filled on a later order |
+| Homepage caching, sitemap, canonicals, compression | ✅ |
 
 ---
 
-## 3. Code quality & structure — still open
+## 3. Test suite
 
-In order of value:
+**233 tests / 626 assertions, all passing** across 34 feature files plus unit
+tests. v2's "tests are essentially absent" is long obsolete.
 
-1. **Tests remain essentially absent** — still only the two skeleton `ExampleTest`s. This is now the #1 item on the list. The new checkout logic (`validateLines()`, repricing, order-number retry, limiter keys) is exactly the kind of concurrency-sensitive money code that regresses silently. Start with: checkout happy path, oversell rejection, reprice bounce, `CartService` discount stacking, coupon limits, points redemption.
-2. **Extract Form Requests + a `BdPhone` rule.** The phone regex is still duplicated inline (checkout, register, lead, OTP). One rule class, four call sites.
-3. **`CatalogController::show()` is still ~90 lines** (loves, recently-viewed, view counting, tracking, template resolution, Alpine payload). Extract a `ProductPageData` view-model.
-4. **Guest email backfill** — `Customer::firstOrCreate` only sets email on creation; a repeat guest who adds an email on a later order never gets it saved to their customer record. One `fill`+`save` when blank.
-5. **Duplicate base-query build in catalog pages** — `index()`/`bestSellers()` still construct the same filtered query twice (products + filter groups). Build once, `clone`.
-
-Good as-is: Action classes, transaction boundaries, cost snapshotting, moderated reviews, CAPI/Pixel dedup, `SystemConfig` audit/versioning, Pint, `.env` hygiene, thoughtful comments throughout.
+Money-path coverage now includes `DiscountCapTest`, `OrderStatusTransitionTest`,
+`CheckoutAvailabilityTest`, `StaleOfferSnapshotTest`, `CheckoutTest`,
+`CartServiceTest`, `OrderNumberTest`, `QuantityOfferTest`.
 
 ---
 
-## 4. Missing e-commerce features (unchanged, by impact)
+## 4. Still open
 
-1. **Online payments — the big one.** Still 100% COD (`payment_method => 'cod'` hardcoded). For BD: **bKash Checkout, Nagad, and/or SSLCommerz**. Even optional partial advance payment on COD cuts fake-order/return losses — you already run courier fraud checks, prepayment is the natural next lever.
-2. **Customer order cancellation** — no self-serve cancel while status = `processing`; saves support calls and courier fees.
-3. **Return / exchange request flow** — statuses exist but no customer-facing request form (reason + photos; you already have review photo upload infrastructure to reuse).
-4. **Invoice PDF download** on the confirmation/account order pages (you currently only email it).
-5. **Google Analytics 4** — tracking is Meta-only; GA4 gives funnel data Meta won't.
-6. **Bangla localization** — English-only storefront; a `lang/bn` toggle is mostly translation work in Laravel.
-7. **Back-in-stock via SMS/email** — push-only today; push opt-in rates are low on iOS.
-8. **Shipping zones** — inside/outside Dhaka is coarse; you already collect district, so a district rate table + delivery-time estimates is low-hanging.
-9. **Admin 2FA** — the panel controls SMS sending, Meta tokens, and system config.
-10. **Product Q&A** — cheap to add on top of the review infrastructure.
+In rough order of value.
 
----
-
-## 5. Updated order of work
-
-| # | Item | Effort | Impact |
-|---|------|--------|--------|
-| 1 | Checkout + CartService test suite | 1–2 days | Protects everything just fixed |
-| 2 | Queue post-checkout SMS/email/CAPI | Hours | Checkout latency |
-| 3 | Throttle `GET /track` + signed link in invoice email | Hours | Closes the last enumeration path |
-| 4 | `BdPhone` rule + Form Requests | Hours | Deduplication |
-| 5 | bKash/Nagad/SSLCommerz | Days | Revenue |
-| 6 | Order cancellation + return requests | 1–2 days | Support load |
-| 7 | Guest email backfill, catalog query dedupe, `ProductPageData` extraction | Hours | Hygiene |
-| 8 | GA4, Bangla, shipping zones, admin 2FA, image srcset audit | Ongoing | Growth |
+1. **Online payments — still 100% COD** (`payment_method => 'cod'` is hardcoded).
+   For Bangladesh: bKash Checkout, Nagad, or SSLCommerz. Even optional partial
+   advance payment cuts fake-order and return losses.
+2. **Customer order cancellation** — no self-serve cancel while `processing`.
+3. **Return / exchange request flow** — statuses exist, no customer-facing form.
+4. **Form Requests** — only `Meta/` and `SystemConfig/` have them; storefront
+   controllers still validate inline. (`BdPhone` is done; this is the rest.)
+5. **`CatalogController::show()` is ~74 lines** — extract a `ProductPageData`
+   view-model (loves, recently-viewed, view counting, tracking, Alpine payload).
+6. **Duplicate base-query build** in `index()`/`bestSellers()` — build once, clone.
+7. **Search is `LIKE '%term%'`** across name/sku/short_description. Fine at 109
+   products; revisit (FULLTEXT or Scout) past a few thousand.
+8. **Images** — WebP pipeline is good, but `loading="lazy"` and explicit
+   width/height are inconsistent and there is no `srcset`.
+9. **Invoice PDF download** on the confirmation and account order pages.
+10. **GA4**, **Bangla localization**, **district-level shipping zones**,
+    **admin 2FA**, **back-in-stock via SMS/email**, **product Q&A**.
 
 ---
 
-*History: v1 (2026-07-15) identified 5 critical security/correctness issues, 8 performance items, 2 SEO gaps. v2 (2026-07-16) verified all criticals and most performance/SEO items fixed in commits `9b5a568`…`67b8ca9`.*
+## 5. Production notes (checked 2026-08-01 over SSH)
+
+- 109 products, 635 customers (mostly Woo-imported), 1 real order — effectively
+  pre-launch.
+- **0 active coupons and 0 products with quantity offers**, so §1.1 was armed but
+  never fired in production. It would have on the first campaign.
+- Steadfast is fully configured with a live consignment, so §1.2 *was* live.
+- Queue drains via the scheduler (`queue:work --stop-when-empty --max-time=50`
+  every minute), not a second cron entry — `DEPLOY.md` still says otherwise and
+  still uses the old `~/noychoy-store` path. Production lives at
+  `~/repositories/noychoy-store`.
+- Cache is Redis, sessions and queue are database, `APP_DEBUG=false`. Correct.
+- 8 failed jobs are pre-fix residue from 2026-07-27 (all `SendOrderPlacedEffects`
+  `ModelNotFoundException`, from before `$deleteWhenMissingModels` landed the
+  same evening). Safe to clear.
+
+> **After every deploy**, `deploy.sh` cannot flush the **LiteSpeed page cache**
+> or reset the **lsphp OPcache** — do both in cPanel or PHP changes will not take
+> effect on the live site.
+
+---
+
+*History: v1 (2026-07-15) found 5 critical security/correctness issues. v2
+(2026-07-16) verified those fixed. v3 (2026-08-01) audited the money and
+inventory paths against code, tests, a browser and production; found and fixed 6
+live defects; corrected v2's stale claims about tests, queued side effects and
+`/track` throttling.*
