@@ -58,10 +58,17 @@ class OrderController extends Controller
         $processingSerials = $processingProducts->pluck('serial', 'id');
         $processingImages = $processingProducts->mapWithKeys(fn ($p) => [$p->id => $p->thumbnail]);
 
+        // BDCourier reputation for the phones on this page — read from cache
+        // only. A page view must never spend plan quota; the bulk action does
+        // the fetching.
+        $bdCourier = app(BdCourierService::class);
+
         return view('admin.orders.index', [
             'orders' => $orders,
             'statuses' => Order::STATUSES,
             'orderCounts' => $orderCounts,
+            'bdCourierOn' => $bdCourier->isConfigured(),
+            'bdHistory' => $bdCourier->isConfigured() ? $bdCourier->cachedMany($phones) : [],
             'processingItems' => $processingItems,
             'processingSerials' => $processingSerials,
             'processingImages' => $processingImages,
@@ -551,6 +558,48 @@ class OrderController extends Controller
         }
 
         return back()->with('success', 'Courier history updated for '.$order->customer_phone.'.');
+    }
+
+    /**
+     * Bulk BDCourier lookup for the orders selected in the list.
+     *
+     * Deduplicated by phone and skipping numbers already cached, so selecting a
+     * page of orders from repeat customers costs very few credits.
+     */
+    public function bulkCourierCheck(Request $request, BdCourierService $bdCourier)
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        // Each lookup is a synchronous HTTP call; don't let a slow shared host
+        // abort part-way through a selection.
+        @set_time_limit(300);
+
+        $phones = Order::whereIn('id', $ids)->pluck('customer_phone');
+        $result = $bdCourier->checkMany($phones);
+
+        if ($result['error'] && $result['checked'] === 0) {
+            return back()->with('error', $result['error']);
+        }
+
+        $parts = [];
+        if ($result['checked']) {
+            $parts[] = $result['checked'].' number(s) checked';
+        }
+        if ($result['cached']) {
+            $parts[] = $result['cached'].' already up to date';
+        }
+        if ($result['failed']) {
+            $parts[] = $result['failed'].' failed';
+        }
+        if ($result['skipped']) {
+            $parts[] = $result['skipped'].' skipped (limit '.BdCourierService::BULK_LIMIT.' per run)';
+        }
+
+        return back()->with($result['failed'] ? 'error' : 'success',
+            'Courier history: '.(implode(' · ', $parts) ?: 'nothing to check').'.');
     }
 
     public function refreshShipment(Order $order, SteadfastService $steadfast)

@@ -303,7 +303,7 @@
             @endphp
             <div class="card p-5">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold">Courier history (BDCourier)</h2>
+                    <h2 class="font-semibold">Courier History</h2>
                     @if($bdCourier)
                         <span class="text-[11px] text-ink-700/45"
                               title="Cached — press again to refresh">checked {{ \Illuminate\Support\Carbon::parse($bdCourier['checked_at'])->diffForHumans() }}</span>

@@ -27,6 +27,29 @@ class BdCourierService
 {
     public const CACHE_TTL_HOURS = 24;
 
+    /** Most numbers one bulk action will look up; the admin waits on each call. */
+    public const BULK_LIMIT = 25;
+
+    /**
+     * Cached results for many phones at once, for the orders list. Cache reads
+     * only — rendering a page must never spend quota.
+     *
+     * @param  iterable<string>  $phones
+     * @return array<string, array<string, mixed>> keyed by canonical phone
+     */
+    public function cachedMany(iterable $phones): array
+    {
+        $out = [];
+
+        foreach (collect($phones)->filter()->map(fn ($p) => bd_phone((string) $p))->unique() as $phone) {
+            if ($hit = $this->cached($phone)) {
+                $out[$phone] = $hit;
+            }
+        }
+
+        return $out;
+    }
+
     /** @return array<string, mixed> */
     protected function config(): array
     {
@@ -119,6 +142,62 @@ class BdCourierService
         }
 
         return $result;
+    }
+
+    /**
+     * Look up several phones in one go (the orders-list bulk action).
+     *
+     * Deduplicated by canonical phone, so five orders from the same customer
+     * cost one credit, and numbers already in the cache are skipped entirely
+     * unless $force. Capped because each lookup is a synchronous HTTP call and
+     * the admin is waiting on the response.
+     *
+     * @param  iterable<string>  $phones
+     * @return array{checked:int, cached:int, failed:int, skipped:int, error:?string}
+     */
+    public function checkMany(iterable $phones, bool $force = false): array
+    {
+        $unique = collect($phones)
+            ->filter(fn ($p) => filled($p))
+            ->map(fn ($p) => bd_phone((string) $p))
+            ->unique()
+            ->values();
+
+        $out = ['checked' => 0, 'cached' => 0, 'failed' => 0, 'skipped' => 0, 'error' => null];
+
+        if (! $this->isConfigured()) {
+            $out['error'] = 'BDCourier is not configured. Add the API key under Admin → Integrations.';
+
+            return $out;
+        }
+
+        $todo = $force ? $unique : $unique->reject(fn ($p) => $this->cached($p) !== null)->values();
+        $out['cached'] = $unique->count() - $todo->count();
+
+        if ($todo->count() > self::BULK_LIMIT) {
+            $out['skipped'] = $todo->count() - self::BULK_LIMIT;
+            $todo = $todo->take(self::BULK_LIMIT);
+        }
+
+        foreach ($todo as $phone) {
+            $result = $this->check($phone);
+
+            if ($result['ok'] ?? false) {
+                $out['checked']++;
+
+                continue;
+            }
+
+            $out['failed']++;
+            // A rejected key or an exhausted quota will fail for every remaining
+            // number too — stop rather than burning through the whole selection.
+            $out['error'] ??= $result['error'] ?? null;
+            if (str_contains((string) $out['error'], 'API key') || str_contains((string) $out['error'], 'quota')) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     /**

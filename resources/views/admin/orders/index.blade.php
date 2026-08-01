@@ -51,6 +51,15 @@
             <button class="btn-primary py-2 text-sm">🚚 Send to Steadfast</button>
         </form>
 
+        @if($bdCourierOn)
+            <form action="{{ route('admin.orders.bulk-courier-check') }}" method="POST" class="inline"
+                  onsubmit="return confirm('Look up courier history for the selected customers? Numbers already checked in the last 24 hours are skipped, and repeats count once — so this usually costs fewer credits than orders selected.')">
+                @csrf
+                <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
+                <button class="btn-outline py-2 text-sm">🔍 Check courier history</button>
+            </form>
+        @endif
+
         <button type="button" class="btn-outline py-2 text-sm"
                 @click="window.open('{{ route('admin.orders.labels') }}?ids=' + sel.join(','), '_blank')">
             🖨 Print labels
@@ -87,8 +96,12 @@
                 <tr>
                     <th class="px-3 py-3 w-8"><input type="checkbox" :checked="allChecked" @change="toggleAll($event)"></th>
                     <th class="px-4 py-3">Order</th><th class="px-4 py-3">Customer</th>
+                    @if($bdCourierOn)
+                        <th class="px-4 py-3" title="This customer's delivery record across every courier (BDCourier)">Courier History</th>
+                    @endif
                     <th class="px-4 py-3">Source</th><th class="px-4 py-3">Items</th>
-                    <th class="px-4 py-3">Total</th><th class="px-4 py-3">Courier</th>
+                    <th class="px-4 py-3">Total</th>
+                    <th class="px-4 py-3" title="This order's Steadfast delivery status">Courier</th>
                     <th class="px-4 py-3">Status</th><th class="px-4 py-3">Date</th>
                 </tr>
             </thead>
@@ -108,7 +121,10 @@
                             'amber' => 'bg-amber-100 text-amber-700',
                             'red' => 'bg-red-100 text-red-700',
                             'gold' => 'bg-gold-100 text-gold-700',
+                            'ink' => 'bg-ink-100 text-ink-700',
                         ];
+                        // BDCourier reputation, from cache only — never fetched on a page view.
+                        $bdRow = $bdHistory[$order->customer_phone] ?? null;
                     @endphp
                     <tr class="{{ $trashed ? 'opacity-70' : 'cursor-pointer' }} {{ $repeat ? 'bg-violet-50 hover:bg-violet-100' : 'hover:bg-ink-50' }}" @unless($trashed) onclick="window.location='{{ route('admin.orders.show', $order) }}'" @endunless>
                         <td class="px-3 py-3" onclick="event.stopPropagation()">
@@ -146,6 +162,25 @@
                                 @endif
                             </div>
                         </td>
+                        @if($bdCourierOn)
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                @if($bdRow)
+                                    <span class="badge {{ $courierTones[$bdRow['risk']['tone']] ?? 'bg-ink-100 text-ink-700' }} text-[10px]"
+                                          title="{{ $bdRow['risk']['note'] }}">{{ $bdRow['risk']['label'] }}</span>
+                                    @if(($bdRow['summary']['total_parcel'] ?? 0) > 0)
+                                        <div class="text-[11px] text-ink-700/60 mt-0.5">
+                                            {{ $bdRow['summary']['success_ratio'] }}%
+                                            <span class="text-ink-700/35">· {{ $bdRow['summary']['success_parcel'] }}/{{ $bdRow['summary']['total_parcel'] }}</span>
+                                        </div>
+                                    @endif
+                                    @if(! empty($bdRow['reports']))
+                                        <div class="text-[10px] text-red-700 mt-0.5" title="{{ count($bdRow['reports']) }} fraud report(s)">⚠️ {{ count($bdRow['reports']) }} report(s)</div>
+                                    @endif
+                                @else
+                                    <span class="text-xs text-ink-700/35" title="Select orders and press “Check courier history”">Not checked</span>
+                                @endif
+                            </td>
+                        @endif
                         <td class="px-4 py-3">
                             @if($order->source_channel)
                                 <span class="badge {{ \App\Support\TrafficSource::badgeClass($order->source_channel) }} text-[10px]"
@@ -199,7 +234,7 @@
                         <td class="px-4 py-3 text-ink-700/60">{{ $order->created_at->format('d M, g:i a') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="px-4 py-10 text-center text-ink-700/50">No orders found.</td></tr>
+                    <tr><td colspan="{{ $bdCourierOn ? 10 : 9 }}" class="px-4 py-10 text-center text-ink-700/50">No orders found.</td></tr>
                 @endforelse
             </tbody>
         </table>

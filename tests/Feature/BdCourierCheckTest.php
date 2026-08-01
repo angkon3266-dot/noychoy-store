@@ -242,6 +242,124 @@ class BdCourierCheckTest extends TestCase
         $order = $this->order();
         $html = $this->actingAs($this->admin())->get('/admin/orders/'.$order->id)->getContent();
 
-        $this->assertStringNotContainsString('Courier history (BDCourier)', $html);
+        $this->assertStringNotContainsString('Courier History', $html);
+    }
+
+    // ── Orders list: column + bulk action ───────────────────────────────────
+
+    protected function orderFor(string $number, string $phone): Order
+    {
+        return Order::create([
+            'order_number' => $number, 'customer_name' => 'C'.$number, 'customer_phone' => $phone,
+            'shipping_address' => 'X', 'subtotal' => 100, 'shipping_cost' => 0, 'discount' => 0,
+            'total' => 100, 'payment_method' => 'cod', 'payment_status' => 'unpaid',
+            'status' => 'processing', 'source' => 'web',
+        ]);
+    }
+
+    public function test_the_list_shows_the_health_and_success_rate_once_checked(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        $order = $this->order();
+        $this->actingAs($this->admin())->post('/admin/orders/'.$order->id.'/courier-check');
+
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Courier History', $html);
+        $this->assertStringContainsString('Safe', $html);
+        $this->assertStringContainsString('84.29%', $html);
+        $this->assertStringContainsString('295/350', $html);
+    }
+
+    public function test_an_unchecked_row_says_so_without_calling_the_api(): void
+    {
+        $this->configure();
+        Http::fake();
+
+        $this->order();
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Not checked', $html);
+        Http::assertNothingSent();
+    }
+
+    public function test_the_column_is_hidden_when_bdcourier_is_off(): void
+    {
+        Setting::put('integrations', []);
+        $this->order();
+
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->getContent();
+
+        $this->assertStringNotContainsString('Courier History', $html);
+    }
+
+    public function test_bulk_check_looks_up_each_selected_order(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        $a = $this->orderFor('40001', '01711111111');
+        $b = $this->orderFor('40002', '01822222222');
+
+        $this->actingAs($this->admin())
+            ->post('/admin/orders/bulk-courier-check', ['ids' => [$a->id, $b->id]])
+            ->assertSessionHas('success');
+
+        Http::assertSentCount(2);
+        $svc = app(BdCourierService::class);
+        $this->assertNotNull($svc->cached('01711111111'));
+        $this->assertNotNull($svc->cached('01822222222'));
+    }
+
+    public function test_bulk_check_charges_a_repeat_customer_only_once(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        // Three orders, same buyer — one number, so one credit.
+        $a = $this->orderFor('40003', '01711111111');
+        $b = $this->orderFor('40004', '01711111111');
+        $c = $this->orderFor('40005', '01711111111');
+
+        $this->actingAs($this->admin())
+            ->post('/admin/orders/bulk-courier-check', ['ids' => [$a->id, $b->id, $c->id]]);
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_bulk_check_skips_numbers_already_cached(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        $a = $this->orderFor('40006', '01711111111');
+        $b = $this->orderFor('40007', '01822222222');
+
+        $this->actingAs($this->admin())->post('/admin/orders/bulk-courier-check', ['ids' => [$a->id]]);
+        Http::assertSentCount(1);
+
+        // Second run covers both, but the first number is already known.
+        $this->actingAs($this->admin())->post('/admin/orders/bulk-courier-check', ['ids' => [$a->id, $b->id]]);
+        Http::assertSentCount(2);
+    }
+
+    public function test_bulk_check_stops_early_on_a_rejected_api_key(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response(['message' => 'Unauthenticated'], 401)]);
+
+        $ids = collect(range(1, 5))
+            ->map(fn ($i) => $this->orderFor('4010'.$i, '018000000'.$i.'0')->id)
+            ->all();
+
+        $this->actingAs($this->admin())
+            ->post('/admin/orders/bulk-courier-check', ['ids' => $ids])
+            ->assertSessionHas('error');
+
+        // One failure that will repeat for every number is enough — don't burn
+        // the whole selection discovering the same thing five times.
+        Http::assertSentCount(1);
     }
 }

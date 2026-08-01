@@ -127,9 +127,11 @@ Route::middleware('admin')->group(function () {
     Route::post('orders/{order}/amend', [OrderController::class, 'amend'])->name('orders.amend');
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
-    // On-demand BDCourier lookup — throttled because every call spends plan quota.
+    // On-demand BDCourier lookups — throttled because every call spends plan quota.
     Route::post('orders/{order}/courier-check', [OrderController::class, 'courierCheck'])
         ->middleware('throttle:20,1')->name('orders.courier-check');
+    Route::post('orders/bulk-courier-check', [OrderController::class, 'bulkCourierCheck'])
+        ->middleware('throttle:10,1')->name('orders.bulk-courier-check');
     Route::post('orders/{order}/sms', [OrderController::class, 'sendSms'])->name('orders.sms');
 
     // Customers (CRM, analytics, SMS, import)
