@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, SteadfastService $steadfast)
     {
         $trashed = $request->boolean('trashed');
 
@@ -74,6 +74,9 @@ class OrderController extends Controller
             'processingImages' => $processingImages,
             'trashed' => $trashed,
             'trashCount' => Order::onlyTrashed()->count(),
+            // Courier wallet, cached — if it runs dry, bookings start failing,
+            // and this is the screen you book from.
+            'courierBalance' => $steadfast->balance(),
         ]);
     }
 
@@ -123,17 +126,6 @@ class OrderController extends Controller
         $settled = $courier['delivered'] + $courier['partial'] + $courier['cancelled'] + $courier['returned'];
         $courier['success_rate'] = $settled > 0 ? round(($courier['delivered'] + $courier['partial']) / $settled * 100) : null;
 
-        // Steadfast balance (best-effort).
-        $balance = null;
-        if ($steadfast->isConfigured()) {
-            try {
-                $b = $steadfast->getBalance();
-                $balance = $b['current_balance'] ?? ($b['balance'] ?? null);
-            } catch (\Throwable $e) {
-                // ignore
-            }
-        }
-
         // BDCourier: render only what a previous click already fetched. Never
         // call the API here — lookups cost plan quota and this is a page view.
         $bdCourier = app(BdCourierService::class);
@@ -143,7 +135,7 @@ class OrderController extends Controller
             'statuses' => Order::STATUSES,
             'insight' => $insight->forPhone($order->customer_phone, $order->id),
             'courier' => $courier,
-            'balance' => $balance,
+            'balance' => $steadfast->balance(),
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
         ]);

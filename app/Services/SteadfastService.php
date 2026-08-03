@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Shipment;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -21,6 +22,7 @@ class SteadfastService
     {
         $int = Setting::get('integrations', []);
         $value = is_array($int) ? ($int[$key] ?? null) : null;
+
         return filled($value) ? $value : $default;
     }
 
@@ -78,7 +80,7 @@ class SteadfastService
             return null;
         }
 
-        return \Illuminate\Support\Facades\Cache::remember(
+        return Cache::remember(
             "sf_status_{$consignmentId}",
             now()->addMinutes(10),
             function () use ($consignmentId) {
@@ -86,6 +88,7 @@ class SteadfastService
                     return $this->statusByConsignmentId($consignmentId)['delivery_status'] ?? null;
                 } catch (\Throwable $e) {
                     Log::warning('Steadfast status lookup failed', ['cid' => $consignmentId, 'error' => $e->getMessage()]);
+
                     return null;
                 }
             }
@@ -96,6 +99,7 @@ class SteadfastService
     public static function describeStatus(?string $raw): array
     {
         $s = strtolower((string) $raw);
+
         return match (true) {
             str_contains($s, 'delivered') && ! str_contains($s, 'partial') => ['Delivered', 3, 'green'],
             str_contains($s, 'partial') => ['Partially delivered', 3, 'amber'],
@@ -112,6 +116,37 @@ class SteadfastService
         return $this->client()->get('/get_balance')->json() ?? [];
     }
 
+    /**
+     * Wallet balance as a number, or null if it can't be read.
+     *
+     * Cached for a few minutes because this is rendered on the orders list —
+     * without it, every page of orders (and every filter change) would cost a
+     * courier API round-trip on the critical path of the busiest admin screen.
+     */
+    public function balance(): ?float
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        $value = Cache::remember('steadfast.balance', now()->addMinutes(5), function () {
+            try {
+                $b = $this->getBalance();
+                $raw = $b['current_balance'] ?? ($b['balance'] ?? null);
+
+                // Cache a sentinel rather than null, so a courier outage doesn't
+                // mean a fresh API call on every single page load.
+                return is_numeric($raw) ? (float) $raw : false;
+            } catch (\Throwable $e) {
+                Log::warning('Steadfast balance lookup failed', ['error' => $e->getMessage()]);
+
+                return false;
+            }
+        });
+
+        return $value === false ? null : (float) $value;
+    }
+
     public function createReturnRequest(array $payload): array
     {
         return $this->client()->post('/create_return_request', $payload)->json() ?? [];
@@ -125,6 +160,7 @@ class SteadfastService
     {
         if (! $this->isConfigured()) {
             Log::warning('Steadfast not configured; skipping consignment', ['order' => $order->order_number]);
+
             return null;
         }
 
@@ -144,6 +180,7 @@ class SteadfastService
         // Success per API doc: top-level status 200 + consignment.consignment_id.
         if (! $consignment || empty($consignment['consignment_id'])) {
             Log::error('Steadfast consignment failed', ['order' => $order->order_number, 'response' => $response]);
+
             return null;
         }
 
@@ -168,6 +205,7 @@ class SteadfastService
         if (strlen($digits) === 10 && $digits[0] === '1') {
             $digits = '0'.$digits;
         }
+
         return $digits;
     }
 }

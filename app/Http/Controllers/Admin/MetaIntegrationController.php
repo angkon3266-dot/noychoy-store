@@ -14,6 +14,7 @@ use App\Services\Meta\MetaQueueRunner;
 use App\Services\Meta\MetaSettings;
 use App\Services\Meta\MetaStats;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 
 /**
@@ -262,6 +263,7 @@ class MetaIntegrationController extends Controller
 
     /**
      * Dashboard-style notifications derived from current state (no extra table).
+     *
      * @return array<int, array{type:string, message:string}>
      */
     private function notifications(): array
@@ -277,10 +279,23 @@ class MetaIntegrationController extends Controller
         }
 
         if ($expires = $this->settings->get('token_expires_at')) {
-            if (\Illuminate\Support\Carbon::parse($expires)->isPast()) {
-                $out[] = ['type' => 'error', 'message' => 'Access token has expired. Generate a new System User token.'];
-            } elseif (\Illuminate\Support\Carbon::parse($expires)->diffInDays(now()) <= 7) {
-                $out[] = ['type' => 'warning', 'message' => 'Access token expires soon ('.\Illuminate\Support\Carbon::parse($expires)->diffForHumans().').'];
+            $expiresAt = Carbon::parse($expires);
+            // Only an OAuth ("Connect with Facebook") connection has an expiring
+            // token; a System User token reports no expiry at all, so telling a
+            // Production-mode merchant to "generate a System User token" sent
+            // them to the wrong screen entirely.
+            $fix = $this->settings->get('mode') === MetaSettings::MODE_PRODUCTION
+                ? 'Reconnect with Facebook to renew it.'
+                : 'Generate a new System User token.';
+
+            if ($expiresAt->isPast()) {
+                $out[] = ['type' => 'error', 'message' => 'Access token has expired. '.$fix];
+            } elseif ($expiresAt->lte(now()->addDays(7))) {
+                // lte() against a threshold, NOT diffInDays(): Carbon 3's diff is
+                // signed, so a future expiry gave a negative number that was
+                // always <= 7 — the "expires soon" warning fired from the moment
+                // the merchant connected and never stopped.
+                $out[] = ['type' => 'warning', 'message' => 'Access token expires soon ('.$expiresAt->diffForHumans().'). '.$fix];
             }
         }
 
@@ -290,7 +305,7 @@ class MetaIntegrationController extends Controller
         }
 
         if ($last = $this->settings->get('last_sync_at')) {
-            $out[] = ['type' => 'success', 'message' => 'Last successful sync '.\Illuminate\Support\Carbon::parse($last)->diffForHumans().'.'];
+            $out[] = ['type' => 'success', 'message' => 'Last successful sync '.Carbon::parse($last)->diffForHumans().'.'];
         }
 
         return $out;

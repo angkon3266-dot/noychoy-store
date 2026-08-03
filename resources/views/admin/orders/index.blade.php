@@ -19,6 +19,21 @@
                get allChecked(){ return this.pageIds.length && this.sel.length === this.pageIds.length },
                toggleAll(e){ this.sel = e.target.checked ? [...this.pageIds] : [] } }">
 
+    @if($courierBalance !== null)
+        {{-- Courier wallet. This is the screen orders are booked from, so a
+             balance running dry belongs here rather than one order deep. --}}
+        @php $lowBalance = $courierBalance < 500; @endphp
+        <div class="mb-4 flex items-center gap-2 text-sm">
+            <span class="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium
+                         {{ $lowBalance ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-ink-50 text-ink-700 border border-ink-100' }}">
+                🚚 Courier balance: <strong>৳{{ number_format($courierBalance, 0) }}</strong>
+                @if($lowBalance)
+                    <span class="text-xs font-normal">· low — top up Steadfast before booking more parcels</span>
+                @endif
+            </span>
+        </div>
+    @endif
+
     <form method="GET" class="flex flex-wrap gap-2 mb-4">
         <input name="q" value="{{ request('q') }}" placeholder="Order #, name or phone…" class="input py-2 w-64">
         <select name="status" onchange="this.form.submit()" class="input py-2">

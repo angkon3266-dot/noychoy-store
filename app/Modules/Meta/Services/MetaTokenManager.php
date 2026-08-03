@@ -129,7 +129,10 @@ class MetaTokenManager implements SocialConnectionManager
             if ($c->token_expires_at->isPast()) {
                 return 'expired';
             }
-            if ($c->token_expires_at->diffInDays(now()) <= 7) {
+            // Threshold comparison, not a diff: Carbon 3's diffInDays() is
+            // signed, so a future expiry read as negative and every healthy
+            // connection reported itself as "expiring".
+            if ($c->token_expires_at->lte(now()->addDays(7))) {
                 return 'expiring';
             }
         }

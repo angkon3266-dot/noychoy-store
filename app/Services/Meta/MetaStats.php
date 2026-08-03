@@ -4,6 +4,7 @@ namespace App\Services\Meta;
 
 use App\Models\MetaSyncLog;
 use App\Models\MetaSyncState;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -67,8 +68,8 @@ class MetaStats
         $queue = config('meta.sync.queue', 'default');
         $metaJobs = fn () => DB::table('jobs')->where('queue', $queue);
 
-        $waiting = (clone ($metaJobs()))->whereNull('reserved_at')->count();
-        $running = (clone ($metaJobs()))->whereNotNull('reserved_at')->count();
+        $waiting = (clone $metaJobs())->whereNull('reserved_at')->count();
+        $running = (clone $metaJobs())->whereNotNull('reserved_at')->count();
 
         // Failed jobs belonging to this module (payload references our job
         // namespace). Avoid backslash-escaping quirks by matching loosely.
@@ -93,8 +94,10 @@ class MetaStats
         $tokenExpires = $this->settings->get('token_expires_at');
         $tokenStatus = match (true) {
             ! $this->settings->hasToken() => 'missing',
-            $tokenExpires && \Illuminate\Support\Carbon::parse($tokenExpires)->isPast() => 'expired',
-            $tokenExpires && \Illuminate\Support\Carbon::parse($tokenExpires)->diffInDays(now()) <= 7 => 'expiring',
+            $tokenExpires && Carbon::parse($tokenExpires)->isPast() => 'expired',
+            // lte() against a threshold — Carbon 3's diffInDays() is signed, so
+            // a future expiry was negative and every connection read "expiring".
+            $tokenExpires && Carbon::parse($tokenExpires)->lte(now()->addDays(7)) => 'expiring',
             default => 'ok',
         };
 

@@ -2,9 +2,12 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Meta\Services\MetaDebug;
 use App\Services\Meta\MetaSettings;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -26,8 +29,8 @@ class MetaSecurityGate
 
         // Diagnostics only: this fires on every Meta admin request, so it is
         // gated behind Meta debug mode rather than written to production logs.
-        if (app(\App\Modules\Meta\Services\MetaDebug::class)->enabled()) {
-            \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate ENTER', [
+        if (app(MetaDebug::class)->enabled()) {
+            Log::info('[meta-oauth] meta.gate ENTER', [
                 'path' => $request->path(),
                 'user_role' => $user?->role,
             ]);
@@ -35,13 +38,14 @@ class MetaSecurityGate
 
         // Only the Super Admin role may access this module at all.
         if (! $user || $user->role !== 'admin') {
-            \Illuminate\Support\Facades\Log::warning('[meta-oauth] meta.gate ABORT 403 (not super admin) — controller NOT reached', ['path' => $request->path(), 'role' => $user?->role]);
+            Log::warning('[meta-oauth] meta.gate ABORT 403 (not super admin) — controller NOT reached', ['path' => $request->path(), 'role' => $user?->role]);
             abort(403, 'Only the Super Admin can access Meta Integration.');
         }
 
         // First run: no security password set yet → force the user to create one.
         if (! $this->settings->hasSecurityPassword()) {
-            \Illuminate\Support\Facades\Log::warning('[meta-oauth] meta.gate REDIRECT to unlock (no security password set) — controller NOT reached', ['path' => $request->path()]);
+            Log::warning('[meta-oauth] meta.gate REDIRECT to unlock (no security password set) — controller NOT reached', ['path' => $request->path()]);
+
             return redirect()->route('admin.meta.unlock')
                 ->with('meta_setup', true);
         }
@@ -49,10 +53,15 @@ class MetaSecurityGate
         $ttl = (int) config('meta.security.session_ttl', 120);
         $unlockedAt = $request->session()->get('meta_unlocked_at');
 
-        $unlocked = $unlockedAt && now()->diffInMinutes(\Illuminate\Support\Carbon::parse($unlockedAt)) < $ttl;
+        // Compare instants rather than diffing them. Carbon 3's diffInMinutes()
+        // is SIGNED (b − a), so `now()->diffInMinutes($unlockedAt)` returned a
+        // negative number for any past unlock — always < $ttl — and the module
+        // never auto-locked at all, however long the session had been idle.
+        $unlocked = $unlockedAt
+            && Carbon::parse($unlockedAt)->gt(now()->subMinutes($ttl));
 
         if (! $unlocked) {
-            \Illuminate\Support\Facades\Log::warning('[meta-oauth] meta.gate REDIRECT to unlock (session not unlocked) — controller NOT reached', [
+            Log::warning('[meta-oauth] meta.gate REDIRECT to unlock (session not unlocked) — controller NOT reached', [
                 'path' => $request->path(),
                 'unlocked_at' => $unlockedAt,
                 'ttl_minutes' => $ttl,
@@ -63,8 +72,8 @@ class MetaSecurityGate
             return redirect()->route('admin.meta.unlock');
         }
 
-        if (app(\App\Modules\Meta\Services\MetaDebug::class)->enabled()) {
-            \Illuminate\Support\Facades\Log::info('[meta-oauth] meta.gate PASS → controller', ['path' => $request->path()]);
+        if (app(MetaDebug::class)->enabled()) {
+            Log::info('[meta-oauth] meta.gate PASS → controller', ['path' => $request->path()]);
         }
 
         return $next($request);

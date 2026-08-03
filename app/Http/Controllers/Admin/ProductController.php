@@ -153,7 +153,7 @@ class ProductController extends Controller
                     }
                 }
 
-                $product = Product::create([
+                $product = Product::createUnique([
                     'name' => $name,
                     'serial' => $serial,
                     'sku' => $data['sku'] ?? null,
@@ -217,7 +217,7 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateData($request);
-        $product = Product::create($data);
+        $product = Product::createUnique($data);
 
         $this->syncCategories($data, $product);
         $this->syncImages($request, $product);
@@ -474,7 +474,7 @@ class ProductController extends Controller
         $copy->status = 'draft';
         $copy->is_featured = false;
         $copy->views = 0;
-        $copy->save();
+        $copy->saveWithUniqueSerial();
 
         foreach ($product->images as $img) {
             $copy->images()->create([

@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * The Steadfast wallet balance on the order page.
+ * The Steadfast wallet balance on the ORDERS LIST.
  *
- * It sits in the page header rather than inside the courier card further down:
- * if the wallet runs dry, bookings start failing, and that is something you
- * need to see *before* dispatching — not after scrolling past the items.
+ * It lives on the list rather than one order deep: this is the screen parcels
+ * are booked from, and a wallet running dry stops bookings for everyone, not
+ * for one order. Cached, so rendering the busiest admin screen doesn't cost a
+ * courier round-trip per page.
  */
 class CourierBalanceTest extends TestCase
 {
@@ -55,28 +56,39 @@ class CourierBalanceTest extends TestCase
         ]);
     }
 
-    public function test_the_balance_shows_in_the_page_header(): void
+    public function test_the_balance_shows_on_the_orders_list(): void
     {
         $this->withBalance(1930);
+        $this->order();
 
-        $html = $this->actingAs($this->admin())->get('/admin/orders/'.$this->order()->id)
-            ->assertOk()->getContent();
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->assertOk()->getContent();
 
         $this->assertStringContainsString('Courier balance', $html);
         $this->assertStringContainsString('1,930', $html);
 
-        // Above the items table, not buried in the courier card at the bottom.
-        $this->assertLessThan(
-            strpos($html, 'Items &amp; amounts'),
-            strpos($html, 'Courier balance'),
-        );
+        // Above the table — visible before you start picking orders.
+        $this->assertLessThan(strpos($html, '<table'), strpos($html, 'Courier balance'));
+    }
+
+    public function test_it_is_read_once_and_cached_not_fetched_per_page(): void
+    {
+        $this->withBalance(1930);
+        $this->order();
+
+        $this->actingAs($this->admin())->get('/admin/orders');
+        $this->actingAs($this->admin())->get('/admin/orders');
+        $this->actingAs($this->admin())->get('/admin/orders');
+
+        // One courier round-trip, not one per page load.
+        Http::assertSentCount(1);
     }
 
     public function test_a_low_balance_is_flagged(): void
     {
         $this->withBalance(120);
 
-        $html = $this->actingAs($this->admin())->get('/admin/orders/'.$this->order()->id)->getContent();
+        $this->order();
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->getContent();
 
         $this->assertStringContainsString('Courier balance', $html);
         $this->assertStringContainsString('top up Steadfast', $html);
@@ -86,7 +98,8 @@ class CourierBalanceTest extends TestCase
     {
         $this->withBalance(5000);
 
-        $html = $this->actingAs($this->admin())->get('/admin/orders/'.$this->order()->id)->getContent();
+        $this->order();
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->getContent();
 
         $this->assertStringNotContainsString('top up Steadfast', $html);
     }
@@ -95,8 +108,8 @@ class CourierBalanceTest extends TestCase
     {
         Setting::put('integrations', []);
 
-        $html = $this->actingAs($this->admin())->get('/admin/orders/'.$this->order()->id)
-            ->assertOk()->getContent();
+        $this->order();
+        $html = $this->actingAs($this->admin())->get('/admin/orders')->assertOk()->getContent();
 
         $this->assertStringNotContainsString('Courier balance', $html);
     }
@@ -106,6 +119,7 @@ class CourierBalanceTest extends TestCase
         $this->configureSteadfast();
         Http::fake(fn () => throw new \RuntimeException('connection refused'));
 
-        $this->actingAs($this->admin())->get('/admin/orders/'.$this->order()->id)->assertOk();
+        $this->order();
+        $this->actingAs($this->admin())->get('/admin/orders')->assertOk();
     }
 }

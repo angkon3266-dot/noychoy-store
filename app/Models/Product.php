@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -108,7 +109,7 @@ class Product extends Model
         // Assign the next sequential serial on creation (1,2,3…). Internal — never shown on the storefront.
         static::creating(function (Product $product) {
             if (blank($product->serial)) {
-                $product->serial = (int) static::withTrashed()->max('serial') + 1;
+                $product->serial = static::nextSerial();
             }
         });
 
@@ -119,6 +120,50 @@ class Product extends Model
                 SyncProductKnowledge::dispatch($product->id);
             }
         });
+    }
+
+    /**
+     * The next free product serial.
+     *
+     * `$attempt` steps past a number a concurrent create already claimed. The
+     * same pattern as Order::generateNumber(), and for the same reason: max()+1
+     * is a read-then-write race, and production logged two
+     * "Duplicate entry … for key products_serial_unique" 500s because of it.
+     */
+    public static function nextSerial(int $attempt = 0): int
+    {
+        return (int) static::withTrashed()->max('serial') + 1 + max(0, $attempt);
+    }
+
+    /**
+     * Save a NEW product, stepping the serial forward if another request took
+     * it between our max() and our insert. Retrying the same number would just
+     * reproduce the same duplicate-key error, so each attempt moves on.
+     */
+    public function saveWithUniqueSerial(int $attempts = 5): bool
+    {
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return $this->save();
+            } catch (UniqueConstraintViolationException $e) {
+                // Only the serial index is ours to resolve — a duplicate SKU or
+                // slug is the caller's problem and must still surface.
+                if ($attempt >= $attempts - 1 || ! str_contains($e->getMessage(), 'serial')) {
+                    throw $e;
+                }
+                $this->serial = static::nextSerial($attempt + 1);
+                $this->exists = false;      // the failed insert left it half-set
+            }
+        }
+    }
+
+    /** Product::create(), but resilient to a concurrent serial claim. */
+    public static function createUnique(array $attributes): static
+    {
+        $product = new static($attributes);
+        $product->saveWithUniqueSerial();
+
+        return $product;
     }
 
     public static function uniqueSlug(string $name, ?int $ignoreId = null): string
