@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\LandingPage;
 use App\Models\Product;
+use App\Models\Review;
+use App\Support\LandingTemplates;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class LandingPageController extends Controller
 {
@@ -17,9 +19,33 @@ class LandingPageController extends Controller
         ]);
     }
 
-    public function create()
+    /**
+     * New page. Without a template choice this shows the gallery; with one it
+     * opens the normal editor pre-filled with that layout's blocks.
+     *
+     * The template is a starting point only — nothing links the page back to it
+     * afterwards, so editing a page never fights the template it came from.
+     */
+    public function create(Request $request)
     {
-        return $this->form(new LandingPage(['blocks' => [], 'product_ids' => [], 'show_header' => true, 'show_footer' => true]));
+        $template = (string) $request->query('template', '');
+
+        if ($template === '') {
+            return view('admin.landing.templates', [
+                'templates' => LandingTemplates::all(),
+            ]);
+        }
+
+        $blocks = $template === 'blank'
+            ? []
+            : (LandingTemplates::get($template)['blocks'] ?? []);
+
+        return $this->form(new LandingPage([
+            'blocks' => $blocks,
+            'product_ids' => [],
+            'show_header' => true,
+            'show_footer' => true,
+        ]));
     }
 
     public function edit(LandingPage $landing)
@@ -33,8 +59,8 @@ class LandingPageController extends Controller
             'page' => $page,
             'allProducts' => Product::orderBy('name')->get(['id', 'name'])
                 ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'thumb' => $p->thumbnail])->values(),
-            'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
-            'recentReviews' => \App\Models\Review::approved()->with('product:id,name')
+            'allCategories' => Category::orderBy('name')->get(['id', 'name']),
+            'recentReviews' => Review::approved()->with('product:id,name')
                 ->latest()->take(60)->get(['id', 'product_id', 'author_name', 'rating', 'title', 'body']),
         ]);
     }

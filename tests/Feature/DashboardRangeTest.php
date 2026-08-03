@@ -109,6 +109,11 @@ class DashboardRangeTest extends TestCase
 
     public function test_sales_follow_the_selected_window(): void
     {
+        // Pin the clock to midday. "2 hours ago" has to still be today for this
+        // test to mean anything, and between midnight and 02:00 UTC it wasn't —
+        // the suite went red on the clock rather than on a code change.
+        $this->travelTo(now()->startOfDay()->addHours(12));
+
         $this->order(now()->subHours(2)->toDateTimeString(), 100);
         $this->order(now()->subDays(10)->toDateTimeString(), 500);
 

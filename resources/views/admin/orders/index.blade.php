@@ -53,7 +53,7 @@
 
         @if($bdCourierOn)
             <form action="{{ route('admin.orders.bulk-courier-check') }}" method="POST" class="inline"
-                  onsubmit="return confirm('Look up courier history for the selected customers? Numbers already checked in the last 24 hours are skipped, and repeats count once — so this usually costs fewer credits than orders selected.')">
+                  onsubmit="return confirm('Look up courier history for the selected customers? Numbers already checked in the last 48 hours are skipped, and repeats count once — so this usually costs fewer credits than orders selected.')">
                 @csrf
                 <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
                 <button class="btn-outline py-2 text-sm">🔍 Check courier history</button>

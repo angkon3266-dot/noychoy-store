@@ -37,7 +37,7 @@
                 Looks a customer's phone number up across every major Bangladeshi courier to show how
                 many parcels they have accepted versus refused. Checks run only when you press
                 <strong>Check courier history</strong> on an order, and each one uses your plan quota —
-                the result is then cached for {{ \App\Services\BdCourierService::CACHE_TTL_HOURS }} hours per number.
+                the result is then kept for {{ \App\Services\BdCourierService::FRESH_HOURS }} hours per number.
             </p>
             <label class="flex items-center gap-2 text-sm mb-4">
                 <input type="checkbox" name="bdcourier_enabled" value="1" @checked($int['bdcourier_enabled'] ?? false)>

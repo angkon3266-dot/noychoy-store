@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CourierCheck;
 use App\Models\Setting;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -20,34 +20,47 @@ use Illuminate\Support\Facades\Log;
  * exposes plan, connection-test and legacy endpoints — none are wired up.
  *
  * Lookups cost plan quota, so they never happen on their own. An admin presses
- * "Check courier history" and the result is cached per phone, which means
+ * "Check courier history" and the result is stored per phone, which means
  * re-opening the same order (or another order from the same customer) is free.
+ *
+ * Results live in the `courier_checks` table, not the cache: every deploy runs
+ * `optimize:clear`, which flushes the whole cache store and threw away results
+ * the shop had just paid for.
  */
 class BdCourierService
 {
-    public const CACHE_TTL_HOURS = 24;
+    /** How long a stored result is treated as current. */
+    public const FRESH_HOURS = 48;
 
     /** Most numbers one bulk action will look up; the admin waits on each call. */
     public const BULK_LIMIT = 25;
 
     /**
-     * Cached results for many phones at once, for the orders list. Cache reads
-     * only — rendering a page must never spend quota.
+     * Stored results for many phones at once, for the orders list. One query,
+     * and never an API call — rendering a page must not spend quota.
      *
      * @param  iterable<string>  $phones
      * @return array<string, array<string, mixed>> keyed by canonical phone
      */
     public function cachedMany(iterable $phones): array
     {
-        $out = [];
+        $numbers = collect($phones)->filter()->map(fn ($p) => bd_phone((string) $p))->unique()->values();
 
-        foreach (collect($phones)->filter()->map(fn ($p) => bd_phone((string) $p))->unique() as $phone) {
-            if ($hit = $this->cached($phone)) {
-                $out[$phone] = $hit;
-            }
+        if ($numbers->isEmpty()) {
+            return [];
         }
 
-        return $out;
+        return CourierCheck::whereIn('phone', $numbers)
+            ->where('checked_at', '>', now()->subHours(self::FRESH_HOURS))
+            ->get()
+            ->mapWithKeys(fn (CourierCheck $c) => [$c->phone => $this->hydrate($c)])
+            ->all();
+    }
+
+    /** Rebuild the render payload from a stored row. */
+    protected function hydrate(CourierCheck $row): array
+    {
+        return ($row->payload ?? []) + ['checked_at' => $row->checked_at?->toIso8601String()];
     }
 
     /** @return array<string, mixed> */
@@ -82,25 +95,22 @@ class BdCourierService
         return (float) ($this->config()['bdcourier_warning_threshold'] ?? 50);
     }
 
-    protected function cacheKey(string $phone): string
-    {
-        return 'bdcourier.check.'.bd_phone($phone);
-    }
-
     /**
      * A previously fetched result for this phone, without spending quota.
-     * Returns null if it was never looked up (or the cache has expired).
+     * Returns null if it was never looked up, or the stored result has aged out.
      *
      * @return array<string, mixed>|null
      */
     public function cached(string $phone): ?array
     {
-        return Cache::get($this->cacheKey($phone));
+        $row = CourierCheck::where('phone', bd_phone($phone))->first();
+
+        return $row && $row->isFresh(self::FRESH_HOURS) ? $this->hydrate($row) : null;
     }
 
     public function forget(string $phone): void
     {
-        Cache::forget($this->cacheKey($phone));
+        CourierCheck::where('phone', bd_phone($phone))->delete();
     }
 
     /**
@@ -138,7 +148,16 @@ class BdCourierService
         $result = $this->normalise($response->json() ?? []);
 
         if ($result['ok']) {
-            Cache::put($this->cacheKey($phone), $result, now()->addHours(self::CACHE_TTL_HOURS));
+            CourierCheck::updateOrCreate(
+                ['phone' => bd_phone($phone)],
+                [
+                    'payload' => $result,
+                    'success_ratio' => $result['summary']['success_ratio'] ?? 0,
+                    'total_parcel' => $result['summary']['total_parcel'] ?? 0,
+                    'reports_count' => count($result['reports'] ?? []),
+                    'checked_at' => now(),
+                ],
+            );
         }
 
         return $result;

@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Services\BdCourierService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -243,6 +244,54 @@ class BdCourierCheckTest extends TestCase
         $html = $this->actingAs($this->admin())->get('/admin/orders/'.$order->id)->getContent();
 
         $this->assertStringNotContainsString('Courier History', $html);
+    }
+
+    // ── Durability ──────────────────────────────────────────────────────────
+
+    public function test_a_result_survives_a_cache_flush(): void
+    {
+        // This is the bug: deploy.sh runs `optimize:clear`, which flushes the
+        // whole cache store, so results the shop had paid for vanished on the
+        // next deploy. They live in the database now.
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        $order = $this->order();
+        $this->actingAs($this->admin())->post('/admin/orders/'.$order->id.'/courier-check');
+
+        Cache::flush();
+
+        $this->assertNotNull(app(BdCourierService::class)->cached($order->customer_phone));
+        $html = $this->actingAs($this->admin())->get('/admin/orders/'.$order->id)->getContent();
+        $this->assertStringContainsString('84.29%', $html);
+    }
+
+    public function test_a_result_is_kept_for_48_hours_then_ages_out(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        $order = $this->order();
+        $this->actingAs($this->admin())->post('/admin/orders/'.$order->id.'/courier-check');
+        $svc = app(BdCourierService::class);
+
+        $this->travel(47)->hours();
+        $this->assertNotNull($svc->cached($order->customer_phone), 'should still be current at 47h');
+
+        $this->travel(2)->hours();
+        $this->assertNull($svc->cached($order->customer_phone), 'should have aged out past 48h');
+    }
+
+    public function test_re_checking_updates_the_stored_row_rather_than_duplicating_it(): void
+    {
+        $this->configure();
+        Http::fake(['api.bdcourier.com/*' => Http::response($this->payload())]);
+
+        $order = $this->order();
+        $this->actingAs($this->admin())->post('/admin/orders/'.$order->id.'/courier-check');
+        $this->actingAs($this->admin())->post('/admin/orders/'.$order->id.'/courier-check');
+
+        $this->assertDatabaseCount('courier_checks', 1);
     }
 
     // ── Orders list: column + bulk action ───────────────────────────────────

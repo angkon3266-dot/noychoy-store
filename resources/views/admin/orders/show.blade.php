@@ -16,6 +16,18 @@
         ]));
     @endphp
     <div class="flex items-center gap-2">
+    @if($balance !== null)
+        {{-- Courier wallet: if this runs dry, bookings start failing, so it
+             belongs where you see it before dispatching rather than buried
+             in the Steadfast card further down. --}}
+        @php $lowBalance = (float) $balance < 500; @endphp
+        <span class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+                     {{ $lowBalance ? 'bg-red-100 text-red-700' : 'bg-ink-100 text-ink-700' }}"
+              title="{{ $lowBalance ? 'Low — top up Steadfast before booking more parcels.' : 'Your Steadfast wallet balance.' }}">
+            🚚 Courier balance: ৳{{ number_format((float) $balance, 0) }}
+            @if($lowBalance)<span class="text-xs">· low</span>@endif
+        </span>
+    @endif
     @if($telHref = tel_link($order->customer_phone))
         <a href="{{ $telHref }}"
            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition"
