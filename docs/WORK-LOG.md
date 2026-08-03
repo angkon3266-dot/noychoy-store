@@ -193,6 +193,10 @@ model, not a relabel.
    storefront controllers; GA4; Bangla localisation; district shipping zones;
    admin 2FA.
 
+> **Full migration plan:** [META-SAAS-ROADMAP.md](META-SAAS-ROADMAP.md) — what
+> Embedded Signup (FBE) requires, what it would cost, and which phases are
+> gated on Meta rather than on us.
+
 ### Meta token architecture (researched 2026-08-02, against Meta's docs)
 
 - The dashboard warning refers to the **long-lived OAuth user token**, stored as
