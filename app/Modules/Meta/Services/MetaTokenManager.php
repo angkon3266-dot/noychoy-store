@@ -7,30 +7,68 @@ use App\Models\MetaConnection;
 use App\Support\Social\Contracts\SocialConnectionManager;
 
 /**
- * Meta driver for the platform's Token Manager. Owns the single Meta connection
- * row + its assets (catalogs, pages, IG accounts, pixels, ad accounts), granted
- * scopes and health. Implements the provider-agnostic {@see SocialConnectionManager}
- * so modules depend on the contract, not on Meta specifics.
+ * Meta driver for the platform's Token Manager. Owns the Meta connection row +
+ * its assets (catalogs, pages, IG accounts, pixels, ad accounts), granted scopes
+ * and health. Implements the provider-agnostic {@see SocialConnectionManager} so
+ * modules depend on the contract, not on Meta specifics.
+ *
+ * **Scoping.** Every lookup goes through {@see scope()}, which describes *which*
+ * connection this manager speaks for. Today that is `['provider' => 'meta']` —
+ * one row, the current behaviour exactly. It is a method rather than a literal
+ * so multi-tenancy is a one-line change here (`+ ['merchant_id' => …]`) instead
+ * of a hunt for `firstOrCreate` calls scattered through the class.
+ *
+ * `forStore()` already lets a caller aim this manager at a specific connection,
+ * which is what a per-merchant resolver will use. Nothing calls it yet.
  */
 class MetaTokenManager implements SocialConnectionManager
 {
     private ?MetaConnection $connection = null;
+
+    /** Extra scope narrowing which connection this manager speaks for. */
+    private array $scopeOverride = [];
 
     public function provider(): string
     {
         return 'meta';
     }
 
-    /** The single Meta connection, created on first write. */
+    /**
+     * The attributes identifying this manager's connection row.
+     *
+     * MULTI-TENANCY: add the merchant key here and every read/write below
+     * follows automatically.
+     */
+    protected function scope(): array
+    {
+        return ['provider' => 'meta'] + $this->scopeOverride;
+    }
+
+    /**
+     * Point this manager at a specific store's connection.
+     *
+     * Returns a fresh instance rather than mutating, so one request can safely
+     * touch several stores without the memo leaking between them.
+     */
+    public function forStore(array $scope): static
+    {
+        $clone = clone $this;
+        $clone->scopeOverride = $scope;
+        $clone->connection = null;          // never carry another store's row over
+
+        return $clone;
+    }
+
+    /** The Meta connection for the current scope, created on first write. */
     public function connection(): MetaConnection
     {
-        return $this->connection ??= MetaConnection::firstOrCreate(['provider' => 'meta']);
+        return $this->connection ??= MetaConnection::firstOrCreate($this->scope());
     }
 
     /** Existing connection or null (read-only, no row creation). */
     public function existing(): ?MetaConnection
     {
-        return $this->connection ??= MetaConnection::where('provider', 'meta')->first();
+        return $this->connection ??= MetaConnection::where($this->scope())->first();
     }
 
     public function isConnected(): bool

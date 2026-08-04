@@ -2,6 +2,7 @@
 
 namespace App\Services\Meta;
 
+use App\Services\Meta\Credentials\MetaCredentialResolver;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -37,8 +38,10 @@ class MetaDiagnostics
             'Enter all three under Meta → Settings.');
 
         // Graph API reachability + token validity (single debug_token call).
-        $graphOk = null; $graphDetail = 'No token to test with.';
-        $tokenOk = null; $tokenDetail = 'No token configured.';
+        $graphOk = null;
+        $graphDetail = 'No token to test with.';
+        $tokenOk = null;
+        $tokenDetail = 'No token configured.';
         if ($s->hasToken()) {
             try {
                 $dbg = $this->client->debugToken();
@@ -52,12 +55,19 @@ class MetaDiagnostics
                 $tokenDetail = ! $valid ? 'Token reported invalid.'
                     : ($expired ? 'Token expired.' : ($exp === 0 ? 'Never expires (long-lived).' : 'Expires '.date('Y-m-d', $exp).'.'));
             } catch (\Throwable $e) {
-                $graphOk = false; $graphDetail = $e->getMessage();
-                $tokenOk = false; $tokenDetail = $e->getMessage();
+                $graphOk = false;
+                $graphDetail = $e->getMessage();
+                $tokenOk = false;
+                $tokenDetail = $e->getMessage();
             }
         }
-        $checks[] = $this->check('graph', 'Graph API', $graphOk, $graphDetail, 'Check server connectivity and the access token.');
-        $checks[] = $this->check('token', 'Token Validity', $tokenOk, $tokenDetail, 'Reconnect or generate a new System User token.');
+        // Name the credential and give ITS fix. "Reconnect or generate a new
+        // System User token" covered both credentials at once and so told half
+        // of all merchants to visit a screen that does not apply to them.
+        $creds = app(MetaCredentialResolver::class)->resolve();
+
+        $checks[] = $this->check('graph', 'Graph API', $graphOk, $graphDetail, 'Check the server can reach graph.facebook.com.');
+        $checks[] = $this->check('token', 'Connection token', $tokenOk, $tokenDetail, $creds->connectionAdvice());
 
         // OAuth app credentials (Connect-with-Facebook availability).
         $oauth = filled(config('meta.oauth.app_id')) && filled(config('meta.oauth.app_secret'));
@@ -66,14 +76,16 @@ class MetaDiagnostics
             'Set the Meta App ID & Secret (System Config) to enable Connect with Facebook.');
 
         // Catalog access.
-        $catOk = null; $catDetail = 'No token/catalog to test.';
+        $catOk = null;
+        $catDetail = 'No token/catalog to test.';
         if ($s->isConfigured()) {
             try {
                 $c = $this->client->catalog($s->catalogId());
                 $catOk = true;
                 $catDetail = ($c['name'] ?? 'Catalog').' · '.($c['product_count'] ?? 0).' products';
             } catch (\Throwable $e) {
-                $catOk = false; $catDetail = $e->getMessage();
+                $catOk = false;
+                $catDetail = $e->getMessage();
             }
         }
         $checks[] = $this->check('catalog', 'Catalog', $catOk, $catDetail, 'Verify the Catalog ID and that the token can access it.');
@@ -87,17 +99,19 @@ class MetaDiagnostics
         // Conversions API.
         $capi = $s->capiEnabled();
         $checks[] = $this->check('capi', 'Conversions API', $capi,
-            $capi ? 'Enabled (token + pixel present).' : 'Disabled or token/pixel missing.',
-            'Enable CAPI and set a token under Tracking.');
+            $capi ? 'Enabled — '.lcfirst($creds->capiSourceLabel()).', pixel set.' : 'Disabled, or no pixel/token.',
+            $creds->capiAdvice());
 
         // Feed URL reachability.
-        $feedOk = null; $feedDetail = null;
+        $feedOk = null;
+        $feedDetail = null;
         try {
             $r = Http::timeout(8)->get(route('feed.meta'));
             $feedOk = $r->successful();
             $feedDetail = 'HTTP '.$r->status();
         } catch (\Throwable $e) {
-            $feedOk = false; $feedDetail = $e->getMessage();
+            $feedOk = false;
+            $feedDetail = $e->getMessage();
         }
         $checks[] = $this->check('feed', 'Feed URL', $feedOk, $feedDetail, 'Ensure the storefront is reachable and the feed route works.');
 

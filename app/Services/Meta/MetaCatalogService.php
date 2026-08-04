@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Services\Meta\Data\ConnectionStatus;
 use App\Services\Meta\Exceptions\MetaApiException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Domain-level orchestration for Meta catalog sync. Uses {@see MetaGraphClient}
@@ -45,7 +46,7 @@ class MetaCatalogService
         $checks = [];
 
         if (! $this->settings->isConfigured()) {
-            return ConnectionStatus::failed('connection_failed', 'Enter Business ID, Catalog ID and an access token first.');
+            return ConnectionStatus::failed('connection_failed', 'Connect with Facebook, or enter a Business ID, Catalog ID and System User token first.');
         }
 
         try {
@@ -56,7 +57,9 @@ class MetaCatalogService
             if (isset($debug['is_valid']) && $debug['is_valid'] === false) {
                 $checks[] = ['label' => 'Token validity', 'ok' => false, 'detail' => 'Token is not valid.'];
 
-                return ConnectionStatus::failed('invalid_token', '❌ Invalid Token', $checks);
+                // Name the credential: this is the CONNECTION token that drives
+                // catalog sync, not the optional Conversions API token.
+                return ConnectionStatus::failed('invalid_token', '❌ Connection token invalid', $checks);
             }
             $checks[] = ['label' => 'Token validity', 'ok' => true, 'detail' => null];
 
@@ -223,6 +226,7 @@ class MetaCatalogService
      * so the queue can retry the whole chunk. Terminal errors are recorded.
      *
      * @param  array<int,int>  $productIds
+     *
      * @throws MetaApiException on retryable failures (rate limit / network)
      */
     public function syncChunk(array $productIds, bool $force = false): void
@@ -428,7 +432,7 @@ class MetaCatalogService
             [
                 'retailer_id' => $this->mapper->retailerId($product),
                 'status' => MetaSyncState::STATUS_FAILED,
-                'last_error' => \Illuminate\Support\Str::limit($error, 500),
+                'last_error' => Str::limit($error, 500),
             ],
         );
     }

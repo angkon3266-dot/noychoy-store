@@ -36,6 +36,142 @@
         </div>
     @endif
 
+    {{-- ── Credentials ────────────────────────────────────────────────────────
+         Two independent credentials, shown separately and never blended. The
+         connection token drives catalog sync; the Conversions API token is
+         optional and falls back to the connection token when unset. Merging
+         them in the UI is what made "which token is broken?" unanswerable. --}}
+    @php
+        $creds = app(\App\Services\Meta\Credentials\MetaCredentialResolver::class)->resolve();
+        $connHealth = $creds->connectionHealth();
+        $daysLeft = $creds->connectionDaysLeft();
+        $connTone = [
+            'ok' => ['Connected', 'bg-green-100 text-green-700'],
+            'expiring' => ['Expiring soon', 'bg-amber-100 text-amber-700'],
+            'expired' => ['Expired', 'bg-red-100 text-red-700'],
+            'missing' => ['Not connected', 'bg-ink-100 text-ink-700'],
+        ][$connHealth];
+        $capiOn = $settings->capiEnabled();
+        $capiSource = $creds->capiSource();
+    @endphp
+
+    <div class="grid gap-4 md:grid-cols-2">
+        {{-- Facebook connection (catalog sync) --}}
+        <div class="card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="font-semibold">Facebook connection</h2>
+                    <p class="text-[11px] text-ink-700/50 mt-0.5">Syncs your products to the catalogue</p>
+                </div>
+                <span class="badge {{ $connTone[1] }}">{{ $connTone[0] }}</span>
+            </div>
+
+            <dl class="text-sm space-y-1.5">
+                <div class="flex justify-between gap-3">
+                    <dt class="text-ink-700/60">Method</dt>
+                    <dd class="font-medium">{{ $creds->isOauth() ? 'Connect with Facebook (OAuth)' : 'System User token (manual)' }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                    <dt class="text-ink-700/60">Expires</dt>
+                    <dd class="font-medium">
+                        @if(! $creds->hasConnection())—
+                        @elseif($daysLeft === null)Does not expire
+                        @elseif($daysLeft < 0)<span class="text-red-700">Expired</span>
+                        @else<span class="{{ $connHealth === 'expiring' ? 'text-amber-700' : '' }}">in {{ $daysLeft }} day{{ $daysLeft === 1 ? '' : 's' }}</span>
+                        @endif
+                    </dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                    <dt class="text-ink-700/60">Connected</dt>
+                    <dd class="font-medium">{{ $creds->connectedAt?->diffForHumans() ?? '—' }}</dd>
+                </div>
+                @if($creds->businessId)
+                    <div class="flex justify-between gap-3">
+                        <dt class="text-ink-700/60">Business</dt>
+                        <dd class="font-medium truncate max-w-[55%]">{{ $snapshot['connected_business_name'] ?? $creds->businessId }}</dd>
+                    </div>
+                @endif
+            </dl>
+
+            @if($connHealth !== 'ok')
+                <p class="mt-3 text-xs text-ink-700/70 bg-ink-50 rounded px-2.5 py-2">{{ $creds->connectionAdvice() }}</p>
+            @endif
+
+            {{-- The action follows the CREDENTIAL, not the app config. An
+                 OAuth-connected store offered "Update System User token" was
+                 being pointed at a screen that does not apply to it. --}}
+            <div class="mt-4">
+                @if($creds->isOauth() && $oauthConfigured)
+                    <a href="{{ route('admin.meta.oauth.redirect') }}"
+                       class="{{ $connHealth === 'ok' ? 'btn-outline' : 'btn-primary' }} w-full text-center">
+                        {{ $creds->hasConnection() ? 'Reconnect with Facebook' : 'Connect with Facebook' }}
+                    </a>
+                @elseif($creds->isOauth())
+                    {{-- Connected by OAuth, but this install has no Meta App
+                         credentials, so we cannot start the flow. Say so. --}}
+                    <a href="{{ route('admin.system-config.index') }}" class="btn-outline w-full text-center">
+                        Add Meta App credentials to reconnect
+                    </a>
+                @else
+                    <a href="#settings" class="btn-outline w-full text-center">
+                        {{ $creds->hasConnection() ? 'Replace System User token' : 'Add a System User token' }}
+                    </a>
+                @endif
+            </div>
+        </div>
+
+        {{-- Conversions API --}}
+        <div class="card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="font-semibold">Conversions API <span class="text-[11px] font-normal text-ink-700/45">· optional</span></h2>
+                    <p class="text-[11px] text-ink-700/50 mt-0.5">Sends purchase events server-side</p>
+                </div>
+                <span class="badge {{ $capiOn ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }}">{{ $capiOn ? 'Active' : 'Off' }}</span>
+            </div>
+
+            <dl class="text-sm space-y-1.5">
+                <div class="flex justify-between gap-3">
+                    <dt class="text-ink-700/60">Credential</dt>
+                    <dd class="font-medium text-right">
+                        @if($capiSource === \App\Services\Meta\Credentials\MetaCredentials::CAPI_DEDICATED)
+                            <span class="text-green-700">Dedicated System User token</span>
+                        @elseif($capiSource === \App\Services\Meta\Credentials\MetaCredentials::CAPI_INHERITED)
+                            <span>{{ $creds->isOauth() ? 'Facebook connection token' : 'System User token' }}</span>
+                        @else
+                            <span class="text-ink-700/50">None</span>
+                        @endif
+                    </dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                    <dt class="text-ink-700/60">Pixel</dt>
+                    <dd class="font-medium">{{ $creds->pixelId ?: '—' }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                    <dt class="text-ink-700/60">Last event sent</dt>
+                    <dd class="font-medium">{{ $settings->get('last_event_sent_at') ? \Illuminate\Support\Carbon::parse($settings->get('last_event_sent_at'))->diffForHumans() : '—' }}</dd>
+                </div>
+            </dl>
+
+            @if($capiSource === \App\Services\Meta\Credentials\MetaCredentials::CAPI_INHERITED)
+                <p class="mt-3 text-xs text-ink-700/70 bg-ink-50 rounded px-2.5 py-2">
+                    No separate token set, so events are sent with the connection token above —
+                    which means reconnecting Facebook also renews the Conversions API.
+                </p>
+            @endif
+
+            <div class="mt-4 grid grid-cols-2 gap-2">
+                <a href="{{ route('admin.meta.tracking.validate-token') }}"
+                   class="btn-outline w-full text-center {{ $capiSource === \App\Services\Meta\Credentials\MetaCredentials::CAPI_NONE ? 'pointer-events-none opacity-50' : '' }}">
+                    Validate
+                </a>
+                <a href="{{ route('admin.meta.tracking') }}" class="btn-outline w-full text-center">
+                    {{ $creds->usesDedicatedCapiToken() ? 'Replace token' : 'Set token' }}
+                </a>
+            </div>
+        </div>
+    </div>
+
     {{-- Notifications --}}
     @foreach($notifications as $note)
         <div class="rounded-md px-4 py-2.5 text-sm border

@@ -9,6 +9,8 @@ use App\Jobs\Meta\SyncCatalogChunkToMeta;
 use App\Jobs\Meta\SyncProductToMeta;
 use App\Models\MetaSyncLog;
 use App\Models\Product;
+use App\Services\Meta\Credentials\MetaCredentialResolver;
+use App\Services\Meta\Credentials\MetaCredentials;
 use App\Services\Meta\MetaCatalogService;
 use App\Services\Meta\MetaQueueRunner;
 use App\Services\Meta\MetaSettings;
@@ -274,29 +276,42 @@ class MetaIntegrationController extends Controller
             return $out;
         }
 
+        // Every message below names ONE credential and gives the fix for that
+        // credential only. The connection token and the Conversions API token
+        // are independent and have different remedies; conflating them sent
+        // merchants to the wrong screen.
+        $creds = app(MetaCredentialResolver::class)->resolve();
+
         if ($this->settings->get('last_connection_ok') === false) {
-            $out[] = ['type' => 'error', 'message' => 'Last connection test failed — check your token and permissions.'];
+            $out[] = ['type' => 'error', 'message' => 'The last connection test to Meta failed. '.$creds->connectionAdvice()];
         }
 
-        if ($expires = $this->settings->get('token_expires_at')) {
-            $expiresAt = Carbon::parse($expires);
-            // Only an OAuth ("Connect with Facebook") connection has an expiring
-            // token; a System User token reports no expiry at all, so telling a
-            // Production-mode merchant to "generate a System User token" sent
-            // them to the wrong screen entirely.
-            $fix = $this->settings->get('mode') === MetaSettings::MODE_PRODUCTION
-                ? 'Reconnect with Facebook to renew it.'
-                : 'Generate a new System User token.';
+        // Connection token (catalog sync). Threshold comparison, never a diff —
+        // Carbon 3's diffInDays() is signed, and comparing it against a positive
+        // number was true for every future date, so "expires soon" ran forever.
+        $health = $creds->connectionHealth();
 
-            if ($expiresAt->isPast()) {
-                $out[] = ['type' => 'error', 'message' => 'Access token has expired. '.$fix];
-            } elseif ($expiresAt->lte(now()->addDays(7))) {
-                // lte() against a threshold, NOT diffInDays(): Carbon 3's diff is
-                // signed, so a future expiry gave a negative number that was
-                // always <= 7 — the "expires soon" warning fired from the moment
-                // the merchant connected and never stopped.
-                $out[] = ['type' => 'warning', 'message' => 'Access token expires soon ('.$expiresAt->diffForHumans().'). '.$fix];
-            }
+        if ($health === 'expired') {
+            $out[] = [
+                'type' => 'error',
+                'message' => 'Your Facebook connection has expired, so product sync has stopped. '.$creds->connectionAdvice(),
+            ];
+        } elseif ($health === 'expiring') {
+            $days = $creds->connectionDaysLeft();
+            $out[] = [
+                'type' => 'warning',
+                'message' => 'Your Facebook connection expires in '
+                    .($days !== null ? ($days <= 0 ? 'less than a day' : $days.' day'.($days === 1 ? '' : 's')) : 'a few days')
+                    .'. '.$creds->connectionAdvice(),
+            ];
+        }
+
+        // Conversions API — a separate credential with a separate fix.
+        if ($this->settings->get('capi_enabled') && $creds->capiSource() === MetaCredentials::CAPI_NONE) {
+            $out[] = [
+                'type' => 'warning',
+                'message' => 'The Conversions API is switched on but has no token to send with. '.$creds->capiAdvice(),
+            ];
         }
 
         $recentFailures = MetaSyncLog::where('status', 'failed')->where('created_at', '>=', now()->subDay())->count();
