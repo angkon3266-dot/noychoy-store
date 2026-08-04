@@ -3,15 +3,19 @@
 namespace App\Services;
 
 use App\Models\AbandonedCart;
+use App\Models\AdminAlertRead;
 use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\User;
+use App\Services\Meta\Credentials\MetaCredentialResolver;
 use App\Support\DateRange;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Everything in the shop that wants someone's attention, in one list.
@@ -40,11 +44,11 @@ class AdminAlerts
     /**
      * Alerts for one admin, newest first, each flagged read/unread.
      *
-     * @return \Illuminate\Support\Collection<int,array>
+     * @return Collection<int,array>
      */
-    public function for(User $user): \Illuminate\Support\Collection
+    public function for(User $user): Collection
     {
-        $read = \App\Models\AdminAlertRead::where('user_id', $user->getKey())
+        $read = AdminAlertRead::where('user_id', $user->getKey())
             ->pluck('alert_key')->flip();
 
         return $this->all()
@@ -79,7 +83,7 @@ class AdminAlerts
      * __PHP_Incomplete_Class and blows up at the point of use. Timestamps are
      * rehydrated on the way out.
      */
-    public function all(): \Illuminate\Support\Collection
+    public function all(): Collection
     {
         $cached = Cache::remember('admin.alerts.v1', self::CACHE_SECONDS, fn () => [
             ...$this->outOfStock(),
@@ -91,6 +95,7 @@ class AdminAlerts
             ...$this->failedDeliveries(),
             ...$this->sellingBelowCost(),
             ...$this->smsCredit(),
+            ...$this->metaTokenExpiring(),
             ...$this->viewedNotSold(),
             ...$this->returningCustomers(),
             ...$this->couponIssues(),
@@ -106,7 +111,7 @@ class AdminAlerts
 
         return collect($cached)->map(fn ($a) => [
             ...$a,
-            'at' => $a['at'] ? \Illuminate\Support\Carbon::createFromTimestamp($a['at']) : null,
+            'at' => $a['at'] ? Carbon::createFromTimestamp($a['at']) : null,
         ]);
     }
 
@@ -132,7 +137,7 @@ class AdminAlerts
             'title' => $title,
             'body' => $body,
             'url' => $url,
-            'at' => $at ? \Illuminate\Support\Carbon::parse($at)->getTimestamp() : null,
+            'at' => $at ? Carbon::parse($at)->getTimestamp() : null,
         ];
     }
 
@@ -179,7 +184,7 @@ class AdminAlerts
             ->map(fn ($r) => $this->alert(
                 "review.{$r->id}", 'review', 'info',
                 'New review awaiting approval',
-                trim(($r->product?->name ? $r->product->name.' — ' : '').($r->rating ? "{$r->rating}★ " : '').\Illuminate\Support\Str::limit((string) $r->comment, 70)),
+                trim(($r->product?->name ? $r->product->name.' — ' : '').($r->rating ? "{$r->rating}★ " : '').Str::limit((string) $r->comment, 70)),
                 route('admin.reviews.index'), $r->created_at,
             ))->all());
     }
@@ -292,6 +297,44 @@ class AdminAlerts
                 'SMS credit is low ('.$amount.')',
                 'Order confirmations and login OTPs stop silently when this runs out.',
                 route('admin.sms.index'), now(),
+            )];
+        });
+    }
+
+    // ── Integrations ─────────────────────────────────────────────────────────
+
+    /**
+     * The Facebook connection is expiring or already expired. Derived from
+     * live state (MetaCredentials), not a "sent once" flag: the scheduled
+     * RefreshMetaToken job renews it automatically in the last 14 days before
+     * expiry, so under normal operation this never fires at all — it only
+     * appears once renewal has actually been failing, and disappears again
+     * the moment it succeeds or the merchant reconnects.
+     */
+    protected function metaTokenExpiring(): array
+    {
+        return $this->guard(function () {
+            $creds = app(MetaCredentialResolver::class)->resolve();
+
+            if (! $creds->hasConnection() || ! $creds->isOauth()) {
+                return [];
+            }
+
+            $health = $creds->connectionHealth();
+            if (! in_array($health, ['expiring', 'expired'], true)) {
+                return [];
+            }
+
+            $days = $creds->connectionDaysLeft();
+            $body = $health === 'expired'
+                ? 'Product sync to Facebook has stopped. Reconnect to resume it.'
+                : 'Automatic renewal has not succeeded yet ('.($days !== null ? $days.' day'.($days === 1 ? '' : 's').' left' : 'a few days left').'). It will keep retrying daily — reconnect now if you would rather not wait.';
+
+            return [$this->alert(
+                'meta.token_expiring', 'integration', $health === 'expired' ? 'urgent' : 'warning',
+                $health === 'expired' ? 'Facebook connection has expired' : 'Facebook connection expires soon',
+                $body,
+                route('admin.meta.index'), now(),
             )];
         });
     }

@@ -1,7 +1,9 @@
 <?php
 
+use App\Jobs\Meta\RefreshMetaToken;
 use App\Jobs\Meta\RetryFailedMetaSyncs;
 use App\Jobs\Meta\VerifyCatalogSync;
+use App\Services\NotificationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -31,6 +33,12 @@ Schedule::job(new RetryFailedMetaSyncs)->hourly()->name('meta-retry-failed')->wi
 // Daily: verify the whole catalog is in sync and re-queue anything stale.
 Schedule::job(new VerifyCatalogSync)->dailyAt('03:30')->name('meta-verify-catalog')->withoutOverlapping();
 
+// Daily: renew the OAuth connection token in the last 14 days before it
+// expires, so a merchant on "Connect with Facebook" never has to manually
+// reconnect within a normal ~60-day window. No-op outside that window and
+// for Development Mode / System User connections (see MetaTokenRefresher).
+Schedule::job(new RefreshMetaToken)->dailyAt('02:45')->name('meta-token-refresh')->withoutOverlapping();
+
 // ── Member notifications ────────────────────────────────────────────────────
 // Batched "new arrivals" announcement — sends one notification for the day's new
 // products (a no-op when there are none). Adjust the time as you like.
@@ -42,8 +50,8 @@ Schedule::command('notifications:new-arrivals')->dailyAt('10:00')->name('notify-
 // alerts) down with it. Report and carry on instead.
 Schedule::call(function () {
     try {
-        app(\App\Services\NotificationService::class)->deliverDue();
-    } catch (\Throwable $e) {
+        app(NotificationService::class)->deliverDue();
+    } catch (Throwable $e) {
         report($e);
     }
 })->everyFiveMinutes()->name('notify-deliver-scheduled');
