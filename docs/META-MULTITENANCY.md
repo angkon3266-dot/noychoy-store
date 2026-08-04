@@ -1,5 +1,19 @@
 # Meta module — what changes when multi-tenancy arrives
 
+> ## ⚠️ Superseded — this assumed the wrong product model
+>
+> Written when "SaaS for many merchants" was read as one shared installation.
+> The actual model is **one installation per customer**: their own hosting,
+> database and domain, managing exactly one store and one Meta connection.
+>
+> **Use [PRODUCT-ROADMAP.md](PRODUCT-ROADMAP.md) instead.**
+>
+> Everything below about `merchant_id`, tenant-aware jobs, an operator dashboard
+> and Graph API fairness between merchants is **not applicable**. Two points
+> survived the change of model and were carried over to the new roadmap:
+> retiring the duplicate credential store (§2 here), and the rule that a token
+> must never sit in a queue payload.
+
 *Written 2026-08-03, alongside the SaaS-readiness refactor. Companion to
 [META-SAAS-ROADMAP.md](META-SAAS-ROADMAP.md).*
 

@@ -9,6 +9,13 @@ no token pasting and no periodic reconnection.
 
 ---
 
+> **Scope note (2026-08-03):** the product model is **one installation per
+> customer**, not a shared platform — see [PRODUCT-ROADMAP.md](PRODUCT-ROADMAP.md).
+> The Meta research below (permissions, Business Verification, the allow-list,
+> token lifecycle) is still accurate and worth keeping. The multi-tenancy
+> sections are not applicable, and FBE itself is only relevant if you adopt a
+> vendor-owned Meta App.
+
 ## 0. Read this first — the two things that decide the timeline
 
 ### 0.1 FBE is not self-serve. It is allow-listed.
