@@ -39,7 +39,13 @@ choice rather than a compromise.
 
 ---
 
-## 1. 🔴 The decision that blocks everything else: whose Meta App is it?
+## 1. 🟢 RESOLVED — whose Meta App is it?
+
+> **Full comparison + evidence:** [META-APP-ARCHITECTURE.md](META-APP-ARCHITECTURE.md)
+> (researched 2026-08-03). Verified against Meta's Platform Terms and Meta's own
+> "Facebook for WooCommerce" plugin — the closest real-world comparable, run by
+> Meta itself across hundreds of thousands of independent self-hosted stores
+> through one shared App.
 
 `config/meta.php` reads `META_APP_ID` / `META_APP_SECRET` from **each install's
 environment**, and System Config lets the customer set them. So today, every
@@ -61,16 +67,21 @@ Three ways forward:
 | Option | How it works | Verdict |
 |---|---|---|
 | **A. Customer's own App** (today) | Each customer creates an App, does their own Verification + Review | Honest, zero vendor infrastructure — but OAuth is unreachable for most. **Manual token becomes the real product** |
-| **B. Ship your App credentials** | Your `META_APP_SECRET` in every customer's `.env` | ❌ **Do not.** The secret signs `appsecret_proof` and OAuth token exchange. On a customer-controlled server it is readable by the customer, their host, and anyone with file access. You cannot rotate it without breaking every install, and one leak compromises every customer |
-| **C. Vendor OAuth broker** | A small service you host holds the secret; customer installs redirect through it and receive only the resulting token | ✅ The correct answer for commercial distribution. Customers get one-click connect, your secret never leaves your server, one App Review covers everyone. Cost: one small service you must run and keep up |
+| **B. Ship your App credentials** | Your `META_APP_SECRET` in every customer's `.env` | ❌ **Rejected — the only option with an unmitigable defect.** The secret signs `appsecret_proof` and OAuth token exchange. On a customer-controlled server it is readable by the customer, their host, and anyone with file access. Cannot be rotated without breaking every install, and one leak — or one App suspension from a single customer's abuse — hits every customer simultaneously |
+| **C. Vendor OAuth broker** | A small service you host holds the secret; customer installs redirect through it and receive only the resulting token | ✅ **Confirmed target.** This is what Meta's own Facebook-for-WooCommerce does. Customers get one-click connect, your secret never leaves your server, one App Review covers everyone — Meta's "Tech Provider" terms are the named, sanctioned path for exactly this |
 
-**Recommendation: A now, C when OAuth becomes a selling point.** Stop treating
-Development Mode as the lesser path — for this product it is the one that works.
-Option B is the tempting shortcut and it is the one that will hurt you.
+**Decision: A now, C when there is revenue to fund it.** Development Mode
+(manual System User token) is not the lesser path for this product — it is the
+one that works for most customers today, and should be built and documented as
+the primary flow, not a fallback. B is off the table permanently, not just for
+now: its risk *increases* with customer count, it has no mitigation, and the
+alternative (C) achieves the same one-click UX without it.
 
 > **Rate-limit caveat.** Graph API limits are **per App**. Under A each customer
 > has their own App and their own budget — one of A's genuine advantages. Under
-> B or C every install shares yours, and fairness between customers becomes real
+> C every install shares yours, and this is the one problem the broker does
+> *not* solve — it only removes the secret-distribution risk, not the shared
+> rate-limit ceiling. Budget for it before C carries real volume.
 > again. That was the only part of the multi-tenant plan with a life beyond it.
 
 ---
@@ -231,7 +242,7 @@ the screen that holds their Meta credentials and can send SMS.
 
 | # | Task | Why now | Effort |
 |---|---|---|---|
-| 1 | **Decide the Meta App model** (§1) | Blocks how OAuth is documented, sold and supported | Decision, not code |
+| 1 | ~~Decide the Meta App model~~ (§1) — **resolved, A now / C later** | Was blocking how OAuth is documented, sold and supported | Done — decision only |
 | 2 | **Version + `app:install` + `app:update`** (§2) | Cannot support customer #10 without it | ~1 week |
 | 3 | **Migration-skip safety** (§2) | Every future release depends on it | ~2 days |
 | 4 | **Token auto-refresh** (§3) | Removes a recurring, permanent support cost | ~1 week |

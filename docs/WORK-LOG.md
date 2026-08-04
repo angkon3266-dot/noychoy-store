@@ -5,8 +5,86 @@ picked up cold: every claim was verified against the code, the test suite, a
 browser session or the live server at the time, and the commit is named so you
 can read the full reasoning in `git show <sha>`.
 
-**State at the end of this run:** `e753b86` on `main`, deployed. **322 tests
+**State at the end of this run:** `2da5fbd` on `main`, deployed. **341 tests
 passing.** Production doctor: *no problems found*.
+
+---
+
+## 8. Meta credentials separated; SaaS planning corrected to the real model — `f225901`, `c5af260`, `2da5fbd`
+
+**Two credentials, kept apart.** The module had always had a **connection
+token** (OAuth or a pasted System User token — drives catalog sync) and an
+optional **Conversions API token** that silently falls back to the connection
+token when unset. Blurring them produced advice like *"replace the System User
+token"* when there was no System User token — CAPI was running on the OAuth
+token, and reconnecting Facebook was the actual fix.
+
+`MetaCredentials` is now a value object that knows which is which and answers
+for itself (`connectionAdvice()`, `capiAdvice()`). Every message in
+`MetaIntegrationController`, `MetaDiagnostics` and `MetaCatalogService` now
+names one credential. The dashboard got two separate cards — connection
+(method, days left, reconnect) and Conversions API (active, which credential,
+validate, replace) — with the reconnect button now following the credential
+rather than the app config.
+
+**Found while testing:** `Setting::$memo` is a `static` property that outlives
+the container, so a test that only *read* settings saw whatever the previous
+test had written. Fixed in `tests/TestCase.php::setUp()`. It stayed hidden
+because `Setting::put()` already clears the memo — only read-first tests were
+ever affected.
+
+**The SaaS planning had the wrong product model.** First pass assumed "SaaS for
+many merchants" meant one shared installation, and built toward
+`merchant_id`-scoped multi-tenancy (`META-MULTITENANCY.md`, now marked
+superseded). The actual model, clarified by the user: **one Laravel install per
+customer** — their own host, DB, domain, one store each. That inverts the
+plan:
+
+- Dropped entirely: `merchants` table, `merchant_id` columns, tenant-aware
+  jobs, cross-merchant operator dashboard, the `MetaCredentialResolver`
+  interface (built for this, zero callers under the real model)
+- Kept: `MetaCredentials` — separating the two tokens was a correctness fix,
+  not a tenancy one
+- **The tenancy boundary is the installation itself** — separate DB/host/domain
+  is stronger isolation than `merchant_id` scoping would have given
+
+Current planning lives in **[PRODUCT-ROADMAP.md](PRODUCT-ROADMAP.md)**. Two
+findings reshaped the priorities:
+
+1. Every install needs its own Meta App, and advanced-access permissions
+   (`catalog_management`) need App Review + Business Verification — which most
+   small merchants won't pass. **The manual System User token is the primary
+   flow for this product, not a fallback.**
+2. **There is no installer or updater** (`APP_VERSION`, `app:install`,
+   `app:update` all absent). Fine for one install you own; it is the actual
+   blocker for customer #10, ranked above every Meta improvement.
+
+---
+
+## 9. Meta App architecture — customer-owned vs vendor-owned vs OAuth broker
+
+Researched to resolve `PRODUCT-ROADMAP.md` §1 with evidence rather than
+reasoning alone. Full writeup: **[META-APP-ARCHITECTURE.md](META-APP-ARCHITECTURE.md)**.
+
+**Verified against Meta's Platform Terms and Meta's own "Facebook for
+WooCommerce" plugin** — the closest real-world comparable: Meta itself runs one
+shared App across hundreds of thousands of independent, unrelated, self-hosted
+WooCommerce stores. Meta's Platform Terms name this the **Tech Provider**
+model, with explicit obligations (per-client data segregation, use limited to
+that client's direction) — and independent of that paperwork, Facebook Login
+for Business tokens are **cryptographically scoped per business**, so a
+compromised token only ever exposes the one business that issued it, whatever
+App issued it.
+
+**Decision, confirmed:**
+
+| | Verdict |
+|---|---|
+| **A. Customer's own App** | Ship this now. Zero infra; OAuth unreachable for most customers, so Development Mode is the real flow |
+| **B. Vendor App, secret shipped to every install** | **Rejected permanently.** The only option with a structural, unmitigable defect — a secret on infrastructure you don't control, unrotatable, and one leak or one abusive customer breaks every install at once. Risk *rises* with customer count |
+| **C. Vendor OAuth broker** | **Confirmed target**, built when revenue funds it. Exactly what Meta's own WooCommerce plugin does. One-click connect, secret never leaves vendor infrastructure. Does **not** fix the shared Graph API rate limit — that stays per-App regardless of A/B/C |
+
+No code changed — planning only.
 
 ---
 
