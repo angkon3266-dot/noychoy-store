@@ -88,6 +88,32 @@ No code changed — planning only.
 
 ---
 
+## 10. Follow-up: what if the vendor also provides the hosting?
+
+Asked and answered same session. **Confirmed access model: reseller
+hosting** — the vendor provisions each customer's account, but the customer
+still gets their own FTP/File Manager/SSH to it (same pattern DEPLOY.md and
+NAMECHEAP-DEPLOY.md already describe).
+
+**Does this change the B/C verdict from §9? No.** Whoever can reach that
+account's filesystem can read a shared secret — the customer, anyone they
+later grant access to, anyone who compromises the account. Who provisioned it
+originally doesn't change who can read it today. `META-APP-ARCHITECTURE.md`
+§3a has the full table, including the one case that *would* change the
+verdict (fully managed, no customer file access at all) — not the case here.
+
+**What it does change:** as reseller, the vendor likely retains WHM-level
+access to every account independent of the customer's own login. That's not a
+Meta question at all — it lands on `PRODUCT-ROADMAP.md` §2, the
+installer/updater gap. "Ship a customer-run updater" becomes "push updates
+across the fleet yourself," which is both easier to build and doesn't depend
+on customer competence. Flagged as **pending confirmation** against the actual
+reseller mechanism in use before treating it as load-bearing.
+
+No code changed.
+
+---
+
 ## 1. Money-path bugs — `b75af87`, `f15c769`
 
 Six defects, each reproduced before it was fixed and each now covered by a

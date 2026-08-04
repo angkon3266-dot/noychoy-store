@@ -106,6 +106,29 @@ budget. See the scalability row below.
 
 ---
 
+## 3a. Addendum — what if the vendor also provides the hosting?
+
+*Added 2026-08-03, in response to a follow-up question.* Answer depends
+entirely on what access the customer has to the server itself:
+
+| Vendor's hosting model | Changes the B/C verdict? |
+|---|---|
+| **Fully managed** — customer sees only the store admin panel, no SSH/FTP/File Manager | **Yes.** No customer, and no one they grant access to, can ever reach the filesystem. A secret written to `.env` is then genuinely on infrastructure the vendor alone controls — which is exactly the condition Meta's own guidance requires. B becomes viable, though C is still marginally better on blast-radius and rotation grounds (compromising one server under B still leaks that server's copy; under C, no server holds the secret at all) |
+| **Reseller hosting — customer gets their own cPanel/FTP/SSH** (confirmed as the actual plan) | **No.** The exposure surface is identical to pure self-hosting: whoever can reach that account's File Manager — the customer, anyone they later grant access to, anyone who compromises the account — can read the secret. Who provisioned the account originally is irrelevant to who can read it today. **The verdict is unchanged: reject B, target C or run A.** |
+
+**What the reseller model *does* change is unrelated to the Meta App
+question.** As reseller, the vendor likely retains WHM-level access to every
+account independent of the customer's own cPanel login — a materially
+different position than arms-length self-hosted distribution, and directly
+relevant to `PRODUCT-ROADMAP.md` §2 (the installer/updater gap): centrally
+pushing updates across the fleet becomes plausible, rather than depending on
+each customer correctly running an updater themselves. This depends on which
+specific reseller mechanism is used (WHM resold through a parent host vs. a
+vendor-operated VPS reseller stack), and should be confirmed against the
+actual hosting plan before being treated as load-bearing.
+
+---
+
 ## 4. What architecture do comparable products use?
 
 **Meta for WooCommerce is the direct, verified comparable** (§1): one

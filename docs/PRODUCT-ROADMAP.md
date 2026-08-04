@@ -93,7 +93,17 @@ customer upgrades by someone SSH-ing in and running `deploy.sh` against a repo
 they can reach. That is fine for one install you own. It does not survive
 customer #10, and it is the single biggest gap in the product.
 
-What a distributed product needs:
+> **If you host and resell every customer's account** (confirmed 2026-08-03,
+> see `META-APP-ARCHITECTURE.md` §3a): you likely retain WHM-level access to
+> every account independent of the customer's own cPanel login. That changes
+> "ship a customer-run updater" into "push updates across the fleet yourself,"
+> which is both easier to build and doesn't depend on any customer running a
+> command correctly. Confirm this against your actual reseller mechanism before
+> treating it as load-bearing — worth doing before committing to which of the
+> two you build.
+
+What a distributed product needs (customer-run version — build the
+fleet-update version instead if the above holds):
 
 - **A version constant**, surfaced in the admin footer and `app:doctor`. Support
   cannot start without "which version are you on?"
