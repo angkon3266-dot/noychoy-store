@@ -162,12 +162,53 @@ infrastructure the vendor controls.
 
 ---
 
-## 5. Comparison
+## 5. Correction — Option A's onboarding is likely far better than first stated
+
+*Added 2026-08-03, in response to "so what do we do?"* The original version
+of §6's comparison rated A's onboarding "poor — App Review + Business
+Verification is unreachable for most small merchants." That was wrong, and
+wrong in a way that mattered: it conflated two different scenarios that Meta
+treats completely differently.
+
+Verified directly against Meta's Business Verification docs: *"If your app
+will only be used by app users who have a role on the app itself you do not
+need to complete verification"* — Business Verification and App Review gate
+**a vendor's one App serving many unrelated merchants' businesses** (what B and
+C actually need). They do **not** gate a merchant creating their own App and
+connecting it only to their own business — the merchant is that app's admin,
+so it never leaves Standard Access. **No App Review. No Business
+Verification.**
+
+This means Option A's real onboarding cost is: the merchant creates a small
+Meta App (a few fields, no review) and sets up a **Facebook Login for
+Business `config_id`** inside it — a real, documented step
+(`META_INTEGRATION.md` §"Why Login for Business?" — `catalog_management` /
+`business_management` aren't valid standard Login scopes) — after which
+"Connect with Facebook" works the normal way. That is a one-time, guidable
+setup cost per merchant, not a compliance wall most of them fail.
+
+**What this does not yet confirm:** the quoted text describes Meta's stated
+*policy*. It has not been confirmed by actually running this product's
+"Connect with Facebook" flow end-to-end against a self-created App with no
+review submitted. Docs and dialog behaviour occasionally diverge (rate limits
+or fraud heuristics on brand-new small apps, for instance). **Before
+redesigning onboarding around this, run the test once:** create one throwaway
+App under a Business Manager you control, set up its Login-for-Business
+config, and walk the actual OAuth flow this codebase implements — confirm
+`catalog_management`/`business_management` are actually grantable and a real
+catalog actually syncs. An afternoon, resolves the largest remaining
+uncertainty in this whole document.
+
+---
+
+## 6. Comparison
+
+*Onboarding row updated to reflect §5 — pending the live test described there.*
 
 | | **A. Customer-owned App** | **B. Vendor-owned App, secret shipped** | **C. Vendor OAuth broker** |
 |---|---|---|---|
 | **Security** | Good — blast radius is one customer, entirely their own risk | 🔴 Structural defect — shared secret on infrastructure you don't control, unrotatable, blast radius is every customer | ✅ Best — secret never leaves vendor infrastructure; per-business tokens already isolate customers (§1) |
-| **Merchant onboarding** | Poor for OAuth — App Review + Business Verification is unreachable for most small merchants. Manual System User token becomes the real path | ✅ One-click — App Review done once by the vendor covers every customer | ✅ One-click — same as B |
+| **Merchant onboarding** | **Likely good** — Standard Access, no App Review or Business Verification when the merchant's own App only ever touches their own business (§5). Real cost: one-time App + Login-for-Business setup, pending the live test | ✅ One-click — App Review done once by the vendor covers every customer | ✅ One-click — same as B |
 | **Maintenance (vendor)** | ✅ None — no shared infra, nothing to keep in good standing | Must keep the App in good standing; one abusive customer risks the App for everyone, with no isolation to contain it | Must build **and run** a small always-on service — real new operational surface, but the risk it carries is contained and well-understood |
 | **App Review** | Every customer faces it independently — most never clear it | Done once, by the vendor, covers all customers | Done once, by the vendor, covers all customers |
 | **Scalability** | Perfect for the vendor (zero shared infra); poor for customers (each hits the same wall) | Works until the shared Graph API rate-limit budget is felt across many active stores, or the App gets flagged | Same rate-limit ceiling as B — the broker fixes the *secret* problem, not the *rate limit* problem |
@@ -178,30 +219,41 @@ infrastructure the vendor controls.
 
 ## Recommendation
 
-**Reject B outright.** It is the only option whose central risk cannot be
-mitigated — a secret that must exist, held on infrastructure you do not
-operate, growing riskier as the customer base grows.
+**Reject B outright — unaffected by §5's correction.** It is the only option
+whose central risk cannot be mitigated — a secret that must exist, held on
+infrastructure you do not operate, growing riskier as the customer base grows.
 
-**Target architecture: C.** It is what Meta's own comparable product actually
-does, it is the correct application of Meta's own security guidance to a
-distributed-software business, and it delivers genuine one-click onboarding —
-which for this product's merchants (see §1's onboarding row) is close to the
-only way most of them will ever use OAuth at all.
+**Immediate next step: run the live test in §5.** It decides which of A or C
+is worth investing in first, and it costs an afternoon.
 
-**Sequencing: ship A now, build C when there is revenue to fund it.** A needs
-zero new infrastructure and is honest about what it is — most customers will
-run on the manual System User token regardless, which is exactly what
-`PRODUCT-ROADMAP.md` already identified as the real primary flow, not a
-fallback. Design the connection UI so that swapping in C later changes only
-*where the OAuth redirect points*, not the token-handling code downstream —
-`MetaCredentials` (already built) makes this cheap either way, since it already
-treats "how the connection token was obtained" as a fact to display, not
-something the rest of the module needs to branch on.
+**If the test confirms §5** (Standard Access genuinely covers a merchant's own
+App on their own business, no review needed): **Option A becomes the primary
+target, not the interim one.** Build the guided setup — create-App walkthrough,
+Login-for-Business `config_id` steps, then the existing "Connect with
+Facebook" flow — as the main onboarding path. This needs zero vendor
+infrastructure, carries none of B's or C's shared-secret considerations at
+all, and gets close to one-click without ever building a broker. C's appeal
+shrinks to "smoother UX, worth it once there are enough customers to justify
+running a service" rather than "the only real path to working OAuth."
+
+**If the test does not confirm §5** (some Business-Manager-specific dialog
+behaviour blocks it despite the stated policy): fall back to the original
+sequencing — manual System User token as the primary flow, **C as the target
+architecture**, built when revenue funds it. It is what Meta's own comparable
+product (Facebook for WooCommerce) actually does, and it is the correct
+application of Meta's own security guidance to a distributed-software
+business.
+
+**Either way:** design the connection UI so today's manual-token flow, a
+future guided-A flow, and an eventual broker-C flow all converge on the same
+downstream token handling. `MetaCredentials` (already built) already treats
+"how the connection token was obtained" as a fact to display, not something
+the rest of the module branches on — so this costs nothing extra now.
 
 This does not change the priority order in `PRODUCT-ROADMAP.md`: **the version/
-installer/updater gap and token auto-refresh remain higher-ROI than building
-the broker**, because they matter on Architecture A too, and Architecture A is
-what ships first regardless.
+installer/updater gap and token auto-refresh remain higher-ROI than either A's
+guided setup or C's broker**, because both matter regardless of which of A/C
+wins, and neither is built yet.
 
 ---
 

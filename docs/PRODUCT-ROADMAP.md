@@ -49,33 +49,44 @@ choice rather than a compromise.
 
 `config/meta.php` reads `META_APP_ID` / `META_APP_SECRET` from **each install's
 environment**, and System Config lets the customer set them. So today, every
-customer is expected to bring their own Meta App. That has a consequence I do not
-think has been priced in.
+customer is expected to bring their own Meta App.
 
-**To use "Connect with Facebook" for a real store, the App needs
-`catalog_management` and `business_management` at advanced access — which
-requires App Review *and* Business Verification.** A small Bangladeshi jewellery
-merchant will not get through that. Realistically, most customers never will.
+> **Correction (2026-08-03), verified against Meta's own docs:** an earlier
+> version of this section claimed a small merchant "will not get through" App
+> Review and Business Verification, and concluded OAuth was unreachable for
+> most customers. That conflated two different scenarios. Meta is explicit:
+> *"If your app will only be used by app users who have a role on the app
+> itself you do not need to complete verification"* — Business Verification
+> and App Review gate **a vendor's one App serving many merchants' unrelated
+> businesses** (Options B/C, below). A merchant creating their **own** App to
+> manage only **their own** business never leaves Standard Access, because the
+> merchant IS the app's admin. **No App Review. No Business Verification.**
+> That is a materially different claim than what stood here before — see
+> `META-APP-ARCHITECTURE.md` §5 for the verification and the one thing this
+> still needs before being fully trusted: a live end-to-end test, since Meta's
+> docs describe policy, not a guarantee the permissions dialog behaves
+> identically in practice.
 
-Which means: **for most of your customers, OAuth will not work at all, and
-Development Mode (paste a System User token) is the only path that functions.**
-That is not a fallback in this model — it is the primary flow, and it deserves to
-be treated as such in the UI, the docs and the onboarding.
+Which means: **Option A (customer's own App) may be much closer to genuine
+one-click than previously stated** — a merchant creates a small App (no review
+needed) and connects it to their own catalog the normal OAuth way. What it
+still requires: setting up a **Facebook Login for Business `config_id`**
+inside that app (`META_INTEGRATION.md` already documents this — `catalog_management`
+/ `business_management` aren't valid standard Login scopes, so this step
+doesn't go away, it just happens once, on the merchant's own app, not yours).
 
 Three ways forward:
 
 | Option | How it works | Verdict |
 |---|---|---|
-| **A. Customer's own App** (today) | Each customer creates an App, does their own Verification + Review | Honest, zero vendor infrastructure — but OAuth is unreachable for most. **Manual token becomes the real product** |
+| **A. Customer's own App** (today) | Each customer creates a small App and connects it to their own business — Standard Access, no review needed | **Likely the real answer**, pending the live test in `META-APP-ARCHITECTURE.md` §5. Needs a good in-product guide for the one-time app-creation + Login-for-Business setup, but no vendor infrastructure and no shared-secret risk at all |
 | **B. Ship your App credentials** | Your `META_APP_SECRET` in every customer's `.env` | ❌ **Rejected — the only option with an unmitigable defect.** The secret signs `appsecret_proof` and OAuth token exchange. On a customer-controlled server it is readable by the customer, their host, and anyone with file access. Cannot be rotated without breaking every install, and one leak — or one App suspension from a single customer's abuse — hits every customer simultaneously |
-| **C. Vendor OAuth broker** | A small service you host holds the secret; customer installs redirect through it and receive only the resulting token | ✅ **Confirmed target.** This is what Meta's own Facebook-for-WooCommerce does. Customers get one-click connect, your secret never leaves your server, one App Review covers everyone — Meta's "Tech Provider" terms are the named, sanctioned path for exactly this |
+| **C. Vendor OAuth broker** | A small service you host holds the secret; customer installs redirect through it and receive only the resulting token | Still the right answer for a vendor App serving *many* customers through one shared identity — but if A tests out, most of C's advantage (no review friction, no forever-pasted token) is already achieved without it. Lower priority than previously stated pending the test |
 
-**Decision: A now, C when there is revenue to fund it.** Development Mode
-(manual System User token) is not the lesser path for this product — it is the
-one that works for most customers today, and should be built and documented as
-the primary flow, not a fallback. B is off the table permanently, not just for
-now: its risk *increases* with customer count, it has no mitigation, and the
-alternative (C) achieves the same one-click UX without it.
+**Decision: test A properly, invest in guiding merchants through it. B stays
+off the table permanently regardless of what the test shows** — unrelated to
+this correction, unaffected by it: its risk *increases* with customer count,
+it has no mitigation, and A or C both achieve the same or better UX without it.
 
 > **Rate-limit caveat.** Graph API limits are **per App**. Under A each customer
 > has their own App and their own budget — one of A's genuine advantages. Under

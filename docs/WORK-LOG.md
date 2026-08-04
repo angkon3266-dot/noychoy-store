@@ -80,11 +80,35 @@ App issued it.
 
 | | Verdict |
 |---|---|
-| **A. Customer's own App** | Ship this now. Zero infra; OAuth unreachable for most customers, so Development Mode is the real flow |
+| **A. Customer's own App** | ~~OAuth unreachable for most customers~~ — **see §11, this row was wrong** |
 | **B. Vendor App, secret shipped to every install** | **Rejected permanently.** The only option with a structural, unmitigable defect — a secret on infrastructure you don't control, unrotatable, and one leak or one abusive customer breaks every install at once. Risk *rises* with customer count |
-| **C. Vendor OAuth broker** | **Confirmed target**, built when revenue funds it. Exactly what Meta's own WooCommerce plugin does. One-click connect, secret never leaves vendor infrastructure. Does **not** fix the shared Graph API rate limit — that stays per-App regardless of A/B/C |
+| **C. Vendor OAuth broker** | **Was the confirmed target**; demoted pending §11's live test. Exactly what Meta's own WooCommerce plugin does. One-click connect, secret never leaves vendor infrastructure. Does **not** fix the shared Graph API rate limit — that stays per-App regardless of A/B/C |
 
 No code changed — planning only.
+
+---
+
+## 11. Correction: Option A's onboarding claim was wrong
+
+Asked "so what do we do?" — answering it surfaced that the onboarding row above
+conflated two different Meta scenarios. Verified directly against Meta's
+Business Verification docs: *"If your app will only be used by app users who
+have a role on the app itself you do not need to complete verification."*
+Business Verification and App Review gate **a vendor's one App serving many
+unrelated merchants** (what B/C need) — not **a merchant's own App managing
+only their own business**, where the merchant already has the admin role. **No
+App Review. No Business Verification.** The real cost of Option A is a
+one-time guided setup (create a small App, configure Facebook Login for
+Business), not a compliance wall most merchants fail.
+
+**Not yet confirmed by a live run** — Meta's docs describe policy, not a
+guarantee the permissions dialog behaves identically for a brand-new
+self-created App. `META-APP-ARCHITECTURE.md` §5 has the full correction and
+names the exact test to run: one throwaway App, one real catalog sync attempt,
+no App Review submitted. An afternoon, resolves the largest open question in
+the whole plan and decides whether Option A or Option C gets built first.
+
+No code changed.
 
 ---
 
