@@ -116,6 +116,21 @@ entirely on what access the customer has to the server itself:
 | **Fully managed** — customer sees only the store admin panel, no SSH/FTP/File Manager | **Yes.** No customer, and no one they grant access to, can ever reach the filesystem. A secret written to `.env` is then genuinely on infrastructure the vendor alone controls — which is exactly the condition Meta's own guidance requires. B becomes viable, though C is still marginally better on blast-radius and rotation grounds (compromising one server under B still leaks that server's copy; under C, no server holds the secret at all) |
 | **Reseller hosting — customer gets their own cPanel/FTP/SSH** (confirmed as the actual plan) | **No.** The exposure surface is identical to pure self-hosting: whoever can reach that account's File Manager — the customer, anyone they later grant access to, anyone who compromises the account — can read the secret. Who provisioned the account originally is irrelevant to who can read it today. **The verdict is unchanged: reject B, target C or run A.** |
 
+> **"Store it in System Config instead of `.env`, since that's Crypt-encrypted
+> and password-gated" does not close this gap.** Verified against
+> `SystemConfigRepository.php:69` — sensitive values there use Laravel's
+> standard `Crypt::encryptString()`, keyed by `APP_KEY`. `APP_KEY` has no home
+> but `.env` (`config/app.php:100`, and confirmed by this project's own rule
+> that it is "never editable" in System Config — it's the root key, it has to
+> stay in the bootstrap file). Filesystem access to the account already yields
+> `APP_KEY` plus the DB credentials (also unavoidably in `.env`), which
+> together are sufficient to decrypt any System-Config-stored secret directly —
+> `Crypt::decryptString()` from a `tinker` session, no HTTP request involved,
+> so the web UI's password-confirmation gate is never reached. That gate is
+> real protection against a DB-only leak, a lower-privileged panel login, or
+> the value ending up in a compiled config cache — not against filesystem
+> access, which is the access level in question here.
+
 **What the reseller model *does* change is unrelated to the Meta App
 question.** As reseller, the vendor likely retains WHM-level access to every
 account independent of the customer's own cPanel login — a materially
