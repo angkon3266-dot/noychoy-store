@@ -3,7 +3,6 @@
 <head>
     <meta charset="utf-8">
     <title>Shipping labels</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, Helvetica, sans-serif; color: #111; background: #f3f4f6; }
@@ -33,8 +32,7 @@
         .label .item .var { color: #555; }
         .label .item .qp { white-space: nowrap; text-align: right; font-weight: 600; }
         .label .note { margin-top: 1mm; font-style: italic; color: #333; }
-        .label .barcode { margin-top: 1.5mm; text-align: center; }
-        .label .barcode svg { max-width: 100%; height: 10mm; }
+        .label .tracking { margin-top: 1.5mm; padding-top: 1mm; border-top: 1px dotted #999; text-align: center; font-size: 9px; letter-spacing: 0.3px; }
 
         @media print {
             .toolbar { display: none; }
@@ -96,18 +94,9 @@
 
                 @if($order->notes)<div class="note">📝 {{ \Illuminate\Support\Str::limit($order->notes, 90) }}</div>@endif
 
-                <div class="barcode">
-                    <svg class="bc" data-code="{{ $order->shipment->tracking_code ?: $order->shipment->consignment_id }}"></svg>
-                    <div style="font-size:8px">Inv {{ $order->order_number }} · {{ $order->shipment->tracking_code ?: $order->shipment->consignment_id }}</div>
-                </div>
+                <div class="tracking">Inv {{ $order->order_number }} · {{ $order->shipment->tracking_code ?: $order->shipment->consignment_id }}</div>
             </div>
         @endforeach
     </div>
-
-    <script>
-        document.querySelectorAll('svg.bc').forEach(function (el) {
-            try { JsBarcode(el, el.dataset.code || ' ', { format: 'CODE128', displayValue: false, margin: 0, height: 40 }); } catch (e) {}
-        });
-    </script>
 </body>
 </html>

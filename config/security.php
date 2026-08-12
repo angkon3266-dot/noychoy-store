@@ -98,19 +98,19 @@ return [
                 "'unsafe-inline'",              // inline Blade <script> blocks
                 "'unsafe-eval'",                // Alpine's expression evaluator
                 'https://connect.facebook.net', // Meta Pixel (fbevents.js)
-                'https://cdn.jsdelivr.net',     // JsBarcode, admin shipping labels
             ],
 
             'style-src' => [
                 "'self'",
                 "'unsafe-inline'",              // Blade style="" and theme CSS vars
-                'https://fonts.googleapis.com', // admin-selected Google Fonts
             ],
 
+            // Brand fonts are self-hosted by the Vite build (see vite.config.js)
+            // or uploaded by the admin — never fetched from a third party, so
+            // 'self' is the whole list.
             'font-src' => [
                 "'self'",
                 'data:',
-                'https://fonts.gstatic.com',    // the files Google Fonts CSS points at
             ],
 
             // Product photography can be a remote URL (ProductImage::url passes

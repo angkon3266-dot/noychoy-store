@@ -139,12 +139,28 @@ class OrderLabelQueueTest extends TestCase
 
     public function test_a_booked_order_without_a_consignment_is_still_excluded(): void
     {
-        // Nothing to put on the label — there is no consignment id or barcode.
+        // Nothing to put on the label — there is no consignment id.
         $this->order('booked', '41005', 'No Consignment');
 
         $this->actingAs($this->admin())->get('/admin/orders/labels')
             ->assertOk()
             ->assertDontSee('No Consignment');
+    }
+
+    /**
+     * The label sheet used to load a barcode library from jsDelivr — a page an
+     * admin prints from must not depend on a third-party CDN being reachable.
+     * Tracking is shown as plain text instead.
+     */
+    public function test_the_label_sheet_loads_no_external_script(): void
+    {
+        $order = $this->withConsignment($this->order('booked', '41008', 'Awaiting Label'), '9009');
+
+        $html = $this->actingAs($this->admin())->get('/admin/orders/labels')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('jsdelivr.net', $html);
+        $this->assertStringNotContainsString('JsBarcode', $html);
+        $this->assertStringContainsString('TRK9009', $html);
     }
 
     public function test_explicitly_selected_non_booked_orders_are_skipped_with_a_note(): void

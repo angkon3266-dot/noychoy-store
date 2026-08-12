@@ -119,9 +119,6 @@ class SecurityHeadersTest extends TestCase
         foreach ([
             'https://connect.facebook.net',   // Meta Pixel loader
             'https://www.facebook.com',       // Pixel event delivery
-            'https://cdn.jsdelivr.net',       // JsBarcode on shipping labels
-            'https://fonts.googleapis.com',   // Google Fonts stylesheet
-            'https://fonts.gstatic.com',      // Google Fonts files
             'https://www.youtube.com',        // product / home-block video
             'https://player.vimeo.com',
         ] as $host) {
@@ -137,6 +134,27 @@ class SecurityHeadersTest extends TestCase
         $this->assertStringContainsString("base-uri 'self'", $csp);
         $this->assertStringContainsString("form-action 'self'", $csp);
         $this->assertStringContainsString("frame-ancestors 'self'", $csp);
+    }
+
+    /**
+     * Fonts and shipping-label barcodes both used to pull a third-party script
+     * or stylesheet — Google Fonts and a jsDelivr-hosted barcode library. Both
+     * were dropped in favour of self-hosted fonts and a text-only tracking
+     * line, specifically so the storefront and the admin never depend on
+     * another server being up. This pins that down — a returning host here
+     * means the dependency crept back in.
+     */
+    public function test_the_policy_no_longer_allows_the_removed_third_parties(): void
+    {
+        $csp = $this->get('/_test/ping')->headers->get('Content-Security-Policy');
+
+        foreach ([
+            'fonts.googleapis.com',
+            'fonts.gstatic.com',
+            'cdn.jsdelivr.net',
+        ] as $host) {
+            $this->assertStringNotContainsString($host, $csp, "CSP still allows {$host}");
+        }
     }
 
     public function test_extra_hosts_widen_the_policy_without_a_code_change(): void

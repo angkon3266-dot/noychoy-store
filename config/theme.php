@@ -13,8 +13,10 @@ return [
         'noir' => ['label' => 'Noir', 'primary' => '#1f2937', 'accent' => '#9ca3af', 'background' => '#f7f7f8', 'text' => '#0a0a0a'],
     ],
 
-    // Curated fonts (Google) the admin can pick, plus "custom" for uploaded files.
-    'fonts' => ['Poppins', 'Inter', 'Montserrat', 'Lato', 'Raleway', 'Jost', 'Playfair Display', 'Cormorant Garamond', 'Marcellus', 'Instrument Sans'],
+    // Built-in fonts, self-hosted by the Vite build (see vite.config.js) — no
+    // request to any font CDN at runtime. "custom" (an uploaded file) is the
+    // only other option; there is deliberately no live Google Fonts fetch.
+    'fonts' => ['Playfair Display', 'Instrument Sans'],
 
     // Default appearance — overridable from Admin → Appearance (stored in settings table).
     'defaults' => [

@@ -126,7 +126,7 @@
     {{-- Fonts --}}
     <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-1">Fonts</h2>
-        <p class="text-xs text-ink-700/60 mb-4">Pick a Google font, or upload your own brand font file (.woff2/.woff/.ttf/.otf) — e.g. <strong>Blore</strong> for headings.</p>
+        <p class="text-xs text-ink-700/60 mb-4">Pick a built-in font (self-hosted, no external requests), or upload your own brand font file (.woff2/.woff/.ttf/.otf) — e.g. <strong>Blore</strong> for headings.</p>
         <div class="grid sm:grid-cols-2 gap-6">
             @foreach(['heading' => 'Heading font', 'body' => 'Body font'] as $slot => $slotLabel)
                 @php
@@ -137,7 +137,7 @@
                 <div x-data="{ src: '{{ $curSrc }}' }">
                     <label class="label">{{ $slotLabel }}</label>
                     <div class="flex gap-2 mb-2">
-                        <label class="flex items-center gap-1.5 text-sm"><input type="radio" name="font_{{ $slot }}_src" value="google" x-model="src"> Google font</label>
+                        <label class="flex items-center gap-1.5 text-sm"><input type="radio" name="font_{{ $slot }}_src" value="google" x-model="src"> Built-in</label>
                         <label class="flex items-center gap-1.5 text-sm"><input type="radio" name="font_{{ $slot }}_src" value="custom" x-model="src"> Upload</label>
                     </div>
                     <div x-show="src==='google'">

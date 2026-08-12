@@ -51,7 +51,9 @@
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
     {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}
 
-    {{-- Brand fonts (Google and/or uploaded custom) --}}
+    {{-- Brand fonts: either of the two built-in families (self-hosted by the
+         Vite build — see vite.config.js) or an uploaded custom file. Nothing
+         here ever requests a font from an external host. --}}
     @php
         $fHeading = theme('font_heading', 'Playfair Display');
         $fHeadingSrc = theme('font_heading_src', 'google');
@@ -59,23 +61,7 @@
         $fBody = theme('font_body', 'Instrument Sans');
         $fBodySrc = theme('font_body_src', 'google');
         $fBodyFile = theme('font_body_file');
-        $googleFonts = collect();
-        if ($fHeadingSrc === 'google' && $fHeading) $googleFonts->push($fHeading);
-        if ($fBodySrc === 'google' && $fBody) $googleFonts->push($fBody);
-        // These two families are already self-hosted via the Vite build (Bunny
-        // fonts) — don't ALSO download them from Google (double font payload).
-        $googleFonts = $googleFonts->filter()->unique()
-            ->reject(fn ($f) => in_array($f, ['Instrument Sans', 'Playfair Display'], true))
-            ->values();
     @endphp
-    @if($googleFonts->isNotEmpty())
-        @php $googleFontsUrl = 'https://fonts.googleapis.com/css2?'.$googleFonts->map(fn($f) => 'family='.str_replace(' ', '+', $f).':wght@400;500;600;700')->implode('&').'&display=swap'; @endphp
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        {{-- Load font CSS without blocking render; flip to all once loaded. font-display:swap shows text immediately. --}}
-        <link href="{{ $googleFontsUrl }}" rel="stylesheet" media="print" onload="this.media='all'">
-        <noscript><link href="{{ $googleFontsUrl }}" rel="stylesheet"></noscript>
-    @endif
     <style>
         @if($fHeadingSrc === 'custom' && $fHeadingFile)
         @font-face{ font-family:'{{ $fHeading }}'; src:url('{{ asset('storage/'.$fHeadingFile) }}'); font-weight:400 700; font-display:swap; }
