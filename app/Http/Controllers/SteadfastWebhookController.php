@@ -66,9 +66,14 @@ class SteadfastWebhookController extends Controller
             ->applyCourierStatus($order, $deliveryStatus, 'Steadfast webhook');
 
         if (! $moved) {
+            // "in_review" is Steadfast's just-booked state — we already recorded
+            // that ourselves as `booked` when the consignment was created, and
+            // calling it "shipped" here would pull the order off the label queue
+            // before anyone had printed the label. "pending" is the one that
+            // means the courier actually has it and is moving.
             $progress = match ($deliveryStatus) {
                 'hold' => 'processing',
-                'in_review', 'pending' => 'shipped',
+                'pending' => 'shipped',
                 default => null,
             };
             if ($progress && $order->status !== $progress) {

@@ -37,18 +37,21 @@
     <form method="GET" class="flex flex-wrap gap-2 mb-4">
         <input name="q" value="{{ request('q') }}" placeholder="Order #, name or phone…" class="input py-2 w-64">
         <select name="status" onchange="this.form.submit()" class="input py-2">
-            <option value="">All statuses</option>
+            {{-- "all" is spelled out because an empty value means "use the
+                 default", which is Processing — the day's packing queue. --}}
+            <option value="all" @selected($status==='all')>All statuses</option>
             @foreach($statuses as $key => $label)
-                <option value="{{ $key }}" @selected(request('status')==$key)>{{ $label }}</option>
+                <option value="{{ $key }}" @selected($status===$key)>{{ $label }}</option>
             @endforeach
         </select>
         <button class="btn-outline">Search</button>
         @if($trashed)
             <a href="{{ route('admin.orders.index') }}" class="btn-outline whitespace-nowrap ml-auto">← Back to active orders</a>
         @else
-            <a href="{{ route('admin.orders.labels') }}" target="_blank" class="btn-outline whitespace-nowrap ml-auto">🖨 Print all labels</a>
+            <a href="{{ route('admin.orders.labels') }}" target="_blank" class="btn-outline whitespace-nowrap ml-auto"
+               title="Labels for every order booked with the courier and still waiting to be handed over">🖨 Print all labels</a>
             <a href="{{ route('admin.orders.cards') }}" target="_blank" class="btn-outline whitespace-nowrap"
-               title="Cards for every order currently being processed">💌 Thank-you cards</a>
+               title="Cards for every order currently being packed">💌 Thank-you cards</a>
             <a href="{{ route('admin.orders.index', ['trashed' => 1]) }}" class="btn-outline whitespace-nowrap">🗑 Trash{{ $trashCount ? ' ('.$trashCount.')' : '' }}</a>
         @endif
     </form>

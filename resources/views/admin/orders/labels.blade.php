@@ -48,11 +48,14 @@
     <div class="toolbar">
         <button onclick="window.print()">🖨 Print {{ $orders->count() }} label(s)</button>
         <a href="{{ url()->previous() }}">← Back</a>
-        <span style="font-size:13px;color:#888;margin-left:12px">2 labels per row · each label lists every item with photo, variation, qty &amp; price. Only orders with a Steadfast consignment are shown.</span>
+        <span style="font-size:13px;color:#888;margin-left:12px">2 labels per row · each label lists every item with photo, variation, qty &amp; price. Only orders <strong>booked with the courier</strong> are shown.</span>
+        @if(($skipped ?? 0) > 0)
+            <span style="font-size:13px;color:#a15c00;margin-left:12px">{{ $skipped }} selected order(s) skipped — they are not booked with the courier.</span>
+        @endif
     </div>
 
     @if($orders->isEmpty())
-        <div class="sheet"><p style="grid-column:1/3;padding:20px;text-align:center;color:#888">No orders with a courier consignment to print.</p></div>
+        <div class="sheet"><p style="grid-column:1/3;padding:20px;text-align:center;color:#888">Nothing to print. Labels appear here once an order is sent to Steadfast — its status becomes “Booked with courier”.</p></div>
     @endif
 
     <div class="sheet">

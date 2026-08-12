@@ -3,10 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContactMessage;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Setting;
+use App\Models\Visit;
+use App\Services\DashboardAnalytics;
+use App\Services\LoyaltyService;
+use App\Support\DateRange;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -20,18 +29,18 @@ class DashboardController extends Controller
     ];
 
     /** Save which panels this admin wants to see. */
-    public function savePanels(\Illuminate\Http\Request $request)
+    public function savePanels(Request $request)
     {
         $chosen = array_values(array_intersect(
             array_keys(self::PANELS),
             (array) $request->input('panels', [])
         ));
-        \App\Models\Setting::put('dashboard_panels', $chosen);
+        Setting::put('dashboard_panels', $chosen);
 
         return back()->with('success', 'Dashboard layout saved.');
     }
 
-    public function index(\App\Services\DashboardAnalytics $analytics, \Illuminate\Http\Request $request)
+    public function index(DashboardAnalytics $analytics, Request $request)
     {
         $today = now()->startOfDay();
 
@@ -39,7 +48,7 @@ class DashboardController extends Controller
         // counts (pending/processing/shipped), stock and the customer base are
         // deliberately NOT filtered: they describe the state of the shop right
         // now, and "0 pending" because you picked "Today" would be a lie.
-        $range = \App\Support\DateRange::fromRequest($request);
+        $range = DateRange::fromRequest($request);
 
         // Orders that count as "real sales" (exclude cancelled / returned).
         $sold = fn () => $range->constrain(Order::whereNotIn('status', ['cancelled', 'returned']));
@@ -70,7 +79,9 @@ class DashboardController extends Controller
                 ->whereDate('created_at', $today)->sum('total'),
             'pending' => Order::where('status', 'pending')->count(),
             'processing' => Order::where('status', 'processing')->count(),
-            'shipped' => Order::where('status', 'shipped')->count(),
+            // "Gone to the courier" — booking used to write `shipped` directly,
+            // so both statuses belong in this figure for it to keep its meaning.
+            'shipped' => Order::whereIn('status', ['booked', 'shipped'])->count(),
             'aov' => $aov,
             'cod_success' => $codSuccess,
             'products' => Product::count(),
@@ -115,7 +126,7 @@ class DashboardController extends Controller
 
         // Outstanding loyalty-points liability (what redemption would cost).
         $pointsOutstanding = (int) Customer::sum('points');
-        $pointsLiability = app(\App\Services\LoyaltyService::class)->pointsValue($pointsOutstanding);
+        $pointsLiability = app(LoyaltyService::class)->pointsValue($pointsOutstanding);
 
         $lowStockProducts = Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)
             ->orderBy('stock_quantity')->take(5)->get(['id', 'name', 'slug', 'stock_quantity']);
@@ -129,8 +140,8 @@ class DashboardController extends Controller
         $recentOrders = Order::latest()->take(10)->get();
 
         // Contact-form inbox, surfaced here so new messages are seen immediately.
-        $unreadMessages = \App\Models\ContactMessage::where('is_read', false)->count();
-        $recentMessages = \App\Models\ContactMessage::where('is_read', false)->latest()->take(6)->get();
+        $unreadMessages = ContactMessage::where('is_read', false)->count();
+        $recentMessages = ContactMessage::where('is_read', false)->latest()->take(6)->get();
 
         $statusCounts = Order::query()
             ->selectRaw('status, count(*) as count')
@@ -138,7 +149,7 @@ class DashboardController extends Controller
             ->pluck('count', 'status');
 
         // Deep-analysis panels (admin chooses which are visible; all on by default).
-        $saved = \App\Models\Setting::get('dashboard_panels', null);
+        $saved = Setting::get('dashboard_panels', null);
         $panels = is_array($saved) ? $saved : array_keys(self::PANELS);
 
         // Each panel is computed defensively: analytics are decoration, and one
@@ -169,9 +180,9 @@ class DashboardController extends Controller
         ];
 
         // Unique visitors: all-time as the headline, plus the chosen window.
-        $stats['visitors_total'] = (int) $safe(fn () => \App\Models\Visit::distinct()->count('visitor_token'), 0);
-        $stats['visitors_today'] = (int) $safe(fn () => \App\Models\Visit::whereDate('created_at', $today)->distinct()->count('visitor_token'), 0);
-        $stats['visitors_period'] = (int) $safe(fn () => $range->constrain(\App\Models\Visit::query())->distinct()->count('visitor_token'), 0);
+        $stats['visitors_total'] = (int) $safe(fn () => Visit::distinct()->count('visitor_token'), 0);
+        $stats['visitors_today'] = (int) $safe(fn () => Visit::whereDate('created_at', $today)->distinct()->count('visitor_token'), 0);
+        $stats['visitors_period'] = (int) $safe(fn () => $range->constrain(Visit::query())->distinct()->count('visitor_token'), 0);
 
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
@@ -186,15 +197,15 @@ class DashboardController extends Controller
      * Unlike visitor counts, revenue sums cleanly across grouped days, so a
      * long window loses no accuracy from bucketing — only resolution.
      *
-     * @return \Illuminate\Support\Collection<int,array{label:string,total:float}>
+     * @return Collection<int,array{label:string,total:float}>
      */
-    protected function revenueSeries(\App\Support\DateRange $range): \Illuminate\Support\Collection
+    protected function revenueSeries(DateRange $range): Collection
     {
         $byDay = $range->constrain(Order::whereNotIn('status', ['cancelled', 'returned']))
             ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
             ->groupBy('d')->pluck('t', 'd');
 
-        $start = $range->start ?? \Illuminate\Support\Carbon::parse(
+        $start = $range->start ?? Carbon::parse(
             Order::min('created_at') ?: now()
         )->startOfDay();
         $end = $range->end ?? now()->endOfDay();

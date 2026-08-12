@@ -122,7 +122,9 @@ class CourierStatusSyncTest extends TestCase
         $order = $this->orderWithShipment();
         $this->webhook($order, 'delivered');
 
-        $html = $this->actingAs($this->admin())->get('/admin/orders')->assertOk()->getContent();
+        // ?status=all because the list now opens on the packing queue
+        // (Processing), and a delivered order is by definition not in it.
+        $html = $this->actingAs($this->admin())->get('/admin/orders?status=all')->assertOk()->getContent();
 
         $this->assertStringContainsString('confirmed by courier', $html);
     }

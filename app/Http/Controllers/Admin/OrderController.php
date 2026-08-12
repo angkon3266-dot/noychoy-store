@@ -11,8 +11,6 @@ use App\Models\Product;
 use App\Models\Setting;
 use App\Services\BdCourierService;
 use App\Services\CustomerInsight;
-use App\Services\NotificationService;
-use App\Services\PushTemplateService;
 use App\Services\SmsService;
 use App\Services\SteadfastService;
 use Illuminate\Http\Request;
@@ -24,9 +22,17 @@ class OrderController extends Controller
     {
         $trashed = $request->boolean('trashed');
 
+        // This screen is a work queue, so it opens on the orders that still
+        // need packing rather than on everything ever sold. "all" is the
+        // explicit escape hatch — an empty value falls back to the default,
+        // and a search has to look everywhere or it finds nothing.
+        $status = $request->query('status')
+            ?: (($trashed || filled($request->query('q'))) ? 'all' : 'processing');
+        $statusFilter = $status === 'all' ? null : $status;
+
         $orders = Order::query()
             ->when($trashed, fn ($q) => $q->onlyTrashed())
-            ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
+            ->when($statusFilter, fn ($q, $s) => $q->where('status', $s))
             ->when($request->query('q'), function ($q, $term) {
                 $q->where(fn ($w) => $w->where('order_number', 'like', "%{$term}%")
                     ->orWhere('customer_phone', 'like', "%{$term}%")
@@ -66,6 +72,7 @@ class OrderController extends Controller
         return view('admin.orders.index', [
             'orders' => $orders,
             'statuses' => Order::STATUSES,
+            'status' => $status,
             'orderCounts' => $orderCounts,
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdHistory' => $bdCourier->isConfigured() ? $bdCourier->cachedMany($phones) : [],
@@ -208,19 +215,33 @@ class OrderController extends Controller
         return back()->with('success', 'Order amounts updated.');
     }
 
-    /** Print-ready shipping labels (A4, 14 per page) for orders with a consignment. */
+    /**
+     * Print-ready shipping labels (A4, 2 per row) for orders booked with the
+     * courier.
+     *
+     * A label is only ever wanted for a parcel that still has to be stuck and
+     * handed over, so this is scoped to "booked" — the status an order enters
+     * the moment a Steadfast consignment is created. Anything already shipped,
+     * delivered, cancelled or returned is past that point and printing it again
+     * just wastes a sheet.
+     */
     public function labels(Request $request)
     {
         $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
 
         $orders = Order::with('items.product.images', 'items.variant.image', 'shipment')
+            ->where('status', 'booked')
             ->whereHas('shipment', fn ($s) => $s->whereNotNull('consignment_id'))
             ->when($ids, fn ($q) => $q->whereIn('id', $ids))
             ->latest()
             ->take(200)
             ->get();
 
-        return view('admin.orders.labels', compact('orders'));
+        // If the admin ticked orders that aren't awaiting a label, say so rather
+        // than silently printing fewer than they expected.
+        $skipped = $ids ? count($ids) - $orders->count() : 0;
+
+        return view('admin.orders.labels', compact('orders', 'skipped'));
     }
 
     /** Create Steadfast consignments for several orders at once (skips already-sent). */
@@ -252,16 +273,20 @@ class OrderController extends Controller
 
                 continue;
             }
-            if (in_array($order->status, ['pending', 'confirmed', 'processing'], true)) {
-                $order->update(['status' => 'shipped']);
-                $order->history()->create(['status' => 'booked', 'note' => 'Consignment created at Steadfast', 'created_by' => auth()->user()->name]);
+            if (in_array($order->status, Order::PRE_BOOKING_STATUSES, true)) {
+                app(TransitionOrderStatus::class)->handle(
+                    $order, 'booked', 'Consignment created at Steadfast', auth()->user()?->name ?? 'Admin',
+                );
             }
             $created++;
         }
 
         $msg = "Sent {$created} order(s) to Steadfast"
             .($skipped ? ", {$skipped} already booked" : '')
-            .($failed ? ", {$failed} failed (check logs)" : '').'.';
+            .($failed ? ", {$failed} failed (check logs)" : '').'.'
+            // They have just left the default (Processing) view, so say where
+            // they went rather than letting them look like they vanished.
+            .($created ? ' They are now "Booked with courier" — print their labels from there.' : '');
 
         return back()->with($failed ? 'error' : 'success', $msg);
     }
@@ -501,35 +526,17 @@ class OrderController extends Controller
             return back()->with('error', 'Steadfast rejected the request. Check the logs.');
         }
 
-        if (in_array($order->status, ['pending', 'confirmed', 'processing'], true)) {
-            $order->update(['status' => 'shipped']);
-            $order->history()->create(['status' => 'booked', 'note' => 'Consignment created at Steadfast', 'created_by' => auth()->user()->name]);
-            // Courier picked it up → tell the customer it's on the way.
-            $this->pushOrderStatus($order->fresh('shipment'), 'shipped');
+        // Booking is not shipping: the parcel is registered with Steadfast but
+        // still on the shelf waiting for its label. It moves on to "shipped"
+        // when the courier actually reports movement — that is also when the
+        // customer gets the "on its way" push, rather than a day early.
+        if (in_array($order->status, Order::PRE_BOOKING_STATUSES, true)) {
+            app(TransitionOrderStatus::class)->handle(
+                $order, 'booked', 'Consignment created at Steadfast', auth()->user()?->name ?? 'Admin',
+            );
         }
 
         return back()->with('success', "Consignment created. Tracking: {$shipment->tracking_code}");
-    }
-
-    /** Send the editable transactional web push for an order status change. */
-    protected function pushOrderStatus(Order $order, string $status): void
-    {
-        if (! $order->customer_id) {
-            return;
-        }
-        $trigger = match ($status) {
-            'confirmed' => 'order_confirmed',
-            'shipped' => 'order_shipped',
-            'delivered' => 'order_delivered',
-            default => null,
-        };
-        if (! $trigger) {
-            return;
-        }
-        $payload = app(PushTemplateService::class)->forOrder($trigger, $order);
-        if ($payload) {
-            app(NotificationService::class)->pushToCustomer((int) $order->customer_id, $payload);
-        }
     }
 
     /**
@@ -723,9 +730,11 @@ class OrderController extends Controller
     {
         $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
 
-        // Cards are packing-slip inserts, so only orders being packed get one.
+        // Cards are packing-slip inserts, so only orders being packed get one —
+        // which now runs right up to the handover, since a booked order is still
+        // sitting in the shop waiting for its label.
         $orders = Order::with('customer')
-            ->where('status', 'processing')
+            ->whereIn('status', ['processing', 'booked'])
             ->when($ids, fn ($q) => $q->whereIn('id', $ids))
             ->latest()->take(300)->get();
 

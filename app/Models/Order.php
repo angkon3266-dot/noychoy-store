@@ -16,11 +16,18 @@ class Order extends Model
         'pending' => 'Pending',
         'confirmed' => 'Confirmed',
         'processing' => 'Processing',
+        'booked' => 'Booked with courier',
         'shipped' => 'Shipped',
         'delivered' => 'Delivered',
         'cancelled' => 'Cancelled',
         'returned' => 'Returned',
     ];
+
+    /**
+     * Statuses a "Send to Steadfast" is allowed to move an order out of.
+     * Anything further along already has a consignment or has been settled.
+     */
+    public const PRE_BOOKING_STATUSES = ['pending', 'confirmed', 'processing'];
 
     protected $fillable = [
         'order_number', 'customer_id', 'customer_name', 'customer_phone', 'customer_email',

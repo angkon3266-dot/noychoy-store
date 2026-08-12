@@ -428,7 +428,12 @@
                 </div>
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <form action="{{ route('admin.orders.steadfast.refresh', $order) }}" method="POST">@csrf<button class="btn-outline w-full">Refresh status</button></form>
-                    <a href="{{ route('admin.orders.labels', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">🖨 Print label</a>
+                    @if($order->status === 'booked')
+                        <a href="{{ route('admin.orders.labels', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">🖨 Print label</a>
+                    @else
+                        <span class="btn-outline w-full text-center opacity-50 cursor-not-allowed"
+                              title="Labels print while the order is booked with the courier and waiting to be handed over">🖨 Print label</span>
+                    @endif
                     <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">💌 Print thank-you card</a>
                 </div>
             @else
@@ -467,18 +472,19 @@
                 @if(blank($order->card_message))
                     <p class="text-[11px] text-ink-700/50 whitespace-pre-line border-l-2 border-ink-100 pl-2">{{ \App\Http\Controllers\Admin\OrderController::cardMessageFor($order) }}</p>
                 @endif
+                @php $packing = in_array($order->status, ['processing', 'booked'], true); @endphp
                 <div class="grid grid-cols-2 gap-2">
                     <button class="btn-outline w-full">Save message</button>
-                    @if($order->status === 'processing')
+                    @if($packing)
                         <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank"
                            class="btn-outline w-full text-center">🖨 Print card</a>
                     @else
                         <span class="btn-outline w-full text-center opacity-50 cursor-not-allowed"
-                              title="Cards print once the order moves to Processing">🖨 Print card</span>
+                              title="Cards print while the order is being packed">🖨 Print card</span>
                     @endif
                 </div>
-                @unless($order->status === 'processing')
-                    <p class="text-[11px] text-ink-700/50">Cards print once this order is moved to <strong>Processing</strong>.</p>
+                @unless($packing)
+                    <p class="text-[11px] text-ink-700/50">Cards print while this order is being packed — <strong>Processing</strong> or <strong>Booked with courier</strong>.</p>
                 @endunless
             </form>
         </div>

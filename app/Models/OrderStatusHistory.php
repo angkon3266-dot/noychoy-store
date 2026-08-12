@@ -11,15 +11,14 @@ class OrderStatusHistory extends Model
 
     protected $fillable = ['order_id', 'status', 'note', 'created_by'];
 
-    /** Human label for the timeline. Custom states map to friendlier text. */
+    /**
+     * Human label for the timeline. "booked" used to be special-cased here
+     * because it was a history-only marker; it is a real order status now, so
+     * the shared list covers it and the two screens can't word it differently.
+     */
     public function getLabelAttribute(): string
     {
-        $custom = [
-            'booked' => 'Booked With Courier',
-        ];
-
-        return $custom[$this->status]
-            ?? Order::STATUSES[$this->status]
+        return Order::STATUSES[$this->status]
             ?? ucwords(str_replace('_', ' ', (string) $this->status));
     }
 
