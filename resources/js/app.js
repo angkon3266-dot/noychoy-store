@@ -164,6 +164,46 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Homepage hero slideshow ──────────────────────────────────────────────
+    // Cross-fades the hero panel between the uploaded hero image and the featured
+    // products. Advancing pauses while the pointer is over the panel, so nothing
+    // slides out from under someone about to click a product.
+    window.Alpine.data('heroSlider', (count) => ({
+        i: 0,
+        timer: null,
+        touchX: null,
+        start() {
+            this.stop();
+            if (count > 1) {
+                this.timer = setInterval(() => this.go(this.i + 1), 5500);
+            }
+        },
+        stop() {
+            clearInterval(this.timer);
+            this.timer = null;
+        },
+        /** Wraps in both directions, so "previous" from the first slide is the last. */
+        go(k) {
+            this.i = ((k % count) + count) % count;
+        },
+        swipeStart(e) {
+            this.touchX = e.changedTouches[0].clientX;
+            this.stop();
+        },
+        swipeEnd(e) {
+            if (this.touchX === null) {
+                return;
+            }
+            const dx = e.changedTouches[0].clientX - this.touchX;
+            // Only past a deliberate threshold — a tap on a product must stay a tap.
+            if (Math.abs(dx) > 40) {
+                this.go(dx < 0 ? this.i + 1 : this.i - 1);
+            }
+            this.touchX = null;
+            this.start();
+        },
+    }));
+
     // ── Share button: native sheet on mobile, menu everywhere else ───────────
     window.Alpine.data('shareBox', (url, title) => ({
         open: false,

@@ -3,8 +3,24 @@
 
 @section('content')
 @php
-    $heroImg = theme_asset(home_content('hero_image'));
     $cats = $categories ?? collect();
+
+    // Hero slideshow. The uploaded hero image leads (editorial first impression,
+    // links to the shop), then the featured products follow — each linking to its
+    // own page, so the hero is shoppable rather than decorative. Capped because
+    // later slides are almost never reached and every extra one is another image
+    // competing for the first paint.
+    $heroSlides = collect();
+
+    if ($heroImg = theme_asset(home_content('hero_image'))) {
+        $heroSlides->push(['image' => $heroImg, 'link' => home_content('hero_cta_link') ?: route('shop'), 'alt' => '']);
+    }
+
+    foreach ($featured->take(5) as $p) {
+        if ($p->thumbnail) {
+            $heroSlides->push(['image' => $p->thumbnail, 'link' => route('product.show', $p), 'alt' => $p->name]);
+        }
+    }
 @endphp
 
 {{-- ── Hero: editorial split ─────────────────────────────────────────── --}}
@@ -29,13 +45,48 @@
                 </div>
             </div>
         </div>
-        <div class="order-1 lg:order-2 relative min-h-[42vh] lg:min-h-[80vh] bg-gold-100 overflow-hidden">
-            @if($heroImg)
-                <img src="{{ $heroImg }}" alt="" class="absolute inset-0 w-full h-full object-cover">
-            @elseif($featured->first()?->thumbnail)
-                <img src="{{ $featured->first()->thumbnail }}" alt="" class="absolute inset-0 w-full h-full object-cover">
+        {{-- Every utility below already exists elsewhere in the bundle, so this
+             slideshow adds no CSS weight and no new JS beyond the Alpine that
+             ships with the page anyway. --}}
+        <div class="order-1 lg:order-2 relative min-h-[42vh] lg:min-h-[80vh] bg-gold-100 overflow-hidden group"
+             @if($heroSlides->count() > 1)
+                 x-data="heroSlider({{ $heroSlides->count() }})" x-init="start()"
+                 @mouseenter="stop()" @mouseleave="start()"
+                 @touchstart.passive="swipeStart($event)" @touchend.passive="swipeEnd($event)"
+             @endif>
+            @foreach($heroSlides as $k => $s)
+                {{-- Stacked and cross-faded rather than translated: the panel is a
+                     fixed frame here, so a slide-in would show the page behind it. --}}
+                <a href="{{ $s['link'] }}" aria-label="{{ $s['alt'] ?: 'View the collection' }}"
+                   class="absolute inset-0 block transition-opacity duration-1000 ease-out"
+                   @if($heroSlides->count() > 1)
+                       x-bind:class="i === {{ $k }} ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+                       x-bind:aria-hidden="i !== {{ $k }}"
+                   @endif>
+                    <img src="{{ $s['image'] }}" alt="{{ $s['alt'] }}"
+                         @if($k > 0) loading="lazy" @endif
+                         class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105">
+                </a>
+            @endforeach
+
+            <div class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
+
+            @if($heroSlides->count() > 1)
+                {{-- Arrows only on hover, so the panel still reads as an editorial
+                     photograph when nobody is interacting with it. --}}
+                <button type="button" @click="go(i - 1)" aria-label="Previous"
+                        class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/75 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">‹</button>
+                <button type="button" @click="go(i + 1)" aria-label="Next"
+                        class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/75 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">›</button>
+
+                <div class="absolute bottom-5 inset-x-0 flex justify-center gap-2">
+                    @foreach($heroSlides as $k => $s)
+                        <button type="button" @click="go({{ $k }})" aria-label="Go to slide {{ $k + 1 }}"
+                                class="w-1.5 h-1.5 rounded-full transition-all duration-300"
+                                x-bind:class="i === {{ $k }} ? 'bg-white w-5' : 'bg-white/55 hover:bg-white/80'"></button>
+                    @endforeach
+                </div>
             @endif
-            <div class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
         </div>
     </div>
 </section>
