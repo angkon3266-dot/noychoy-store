@@ -1,6 +1,14 @@
 <?php
 
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Setting;
+use App\Services\ImageOptimizer;
+use App\Services\MemberPricingService;
+use App\Services\Meta\MetaProductMapper;
+use App\Services\Meta\MetaSettings;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -48,9 +56,9 @@ if (! function_exists('upload_limit_mb')) {
 
 if (! function_exists('member_pricing')) {
     /** Shared MemberPricingService instance. */
-    function member_pricing(): \App\Services\MemberPricingService
+    function member_pricing(): MemberPricingService
     {
-        return app(\App\Services\MemberPricingService::class);
+        return app(MemberPricingService::class);
     }
 }
 
@@ -75,6 +83,7 @@ if (! function_exists('theme')) {
         if ($key === null) {
             return $merged;
         }
+
         return $merged[$key] ?? $default;
     }
 }
@@ -86,6 +95,7 @@ if (! function_exists('theme_asset')) {
         if (blank($path)) {
             return null;
         }
+
         return Str::startsWith($path, ['http://', 'https://'])
             ? $path
             : Storage::disk('public')->url($path);
@@ -192,7 +202,7 @@ if (! function_exists('site_menu')) {
         }
 
         // Default: "Shop All" + active top-level categories as dropdowns.
-        $cats = \App\Models\Category::query()->where('is_active', true)->get();
+        $cats = Category::query()->where('is_active', true)->get();
         $menu = [[
             'label' => 'Shop All', 'type' => 'link', 'url' => route('shop'),
             'new_tab' => false, 'badge' => null, 'view_all_mobile' => false, 'children' => [], 'columns' => [],
@@ -226,7 +236,7 @@ if (! function_exists('normalize_menu_item')) {
         // Legacy support: type 'category' + value (id) → resolve to a URL.
         $url = (string) ($item['url'] ?? '');
         if ($url === '' && ($item['type'] ?? '') === 'category') {
-            $cat = \App\Models\Category::find((int) ($item['value'] ?? 0));
+            $cat = Category::find((int) ($item['value'] ?? 0));
             $url = $cat ? route('category.show', $cat->slug) : '#';
         } elseif ($url === '') {
             $url = (string) ($item['value'] ?? '#');
@@ -239,14 +249,17 @@ if (! function_exists('normalize_menu_item')) {
         $children = collect($item['children'] ?? [])->map(function ($c) {
             $cl = trim((string) ($c['label'] ?? ''));
             $cu = (string) ($c['url'] ?? $c['value'] ?? '#');
+
             return $cl === '' ? null : ['label' => $cl, 'url' => $cu, 'new_tab' => (bool) ($c['new_tab'] ?? false)];
         })->filter()->values()->all();
 
         $columns = collect($item['columns'] ?? [])->map(function ($col) {
             $links = collect($col['links'] ?? [])->map(function ($l) {
                 $ll = trim((string) ($l['label'] ?? ''));
+
                 return $ll === '' ? null : ['label' => $ll, 'url' => (string) ($l['url'] ?? '#'), 'new_tab' => (bool) ($l['new_tab'] ?? false)];
             })->filter()->values()->all();
+
             return empty($links) && trim((string) ($col['heading'] ?? '')) === '' ? null
                 : ['heading' => trim((string) ($col['heading'] ?? '')), 'links' => $links];
         })->filter()->values()->all();
@@ -289,20 +302,30 @@ if (! function_exists('color_hex')) {
         if (preg_match('/^#?[0-9a-f]{6}$/i', $key)) {
             return '#'.ltrim($key, '#');
         }
+
         return null;
     }
 }
 
 if (! function_exists('meta_pixel_id')) {
     /**
-     * Pixel ID, resolved from the database first: the Meta Integration settings
-     * (MetaSettings->pixel_id) win, then the Appearance/theme setting, then the
-     * .env fallback — so the admin's per-store value drives both Pixel & CAPI.
+     * Pixel ID — one editable home (Meta Integration → Tracking), with .env as
+     * the deploy-time fallback for a fresh install.
+     *
+     * Appearance used to hold a second copy that lost this precedence contest.
+     * Because the loser still rendered in its own form field, an admin could
+     * read one Pixel ID on screen while a different one fired on the storefront
+     * — which is exactly what happened. A setting with two editors has no
+     * single answer to "what is it set to", so there is now only one.
      */
     function meta_pixel_id(): ?string
     {
-        return app(\App\Services\Meta\MetaSettings::class)->pixelId()
-            ?: (theme('meta_pixel_id') ?: config('meta.pixel_id'));
+        $id = app(MetaSettings::class)->pixelId() ?: config('meta.pixel_id');
+
+        // Normalise "" (an unset env var) to null: callers gate the whole Pixel
+        // snippet on this, and "not configured" should read as absent rather
+        // than as a Pixel whose id happens to be blank.
+        return filled($id) ? (string) $id : null;
     }
 }
 
@@ -377,9 +400,9 @@ if (! function_exists('meta_content_id')) {
      * products (retargeting / Advantage+). Delegates to MetaProductMapper so
      * there is a single source of truth: "prod-{id}" / "prod-{id}-var-{vid}".
      */
-    function meta_content_id(\App\Models\Product $product, ?\App\Models\ProductVariant $variant = null): string
+    function meta_content_id(Product $product, ?ProductVariant $variant = null): string
     {
-        return app(\App\Services\Meta\MetaProductMapper::class)->retailerId($product, $variant);
+        return app(MetaProductMapper::class)->retailerId($product, $variant);
     }
 }
 
@@ -393,6 +416,7 @@ if (! function_exists('youtube_id')) {
         if (preg_match('~^[A-Za-z0-9_-]{11}$~', trim($url))) {
             return trim($url);
         }
+
         return null;
     }
 }
@@ -441,10 +465,10 @@ if (! function_exists('resolve_media')) {
      * or remote URL) is imported. Library picks that already live on our public
      * disk are reused in place (no wasteful re-copy). Returns null if neither.
      */
-    function resolve_media(\Illuminate\Http\Request $request, string $field, string $dir = 'uploads'): ?string
+    function resolve_media(Request $request, string $field, string $dir = 'uploads'): ?string
     {
         if ($request->hasFile($field)) {
-            return app(\App\Services\ImageOptimizer::class)->storeWebp($request->file($field), $dir);
+            return app(ImageOptimizer::class)->storeWebp($request->file($field), $dir);
         }
 
         $url = trim((string) $request->input($field.'_url', ''));
@@ -458,7 +482,7 @@ if (! function_exists('resolve_media')) {
         }
 
         // A remote URL (e.g. pasted from elsewhere) — download & optimise a copy.
-        return app(\App\Services\ImageOptimizer::class)->storeWebpFromUrl($url, $dir);
+        return app(ImageOptimizer::class)->storeWebpFromUrl($url, $dir);
     }
 }
 

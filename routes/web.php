@@ -2,11 +2,23 @@
 
 use App\Http\Controllers\Customer\AccountController;
 use App\Http\Controllers\Customer\AuthController as CustomerAuthController;
+use App\Http\Controllers\Customer\GoogleController;
+use App\Http\Controllers\Customer\PasswordResetController;
+use App\Http\Controllers\MetaWebhookController;
 use App\Http\Controllers\Shop\CartController;
 use App\Http\Controllers\Shop\CatalogController;
 use App\Http\Controllers\Shop\CheckoutController;
+use App\Http\Controllers\Shop\DiscoverController;
 use App\Http\Controllers\Shop\HomeController;
-use App\Http\Controllers\MetaWebhookController;
+use App\Http\Controllers\Shop\LandingController;
+use App\Http\Controllers\Shop\LeadController;
+use App\Http\Controllers\Shop\LoveController;
+use App\Http\Controllers\Shop\ManifestController;
+use App\Http\Controllers\Shop\PageController;
+use App\Http\Controllers\Shop\ProductFeedController;
+use App\Http\Controllers\Shop\PushController;
+use App\Http\Controllers\Shop\ReviewController;
+use App\Http\Controllers\Shop\SitemapController;
 use App\Http\Controllers\SteadfastWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,28 +31,42 @@ Route::post('/webhooks/meta', [MetaWebhookController::class, 'handle'])->name('m
 
 // ── Storefront ──────────────────────────────────────────────────────────────
 Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/sitemap.xml', [\App\Http\Controllers\Shop\SitemapController::class, 'index'])->name('sitemap');
-Route::get('/site.webmanifest', \App\Http\Controllers\Shop\ManifestController::class)->name('manifest');
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('/site.webmanifest', ManifestController::class)->name('manifest');
 
 // Marketing landing pages built in the admin section builder.
-Route::get('/lp/{slug}', [\App\Http\Controllers\Shop\LandingController::class, 'show'])->name('landing.show');
-Route::get('/robots.txt', fn () => response(
-    "User-agent: *\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n\nSitemap: ".route('sitemap')."\n",
-    200, ['Content-Type' => 'text/plain'],
-))->name('robots');
+Route::get('/lp/{slug}', [LandingController::class, 'show'])->name('landing.show');
+// Honours System Config → SEO. Both settings existed but were ignored here,
+// so switching the shop to "noindex" (a staging copy, a store not open yet)
+// silently did nothing at all — the worst kind of setting.
+Route::get('/robots.txt', function () {
+    $private = config('seo.robots') === 'noindex';
+
+    $body = $private
+        ? "User-agent: *\nDisallow: /\n"
+        : "User-agent: *\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n";
+
+    // A sitemap line pointing at a disabled (404) sitemap is a crawl error, and
+    // there is nothing to advertise on a site asking not to be indexed.
+    if (! $private && config('seo.sitemap_enabled', true)) {
+        $body .= "\nSitemap: ".route('sitemap')."\n";
+    }
+
+    return response($body, 200, ['Content-Type' => 'text/plain']);
+})->name('robots');
 Route::get('/shop', [CatalogController::class, 'index'])->name('shop');
 Route::get('/best-sellers', [CatalogController::class, 'bestSellers'])->name('best-sellers');
 
 // Web-push subscription (public — works for guests and members).
 Route::middleware('throttle:20,1')->group(function () {
-    Route::post('/push/subscribe', [\App\Http\Controllers\Shop\PushController::class, 'subscribe'])->name('push.subscribe');
-    Route::post('/push/unsubscribe', [\App\Http\Controllers\Shop\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
-    Route::post('/push/watch-stock', [\App\Http\Controllers\Shop\PushController::class, 'watchStock'])->name('push.watch-stock');
+    Route::post('/push/subscribe', [PushController::class, 'subscribe'])->name('push.subscribe');
+    Route::post('/push/unsubscribe', [PushController::class, 'unsubscribe'])->name('push.unsubscribe');
+    Route::post('/push/watch-stock', [PushController::class, 'watchStock'])->name('push.watch-stock');
 });
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager
-Route::get('/feed/meta.csv', [\App\Http\Controllers\Shop\ProductFeedController::class, 'meta'])->name('feed.meta');
+Route::get('/feed/meta.csv', [ProductFeedController::class, 'meta'])->name('feed.meta');
 // Throttled: order numbers are sequential, so an unthrottled lookup would let
 // someone who knows a phone number enumerate their way to the matching order.
 Route::get('/track', [CheckoutController::class, 'track'])->name('track')->middleware('throttle:20,1');
@@ -66,13 +92,13 @@ Route::controller(CartController::class)->group(function () {
 // Checkout
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
 Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:10,1');
-Route::post('/checkout/lead', [\App\Http\Controllers\Shop\LeadController::class, 'capture'])->name('checkout.lead')->middleware('throttle:15,1');
+Route::post('/checkout/lead', [LeadController::class, 'capture'])->name('checkout.lead')->middleware('throttle:15,1');
 
 // Product reviews (photo uploads — keep tight)
-Route::post('/product/{product:slug}/review', [\App\Http\Controllers\Shop\ReviewController::class, 'store'])->name('review.store')->middleware('throttle:5,10');
+Route::post('/product/{product:slug}/review', [ReviewController::class, 'store'])->name('review.store')->middleware('throttle:5,10');
 
 // Love / heart reaction (anonymous, per-browser cookie)
-Route::post('/product/{product:slug}/love', [\App\Http\Controllers\Shop\LoveController::class, 'toggle'])->name('product.love')->middleware('throttle:60,1');
+Route::post('/product/{product:slug}/love', [LoveController::class, 'toggle'])->name('product.love')->middleware('throttle:60,1');
 Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'confirmation'])->name('order.confirmation');
 
 // ── Customer accounts (optional) ─────────────────────────────────────────────
@@ -83,22 +109,22 @@ Route::middleware('guest:customer')->group(function () {
     Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.post')->middleware('throttle:5,1');
 
     // Continue with Google (OAuth2, no Socialite)
-    Route::get('/auth/google', [\App\Http\Controllers\Customer\GoogleController::class, 'redirect'])->name('customer.google');
+    Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('customer.google');
 
     // Forgot password via SMS OTP (throttled per phone + IP — sends paid SMS)
-    Route::get('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showForgot'])->name('customer.password.forgot');
-    Route::post('/password/forgot', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendOtp'])->name('customer.password.send')->middleware('throttle:otp');
-    Route::get('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showReset'])->name('customer.password.reset');
-    Route::post('/password/reset', [\App\Http\Controllers\Customer\PasswordResetController::class, 'reset'])->name('customer.password.update')->middleware('throttle:10,1');
+    Route::get('/password/forgot', [PasswordResetController::class, 'showForgot'])->name('customer.password.forgot');
+    Route::post('/password/forgot', [PasswordResetController::class, 'sendOtp'])->name('customer.password.send')->middleware('throttle:otp');
+    Route::get('/password/reset', [PasswordResetController::class, 'showReset'])->name('customer.password.reset');
+    Route::post('/password/reset', [PasswordResetController::class, 'reset'])->name('customer.password.update')->middleware('throttle:10,1');
 
     // Forgot password via email link
-    Route::post('/password/email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'sendEmailLink'])->name('customer.password.email')->middleware('throttle:otp');
-    Route::get('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'showEmailReset'])->name('customer.password.email.form');
-    Route::post('/password/reset-email', [\App\Http\Controllers\Customer\PasswordResetController::class, 'resetViaEmail'])->name('customer.password.email.update')->middleware('throttle:10,1');
+    Route::post('/password/email', [PasswordResetController::class, 'sendEmailLink'])->name('customer.password.email')->middleware('throttle:otp');
+    Route::get('/password/reset-email', [PasswordResetController::class, 'showEmailReset'])->name('customer.password.email.form');
+    Route::post('/password/reset-email', [PasswordResetController::class, 'resetViaEmail'])->name('customer.password.email.update')->middleware('throttle:10,1');
 });
 
 // Google OAuth callback (outside guest group so it works mid-session)
-Route::get('/auth/google/callback', [\App\Http\Controllers\Customer\GoogleController::class, 'callback'])->name('customer.google.callback');
+Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('customer.google.callback');
 Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
 Route::middleware('auth:customer')->group(function () {
@@ -130,14 +156,14 @@ Route::middleware('auth:customer')->group(function () {
 
 });
 
-Route::get('/discover', [\App\Http\Controllers\Shop\DiscoverController::class, 'index'])->name('discover');
+Route::get('/discover', [DiscoverController::class, 'index'])->name('discover');
 
 // Footer content pages (privacy / terms / refund) + contact.
-Route::get('/privacy-policy', [\App\Http\Controllers\Shop\PageController::class, 'legal'])->defaults('page', 'privacy')->name('page.privacy');
-Route::get('/terms-and-conditions', [\App\Http\Controllers\Shop\PageController::class, 'legal'])->defaults('page', 'terms')->name('page.terms');
-Route::get('/refund-policy', [\App\Http\Controllers\Shop\PageController::class, 'legal'])->defaults('page', 'refund')->name('page.refund');
-Route::get('/contact', [\App\Http\Controllers\Shop\PageController::class, 'contact'])->name('page.contact');
-Route::post('/contact', [\App\Http\Controllers\Shop\PageController::class, 'submitContact'])->name('page.contact.submit');
+Route::get('/privacy-policy', [PageController::class, 'legal'])->defaults('page', 'privacy')->name('page.privacy');
+Route::get('/terms-and-conditions', [PageController::class, 'legal'])->defaults('page', 'terms')->name('page.terms');
+Route::get('/refund-policy', [PageController::class, 'legal'])->defaults('page', 'refund')->name('page.refund');
+Route::get('/contact', [PageController::class, 'contact'])->name('page.contact');
+Route::post('/contact', [PageController::class, 'submitContact'])->name('page.contact.submit');
 
 // Catalog (slug routes last so they don't shadow the above)
 Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');

@@ -166,12 +166,13 @@ class ConfigSchema
                 ],
             ],
 
+            // Default meta title/description are NOT here: Appearance → Homepage
+            // content already owns them, and a second editor for the same thing
+            // only creates a "which one is live?" question with no good answer.
             'seo' => [
                 'label' => 'SEO',
-                'description' => 'Default meta tags & indexing.',
+                'description' => 'Search-engine indexing. Meta titles and descriptions are edited under Appearance → Homepage content.',
                 'fields' => [
-                    ['key' => 'seo.default_title', 'label' => 'Default meta title', 'type' => 'text', 'config' => 'seo.default_title', 'env' => null],
-                    ['key' => 'seo.default_description', 'label' => 'Default meta description', 'type' => 'textarea', 'config' => 'seo.default_description', 'env' => null],
                     ['key' => 'seo.robots', 'label' => 'Robots policy', 'type' => 'select', 'config' => 'seo.robots', 'env' => null, 'options' => ['index', 'noindex']],
                     ['key' => 'seo.sitemap_enabled', 'label' => 'Sitemap enabled', 'type' => 'bool', 'config' => 'seo.sitemap_enabled', 'env' => null],
                 ],

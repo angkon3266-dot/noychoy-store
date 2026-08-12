@@ -861,13 +861,20 @@
     </script>
 
     <!-- Marketing -->
+    {{-- The Pixel ID used to live here too. Two editable copies in two places
+         is one copy too many: this one lost the precedence contest inside
+         meta_pixel_id() and sat here reading like the live value while a
+         different number actually fired. Pixel now has exactly one home. --}}
     <div class="card p-6" x-show="tab==='branding'">
         <h2 class="font-semibold mb-4">Marketing &amp; tracking</h2>
         <div class="grid sm:grid-cols-2 gap-4">
-            <div><label class="label">Meta Pixel ID</label><input name="meta_pixel_id" value="{{ $theme['meta_pixel_id'] }}" class="input" placeholder="123456789012345"></div>
             <div><label class="label">WhatsApp number (with country code)</label><input name="whatsapp_number" value="{{ $theme['whatsapp_number'] }}" class="input" placeholder="8801XXXXXXXXX"></div>
         </div>
-        <p class="text-xs text-ink-700/50 mt-2">The server-side Conversions API (token + enable) is configured under <strong>Meta Integration → Settings</strong> and stored encrypted in the database. Pixel fires PageView, ViewContent, AddToCart, InitiateCheckout &amp; Purchase automatically, deduplicated with the server events.</p>
+        <p class="text-xs text-ink-700/50 mt-2">
+            The Meta Pixel and the server-side Conversions API are configured under
+            <a href="{{ route('admin.meta.tracking') }}" class="underline font-medium">Meta Integration → Tracking</a>.
+            Pixel fires PageView, ViewContent, AddToCart, InitiateCheckout &amp; Purchase automatically, deduplicated with the server events.
+        </p>
     </div>
 
     <!-- Conversion features -->

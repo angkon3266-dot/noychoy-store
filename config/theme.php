@@ -103,9 +103,6 @@ return [
         'show_pdp_whatsapp' => true,
         'show_frequently_bought' => true,
 
-        // Marketing
-        'meta_pixel_id' => null,
-
         // Printed thank-you card design (Appearance → Cards & print).
         // Sizes in mm unless noted; font scale is a % applied to the size-derived base.
         'card_font' => 'serif',

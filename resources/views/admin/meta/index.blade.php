@@ -327,7 +327,11 @@
                     <input type="password" name="access_token" class="input" autocomplete="off" placeholder="{{ $settings->hasToken() ? '•••••••• (saved — leave blank to keep)' : 'Paste your System User token' }}">
                     <p class="text-xs text-ink-700/50 mt-1">Stored encrypted (AES-256). Never a short-lived user token.</p>
                 </div>
-                <div><label class="label">Pixel ID <span class="text-ink-700/40">(optional)</span></label><input name="pixel_id" value="{{ old('pixel_id', $snapshot['pixel_id']) }}" class="input" placeholder="e.g. 1111111111"></div>
+                <div>
+                    <label class="label">Pixel ID</label>
+                    <p class="input bg-ink-50 text-ink-700/70">{{ $snapshot['pixel_id'] ?: '— not set —' }}</p>
+                    <p class="text-xs text-ink-700/50 mt-1">Edited under <a href="{{ route('admin.meta.tracking') }}" class="underline">Tracking</a>, alongside the events it fires.</p>
+                </div>
                 <div class="sm:col-span-2 rounded-lg border border-ink-100 p-3 space-y-2">
                     <label class="flex items-center gap-2 font-medium"><input type="checkbox" name="capi_enabled" value="1" @checked($snapshot['capi_enabled'] ?? false)> Enable Conversions API (server-side events)</label>
                     <p class="text-xs text-ink-700/50">Sends ViewContent, AddToCart, InitiateCheckout &amp; Purchase server-side, deduplicated with the browser Pixel. Requires a Pixel ID above.</p>
@@ -389,7 +393,6 @@
                 <input type="hidden" name="mode" value="production">
                 <input type="hidden" name="business_id" value="{{ $snapshot['business_id'] }}">
                 <input type="hidden" name="catalog_id" value="{{ $snapshot['catalog_id'] }}">
-                <input type="hidden" name="pixel_id" value="{{ $snapshot['pixel_id'] }}">
                 <label class="flex items-center gap-2 font-medium"><input type="checkbox" name="enabled" value="1" @checked($settings->isEnabled())> Enable Meta Integration</label>
                 @include('admin.meta._toggles', ['snapshot' => $snapshot])
                 <button class="btn-primary">Save settings</button>

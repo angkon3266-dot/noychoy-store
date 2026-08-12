@@ -67,7 +67,6 @@ class AppearanceController extends Controller
             'announcement_messages' => ['nullable', 'string'],
             'announcement_link' => ['nullable', 'string', 'max:255'],
             'announcement_speed' => ['nullable', 'integer', 'min:2', 'max:30'],
-            'meta_pixel_id' => ['nullable', 'string', 'max:40'],
             'whatsapp_number' => ['nullable', 'string', 'max:20'],
             'free_shipping_bar' => ['nullable', 'boolean'],
             'show_recently_viewed' => ['nullable', 'boolean'],
@@ -381,7 +380,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'meta_pixel_id', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'product_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
             'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
             'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
             'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',

@@ -79,12 +79,15 @@ class MetaIntegrationController extends Controller
     {
         $data = $request->validated();
 
+        // pixel_id is deliberately absent: Meta Integration → Tracking owns it.
+        // Writing it from here too meant this form had to carry a copy of the
+        // value on every save just to avoid blanking it — and `?? null` would
+        // silently wipe a working Pixel the moment the field wasn't submitted.
         $this->settings->update(array_merge(
             [
                 'mode' => $data['mode'],
                 'business_id' => $data['business_id'] ?? null,
                 'catalog_id' => $data['catalog_id'] ?? null,
-                'pixel_id' => $data['pixel_id'] ?? null,
             ],
             $request->booleanFlags(),
         ));

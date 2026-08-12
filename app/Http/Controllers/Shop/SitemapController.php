@@ -16,6 +16,10 @@ class SitemapController extends Controller
 {
     public function index()
     {
+        // System Config → SEO → "Sitemap enabled" used to be settable and then
+        // ignored, so turning it off left the sitemap happily serving.
+        abort_unless(config('seo.sitemap_enabled', true), 404);
+
         $xml = Cache::remember('sitemap.xml.v1', 3600, function () {
             $urls = [];
 
