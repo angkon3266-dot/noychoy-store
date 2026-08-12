@@ -91,6 +91,11 @@
     </div>
 </section>
 
+{{-- ── Deals of the Day ──────────────────────────────────────────────── --}}
+{{-- Straight after the hero: a deal nobody scrolls to is not a deal. Renders
+     nothing at all when no offers are live, so the page simply closes up. --}}
+<x-deals-carousel />
+
 {{-- ── Category lookbook ─────────────────────────────────────────────── --}}
 @if(home_content('show_categories') && $cats->isNotEmpty())
 <section class="mx-auto max-w-7xl px-4 py-16 lg:py-24">

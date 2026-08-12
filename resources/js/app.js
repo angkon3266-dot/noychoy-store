@@ -149,9 +149,14 @@ document.addEventListener('alpine:init', () => {
     // ── Landing page countdown ───────────────────────────────────────────────
     window.Alpine.data('countdownBox', (endsAtUnix) => ({
         units: [],
+        // A page can be served from the LiteSpeed cache long after it was
+        // rendered, so the deadline has to be re-checked in the browser rather
+        // than trusted from render time alone.
+        expired: false,
         start() {
             const tick = () => {
                 const left = Math.max(0, endsAtUnix - Math.floor(Date.now() / 1000));
+                this.expired = left <= 0;
                 this.units = [
                     { label: 'Days', value: Math.floor(left / 86400) },
                     { label: 'Hours', value: Math.floor(left / 3600) % 24 },

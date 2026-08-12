@@ -3,22 +3,28 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Shop\HomeController;
+use App\Models\Category;
+use App\Models\Review;
 use App\Models\Setting;
+use App\Services\ImageOptimizer;
+use App\Services\StorefrontFilters;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class AppearanceController extends Controller
 {
-    public function index(\App\Services\StorefrontFilters $filters)
+    public function index(StorefrontFilters $filters)
     {
         return view('admin.appearance', [
             'theme' => theme(),
             'home' => home_content(),
             'homeTemplates' => config('theme.homepage_templates'),
             'productTemplates' => config('theme.product_templates'),
-            'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
+            'allCategories' => Category::orderBy('name')->get(['id', 'name']),
             // For the section builder's "Customer reviews" block picker.
-            'recentReviews' => \App\Models\Review::approved()->with('product:id,name')
+            'recentReviews' => Review::approved()->with('product:id,name')
                 ->latest()->take(60)->get(['id', 'product_id', 'author_name', 'rating', 'title', 'body']),
             'filterConfig' => $filters->config(),
             'filterAttributes' => $filters->discoverAttributes(),
@@ -29,7 +35,7 @@ class AppearanceController extends Controller
         ]);
     }
 
-    public function update(Request $request, \App\Services\ImageOptimizer $optimizer)
+    public function update(Request $request, ImageOptimizer $optimizer)
     {
         $data = $request->validate([
             'primary' => ['nullable', 'string', 'max:9'],
@@ -253,7 +259,7 @@ class AppearanceController extends Controller
 
         // ---- Storefront homepage builder ----
         // Section toggles
-        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise'] as $t) {
+        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals'] as $t) {
             $home[$t] = $request->boolean('home_'.$t);
         }
 
@@ -283,6 +289,7 @@ class AppearanceController extends Controller
                 if (isset($edits[$i]['link'])) {
                     $s['link'] = trim((string) $edits[$i]['link']);
                 }
+
                 return $s;
             });
         if ($request->hasFile('hero_slide_images')) {
@@ -438,7 +445,7 @@ class AppearanceController extends Controller
         }
 
         // Homepage content/sections may have changed — rebuild its cache.
-        \Illuminate\Support\Facades\Cache::forget(\App\Http\Controllers\Shop\HomeController::CACHE_KEY);
+        Cache::forget(HomeController::CACHE_KEY);
 
         return back()->with('success', 'Appearance updated.');
     }

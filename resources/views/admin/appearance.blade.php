@@ -255,6 +255,28 @@
             @endfor
         </div>
 
+        {{-- "Deals of the Day" — driven by Admin → Offers --}}
+        <div class="mt-6 border-t border-ink-100 pt-5">
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_deals" value="1" @checked($home['show_deals'] ?? true)> Show “Deals of the Day”</label>
+            <p class="text-xs text-ink-700/50 mb-3">
+                One card per <strong>active offer</strong> under <a href="{{ route('admin.offers.index') }}" class="underline">Offers</a> — that is where you choose whether a deal promotes
+                a specific product, a whole category, or the entire order. The section hides itself when no offers are running.
+            </p>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="label">Section heading</label><input name="home[deals_title]" value="{{ $home['deals_title'] ?? '' }}" class="input" placeholder="Deals of the Day"></div>
+                <div>
+                    <label class="label">Ends at (optional)</label>
+                    <input type="datetime-local" name="home[deals_ends_at]" class="input"
+                           value="{{ filled($home['deals_ends_at'] ?? null) ? \Illuminate\Support\Carbon::parse($home['deals_ends_at'])->format('Y-m-d\TH:i') : '' }}">
+                    <p class="text-[11px] text-ink-700/50 mt-1">
+                        Shows a live countdown, and hides the whole section once it passes. Leave empty for no deadline.
+                        Read in the site's timezone (<strong>{{ config('app.timezone') }}</strong>@if(config('app.timezone') === 'UTC') — 6 hours behind Dhaka@endif).
+                    </p>
+                </div>
+                <div class="sm:col-span-2"><label class="label">Sub-heading</label><input name="home[deals_subtitle]" value="{{ $home['deals_subtitle'] ?? '' }}" class="input" placeholder="(optional)"></div>
+            </div>
+        </div>
+
         {{-- "Our promise" editorial brand band (Couture template) --}}
         <div class="mt-6 border-t border-ink-100 pt-5">
             <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_promise" value="1" @checked($home['show_promise'] ?? true)> Show the “Our promise” brand band</label>

@@ -46,6 +46,14 @@ return [
         // Homepage video sections — list of { title, url }. url = YouTube link or uploaded MP4 path.
         'videos' => [],
 
+        // "Deals of the Day" — a carousel built from the live offers under
+        // Admin → Offers. deals_ends_at is an optional deadline: while it is set
+        // the section shows a countdown, and it hides itself once it passes.
+        'show_deals' => true,
+        'deals_title' => 'Deals of the Day',
+        'deals_subtitle' => null,
+        'deals_ends_at' => null,
+
         // "Our promise" editorial brand band (Couture template)
         'show_promise' => true,
         'promise_eyebrow' => 'Our promise',
