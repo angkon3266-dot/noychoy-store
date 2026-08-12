@@ -268,9 +268,17 @@
                     <label class="label">Ends at (optional)</label>
                     <input type="datetime-local" name="home[deals_ends_at]" class="input"
                            value="{{ filled($home['deals_ends_at'] ?? null) ? \Illuminate\Support\Carbon::parse($home['deals_ends_at'])->format('Y-m-d\TH:i') : '' }}">
+                    @php
+                        // Built in PHP rather than with an inline @if: a Blade
+                        // directive glued straight onto a word ("Dhaka@endif")
+                        // is not recognised as a directive at all, which leaves
+                        // the compiled view with an unterminated if.
+                        $tzNote = config('app.timezone')
+                            .(config('app.timezone') === 'UTC' ? ' — 6 hours behind Dhaka' : '');
+                    @endphp
                     <p class="text-[11px] text-ink-700/50 mt-1">
                         Shows a live countdown, and hides the whole section once it passes. Leave empty for no deadline.
-                        Read in the site's timezone (<strong>{{ config('app.timezone') }}</strong>@if(config('app.timezone') === 'UTC') — 6 hours behind Dhaka@endif).
+                        Read in the site's timezone (<strong>{{ $tzNote }}</strong>).
                     </p>
                 </div>
                 <div class="sm:col-span-2"><label class="label">Sub-heading</label><input name="home[deals_subtitle]" value="{{ $home['deals_subtitle'] ?? '' }}" class="input" placeholder="(optional)"></div>
@@ -320,15 +328,35 @@
         {{-- Best-selling title --}}
         <div class="mb-6"><label class="label">Best-selling section title</label><input name="home[best_selling_title]" value="{{ $home['best_selling_title'] ?? '' }}" class="input"></div>
 
-        {{-- Hero slides --}}
+        {{-- Hero slides — images and video. Once you add any slide here, it takes
+             over the homepage hero completely (image or video, Couture or
+             Storefront template); leave this empty and the hero falls back to
+             your hero image + featured products automatically. --}}
         <h3 class="text-sm font-semibold text-ink-700 mb-2">Hero slider</h3>
-        @php $slides = collect($home['hero_slides'] ?? [])->filter(fn($s)=>filled($s['image'] ?? null))->values(); @endphp
+        @php
+            // Kept unfiltered on purpose: the edit/remove index below has to match
+            // the raw array the controller saves against, and a video slide has no
+            // "image" key to filter on.
+            $slides = collect($home['hero_slides'] ?? []);
+        @endphp
         @if($slides->isNotEmpty())
             <div class="space-y-3 mb-3">
                 @foreach($slides as $i => $s)
-                    @php $simg = \Illuminate\Support\Str::startsWith($s['image'],['http','/']) ? $s['image'] : \Illuminate\Support\Facades\Storage::disk('public')->url($s['image']); @endphp
+                    @php $isVideo = filled($s['video'] ?? null); @endphp
                     <div class="flex items-center gap-3 rounded-lg border border-ink-100 p-2">
-                        <img src="{{ $simg }}" class="w-24 h-14 object-cover rounded" alt="">
+                        @if($isVideo)
+                            @php $vmeta = video_meta($s['video']); @endphp
+                            <div class="w-24 h-14 rounded bg-ink-900 shrink-0 grid place-items-center relative overflow-hidden">
+                                @if($vmeta && $vmeta['thumb'])
+                                    <img src="{{ $vmeta['thumb'] }}" class="absolute inset-0 w-full h-full object-cover opacity-70" alt="">
+                                @endif
+                                <span class="relative text-white text-lg">▶</span>
+                            </div>
+                            <span class="text-xs text-ink-700/50 shrink-0 w-14">{{ $vmeta['type'] ?? 'video' }}</span>
+                        @else
+                            @php $simg = \Illuminate\Support\Str::startsWith($s['image'],['http','/']) ? $s['image'] : \Illuminate\Support\Facades\Storage::disk('public')->url($s['image']); @endphp
+                            <img src="{{ $simg }}" class="w-24 h-14 object-cover rounded shrink-0" alt="">
+                        @endif
                         <input name="hero_slides[{{ $i }}][link]" value="{{ $s['link'] ?? '' }}" class="input flex-1" placeholder="Link when clicked (optional)">
                         <label class="flex items-center gap-1 text-xs text-red-600"><input type="checkbox" name="hero_slides[{{ $i }}][remove]" value="1"> Remove</label>
                     </div>
@@ -363,6 +391,24 @@
                 <span class="text-lg leading-none">＋</span> Add another image <span class="text-ink-700/40" x-text="'(' + rows + '/' + max + ')'"></span>
             </button>
             <p class="text-xs text-ink-700/50 mt-2">Add up to 10 slides total. Wide images work best (e.g. 1920×800). Links are editable after saving.</p>
+        </div>
+
+        <label class="label mt-4">Add a video slide</label>
+        <p class="text-xs text-ink-700/50 mb-2">Plays muted and on a loop as part of the rotation, same as the images. Upload your own clip (self-hosted, no external server involved) or paste a YouTube/Vimeo link.</p>
+        <div x-data="{ rows: 1 }">
+            <template x-for="r in rows" :key="r">
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="file" name="hero_slide_videos[]" accept="video/mp4,video/webm,video/quicktime" class="input text-sm flex-1">
+                    <span class="text-xs text-ink-700/40">or</span>
+                    <input name="hero_slide_video_urls[]" class="input text-sm flex-1" placeholder="YouTube / Vimeo link">
+                    <button type="button" x-show="rows > 1" @click="rows--" class="shrink-0 text-red-600 text-sm px-2 py-1 hover:bg-red-50 rounded" title="Remove this row">✕</button>
+                </div>
+            </template>
+            <button type="button" @click="rows++"
+                    class="mt-1 inline-flex items-center gap-1 text-sm text-gold-700 font-medium hover:text-gold-800">
+                <span class="text-lg leading-none">＋</span> Add another video
+            </button>
+            <p class="text-xs text-ink-700/50 mt-2">Video files up to 50MB. A long clip still only gets its ~5.5s share of the rotation like every other slide.</p>
         </div>
 
         {{-- Feature strip --}}

@@ -119,6 +119,10 @@ class AppearanceController extends Controller
             'hero_slide_images.*' => ['nullable', 'image', 'max:4096'],
             'hero_slide_urls' => ['nullable', 'array'],
             'hero_slide_urls.*' => ['nullable', 'string', 'max:500'],
+            'hero_slide_videos' => ['nullable', 'array'],
+            'hero_slide_videos.*' => ['nullable', 'file', 'mimes:mp4,webm,mov,m4v,ogg', 'max:51200'],
+            'hero_slide_video_urls' => ['nullable', 'array'],
+            'hero_slide_video_urls.*' => ['nullable', 'string', 'max:500'],
 
             // Section builder
             'home_sections_json' => ['nullable', 'string'],
@@ -306,7 +310,26 @@ class AppearanceController extends Controller
                 $slides->push(['image' => public_url_to_path($url) ?: $url, 'link' => '']);
             }
         }
-        $home['hero_slides'] = $slides->values()->all();
+        // Video slides: an uploaded file (self-hosted) or a pasted YouTube/Vimeo
+        // link. video_meta() (used at render time) normalises either shape.
+        if ($request->hasFile('hero_slide_videos')) {
+            foreach ($request->file('hero_slide_videos') as $file) {
+                if ($file && $file->isValid()) {
+                    $slides->push(['video' => $file->store('hero-videos', 'public'), 'link' => '']);
+                }
+            }
+        }
+        foreach ((array) $request->input('hero_slide_video_urls', []) as $url) {
+            $url = trim((string) $url);
+            if ($url !== '') {
+                $slides->push(['video' => $url, 'link' => '']);
+            }
+        }
+        // A slide needs an image or a video to be worth keeping — drop anything
+        // that ended up with neither (e.g. a row left blank in the form).
+        $home['hero_slides'] = $slides
+            ->filter(fn ($s) => filled($s['image'] ?? null) || filled($s['video'] ?? null))
+            ->values()->all();
 
         // Section builder blocks (JSON) + per-block image uploads
         $blocks = json_decode((string) $request->input('home_sections_json', ''), true);

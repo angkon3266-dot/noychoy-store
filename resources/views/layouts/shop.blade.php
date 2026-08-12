@@ -6,8 +6,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', store_name()) — {{ store_name() }}</title>
     @hasSection('meta')@yield('meta')@endif
+    {{-- request()->routeIs() is deliberate, not just isset($product): Blade's
+         @extends shares the child template's ENTIRE final variable table with
+         this layout, so a stray `foreach ($newArrivals as $product)` on any
+         other page — homepage sections, the shop grid, anywhere — leaves
+         $product still set once the loop ends, and this head would otherwise
+         advertise that leftover product's title/image/price to whoever shares
+         the link. Only the actual product page may set OG/product meta. --}}
     @isset($product)
-        @if($product instanceof \App\Models\Product)
+        @if($product instanceof \App\Models\Product && request()->routeIs('product.show'))
             @php $ogImg = $product->thumbnail; @endphp
             <meta property="og:type" content="product">
             <meta property="og:title" content="{{ $product->meta_title ?: $product->name }}">
@@ -28,7 +35,7 @@
          own copy, else the storefront tagline. --}}
     @php
         $metaDesc = $metaDescription ?? null;
-        if (blank($metaDesc) && isset($product) && $product instanceof \App\Models\Product) {
+        if (blank($metaDesc) && isset($product) && $product instanceof \App\Models\Product && request()->routeIs('product.show')) {
             $metaDesc = $product->meta_description ?: $product->short_description ?: $product->description;
         }
         if (blank($metaDesc)) {

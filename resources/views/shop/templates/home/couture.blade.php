@@ -5,20 +5,41 @@
 @php
     $cats = $categories ?? collect();
 
-    // Hero slideshow. The uploaded hero image leads (editorial first impression,
-    // links to the shop), then the featured products follow — each linking to its
-    // own page, so the hero is shoppable rather than decorative. Capped because
-    // later slides are almost never reached and every extra one is another image
-    // competing for the first paint.
-    $heroSlides = collect();
+    // Hero slideshow. Admin → Appearance → "Hero slider" gives full control —
+    // any mix of images and video, in whatever order they were added — and as
+    // soon as one slide exists there, it replaces the auto-built list entirely.
+    // Nothing added yet: the uploaded hero image leads (editorial first
+    // impression, links to the shop), then up to 5 featured products follow,
+    // each linking to its own page, so the hero is shoppable rather than
+    // decorative. Capped because later slides are almost never reached and
+    // every extra one is another asset competing for the first paint.
+    $heroSlides = collect(home_content('hero_slides') ?? [])
+        ->take(8)
+        ->map(function ($s) {
+            $video = filled($s['video'] ?? null) ? video_meta($s['video']) : null;
+            $image = $video ? null : theme_asset($s['image'] ?? null);
+            if (! $video && ! $image) {
+                return null; // malformed row — nothing to show
+            }
 
-    if ($heroImg = theme_asset(home_content('hero_image'))) {
-        $heroSlides->push(['image' => $heroImg, 'link' => home_content('hero_cta_link') ?: route('shop'), 'alt' => '']);
-    }
+            return [
+                'type' => $video ? 'video' : 'image',
+                'video' => $video,
+                'image' => $image ?: ($video['thumb'] ?? null),
+                'link' => filled($s['link'] ?? null) ? $s['link'] : null,
+                'alt' => $s['alt'] ?? '',
+            ];
+        })
+        ->filter()->values();
 
-    foreach ($featured->take(5) as $p) {
-        if ($p->thumbnail) {
-            $heroSlides->push(['image' => $p->thumbnail, 'link' => route('product.show', $p), 'alt' => $p->name]);
+    if ($heroSlides->isEmpty()) {
+        if ($heroImg = theme_asset(home_content('hero_image'))) {
+            $heroSlides->push(['type' => 'image', 'video' => null, 'image' => $heroImg, 'link' => home_content('hero_cta_link') ?: route('shop'), 'alt' => '']);
+        }
+        foreach ($featured->take(5) as $p) {
+            if ($p->thumbnail) {
+                $heroSlides->push(['type' => 'image', 'video' => null, 'image' => $p->thumbnail, 'link' => route('product.show', $p), 'alt' => $p->name]);
+            }
         }
     }
 @endphp
@@ -55,18 +76,40 @@
                  @touchstart.passive="swipeStart($event)" @touchend.passive="swipeEnd($event)"
              @endif>
             @foreach($heroSlides as $k => $s)
+                @php
+                    // A video with nowhere to send you plays inline instead of
+                    // being wrapped in a link — nothing to click through to.
+                    $tag = $s['link'] ? 'a' : 'div';
+                    $attrs = $s['link'] ? 'href="'.e($s['link']).'"' : '';
+                @endphp
                 {{-- Stacked and cross-faded rather than translated: the panel is a
                      fixed frame here, so a slide-in would show the page behind it. --}}
-                <a href="{{ $s['link'] }}" aria-label="{{ $s['alt'] ?: 'View the collection' }}"
+                <{{ $tag }} {!! $attrs !!} aria-label="{{ $s['alt'] ?: 'View the collection' }}"
                    class="absolute inset-0 block transition-opacity duration-1000 ease-out"
                    @if($heroSlides->count() > 1)
                        x-bind:class="i === {{ $k }} ? 'opacity-100' : 'opacity-0 pointer-events-none'"
                        x-bind:aria-hidden="i !== {{ $k }}"
                    @endif>
-                    <img src="{{ $s['image'] }}" alt="{{ $s['alt'] }}"
-                         @if($k > 0) loading="lazy" @endif
-                         class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105">
-                </a>
+                    @if($s['type'] === 'video' && $s['video']['type'] === 'file')
+                        {{-- Self-hosted upload: an ambient loop, same as a still image's
+                             screen time — no controls, no sound, nothing to wait on. --}}
+                        <video src="{{ $s['video']['src'] }}" autoplay muted loop playsinline
+                               class="w-full h-full object-cover"></video>
+                    @elseif($s['type'] === 'video')
+                        @php
+                            $embed = $s['video']['embed'];
+                            $embed .= $s['video']['type'] === 'youtube'
+                                ? (str_contains($embed, '?') ? '&' : '?').'autoplay=1&mute=1&loop=1&playlist='.\Illuminate\Support\Str::afterLast($embed, '/').'&controls=0&modestbranding=1&rel=0'
+                                : (str_contains($embed, '?') ? '&' : '?').'autoplay=1&muted=1&loop=1&background=1';
+                        @endphp
+                        <iframe src="{{ $embed }}" title="{{ $s['alt'] }}" class="w-full h-full pointer-events-none"
+                                loading="lazy" allow="autoplay" tabindex="-1"></iframe>
+                    @else
+                        <img src="{{ $s['image'] }}" alt="{{ $s['alt'] }}"
+                             @if($k > 0) loading="lazy" @endif
+                             class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105">
+                    @endif
+                </{{ $tag }}>
             @endforeach
 
             <div class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
