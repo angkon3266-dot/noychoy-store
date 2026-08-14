@@ -32,9 +32,12 @@
     @if($slides->count() > 1)
         <button @click="go(i-1)" class="absolute left-3 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white rounded-full w-10 h-10 grid place-items-center shadow">‹</button>
         <button @click="go(i+1)" class="absolute right-3 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white rounded-full w-10 h-10 grid place-items-center shadow">›</button>
-        <div class="absolute bottom-4 inset-x-0 flex justify-center gap-2">
+        {{-- Dot stays 10px of paint; the button around it is a ~44px tap target. --}}
+        <div class="absolute bottom-1 inset-x-0 flex justify-center">
             @foreach($slides as $k => $s)
-                <button @click="i={{ $k }}" class="w-2.5 h-2.5 rounded-full transition" :class="i==={{ $k }} ? 'bg-gold-600' : 'bg-white/70'"></button>
+                <button @click="i={{ $k }}" aria-label="Go to slide {{ $k + 1 }}" class="p-2.5 grid place-items-center">
+                    <span class="w-2.5 h-2.5 rounded-full transition" :class="i==={{ $k }} ? 'bg-gold-600' : 'bg-white/70'"></span>
+                </button>
             @endforeach
         </div>
     @endif

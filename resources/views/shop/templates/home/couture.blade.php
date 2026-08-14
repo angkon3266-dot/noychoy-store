@@ -47,7 +47,10 @@
 {{-- ── Hero: editorial split ─────────────────────────────────────────── --}}
 <section class="relative">
     <div class="mx-auto max-w-7xl grid lg:grid-cols-2 items-stretch">
-        <div class="flex items-center px-6 sm:px-10 py-16 lg:py-28 order-2 lg:order-1">
+        {{-- py-10 on phones: with the image stacked above this block, generous
+             padding pushed "Shop the collection" off the first screen entirely
+             on smaller phones. The CTA must land inside the opening viewport. --}}
+        <div class="flex items-center px-6 sm:px-10 py-10 sm:py-16 lg:py-28 order-2 lg:order-1">
             <div class="max-w-lg">
                 <p class="uppercase tracking-[0.35em] text-[11px] text-gold-700 mb-5">{{ home_content('hero_eyebrow') ?: 'Handcrafted in Bangladesh' }}</p>
                 <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl leading-[1.05] text-ink-900">{!! home_content_heading('text-gold-700') !!}</h1>
@@ -69,7 +72,7 @@
         {{-- Every utility below already exists elsewhere in the bundle, so this
              slideshow adds no CSS weight and no new JS beyond the Alpine that
              ships with the page anyway. --}}
-        <div class="order-1 lg:order-2 relative min-h-[42vh] lg:min-h-[80vh] bg-gold-100 overflow-hidden group"
+        <div class="order-1 lg:order-2 relative min-h-[34vh] sm:min-h-[42vh] lg:min-h-[80vh] bg-gold-100 overflow-hidden group"
              @if($heroSlides->count() > 1)
                  x-data="heroSlider({{ $heroSlides->count() }})" x-init="start()"
                  @mouseenter="stop()" @mouseleave="start()"
@@ -105,8 +108,14 @@
                         <iframe src="{{ $embed }}" title="{{ $s['alt'] }}" class="w-full h-full pointer-events-none"
                                 loading="lazy" allow="autoplay" tabindex="-1"></iframe>
                     @else
+                        {{-- First slide is the page's LCP element: fetch it at
+                             high priority; later slides stay lazy. The 900w
+                             variant serves the ~630px panel; originals can be
+                             1600px, which phones should never download. --}}
+                        @php $v900 = image_variant($s['image'], 900); @endphp
                         <img src="{{ $s['image'] }}" alt="{{ $s['alt'] }}"
-                             @if($k > 0) loading="lazy" @endif
+                             @if($k > 0) loading="lazy" @else fetchpriority="high" @endif
+                             @if($v900) srcset="{{ $v900 }} 900w, {{ $s['image'] }} 1600w" sizes="(min-width: 1024px) 50vw, 100vw" @endif
                              class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105">
                     @endif
                 </{{ $tag }}>
@@ -122,11 +131,16 @@
                 <button type="button" @click="go(i + 1)" aria-label="Next"
                         class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/75 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">›</button>
 
-                <div class="absolute bottom-5 inset-x-0 flex justify-center gap-2">
+                {{-- The dot is 6px of paint but the button is a ~44px target —
+                     a bare 6px control is untappable on touch, where these are
+                     the only visible way to change slides. --}}
+                <div class="absolute bottom-1 inset-x-0 flex justify-center">
                     @foreach($heroSlides as $k => $s)
                         <button type="button" @click="go({{ $k }})" aria-label="Go to slide {{ $k + 1 }}"
-                                class="w-1.5 h-1.5 rounded-full transition-all duration-300"
-                                x-bind:class="i === {{ $k }} ? 'bg-white w-5' : 'bg-white/55 hover:bg-white/80'"></button>
+                                class="p-2.5 grid place-items-center">
+                            <span class="h-1.5 rounded-full transition-all duration-300"
+                                  x-bind:class="i === {{ $k }} ? 'bg-white w-5' : 'bg-white/55 w-1.5'"></span>
+                        </button>
                     @endforeach
                 </div>
             @endif
@@ -197,7 +211,9 @@
         <div class="max-w-md">
             <p class="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-3">{{ home_content('promise_eyebrow') ?: 'Our promise' }}</p>
             <h2 class="font-display text-3xl sm:text-4xl text-ink-900 leading-tight">{{ home_content('promise_title') ?: 'Crafted to be treasured' }}</h2>
-            <p class="mt-5 text-ink-700/70 leading-relaxed">{{ home_content('promise_text') ?: (home_content('hero_subtitle') ?: 'Every piece is quality-checked and finished by hand. Pay on delivery, return with ease, and wear with confidence.') }}</p>
+            {{-- home_content() falls back to the config default; the old extra
+                 fallback to hero_subtitle made the homepage repeat itself. --}}
+            <p class="mt-5 text-ink-700/70 leading-relaxed">{{ home_content('promise_text') }}</p>
             <div class="mt-8 grid grid-cols-3 gap-4 text-center">
                 <div><div class="font-display text-lg text-gold-700">{{ home_content('badge1_title') ?: 'COD' }}</div><p class="text-xs text-ink-700/60 mt-1">{{ home_content('badge1_text') ?: 'Pay on delivery' }}</p></div>
                 <div><div class="font-display text-lg text-gold-700">{{ home_content('badge2_title') ?: 'Fast' }}</div><p class="text-xs text-ink-700/60 mt-1">{{ home_content('badge2_text') ?: 'Nationwide' }}</p></div>

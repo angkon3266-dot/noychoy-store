@@ -1010,6 +1010,9 @@ class ProductController extends Controller
                 if ($autoStamp) {
                     $watermark->applyToPath($stored);   // only new device uploads, not library picks
                 }
+                // Card-sized srcset variant, cut AFTER any watermark so the
+                // small copy carries the same stamp as the original.
+                $optimizer->variant($stored, 450);
                 $paths[] = $stored;
             }
         }

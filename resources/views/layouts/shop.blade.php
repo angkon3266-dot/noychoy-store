@@ -26,6 +26,55 @@
             <meta property="product:condition" content="new">
             <meta property="product:price:amount" content="{{ number_format((float) $product->price, 2, '.', '') }}">
             <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
+
+            {{-- Structured data: this is what earns the price/availability/star
+                 line under the listing in Google. Same guard as the OG tags —
+                 only the real product page may claim to be a Product. --}}
+            @php
+                $ldImages = $product->relationLoaded('images')
+                    ? $product->images->map->url->take(4)->values()->all()
+                    : array_filter([$ogImg]);
+                $ldProduct = [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'Product',
+                    'name' => $product->name,
+                    'description' => \Illuminate\Support\Str::limit(trim(strip_tags($product->short_description ?: $product->description)), 300),
+                    'image' => $ldImages,
+                    'sku' => $product->sku,
+                    'brand' => ['@type' => 'Brand', 'name' => store_name()],
+                    'offers' => [
+                        '@type' => 'Offer',
+                        'url' => route('product.show', $product),
+                        'price' => number_format((float) $product->price, 2, '.', ''),
+                        'priceCurrency' => config('store.currency', 'BDT'),
+                        'availability' => ($product->isAvailable() || $product->isPreorder())
+                            ? 'https://schema.org/InStock'
+                            : 'https://schema.org/OutOfStock',
+                    ],
+                ];
+                // Ratings only when real reviews exist — a zero-count
+                // aggregateRating is a rich-results policy violation.
+                if ($product->review_count > 0 && $product->average_rating) {
+                    $ldProduct['aggregateRating'] = [
+                        '@type' => 'AggregateRating',
+                        'ratingValue' => round((float) $product->average_rating, 1),
+                        'reviewCount' => (int) $product->review_count,
+                    ];
+                }
+                $ldCrumbs = [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'BreadcrumbList',
+                    'itemListElement' => array_values(array_filter([
+                        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => route('home')],
+                        $product->category
+                            ? ['@type' => 'ListItem', 'position' => 2, 'name' => $product->category->name, 'item' => route('category.show', $product->category->slug)]
+                            : null,
+                        ['@type' => 'ListItem', 'position' => $product->category ? 3 : 2, 'name' => $product->name, 'item' => route('product.show', $product)],
+                    ])),
+                ];
+            @endphp
+            <script type="application/ld+json">{!! json_encode($ldProduct, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+            <script type="application/ld+json">{!! json_encode($ldCrumbs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
         @endif
     @endisset
     {{-- Canonical: strips query strings (?sort=, filters) so crawlers don't index
@@ -69,6 +118,15 @@
         $fBodySrc = theme('font_body_src', 'google');
         $fBodyFile = theme('font_body_file');
     @endphp
+    {{-- Preload uploaded brand fonts: they're referenced from a <style> block,
+         so without this the browser only discovers them after CSS parses —
+         measured ~1.2s late on production, a visible swap on every first visit. --}}
+    @if($fHeadingSrc === 'custom' && $fHeadingFile)
+        <link rel="preload" href="{{ asset('storage/'.$fHeadingFile) }}" as="font" crossorigin>
+    @endif
+    @if($fBodySrc === 'custom' && $fBodyFile && $fBodyFile !== $fHeadingFile)
+        <link rel="preload" href="{{ asset('storage/'.$fBodyFile) }}" as="font" crossorigin>
+    @endif
     <style>
         @if($fHeadingSrc === 'custom' && $fHeadingFile)
         @font-face{ font-family:'{{ $fHeading }}'; src:url('{{ asset('storage/'.$fHeadingFile) }}'); font-weight:400 700; font-display:swap; }

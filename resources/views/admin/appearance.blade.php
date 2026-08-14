@@ -292,7 +292,7 @@
             <div class="grid sm:grid-cols-2 gap-4">
                 <div><label class="label">Eyebrow (small text)</label><input name="home[promise_eyebrow]" value="{{ $home['promise_eyebrow'] ?? '' }}" class="input" placeholder="Our promise"></div>
                 <div><label class="label">Heading</label><input name="home[promise_title]" value="{{ $home['promise_title'] ?? '' }}" class="input" placeholder="Crafted to be treasured"></div>
-                <div class="sm:col-span-2"><label class="label">Text</label><textarea name="home[promise_text]" rows="2" class="input" placeholder="(defaults to the hero subtitle)">{{ $home['promise_text'] ?? '' }}</textarea></div>
+                <div class="sm:col-span-2"><label class="label">Text</label><textarea name="home[promise_text]" rows="2" class="input" placeholder="{{ config('home.defaults.promise_text') }}">{{ $home['promise_text'] ?? '' }}</textarea></div>
             </div>
             <div class="mt-4">
                 <x-media-field name="promise_image" :value="theme_asset($home['promise_image'] ?? null) ?: ''" folder="branding"

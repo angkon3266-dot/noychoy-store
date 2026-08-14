@@ -13,7 +13,15 @@
     <a href="{{ route('product.show', $product) }}" class="block">
         <div class="aspect-square overflow-hidden rounded-xl bg-gold-100 relative">
             @if($product->thumbnail)
+                {{-- srcset: a card renders at ~170–400px, the originals are
+                     900–1600px — the 450w variant halves what a phone downloads.
+                     Cards without a generated variant fall back to the original.
+                     width/height are ratio hints only (the square container and
+                     object-cover control actual layout). --}}
+                @php $thumb450 = image_variant($product->thumbnail); @endphp
                 <img src="{{ $product->thumbnail }}" alt="{{ $product->name }}" loading="lazy"
+                     width="450" height="450"
+                     @if($thumb450) srcset="{{ $thumb450 }} 450w, {{ $product->thumbnail }} 1200w" sizes="(min-width: 768px) 25vw, 50vw" @endif
                      class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
             @else
                 <div class="flex h-full items-center justify-center text-gold-300">

@@ -35,23 +35,29 @@
             @endguest
 
             <div class="grid sm:grid-cols-2 gap-4">
+                {{-- autocomplete + inputmode matter more here than anywhere else
+                     on the site: this form is filled one-thumbed on a phone, and
+                     the phone number is the field a COD order lives or dies on —
+                     it gets the numeric keypad, not the full keyboard. --}}
                 <div>
                     <label class="label">Full name *</label>
-                    <input name="name" x-ref="cname" value="{{ old('name', $customer->name ?? '') }}" class="input" required>
+                    <input name="name" x-ref="cname" value="{{ old('name', $customer->name ?? '') }}" class="input" required
+                           autocomplete="name">
                 </div>
                 <div>
                     <label class="label">Mobile number *</label>
-                    <input name="phone" x-ref="phone" value="{{ old('phone', $customer->phone ?? '') }}" placeholder="01XXXXXXXXX" class="input" required
+                    <input type="tel" name="phone" x-ref="phone" value="{{ old('phone', $customer->phone ?? '') }}" placeholder="01XXXXXXXXX" class="input" required
+                           autocomplete="tel" inputmode="numeric"
                            @blur="captureLead($el.value, $refs.cname?.value, $refs.cemail?.value)">
                 </div>
             </div>
             <div>
                 <label class="label">Full address *</label>
-                <textarea name="address" rows="2" class="input" required>{{ old('address', $address->address ?? '') }}</textarea>
+                <textarea name="address" rows="2" class="input" required autocomplete="street-address">{{ old('address', $address->address ?? '') }}</textarea>
             </div>
             <div>
                 <label class="label">Area / Thana</label>
-                <input name="area" value="{{ old('area', $address->area ?? '') }}" class="input">
+                <input name="area" value="{{ old('area', $address->area ?? '') }}" class="input" autocomplete="address-level2">
             </div>
 
             <div>

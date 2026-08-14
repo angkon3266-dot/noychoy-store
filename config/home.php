@@ -58,7 +58,9 @@ return [
         'show_promise' => true,
         'promise_eyebrow' => 'Our promise',
         'promise_title' => 'Crafted to be treasured',
-        'promise_text' => null,                 // falls back to hero_subtitle
+        // Its own copy, deliberately NOT the hero subtitle: the band used to
+        // fall back to it and the homepage said the same sentence twice.
+        'promise_text' => 'Every piece is checked by hand before it ships, delivered anywhere in Bangladesh by Steadfast, and paid for only when it reaches your door.',
         'promise_image' => null,                // falls back to the newest product photo
 
         // Trust badges (bottom strip)

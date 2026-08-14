@@ -47,6 +47,7 @@ class ImageOptimizer
             return $path;
         } catch (\Throwable $e) {
             Log::warning('Image WebP conversion failed; storing original', ['error' => $e->getMessage()]);
+
             return $file->store($dir, 'public');
         }
     }
@@ -68,6 +69,7 @@ class ImageOptimizer
                 $ext = pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION) ?: 'jpg';
                 $path = $dir.'/'.Str::uuid()->toString().'.'.$ext;
                 Storage::disk('public')->put($path, $binary);
+
                 return $path;
             }
 
@@ -89,6 +91,7 @@ class ImageOptimizer
             return $path;
         } catch (\Throwable $e) {
             Log::warning('Remote image import failed; keeping URL', ['url' => $url, 'error' => $e->getMessage()]);
+
             return $url;
         }
     }
@@ -143,6 +146,7 @@ class ImageOptimizer
             return ['old_size' => $oldSize, 'new_size' => strlen($out), 'width' => $w, 'height' => $h];
         } catch (\Throwable $e) {
             Log::warning('optimizeExisting failed', ['path' => $relativePath, 'error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -199,6 +203,70 @@ class ImageOptimizer
 
             return null;
         }
+    }
+
+    /**
+     * Produce (or find) a downscaled WebP sibling of a stored image —
+     * `products/abc.webp` → `products/abc@450.webp` — and return its relative
+     * path, or null when a variant makes no sense (remote URL, missing file,
+     * GD unavailable, or the source is already no wider than the target).
+     *
+     * Variants exist so product cards can offer a `srcset`: the originals are
+     * 900–1600 px wide while a card renders at ~170–400 px, so without this
+     * every phone downloads 2–4× the pixels it can show. Generation happens at
+     * upload time and via `images:variants` — never during a page view, which
+     * must not pay for image encoding on shared hosting.
+     */
+    public function variant(string $relativePath, int $width = 450): ?string
+    {
+        $disk = Storage::disk('public');
+        $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        if (Str::startsWith($relativePath, ['http://', 'https://'])
+            || ! $this->canConvert()
+            || ! in_array($ext, ['webp', 'jpg', 'jpeg', 'png'], true)
+            || ! $disk->exists($relativePath)) {
+            return null;
+        }
+
+        $variantPath = $this->variantPath($relativePath, $width);
+        if ($disk->exists($variantPath)) {
+            return $variantPath;
+        }
+
+        try {
+            $src = @imagecreatefromstring($disk->get($relativePath));
+            if ($src === false) {
+                return null;
+            }
+            if (imagesx($src) <= $width) {
+                imagedestroy($src);
+
+                return null; // an "upscaled" variant would just duplicate the original
+            }
+
+            $src = $this->prepare($src, $width);
+            ob_start();
+            imagewebp($src, null, 82);
+            $out = ob_get_clean();
+            imagedestroy($src);
+
+            $disk->put($variantPath, $out);
+
+            return $variantPath;
+        } catch (\Throwable $e) {
+            Log::warning('Image variant generation failed', ['path' => $relativePath, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /** The naming convention shared by variant(), the helper and the cleanup filter. */
+    public function variantPath(string $relativePath, int $width): string
+    {
+        $dir = trim((string) pathinfo($relativePath, PATHINFO_DIRNAME), '.');
+
+        return ($dir !== '' ? $dir.'/' : '').pathinfo($relativePath, PATHINFO_FILENAME).'@'.$width.'.webp';
     }
 
     protected function canConvert(): bool

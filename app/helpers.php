@@ -329,6 +329,37 @@ if (! function_exists('meta_pixel_id')) {
     }
 }
 
+if (! function_exists('image_variant')) {
+    /**
+     * Public URL of a pre-generated downscaled sibling of a stored image
+     * (see ImageOptimizer::variant()), or null when none exists.
+     *
+     * Accepts either a relative disk path or the full /storage URL the
+     * accessors hand out. Deliberately a lookup only — it never generates,
+     * so a page view costs one file stat, not an image encode.
+     */
+    function image_variant(?string $urlOrPath, int $width = 450): ?string
+    {
+        if (blank($urlOrPath)) {
+            return null;
+        }
+
+        $path = Str::startsWith($urlOrPath, ['http://', 'https://', '/'])
+            ? public_url_to_path($urlOrPath)
+            : $urlOrPath;
+
+        if (blank($path) || Str::startsWith($path, ['http://', 'https://'])) {
+            return null; // remote image — nothing of ours to look up
+        }
+
+        $variant = app(ImageOptimizer::class)->variantPath($path, $width);
+
+        return Storage::disk('public')->exists($variant)
+            ? Storage::disk('public')->url($variant)
+            : null;
+    }
+}
+
 if (! function_exists('bd_phone')) {
     /**
      * Normalise any Bangladeshi mobile number to the bare local 11-digit form

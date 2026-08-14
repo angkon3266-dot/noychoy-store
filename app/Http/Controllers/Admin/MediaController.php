@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\ProductImage;
 use App\Models\Setting;
 use App\Services\ImageOptimizer;
 use App\Services\WatermarkService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Media library — browse, search, optimize (shrink) and delete uploaded images &
@@ -17,6 +20,7 @@ use Illuminate\Support\Facades\Storage;
 class MediaController extends Controller
 {
     protected array $imageExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
+
     protected array $videoExt = ['mp4', 'webm', 'mov', 'ogg', 'm4v'];
 
     public function index(Request $request)
@@ -36,6 +40,9 @@ class MediaController extends Controller
 
         $items = collect($disk->allFiles())
             ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+            // srcset variants (abc@450.webp) are derived files — listing them
+            // would double every image and invite deleting/picking the copy.
+            ->reject(fn ($p) => preg_match('/@\d+\.webp$/', $p))
             ->map(function ($p) use ($disk, $productByPath) {
                 $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
                 $isImage = in_array($ext, $this->imageExt, true);
@@ -135,6 +142,7 @@ class MediaController extends Controller
 
         $items = collect($disk->allFiles())
             ->reject(fn ($p) => str_starts_with($p, 'fonts/'))
+            ->reject(fn ($p) => preg_match('/@\d+\.webp$/', $p)) // hide srcset variants
             ->filter(fn ($p) => in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), $this->imageExt, true))
             ->map(fn ($p) => [
                 'path' => $p,
@@ -264,10 +272,10 @@ class MediaController extends Controller
     protected function repointReferences(string $old, string $new): void
     {
         ProductImage::where('path', $old)->update(['path' => $new]);
-        \App\Models\Category::where('image', $old)->update(['image' => $new]);
+        Category::where('image', $old)->update(['image' => $new]);
 
         $touched = false;
-        foreach (\App\Models\Setting::all() as $setting) {
+        foreach (Setting::all() as $setting) {
             $json = json_encode($setting->value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($json === false || ! str_contains($json, $old)) {
                 continue;
@@ -277,7 +285,7 @@ class MediaController extends Controller
             $touched = true;
         }
         if ($touched) {
-            \Illuminate\Support\Facades\Cache::forget('settings.all');
+            Cache::forget('settings.all');
         }
     }
 
@@ -455,7 +463,7 @@ class MediaController extends Controller
                 continue;
             }
             $dir = trim((string) pathinfo($path, PATHINFO_DIRNAME), '.');
-            $new = ($dir !== '' ? $dir.'/' : '').\Illuminate\Support\Str::uuid()->toString().'.'.$ext;
+            $new = ($dir !== '' ? $dir.'/' : '').Str::uuid()->toString().'.'.$ext;
             $disk->put($new, $bytes);
             $this->repointReferences($path, $new);
             $disk->delete($path);
