@@ -5,7 +5,8 @@
 @section('content')
 {{-- Traditional centered layout with framed gallery --}}
 <div class="mx-auto max-w-5xl px-4 py-10" x-data="productPage(@js($pp))">
-    <nav class="text-sm text-ink-700/60 mb-6 text-center">
+    {{-- Keeps its own centered style rather than the shared partial. --}}
+    <nav aria-label="Breadcrumb" class="text-sm text-ink-700/60 mb-6 text-center">
         <a href="{{ route('home') }}" class="hover:text-gold-700">Home</a> /
         @if($product->category)<a href="{{ route('category.show', $product->category) }}" class="hover:text-gold-700">{{ $product->category->name }}</a>@endif
     </nav>

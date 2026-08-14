@@ -4,11 +4,7 @@
 
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-8" x-data="productPage(@js($pp))">
-    <nav aria-label="Breadcrumb" class="text-sm text-ink-700/60 mb-6">
-        <a href="{{ route('home') }}" class="hover:text-gold-700">Home</a> /
-        @if($product->category)<a href="{{ route('category.show', $product->category) }}" class="hover:text-gold-700">{{ $product->category->name }}</a> /@endif
-        <span class="text-ink-800">{{ $product->name }}</span>
-    </nav>
+    @include('shop.templates.product._breadcrumb')
 
     <div class="grid lg:grid-cols-2 gap-10">
         @include('shop.templates.product._gallery')

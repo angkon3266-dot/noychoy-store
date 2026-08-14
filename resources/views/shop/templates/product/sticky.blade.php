@@ -5,6 +5,7 @@
 @section('content')
 {{-- Conversion-focused: gallery scrolls, buy box sticks on desktop --}}
 <div class="mx-auto max-w-7xl px-4 py-8" x-data="productPage(@js($pp))">
+    @include('shop.templates.product._breadcrumb')
     <div class="grid lg:grid-cols-2 gap-10 items-start">
         @include('shop.templates.product._gallery')
         <div class="lg:sticky lg:top-24">

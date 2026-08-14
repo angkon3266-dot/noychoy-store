@@ -4,6 +4,9 @@
 
 @section('content')
 <div x-data="productPage(@js($pp))">
+    <div class="mx-auto max-w-7xl px-4 pt-6">
+        @include('shop.templates.product._breadcrumb')
+    </div>
     {{-- Dark immersive hero --}}
     <div class="bg-ink-900 text-gold-50">
         <div class="mx-auto max-w-7xl px-4 py-10 grid lg:grid-cols-2 gap-10 items-center">

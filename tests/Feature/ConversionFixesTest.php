@@ -178,6 +178,21 @@ class ConversionFixesTest extends TestCase
         $this->assertStringNotContainsString('aggregateRating', $html);
     }
 
+    public function test_every_gallery_style_product_template_shows_the_breadcrumb(): void
+    {
+        // Production runs "sticky", which had no breadcrumb at all — the
+        // JSON-LD described a trail the page didn't show. "minimal" is exempt
+        // by design (its category eyebrow serves the same purpose).
+        $product = $this->product();
+
+        foreach (['sticky', 'showcase', 'classic', 'luxe'] as $template) {
+            Setting::put('theme', ['product_template' => $template]);
+
+            $this->get('/product/'.$product->slug)->assertOk()
+                ->assertSee('aria-label="Breadcrumb"', false);
+        }
+    }
+
     public function test_the_homepage_does_not_claim_to_be_a_product(): void
     {
         // The $product-leak guard, restated for schema: only product.show may
