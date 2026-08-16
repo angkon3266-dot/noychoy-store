@@ -1,7 +1,13 @@
 <?php
 
+use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\CaptureMetaClickId;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\MetaSecurityGate;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TrackVisit;
+use App\Support\MetaIdentity;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,12 +24,18 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->prefix('admin')
                 ->name('admin.')
                 ->group(base_path('routes/admin.php'));
+
+            // Token-authenticated API + MCP. Registered outside the `web` group
+            // on purpose: no session, no cookies, no CSRF token to fetch — the
+            // callers are scripts and agents, not browsers.
+            Route::group([], base_path('routes/api.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
             'meta.gate' => MetaSecurityGate::class,
+            'api.token' => AuthenticateApiToken::class,
         ]);
 
         // _fbp and _fbc are written by Meta's pixel.js in the browser, in plain
@@ -34,16 +46,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // Exempting them also keeps the _fbc this app writes readable by the
         // Pixel, so browser and server agree on one value.
         $middleware->encryptCookies(except: [
-            \App\Support\MetaIdentity::FBP_COOKIE,
-            \App\Support\MetaIdentity::FBC_COOKIE,
+            MetaIdentity::FBP_COOKIE,
+            MetaIdentity::FBC_COOKIE,
         ]);
 
         // First-party storefront traffic tracking (dashboard visitors + funnel),
         // then the Meta click id (?fbclid= → _fbc) so later events in the same
         // journey can still be attributed to the ad that started it.
         $middleware->web(append: [
-            \App\Http\Middleware\TrackVisit::class,
-            \App\Http\Middleware\CaptureMetaClickId::class,
+            TrackVisit::class,
+            CaptureMetaClickId::class,
         ]);
 
         // External webhooks post without a CSRF token.
@@ -73,8 +85,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // every HTTPS visitor into a redirect loop. SecurityHeaders sits in the
         // global stack so error and non-web responses are covered too.
         $middleware->append([
-            \App\Http\Middleware\ForceHttps::class,
-            \App\Http\Middleware\SecurityHeaders::class,
+            ForceHttps::class,
+            SecurityHeaders::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

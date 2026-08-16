@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AbandonedCartController;
 use App\Http\Controllers\Admin\AdminPushController;
 use App\Http\Controllers\Admin\AlertController;
+use App\Http\Controllers\Admin\ApiTokenController;
 use App\Http\Controllers\Admin\AppearanceController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\CategoryController;
@@ -335,6 +336,11 @@ Route::middleware('admin')->group(function () {
             Route::post('oauth/select-catalog', [MetaOAuthController::class, 'selectCatalog'])->name('oauth.select-catalog');
         });
     });
+
+    // ── API tokens (admin API + MCP connector) ─────────────────────────────
+    Route::get('api-tokens', [ApiTokenController::class, 'index'])->name('api-tokens');
+    Route::post('api-tokens', [ApiTokenController::class, 'store'])->name('api-tokens.store');
+    Route::delete('api-tokens/{apiToken}', [ApiTokenController::class, 'destroy'])->name('api-tokens.destroy');
 
     // ── System Configuration Manager (Super Admin only) ────────────────────
     Route::prefix('system-config')->name('system-config.')->group(function () {
