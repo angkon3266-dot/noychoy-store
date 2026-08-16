@@ -46,6 +46,39 @@ return [
         // Homepage video sections — list of { title, url }. url = YouTube link or uploaded MP4 path.
         'videos' => [],
 
+        // ── "Shop by occasion" (Meridian template) ──────────────────────────
+        // Bangladesh-first, and gift-led on purpose. Eid-ul-Fitr and Pohela
+        // Boishakh are the two peaks of the local calendar — industry figures
+        // put roughly three quarters of fashion-market sales across those two
+        // alone — and the rest are the year-round reasons someone buys jewelry
+        // for another person. Each tile needs an image before it renders, and
+        // the section hides entirely until at least one has one, so a fresh
+        // install never shows a row of empty boxes.
+        'show_occasions' => true,
+        'occasions_title' => 'Shop by occasion',
+        'occasions_subtitle' => 'Who is it for, and what are they celebrating?',
+        'occasions' => [
+            ['label' => 'Eid Gifts', 'tagline' => 'The year’s biggest gifting season', 'link' => null, 'image' => null],
+            ['label' => 'Pohela Boishakh', 'tagline' => 'Boishakhi red, white and gold', 'link' => null, 'image' => null],
+            ['label' => 'Anniversary', 'tagline' => 'Mark the years together', 'link' => null, 'image' => null],
+            ['label' => 'Birthday Gift', 'tagline' => 'Something she opens twice', 'link' => null, 'image' => null],
+            ['label' => 'Date Night', 'tagline' => 'Delicate pieces for low light', 'link' => null, 'image' => null],
+            ['label' => 'Gift for Her', 'tagline' => 'No occasion needed', 'link' => null, 'image' => null],
+            ['label' => 'Holud & Wedding', 'tagline' => 'Bridal sets and statement pieces', 'link' => null, 'image' => null],
+            ['label' => 'Everyday', 'tagline' => 'Light enough to forget you are wearing it', 'link' => null, 'image' => null],
+        ],
+
+        // "Shopping for someone?" — budget bands that link straight into the
+        // shop's existing price filter. Amounts only; the labels are formatted
+        // with the store's own currency so this travels to other installs.
+        'show_gift_finder' => true,
+        'gift_finder_title' => 'Shopping for someone?',
+        'gift_budgets' => [
+            ['min' => null, 'max' => 1000],
+            ['min' => 1000, 'max' => 2500],
+            ['min' => 2500, 'max' => null],
+        ],
+
         // "Deals of the Day" — a carousel built from the live offers under
         // Admin → Offers. deals_ends_at is an optional deadline: while it is set
         // the section shows a countdown, and it hides itself once it passes.

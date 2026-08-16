@@ -411,6 +411,35 @@
             <p class="text-xs text-ink-700/50 mt-2">Video files up to 50MB. A long clip still only gets its ~5.5s share of the rotation like every other slide.</p>
         </div>
 
+        {{-- Shop by occasion (Meridian template) --}}
+        <div class="mt-8 border-t border-ink-100 pt-5">
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_occasions" value="1" @checked($home['show_occasions'] ?? true)> Show “Shop by occasion”</label>
+            <p class="text-xs text-ink-700/50 mb-4">
+                Used by the <strong>Meridian</strong> homepage template. A tile only appears once it has an image, and the whole
+                section stays hidden until at least one does — so a half-finished row never shows on the storefront.
+                Portrait images work best (e.g. 800×1000).
+            </p>
+            <div class="grid sm:grid-cols-2 gap-4 mb-4">
+                <div><label class="label">Section heading</label><input name="home[occasions_title]" value="{{ $home['occasions_title'] ?? '' }}" class="input" placeholder="{{ config('home.defaults.occasions_title') }}"></div>
+                <div><label class="label">Sub-heading</label><input name="home[occasions_subtitle]" value="{{ $home['occasions_subtitle'] ?? '' }}" class="input" placeholder="{{ config('home.defaults.occasions_subtitle') }}"></div>
+            </div>
+
+            @php $occasions = collect($home['occasions'] ?? config('home.defaults.occasions', []))->values(); @endphp
+            <div class="space-y-3">
+                @foreach($occasions as $i => $o)
+                    <div class="rounded-lg border border-ink-100 p-3 grid sm:grid-cols-[auto_1fr] gap-4 items-start">
+                        <x-media-field :name="'occasion_image_'.$i" :value="theme_asset($o['image'] ?? null) ?: ''" folder="occasions" />
+                        <div class="grid sm:grid-cols-3 gap-2 min-w-0">
+                            <input name="occasions[{{ $i }}][label]" value="{{ $o['label'] ?? '' }}" class="input" placeholder="Label (e.g. Eid Gifts)">
+                            <input name="occasions[{{ $i }}][tagline]" value="{{ $o['tagline'] ?? '' }}" class="input" placeholder="Tagline">
+                            <input name="occasions[{{ $i }}][link]" value="{{ $o['link'] ?? '' }}" class="input" placeholder="Link (defaults to Shop)">
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            <p class="text-xs text-ink-700/50 mt-2">Clear a label to delete that tile. Point a link at a category, a landing page (<code>/lp/eid</code>) or any URL.</p>
+        </div>
+
         {{-- Feature strip --}}
         <h3 class="text-sm font-semibold text-ink-700 mt-6 mb-2">Feature strip (reassurance icons)</h3>
         <div x-data="{ rows: @js(array_values($home['feature_strip'] ?? [])) }">
@@ -451,6 +480,7 @@
                         <option value="product_carousel">Product carousel</option>
                         <option value="banner_carousel">Banner + products</option>
                         <option value="video">Video row</option>
+                        <option value="faq">FAQ / questions answered</option>
                         <option value="reviews">Customer reviews</option>
                         <option value="richtext">Rich text / HTML</option>
                     </select>
@@ -535,6 +565,19 @@
                     <p class="text-xs text-ink-700/50">Full-width banner with your image behind heading + button — like a hero promo strip.</p>
                 </div>
 
+                {{-- FAQ --}}
+                <div x-show="b.type==='faq'" class="space-y-2">
+                    <template x-for="(f, fi) in b.faqs" :key="fi">
+                        <div class="flex gap-2">
+                            <input x-model="f.q" class="input py-1.5 text-sm w-64" placeholder="Question">
+                            <input x-model="f.a" class="input py-1.5 text-sm flex-1" placeholder="Answer">
+                            <button type="button" @click="b.faqs.splice(fi,1)" class="text-red-500 px-1">&times;</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="addFaq(b)" class="btn-outline py-1 text-xs">+ Add question</button>
+                    <p class="text-xs text-ink-700/50">Answers the questions a cash-on-delivery buyer asks before ordering — will it tarnish, how long is delivery, what if it doesn't fit.</p>
+                </div>
+
                 {{-- Video --}}
                 <div x-show="b.type==='video'" class="space-y-2">
                     <template x-for="(v, vi) in b.videos" :key="vi">
@@ -584,6 +627,7 @@
                 <option value="cta_banner">CTA banner (image + text + button)</option>
                 <option value="banner_carousel">Banner + products</option>
                 <option value="video">Video row</option>
+                        <option value="faq">FAQ / questions answered</option>
                 <option value="reviews">Customer reviews</option>
                 <option value="richtext">Rich text / HTML</option>
             </select>

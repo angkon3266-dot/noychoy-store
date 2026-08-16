@@ -123,6 +123,12 @@ class AppearanceController extends Controller
             'hero_slide_video_urls' => ['nullable', 'array'],
             'hero_slide_video_urls.*' => ['nullable', 'string', 'max:500'],
 
+            // "Shop by occasion" tiles (Meridian template)
+            'occasions' => ['nullable', 'array', 'max:12'],
+            'occasions.*.label' => ['nullable', 'string', 'max:40'],
+            'occasions.*.tagline' => ['nullable', 'string', 'max:80'],
+            'occasions.*.link' => ['nullable', 'string', 'max:255'],
+
             // Section builder
             'home_sections_json' => ['nullable', 'string'],
             'block_image' => ['nullable', 'array'],
@@ -262,7 +268,7 @@ class AppearanceController extends Controller
 
         // ---- Storefront homepage builder ----
         // Section toggles
-        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals'] as $t) {
+        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals', 'show_occasions', 'show_gift_finder'] as $t) {
             $home[$t] = $request->boolean('home_'.$t);
         }
 
@@ -329,6 +335,30 @@ class AppearanceController extends Controller
         $home['hero_slides'] = $slides
             ->filter(fn ($s) => filled($s['image'] ?? null) || filled($s['video'] ?? null))
             ->values()->all();
+
+        // "Shop by occasion" tiles. Each row keeps its own image, resolved from
+        // a device upload or a media-library pick via the shared media field;
+        // an untouched row keeps whatever image it already had.
+        if ($request->has('occasions')) {
+            $existing = collect($home['occasions'] ?? config('home.defaults.occasions', []));
+            $home['occasions'] = collect($request->input('occasions', []))
+                ->map(function ($row, $i) use ($request, $existing) {
+                    $image = resolve_media($request, 'occasion_image_'.$i, 'occasions');
+
+                    if ($image === null && ! $request->boolean('occasion_image_'.$i.'_cleared')) {
+                        $image = $existing[$i]['image'] ?? null;   // untouched row
+                    }
+
+                    return [
+                        'label' => trim((string) ($row['label'] ?? '')),
+                        'tagline' => trim((string) ($row['tagline'] ?? '')),
+                        'link' => trim((string) ($row['link'] ?? '')) ?: null,
+                        'image' => $image,
+                    ];
+                })
+                ->filter(fn ($o) => $o['label'] !== '')
+                ->values()->all();
+        }
 
         // Section builder blocks (JSON) + per-block image uploads
         $blocks = json_decode((string) $request->input('home_sections_json', ''), true);
@@ -475,7 +505,11 @@ class AppearanceController extends Controller
     /** Sanitise builder blocks to a known shape before storing. */
     protected function normalizeSections(array $blocks): array
     {
-        $types = ['banner', 'product_carousel', 'banner_carousel', 'cta_banner', 'video', 'richtext', 'reviews'];
+        // 'faq' was already renderable by <x-home-block> (landing pages use it)
+        // but the homepage builder never offered it — so the one section every
+        // COD store needs, answering "will it tarnish / how do returns work",
+        // was unreachable from Appearance.
+        $types = ['banner', 'product_carousel', 'banner_carousel', 'cta_banner', 'video', 'richtext', 'reviews', 'faq'];
 
         return collect($blocks)->map(function ($b) use ($types) {
             $type = in_array($b['type'] ?? '', $types, true) ? $b['type'] : null;
@@ -521,6 +555,11 @@ class AppearanceController extends Controller
                 $out['videos'] = collect($b['videos'] ?? [])
                     ->map(fn ($v) => ['title' => trim((string) ($v['title'] ?? '')), 'url' => trim((string) ($v['url'] ?? ''))])
                     ->filter(fn ($v) => $v['url'] !== '')->values()->all();
+            }
+            if ($type === 'faq') {
+                $out['faqs'] = collect($b['faqs'] ?? [])
+                    ->map(fn ($f) => ['q' => trim((string) ($f['q'] ?? '')), 'a' => trim((string) ($f['a'] ?? ''))])
+                    ->filter(fn ($f) => $f['q'] !== '')->values()->all();
             }
             if ($type === 'richtext') {
                 $out['html'] = (string) ($b['html'] ?? '');

@@ -730,7 +730,8 @@ document.addEventListener('alpine:init', () => {
         move(i, d) { const j = i + d; if (j < 0 || j >= this.blocks.length) return; [this.blocks[i], this.blocks[j]] = [this.blocks[j], this.blocks[i]]; },
         addImage(b) { if (!b.images) b.images = []; b.images.push({ image: '', link: '' }); },
         addVideo(b) { if (!b.videos) b.videos = []; b.videos.push({ title: '', url: '' }); },
-        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); b.review_ids = (b.review_ids || []).map(Number); return ''; },
+        addFaq(b) { if (!b.faqs) b.faqs = []; b.faqs.push({ q: '', a: '' }); },
+        ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.faqs = b.faqs || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); b.review_ids = (b.review_ids || []).map(Number); return ''; },
     }));
 
     // ── Admin: landing page builder (homepage blocks + landing-only blocks) ──
