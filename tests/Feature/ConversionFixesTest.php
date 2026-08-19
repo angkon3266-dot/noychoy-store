@@ -126,10 +126,12 @@ class ConversionFixesTest extends TestCase
         ProductImage::create(['product_id' => $product->id, 'path' => $path, 'is_primary' => true, 'position' => 1]);
         app(ImageOptimizer::class)->variant($path, 450);
 
-        $html = $this->get('/shop')->assertOk()->getContent();
-
-        $this->assertStringContainsString('test-image@450.webp 450w', $html);
-        $this->assertStringContainsString('width="450" height="450"', $html);
+        // The React card builds `srcset="… 450w"` from the thumb450 prop, so
+        // the guarantee to test is that the prop carries the variant URL.
+        $this->get('/shop')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Catalog')
+                ->where('products.data.0.thumb450', fn ($v) => str_contains((string) $v, 'test-image@450.webp'))
+        );
     }
 
     public function test_the_backfill_command_generates_missing_variants(): void
@@ -180,16 +182,19 @@ class ConversionFixesTest extends TestCase
 
     public function test_every_gallery_style_product_template_shows_the_breadcrumb(): void
     {
-        // Production runs "sticky", which had no breadcrumb at all — the
-        // JSON-LD described a trail the page didn't show. "minimal" is exempt
-        // by design (its category eyebrow serves the same purpose).
+        // One React product page now serves every template setting, and it
+        // always renders the breadcrumb — whatever legacy template the theme
+        // still names, the page must keep receiving the category trail that
+        // the server-rendered BreadcrumbList JSON-LD describes.
         $product = $this->product();
 
         foreach (['sticky', 'showcase', 'classic', 'luxe'] as $template) {
             Setting::put('theme', ['product_template' => $template]);
 
-            $this->get('/product/'.$product->slug)->assertOk()
-                ->assertSee('aria-label="Breadcrumb"', false);
+            $this->get('/product/'.$product->slug)->assertOk()->assertInertia(
+                fn ($page) => $page->component('Product')
+                    ->where('product.category.name', 'Earrings')
+            );
         }
     }
 

@@ -155,7 +155,9 @@ return [
 
         // Upgrade any stray http:// subresource to https:// rather than letting
         // the browser block it as mixed content. Off if a legacy remote image
-        // host genuinely has no TLS.
-        'upgrade_insecure_requests' => (bool) env('CSP_UPGRADE_INSECURE', true),
+        // host genuinely has no TLS. Defaults off outside production: on a
+        // plain-http localhost the browser would upgrade followed redirects
+        // (e.g. Inertia PATCH → 303 → GET) to https:// and hit a closed port.
+        'upgrade_insecure_requests' => (bool) env('CSP_UPGRADE_INSECURE', env('APP_ENV') === 'production'),
     ],
 ];

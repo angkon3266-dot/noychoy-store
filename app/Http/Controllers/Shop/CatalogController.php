@@ -24,11 +24,8 @@ class CatalogController extends Controller
     {
         $base = Product::published()->search($request->query('q'));
 
-        return view('shop.catalog', [
-            'products' => $this->paginate($base, $request),
-            'filters' => $this->filters->groups($request, clone $base, 'shop'),
-            'title' => $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry',
-        ]);
+        return $this->renderCatalog($request, $base, 'shop',
+            $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry');
     }
 
     /** Curated best-sellers — the products you've flagged as bestsellers. */
@@ -36,10 +33,30 @@ class CatalogController extends Controller
     {
         $base = Product::published()->bestsellers()->search($request->query('q'));
 
-        return view('shop.catalog', [
-            'products' => $this->paginate($base, $request),
-            'filters' => $this->filters->groups($request, clone $base, 'shop'),
-            'title' => 'Best Sellers',
+        return $this->renderCatalog($request, $base, 'shop', 'Best Sellers');
+    }
+
+    /** Shared Inertia response for the shop / best-sellers / category grids. */
+    protected function renderCatalog(Request $request, Builder $base, string $filterKey, string $title, ?Category $category = null)
+    {
+        $products = $this->paginate($base, $request);
+
+        return \Inertia\Inertia::render('Catalog', [
+            'pageTitle' => $title,
+            'title' => $title,
+            'description' => $category?->description,
+            'products' => [
+                'data' => \App\Support\Storefront\ProductCardData::collection($products->items()),
+                'links' => $products->linkCollection(),
+                'total' => $products->total(),
+                'current_page' => $products->currentPage(),
+            ],
+            'filters' => $this->filters->groups($request, clone $base, $filterKey),
+            'sort' => $request->query('sort') ?: theme('default_sort', 'new'),
+            'searchQuery' => $request->query('q') ?: null,
+        ])->withViewData([
+            'pageTitle' => $title,
+            'metaDescription' => $category?->description,
         ]);
     }
 
@@ -118,12 +135,7 @@ class CatalogController extends Controller
             ->where(fn ($q) => $q->whereIn('category_id', $ids)
                 ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)));
 
-        return view('shop.catalog', [
-            'products' => $this->paginate($base, $request),
-            'filters' => $this->filters->groups($request, clone $base, 'category:'.$category->id),
-            'title' => $category->name,
-            'category' => $category,
-        ]);
+        return $this->renderCatalog($request, $base, 'category:'.$category->id, $category->name, $category);
     }
 
     public function show(Request $request, Product $product)
@@ -191,14 +203,27 @@ class CatalogController extends Controller
             'offers' => $product->offerTiers(),
         ];
 
-        // Resolve template: category override → theme default → fallback.
-        $key = $product->category?->product_template ?: theme('product_template');
-        $view = config('theme.product_templates.'.$key.'.view');
-        if (! $view || ! view()->exists($view)) {
-            $view = 'shop.templates.product.showcase';
+        // "Recently viewed" strip (was computed inline in the Blade partial).
+        $recentlyViewed = collect();
+        if (theme('show_recently_viewed')) {
+            $recentIds = collect(session('recently_viewed', []))->reject(fn ($id) => $id === $product->id)->take(4);
+            if ($recentIds->isNotEmpty()) {
+                $recentlyViewed = Product::published()->whereIn('id', $recentIds)
+                    ->with('images', 'approvedReviews')->get()
+                    ->sortBy(fn ($p) => $recentIds->search($p->id))->values();
+            }
         }
 
-        return view($view, compact('product', 'related', 'crossSells', 'pp', 'lovesCount', 'loved', 'vcEventId'));
+        // One React product page replaces the Blade template variants
+        // (showcase/classic/minimal/luxe/sticky) — a superset of showcase.
+        return \Inertia\Inertia::render('Product', [
+            'pageTitle' => $product->meta_title ?: $product->name,
+        ] + \App\Support\Storefront\ProductPageData::make(
+            $product, $related, $crossSells, $pp, $lovesCount, $loved, $vcEventId, $recentlyViewed,
+        ))->withViewData([
+            'pageTitle' => $product->meta_title ?: $product->name,
+            'product' => $product,
+        ]);
     }
 
     /**

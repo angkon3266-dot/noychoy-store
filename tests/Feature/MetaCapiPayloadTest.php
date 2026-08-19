@@ -248,10 +248,11 @@ class MetaCapiPayloadTest extends TestCase
 
         $serverEventId = $this->lastEvent()['event_id'];
 
-        // The Blade prints the same id into fbq(..., { eventID }); if these ever
-        // drift apart Meta counts one action twice.
+        // The page hands the same id to the browser (the React product page
+        // fires fbq ViewContent with it as eventID); if these ever drift apart
+        // Meta counts one action twice.
         $this->assertStringContainsString($serverEventId, $html);
-        $this->assertStringContainsString('eventID', $html);
+        $this->assertStringContainsString('vcEventId', $html);
     }
 
     public function test_the_purchase_event_id_is_the_order_number(): void

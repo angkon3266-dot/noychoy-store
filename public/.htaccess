@@ -5,6 +5,12 @@
 
     RewriteEngine On
 
+    # Never let the LiteSpeed page cache answer an Inertia (JSON) request with
+    # cached HTML for the same URL — the React storefront would fail to parse
+    # it. Dynamic pages carry no-cache headers anyway; this is the backstop.
+    RewriteCond %{HTTP:X-Inertia} .
+    RewriteRule .* - [E=cache-control:no-cache]
+
     # Never serve editor/backup leftovers. `.bak` is not a PHP extension, so a
     # stray public/test.php.bak or public/.htaccess.bak would be handed over as
     # plain text rather than executed — source and server config disclosure. The

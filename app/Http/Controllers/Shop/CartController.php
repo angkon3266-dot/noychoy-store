@@ -18,7 +18,87 @@ class CartController extends Controller
 
     public function index()
     {
-        return view('shop.cart', ['cart' => $this->cart]);
+        $cart = $this->cart;
+
+        // Offers: applied + the single nearest "add X more to unlock".
+        $allOffers = \App\Models\Offer::active()->get();
+        $matched = $cart->matchingOffers();
+        $matchedIds = $matched->pluck('id')->all();
+        $sub = $cart->subtotal() - $cart->offerDiscount();
+        $nearly = $allOffers->reject(fn ($o) => in_array($o->id, $matchedIds))
+            ->filter(fn ($o) => $o->min_subtotal && $o->remainingToUnlock($sub) > 0 && (! $o->members_only || auth('customer')->check()))
+            ->sortBy(fn ($o) => $o->remainingToUnlock($sub))
+            ->first();
+
+        $freeThreshold = (float) config('store.shipping.free_threshold');
+        $customer = auth('customer')->user();
+        $memberUsage = ($customer && member_pricing()->enabled()) ? member_pricing()->usageStatus($customer) : null;
+
+        $suggestions = collect();
+        if (! $cart->isEmpty()) {
+            $inCart = $cart->items()->pluck('product_id')->all();
+            $suggestions = \App\Models\Product::published()->whereNotIn('id', $inCart)
+                ->with('images', 'approvedReviews')->inRandomOrder()->take(4)->get();
+        }
+
+        return \Inertia\Inertia::render('Cart', [
+            'pageTitle' => 'Your Cart',
+            'items' => $cart->items()->map(function ($item) use ($cart) {
+                $offerPct = $cart->lineOfferPercent($item);
+
+                return [
+                    'key' => $item['key'],
+                    'name' => $item['name'],
+                    'url' => route('product.show', $item['slug']),
+                    'image' => $item['image'],
+                    'attributes' => ! empty($item['attributes'])
+                        ? collect($item['attributes'])->map(fn ($v) => "$v")->implode(', ') : null,
+                    'price_text' => money($item['price']),
+                    'qty' => $item['qty'],
+                    'line_total_text' => money($item['price'] * $item['qty']),
+                    'offer' => $offerPct > 0 ? [
+                        'label' => $cart->lineOfferTier($item)['label'] ?? 'Bundle offer',
+                        'saving_text' => money($cart->lineOfferSaving($item)),
+                    ] : null,
+                ];
+            })->values(),
+            'summary' => [
+                'subtotal_text' => money($cart->subtotal()),
+                'discount_lines' => collect($cart->discountLines())
+                    ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
+                'free_shipping_offer' => $cart->hasFreeShippingOffer(),
+                'total_text' => money($cart->subtotal() - $cart->discount()),
+                'hints' => $cart->offerHints(),
+            ],
+            'coupon' => ($c = $cart->coupon()) ? ['code' => $c->code] : null,
+            'freeBar' => (theme('free_shipping_bar') && $freeThreshold > 0) ? [
+                'remaining_text' => money(max(0, $freeThreshold - $cart->subtotal())),
+                'unlocked' => $cart->subtotal() >= $freeThreshold,
+                'pct' => min(100, (int) ($cart->subtotal() / $freeThreshold * 100)),
+            ] : null,
+            'offersPanel' => ($matched->isNotEmpty() || $nearly) ? [
+                'matched' => $matched->map(fn ($o) => ['title' => $o->title])->values(),
+                'nearly' => $nearly ? [
+                    'title' => $nearly->title,
+                    'remaining_text' => money($nearly->remainingToUnlock($sub)),
+                    'pct' => min(100, (int) ($sub / max(1, (float) $nearly->min_subtotal) * 100)),
+                ] : null,
+                'register_hint' => ! auth('customer')->check()
+                    && $allOffers->where('members_only', true)->where('is_active', true)->isNotEmpty(),
+            ] : null,
+            'memberUsage' => ($memberUsage && $memberUsage['percent'] > 0 && $memberUsage['capped']) ? [
+                'remaining' => $memberUsage['remaining'],
+                'max' => $memberUsage['max'],
+                'resets' => $memberUsage['resets_at']?->format('d M'),
+            ] : null,
+            'suggestions' => \App\Support\Storefront\ProductCardData::collection($suggestions),
+            'cartUrls' => [
+                'update' => route('cart.update'),
+                'remove' => route('cart.remove'),
+                'couponApply' => route('cart.coupon'),
+                'couponRemove' => route('cart.coupon.remove'),
+            ],
+        ])->withViewData(['pageTitle' => 'Your Cart']);
     }
 
     public function add(Request $request, Product $product, MetaTrackingService $tracking)

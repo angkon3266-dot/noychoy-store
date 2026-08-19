@@ -4,6 +4,7 @@ use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureMetaClickId;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\MetaSecurityGate;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TrackVisit;
@@ -56,6 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             TrackVisit::class,
             CaptureMetaClickId::class,
+            HandleInertiaRequests::class,
         ]);
 
         // External webhooks post without a CSRF token.
