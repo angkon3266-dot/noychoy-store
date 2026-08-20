@@ -19,18 +19,31 @@ class PageController extends Controller
     {
         abort_unless(in_array($page, self::LEGAL, true), 404);
 
-        return view('shop.page', [
-            'title' => page_content($page, 'title'),
+        $title = page_content($page, 'title');
+
+        return \Inertia\Inertia::render('Legal', [
+            'pageTitle' => $title,
+            'title' => $title,
             'body' => page_content($page, 'body'),
-        ]);
+        ])->withViewData(['pageTitle' => $title]);
     }
 
     public function contact()
     {
-        return view('shop.contact', [
-            'title' => page_content('contact', 'title'),
+        $title = page_content('contact', 'title');
+
+        return \Inertia\Inertia::render('Contact', [
+            'pageTitle' => $title,
+            'title' => $title,
             'intro' => page_content('contact', 'intro'),
-        ]);
+            'details' => [
+                'phone' => \App\Models\Setting::get('store_phone', config('store.phone')),
+                'email' => \App\Models\Setting::get('store_email', config('store.email')),
+                'address' => \App\Models\Setting::get('store_address', config('store.address')),
+                'whatsapp' => theme('whatsapp_number'),
+            ],
+            'submitUrl' => route('page.contact.submit'),
+        ])->withViewData(['pageTitle' => $title]);
     }
 
     public function submitContact(Request $request)

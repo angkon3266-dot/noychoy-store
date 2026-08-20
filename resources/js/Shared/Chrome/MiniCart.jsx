@@ -61,7 +61,7 @@ export default function MiniCart() {
                             <div key={h} className="rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {h}</div>
                         ))}
                         <Link href={urls.cart || '/cart'} onClick={() => setDrawer(false)} className="btn-outline w-full block text-center">View cart</Link>
-                        <a href={urls.checkout || '/checkout'} className="btn-primary w-full block text-center">Checkout</a>
+                        <SmartLink href={urls.checkout || '/checkout'} onClick={() => setDrawer(false)} className="btn-primary w-full block text-center">Checkout</SmartLink>
                     </div>
                 )}
             </div>

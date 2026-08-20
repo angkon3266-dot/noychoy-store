@@ -238,7 +238,8 @@ class DailyDealsTest extends TestCase
             ->assertOk()
             ->assertSee('Deals of the Day')
             ->assertSee('Bangle blowout')
-            ->assertSee(route('product.show', $product));
+            ->assertInertia(fn ($page) => $page->component('Home')
+                ->where('deals.cards.0.href', route('product.show', $product)));
     }
 
     public function test_the_homepage_omits_the_carousel_entirely_when_nothing_is_on_offer(): void

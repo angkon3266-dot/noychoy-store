@@ -97,6 +97,18 @@ class HomeController extends Controller
             $view = 'shop.templates.home.storefront';
         }
 
+        // The live "couture" design is served by the React homepage. Other
+        // template choices keep their Blade views until they're ported —
+        // chrome.inertiaHome (HandleInertiaRequests) must agree with this.
+        if ($view === 'shop.templates.home.couture') {
+            return \Inertia\Inertia::render('Home', \App\Support\Storefront\HomePageData::make(
+                $featured, $newArrivals, $bestSellers, $categories, $sections,
+            ))->withViewData([
+                'pageTitle' => home_content('seo_title') ?: 'Fine Jewelry',
+                'metaDescription' => home_content('hero_subtitle'),
+            ]);
+        }
+
         return view($view, compact(
             'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'sections'
         ));

@@ -13,7 +13,10 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
-        return view('customer.login');
+        return \Inertia\Inertia::render('Auth/Login', [
+            'pageTitle' => 'Login',
+            'old' => ['phone' => old('phone')],
+        ])->withViewData(['pageTitle' => 'Login']);
     }
 
     public function login(Request $request)
@@ -40,7 +43,14 @@ class AuthController extends Controller
 
     public function showRegister()
     {
-        return view('customer.register');
+        return \Inertia\Inertia::render('Auth/Register', [
+            'pageTitle' => 'Register',
+            'old' => [
+                'name' => old('name'),
+                'phone' => old('phone'),
+                'email' => old('email'),
+            ],
+        ])->withViewData(['pageTitle' => 'Register']);
     }
 
     public function register(Request $request)

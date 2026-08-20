@@ -66,16 +66,21 @@ class ConversionFixesTest extends TestCase
 
     public function test_checkout_fields_invite_autofill_and_the_number_pad(): void
     {
+        // The autofill/inputmode attributes themselves now live in the React
+        // page (Checkout.jsx: autoComplete="tel|name|street-address",
+        // inputMode="numeric"); what the server owes the page is the Checkout
+        // component with the prefill + shipping data those fields render from.
         $this->product();
         $this->post('/cart/add/'.Product::first()->slug, ['qty' => 1]);
 
-        $html = $this->get('/checkout')->assertOk()->getContent();
-
-        // The phone field is the one a COD order lives or dies on.
-        $this->assertMatchesRegularExpression('/name="phone"[^>]*autocomplete="tel"/s', preg_replace('/\s+/', ' ', $html));
-        $this->assertStringContainsString('inputmode="numeric"', $html);
-        $this->assertStringContainsString('autocomplete="name"', $html);
-        $this->assertStringContainsString('autocomplete="street-address"', $html);
+        $this->get('/checkout')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Checkout')
+                ->has('prefill.name')
+                ->has('prefill.phone')
+                ->has('prefill.address')
+                ->has('summary.shipInside')
+                ->has('summary.shipOutside')
+        );
     }
 
     // ── B6: image variants + srcset ──────────────────────────────────────────

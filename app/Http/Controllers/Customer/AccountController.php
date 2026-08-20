@@ -23,32 +23,107 @@ class AccountController extends Controller
         $customer = $this->customer();
         $orders = $customer->orders()->with('shipment')->latest()->take(5)->get();
 
-        return view('customer.account', [
-            'customer' => $customer,
-            'orders' => $orders,
-            'defaultAddress' => $customer->defaultAddress,
-            'lovedCount' => $customer->loves()->count(),
-            'reviewCount' => $customer->reviews()->count(),
-            'addressCount' => $customer->addresses()->count(),
-            // Member pricing
-            'memberSaved' => (float) $customer->orders()->sum('member_discount'),
-            'memberPercent' => member_pricing()->basePercent(),
-            'memberUsage' => member_pricing()->enabled() ? member_pricing()->usageStatus($customer) : null,
-            // Loyalty
-            'loyaltyEnabled' => $loyalty->enabled(),
-            'points' => (int) $customer->points,
-            'pointsValue' => $loyalty->pointsValue((int) $customer->points),
-            'liveOffers' => $customer->liveOffers()->get(),
-            'milestones' => $loyalty->weeklyMilestones($customer),
-            'tier' => $loyalty->tierFor($customer),
-        ]);
+        $memberPercent = member_pricing()->basePercent();
+        $memberSaved = (float) $customer->orders()->sum('member_discount');
+        $memberUsage = member_pricing()->enabled() ? member_pricing()->usageStatus($customer) : null;
+        $points = (int) $customer->points;
+        $tier = $loyalty->enabled() ? $loyalty->tierFor($customer) : null;
+
+        return \Inertia\Inertia::render('Account/Dashboard', [
+            'pageTitle' => 'My Account',
+            'customer' => [
+                'name' => $customer->name,
+                'totalOrders' => $customer->total_orders,
+                'totalSpentText' => money($customer->total_spent),
+            ],
+            'stats' => [
+                'loved' => $customer->loves()->count(),
+                'reviews' => $customer->reviews()->count(),
+            ],
+            'member' => ($memberPercent > 0 || $memberSaved > 0) ? [
+                'percent' => rtrim(rtrim(number_format($memberPercent, 1), '0'), '.'),
+                'savedText' => money($memberSaved),
+            ] : null,
+            'liveOffers' => $customer->liveOffers()->get()->map(fn ($o) => [
+                'title' => $o->title,
+                'reward' => $o->rewardText(),
+                'scope' => $o->applies_to !== 'all' ? $o->scopeLabel() : null,
+                'message' => $o->message,
+                'until' => $o->expires_at?->format('d M'),
+                'code' => $o->code,
+            ])->values(),
+            'loyalty' => $loyalty->enabled() ? [
+                'points' => $points,
+                'pointsValueText' => money($loyalty->pointsValue($points)),
+                'value100Text' => money($loyalty->pointsValue(100)),
+                'per1000' => (int) round($loyalty->earnPerTaka() * 1000),
+                'reviewPoints' => $loyalty->reviewPoints(),
+                'reviewPhotoBonus' => $loyalty->reviewPhotoBonus(),
+                'tier' => [
+                    'emoji' => ['silver' => '🥈', 'gold' => '🥇', 'platinum' => '💎'][$tier['current']['key']] ?? '⭐',
+                    'label' => $tier['current']['label'],
+                    'perk' => $tier['current']['perk'],
+                    'lifetime' => number_format($tier['lifetime']),
+                    'next' => $tier['next'] ? [
+                        'label' => $tier['next']['label'],
+                        'perk' => $tier['next']['perk'],
+                        'toNext' => number_format($tier['to_next']),
+                        'progress' => $tier['progress'],
+                    ] : null,
+                ],
+                'memberUsage' => ($memberUsage && $memberUsage['percent'] > 0) ? [
+                    'percent' => rtrim(rtrim(number_format($memberUsage['percent'], 2), '0'), '.'),
+                    'capped' => (bool) $memberUsage['capped'],
+                    'remaining' => $memberUsage['remaining'] ?? null,
+                    'max' => $memberUsage['max'] ?? null,
+                    'resets' => $memberUsage['resets_at']?->format('d M'),
+                ] : null,
+                'milestones' => collect($loyalty->weeklyMilestones($customer))->map(fn ($m) => [
+                    'done' => (bool) $m['done'],
+                    'icon' => $m['icon'],
+                    'label' => $m['label'],
+                    'points' => $m['points'],
+                ])->values(),
+            ] : null,
+            'defaultAddress' => $customer->defaultAddress ? [
+                'name' => $customer->defaultAddress->name,
+                'phone' => $customer->defaultAddress->phone,
+                'line' => collect([$customer->defaultAddress->address, $customer->defaultAddress->area, $customer->defaultAddress->district])->filter()->implode(', '),
+            ] : null,
+            'orders' => $orders->map(fn ($o) => [
+                'number' => $o->order_number,
+                'url' => route('account.order', $o->order_number),
+                'reorderUrl' => route('account.reorder', $o->order_number),
+                'date' => $o->created_at->format('d M Y'),
+                'totalText' => money($o->total),
+                'status' => $o->status,
+            ])->values(),
+        ])->withViewData(['pageTitle' => 'My Account']);
     }
 
     public function orders()
     {
         $orders = $this->customer()->orders()->with('shipment')->latest()->paginate(15);
 
-        return view('customer.orders', compact('orders'));
+        return \Inertia\Inertia::render('Account/Orders', [
+            'pageTitle' => 'My Orders',
+            'orders' => [
+                'data' => collect($orders->items())->map(fn ($o) => $this->orderRow($o))->values(),
+                'links' => $orders->linkCollection(),
+            ],
+        ])->withViewData(['pageTitle' => 'My Orders']);
+    }
+
+    /** One row of the orders table (list page + dashboard share the shape). */
+    protected function orderRow($o): array
+    {
+        return [
+            'number' => $o->order_number,
+            'url' => route('account.order', $o->order_number),
+            'date' => $o->created_at->format('d M Y'),
+            'totalText' => money($o->total),
+            'status' => $o->status,
+        ];
     }
 
     public function notifications(\App\Services\NotificationService $notifications)
@@ -57,7 +132,20 @@ class AccountController extends Controller
         $items = $notifications->visibleFor($customer)->orderByDesc('sent_at')->paginate(20);
         $notifications->markRead($customer);
 
-        return view('customer.notifications', compact('items'));
+        return \Inertia\Inertia::render('Account/Notifications', [
+            'pageTitle' => 'Notifications',
+            'items' => [
+                'data' => collect($items->items())->map(fn ($n) => [
+                    'icon' => $n->iconOrDefault(),
+                    'title' => $n->title,
+                    'body' => $n->body,
+                    'time' => $n->sent_at?->diffForHumans(),
+                    'url' => $n->url ? route('account.notifications.go', $n) : null,
+                    'cta' => $n->cta_label,
+                ])->values(),
+                'links' => $items->linkCollection(),
+            ],
+        ])->withViewData(['pageTitle' => 'Notifications']);
     }
 
     public function markNotificationsRead(\App\Services\NotificationService $notifications)
@@ -150,7 +238,32 @@ class AccountController extends Controller
 
         $tracking = $this->trackingFor($order, $steadfast);
 
-        return view('customer.order', compact('order', 'tracking'));
+        return \Inertia\Inertia::render('Account/OrderDetail', [
+            'pageTitle' => $order->order_number,
+            'order' => [
+                'number' => $order->order_number,
+                'status' => $order->status,
+                'date' => $order->created_at->format('d M Y, g:i a'),
+                'items' => $order->items->map(fn ($i) => [
+                    'name' => $i->name,
+                    'qty' => $i->quantity,
+                    'subtotalText' => money($i->subtotal),
+                ])->values(),
+                'subtotalText' => money($order->subtotal),
+                'discountText' => $order->discount > 0 ? money($order->discount) : null,
+                'shippingText' => money($order->shipping_cost),
+                'totalText' => money($order->total),
+                'address' => [
+                    'name' => $order->customer_name,
+                    'phone' => $order->customer_phone,
+                    'line' => $order->shipping_address
+                        .($order->area ? ', '.$order->area : '')
+                        .($order->district ? ', '.$order->district : ''),
+                ],
+            ],
+            'tracking' => $tracking,
+            'reorderUrl' => route('account.reorder', $order->order_number),
+        ])->withViewData(['pageTitle' => $order->order_number]);
     }
 
     /** Build the live courier-tracking view-model for an order (or null). */
@@ -180,7 +293,19 @@ class AccountController extends Controller
     // ── Profile & security ───────────────────────────────────────────────────
     public function profile()
     {
-        return view('customer.profile', ['customer' => $this->customer()]);
+        $customer = $this->customer();
+
+        return \Inertia\Inertia::render('Account/Profile', [
+            'pageTitle' => 'Profile & security',
+            'profile' => [
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'email' => $customer->email,
+                'gender' => $customer->gender,
+                'hasPassword' => (bool) $customer->password,
+            ],
+            'genders' => \App\Models\Customer::GENDERS,
+        ])->withViewData(['pageTitle' => 'Profile & security']);
     }
 
     public function updateProfile(Request $request)
@@ -222,7 +347,29 @@ class AccountController extends Controller
     // ── Addresses ────────────────────────────────────────────────────────────
     public function addresses()
     {
-        return view('customer.addresses', ['addresses' => $this->customer()->addresses()->latest()->get()]);
+        $customer = $this->customer();
+
+        return \Inertia\Inertia::render('Account/Addresses', [
+            'pageTitle' => 'My addresses',
+            'addresses' => $customer->addresses()->latest()->get()->map(fn ($a) => [
+                'id' => $a->id,
+                'label' => $a->label,
+                'name' => $a->name,
+                'phone' => $a->phone,
+                'address' => $a->address,
+                'area' => $a->area,
+                'city' => $a->city,
+                'district' => $a->district,
+                'is_inside_dhaka' => (bool) $a->is_inside_dhaka,
+                'is_default' => (bool) $a->is_default,
+                'line' => collect([$a->address, $a->area, $a->district])->filter()->implode(', '),
+                'updateUrl' => route('account.addresses.update', $a),
+                'deleteUrl' => route('account.addresses.delete', $a),
+                'defaultUrl' => route('account.addresses.default', $a),
+            ])->values(),
+            'storeUrl' => route('account.addresses.store'),
+            'defaults' => ['name' => $customer->name, 'phone' => $customer->phone],
+        ])->withViewData(['pageTitle' => 'My addresses']);
     }
 
     public function storeAddress(Request $request)
@@ -303,14 +450,36 @@ class AccountController extends Controller
     {
         $reviews = $this->customer()->reviews()->with('product')->latest()->paginate(15);
 
-        return view('customer.reviews', compact('reviews'));
+        return \Inertia\Inertia::render('Account/Reviews', [
+            'pageTitle' => 'My reviews',
+            'reviews' => [
+                'data' => collect($reviews->items())->map(fn ($r) => [
+                    'product' => $r->product ? [
+                        'name' => $r->product->name,
+                        'url' => route('product.show', $r->product),
+                    ] : null,
+                    'status' => $r->status ?? 'approved',
+                    'rating' => (int) $r->rating,
+                    'title' => $r->title,
+                    'body' => $r->body,
+                    'date' => $r->created_at->format('d M Y'),
+                ])->values(),
+                'links' => $reviews->linkCollection(),
+            ],
+        ])->withViewData(['pageTitle' => 'My reviews']);
     }
 
     public function loved()
     {
         $products = $this->customer()->lovedProducts()->paginate(12);
 
-        return view('customer.loved', compact('products'));
+        return \Inertia\Inertia::render('Account/Loved', [
+            'pageTitle' => 'Loved items',
+            'products' => [
+                'data' => \App\Support\Storefront\ProductCardData::collection(collect($products->items())),
+                'links' => $products->linkCollection(),
+            ],
+        ])->withViewData(['pageTitle' => 'Loved items']);
     }
 
     // ── Reorder ──────────────────────────────────────────────────────────────

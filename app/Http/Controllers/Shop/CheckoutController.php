@@ -35,13 +35,68 @@ class CheckoutController extends Controller
         $user = $tracking->customerMatchData($customer);
         $tracking->initiateCheckout($icContentIds, $icValue, (int) $this->cart->count(), $icEventId, $user);
 
-        return view('shop.checkout', [
-            'cart' => $this->cart,
-            'customer' => $customer,
-            'address' => $address,
-            'icEventId' => $icEventId,
-            'icContentIds' => $icContentIds,
-        ]);
+        $loyalty = app(\App\Services\LoyaltyService::class);
+        $custPoints = (int) ($customer->points ?? 0);
+        $appliedPoints = $this->cart->redeemablePoints();
+        $regPct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
+        $discount = $this->cart->discount();
+
+        return \Inertia\Inertia::render('Checkout', [
+            'pageTitle' => 'Checkout',
+            'items' => $this->cart->items()->map(fn ($i) => [
+                'name' => $i['name'],
+                'qty' => $i['qty'],
+                'lineText' => money($i['price'] * $i['qty']),
+            ])->values(),
+            'summary' => [
+                'subtotalText' => money($this->cart->subtotal()),
+                'discountLines' => collect($this->cart->discountLines())
+                    ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
+                'discountText' => $discount > 0 ? money($discount) : null,
+                'discountPct' => ($discount > 0 && $this->cart->subtotal() > 0)
+                    ? round($discount / $this->cart->subtotal() * 100) : 0,
+                'hints' => $this->cart->offerHints(),
+                // Client-side shipping math inputs (same rules the server applies).
+                'sub' => (float) ($this->cart->subtotal() - $discount),
+                'rawSubtotal' => (float) $this->cart->subtotal(),
+                'shipInside' => (int) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
+                'shipOutside' => (int) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
+                'freeThreshold' => config('store.shipping.free_threshold') !== null
+                    ? (float) config('store.shipping.free_threshold') : null,
+            ],
+            'prefill' => [
+                'name' => old('name', $customer->name ?? ''),
+                'phone' => old('phone', $customer->phone ?? ''),
+                'address' => old('address', $address->address ?? ''),
+                'area' => old('area', $address->area ?? ''),
+                'inside' => (bool) old('is_inside_dhaka', $address->is_inside_dhaka ?? false),
+            ],
+            'isMember' => (bool) $customer,
+            'loyalty' => ($customer && $loyalty->enabled() && ($custPoints > 0 || $appliedPoints > 0)) ? [
+                'points' => $custPoints,
+                'pointsValueText' => money($loyalty->pointsValue($custPoints)),
+                'applied' => $appliedPoints,
+                'appliedDiscountText' => money($this->cart->pointsDiscount()),
+                'minRedeem' => $loyalty->minRedeem(),
+                'step' => $loyalty->redeemStep(),
+                'defaultRedeem' => (int) (floor($custPoints / max(1, $loyalty->redeemStep())) * $loyalty->redeemStep()),
+                'pointsUrl' => route('cart.points'),
+            ] : null,
+            'registerPct' => (! $customer && $regPct > 0)
+                ? rtrim(rtrim(number_format($regPct, 2), '0'), '.') : null,
+            'trustBadges' => collect(theme('trust_badges') ?: config('theme.defaults.trust_badges', []))
+                ->filter(fn ($b) => filled($b['title'] ?? null))->take(4)->values(),
+            'ic' => [
+                'eventId' => $icEventId,
+                'contentIds' => $icContentIds,
+                'value' => $icValue,
+                'numItems' => (int) $this->cart->count(),
+            ],
+            'urls' => [
+                'store' => route('checkout.store'),
+                'lead' => route('checkout.lead'),
+            ],
+        ])->withViewData(['pageTitle' => 'Checkout']);
     }
 
     public function store(Request $request, PlaceOrder $placeOrder)
@@ -100,7 +155,33 @@ class CheckoutController extends Controller
                 ->with('error', 'Please verify with your order number and phone to view this order.');
         }
 
-        return view('shop.confirmation', compact('order'));
+        return \Inertia\Inertia::render('Confirmation', [
+            'pageTitle' => 'Order Confirmed',
+            'order' => [
+                'number' => $order->order_number,
+                'name' => $order->customer_name,
+                'items' => $order->items->map(fn ($i) => [
+                    'name' => $i->name,
+                    'qty' => $i->quantity,
+                    'subtotalText' => money($i->subtotal),
+                ])->values(),
+                'subtotalText' => money($order->subtotal),
+                'discountText' => $order->discount > 0 ? money($order->discount) : null,
+                'shippingText' => money($order->shipping_cost),
+                'totalText' => money($order->total),
+            ],
+            // Purchase Pixel event — eventID is the order number, so Meta dedups
+            // against the server CAPI Purchase and against page refreshes alike.
+            'purchase' => [
+                'value' => (float) $order->total,
+                'contentIds' => $order->items->map(fn ($i) => $i->variant_id
+                    ? "prod-{$i->product_id}-var-{$i->variant_id}"
+                    : "prod-{$i->product_id}")->values(),
+                'numItems' => (int) $order->items->sum('quantity'),
+                'eventId' => $order->order_number,
+            ],
+            'trackUrl' => route('track').'?order_number='.$order->order_number,
+        ])->withViewData(['pageTitle' => 'Order Confirmed']);
     }
 
     public function track(Request $request, \App\Services\SteadfastService $steadfast)
@@ -120,6 +201,28 @@ class CheckoutController extends Controller
             }
         }
 
-        return view('shop.track', compact('order', 'tracking'));
+        return \Inertia\Inertia::render('Track', [
+            'pageTitle' => 'Track Order',
+            'query' => [
+                'order_number' => (string) $request->query('order_number', ''),
+                'phone' => (string) $request->query('phone', ''),
+            ],
+            'notFound' => $request->filled('order_number') && ! $order,
+            'order' => $order ? [
+                'number' => $order->order_number,
+                'status' => $order->status,
+                'history' => $order->history->map(fn ($h) => [
+                    'status' => $h->status,
+                    'note' => $h->note,
+                    'date' => $h->created_at->format('d M Y, g:i a'),
+                ])->values(),
+            ] : null,
+            'tracking' => $tracking ? [
+                'label' => $tracking['label'],
+                'tone_class' => $tracking['tone_class'],
+                'step' => $tracking['step'],
+                'tracking_code' => $tracking['tracking_code'],
+            ] : null,
+        ])->withViewData(['pageTitle' => 'Track Order']);
     }
 }

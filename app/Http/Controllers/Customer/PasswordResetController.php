@@ -25,7 +25,10 @@ class PasswordResetController extends Controller
 
     public function showForgot()
     {
-        return view('customer.forgot-password');
+        return \Inertia\Inertia::render('Auth/ForgotPassword', [
+            'pageTitle' => 'Forgot password',
+            'old' => ['email' => old('email'), 'phone' => old('phone')],
+        ])->withViewData(['pageTitle' => 'Forgot password']);
     }
 
     public function sendOtp(Request $request, SmsService $sms)
@@ -57,7 +60,10 @@ class PasswordResetController extends Controller
 
     public function showReset(Request $request)
     {
-        return view('customer.reset-password', ['phone' => $request->query('phone', '')]);
+        return \Inertia\Inertia::render('Auth/ResetPassword', [
+            'pageTitle' => 'Enter code',
+            'phone' => old('phone', $request->query('phone', '')),
+        ])->withViewData(['pageTitle' => 'Enter code']);
     }
 
     public function reset(Request $request)
@@ -120,10 +126,11 @@ class PasswordResetController extends Controller
 
     public function showEmailReset(Request $request)
     {
-        return view('customer.reset-password-email', [
+        return \Inertia\Inertia::render('Auth/ResetPasswordEmail', [
+            'pageTitle' => 'Choose a new password',
             'token' => $request->query('token', ''),
             'email' => $request->query('email', ''),
-        ]);
+        ])->withViewData(['pageTitle' => 'Choose a new password']);
     }
 
     public function resetViaEmail(Request $request)

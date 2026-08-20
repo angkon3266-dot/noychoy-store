@@ -168,12 +168,17 @@ class HeroSlideshowTest extends TestCase
             ['video' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'link' => ''],
         ]]);
 
-        $html = $this->get('/')->assertOk()->getContent();
-
-        $this->assertStringContainsString('youtube.com/embed/dQw4w9WgXcQ', $html);
-        $this->assertStringContainsString('autoplay=1', $html);
-        $this->assertStringContainsString('mute=1', $html);
-        $this->assertStringContainsString('loop=1', $html);
+        // The ambient-autoplay params are precomputed server-side into the
+        // slide payload the React hero renders from.
+        $this->get('/')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Home')
+                ->where('hero.slides.0.video.embedUrl', function ($url) {
+                    return str_contains((string) $url, 'youtube.com/embed/dQw4w9WgXcQ')
+                        && str_contains((string) $url, 'autoplay=1')
+                        && str_contains((string) $url, 'mute=1')
+                        && str_contains((string) $url, 'loop=1');
+                })
+        );
     }
 
     public function test_an_uploaded_video_slide_renders_as_a_muted_looping_video_tag(): void
@@ -185,13 +190,14 @@ class HeroSlideshowTest extends TestCase
             ['video' => 'hero-videos/clip.mp4', 'link' => ''],
         ]]);
 
-        $html = $this->get('/')->assertOk()->getContent();
-
-        $this->assertStringContainsString('<video', $html);
-        $this->assertStringContainsString('autoplay', $html);
-        $this->assertStringContainsString('muted', $html);
-        $this->assertStringContainsString('loop', $html);
-        $this->assertStringContainsString('hero-videos/clip.mp4', $html);
+        // A type:"file" slide is what makes the React hero render
+        // <video autoPlay muted loop playsInline> — assert that contract.
+        $this->get('/')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Home')
+                ->where('hero.slides.0.type', 'video')
+                ->where('hero.slides.0.video.type', 'file')
+                ->where('hero.slides.0.video.src', fn ($src) => str_contains((string) $src, 'hero-videos/clip.mp4'))
+        );
     }
 
     public function test_a_video_slide_with_no_link_is_not_wrapped_in_an_anchor(): void
@@ -213,7 +219,10 @@ class HeroSlideshowTest extends TestCase
             ['video' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'link' => '/pages/our-story'],
         ]]);
 
-        $this->get('/')->assertOk()->assertSee('/pages/our-story', false);
+        $this->get('/')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Home')
+                ->where('hero.slides.0.link', '/pages/our-story')
+        );
     }
 
     public function test_any_saved_slide_replaces_the_auto_built_hero_entirely(): void
@@ -227,10 +236,11 @@ class HeroSlideshowTest extends TestCase
             ['image' => 'hero/custom.jpg', 'link' => '/promo', 'alt' => 'Custom slide'],
         ]]);
 
-        $html = $this->get('/')->assertOk()->getContent();
-
-        $this->assertStringContainsString('hero/custom.jpg', $html);
-        $this->assertSame(1, substr_count($html, 'class="absolute inset-0 block transition-opacity'));
+        $this->get('/')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Home')
+                ->has('hero.slides', 1)
+                ->where('hero.slides.0.image', fn ($img) => str_contains((string) $img, 'hero/custom.jpg'))
+        );
     }
 
     public function test_an_empty_hero_slides_list_falls_back_to_the_auto_built_hero(): void
@@ -238,10 +248,19 @@ class HeroSlideshowTest extends TestCase
         $this->useCouture();
         $product = $this->product('Fallback Product');
         $product->update(['is_featured' => true]);
+        // The fallback only turns a featured product into a slide when it has a
+        // photo to show — give it one so the auto-built hero really triggers.
+        \App\Models\ProductImage::create([
+            'product_id' => $product->id, 'path' => 'products/fallback.webp',
+            'is_primary' => true, 'position' => 1,
+        ]);
         Setting::put('home_content', ['hero_slides' => []]);
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $url = route('product.show', $product);
 
-        $this->assertStringContainsString(route('product.show', $product), $html);
+        $this->get('/')->assertOk()->assertInertia(
+            fn ($page) => $page->component('Home')
+                ->where('hero.slides', fn ($slides) => collect($slides)->contains(fn ($s) => ($s['link'] ?? null) === $url))
+        );
     }
 }

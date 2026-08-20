@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
+import SmartLink from '../Shared/SmartLink';
 
 // Full cart page. Mutations go through Inertia (server redirects back to /cart
 // with fresh props + flash), with optimistic qty display while in flight.
@@ -153,7 +154,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                         <div key={i} className="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {hint}</div>
                     ))}
 
-                    <a href={urls.checkout || '/checkout'} className="btn-primary w-full mt-6">Proceed to checkout</a>
+                    <SmartLink href={urls.checkout || '/checkout'} className="btn-primary w-full mt-6">Proceed to checkout</SmartLink>
                     <Link href={urls.shop || '/shop'} className="block text-center text-sm text-gold-700 hover:underline mt-3">Continue shopping</Link>
                 </div>
             </div>

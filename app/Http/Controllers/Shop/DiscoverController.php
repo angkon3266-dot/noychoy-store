@@ -16,6 +16,18 @@ class DiscoverController extends Controller
         // Fallback: if the admin hasn't set up Discover tiles, show top-level categories.
         $categories = $tiles ? collect() : Category::whereNull('parent_id')->where('is_active', true)->orderBy('name')->take(12)->get();
 
-        return view('shop.discover', compact('tiles', 'categories'));
+        return \Inertia\Inertia::render('Discover', [
+            'pageTitle' => 'Discover',
+            'tiles' => collect($tiles)->map(fn ($t) => [
+                'image' => theme_asset($t['image']),
+                'name' => $t['name'] ?? null,
+                'link' => ($t['link'] ?? null) ?: '#',
+            ])->values(),
+            'categories' => $categories->map(fn ($c) => [
+                'name' => $c->name,
+                'url' => route('category.show', $c),
+                'image' => theme_asset($c->image),
+            ])->values(),
+        ])->withViewData(['pageTitle' => 'Discover']);
     }
 }
