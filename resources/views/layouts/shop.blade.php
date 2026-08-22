@@ -93,7 +93,7 @@
         $metaDesc = \Illuminate\Support\Str::limit(trim(strip_tags((string) $metaDesc)), 160);
     @endphp
     <meta name="description" content="{{ $metaDesc }}">
-    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">@endif
+    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any"><link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">@endif
     {{-- PWA / iOS: web push on iPhone only works from a Home-Screen-installed app,
          which requires this manifest (display: standalone). --}}
     <link rel="manifest" href="{{ route('manifest') }}">
@@ -192,7 +192,7 @@
 <body class="min-h-screen flex flex-col" data-shop>
     @php
         $announce = theme();
-        $announceMsgs = array_values(array_filter((array) ($announce['announcement_messages'] ?? [])));
+        $announceMsgs = announcement_messages();
     @endphp
     @if($announce['announcement_enabled'] && !empty($announceMsgs))
         @php $announceSpeed = max(10, count($announceMsgs) * (int) ($announce['announcement_speed'] ?? 6)); @endphp

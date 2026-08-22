@@ -7,12 +7,12 @@ use App\Models\ContactMessage;
 use Illuminate\Http\Request;
 
 /**
- * Static storefront pages (privacy / terms / refund) + the contact page & form.
- * Legal content is editable in Admin → Pages (falls back to config/pages.php).
+ * Static storefront pages (about / privacy / terms / refund) + the contact page
+ * & form. Content is editable in Admin → Pages (falls back to config/pages.php).
  */
 class PageController extends Controller
 {
-    private const LEGAL = ['privacy', 'terms', 'refund'];
+    private const LEGAL = ['about', 'privacy', 'terms', 'refund'];
 
     /** Render an editable legal page. */
     public function legal(string $page)

@@ -10,7 +10,7 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
     --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
 
-    /* Noychoy jewelry palette — warm gold on soft charcoal/cream */
+    /* Meridian Éclat jewelry palette — warm gold on soft charcoal/cream */
     --color-gold-50: #fbf8f1;
     --color-gold-100: #f5edda;
     --color-gold-200: #ead7b0;
@@ -30,6 +30,43 @@
     --color-ink-700: #36363b;
     --color-ink-800: #232327;
     --color-ink-900: #161618;
+
+    /* Semantic status roles.
+       These used to be stock Tailwind red / green / violet / amber, which
+       clashed with the gold and could not follow a palette change. Each is
+       warmed toward the brand's temperature: the same signal, in the store's
+       own colour. Shade numbers mirror Tailwind's so the sweep was 1:1. */
+    --color-success-50: #f2f5f0;
+    --color-success-100: #e0e9db;
+    --color-success-200: #c4d4bc;
+    --color-success-500: #5c8552;
+    --color-success-600: #4a7343;
+    --color-success-700: #3c5e36;
+    --color-success-800: #2f4a2b;
+
+    --color-danger-50: #fdf3f0;
+    --color-danger-100: #f9e0d9;
+    --color-danger-200: #f0c4b7;
+    --color-danger-400: #c96a51;
+    --color-danger-500: #b4503a;
+    --color-danger-600: #a04530;
+    --color-danger-700: #853827;
+    --color-danger-800: #6b2d20;
+
+    --color-warning-50: #fdf7ea;
+    --color-warning-100: #f9ebca;
+    --color-warning-200: #efdba9;
+    --color-warning-600: #a2782a;
+    --color-warning-700: #8a6520;
+    --color-warning-800: #6f511a;
+
+    --color-promo-50: #f5f2f7;
+    --color-promo-100: #e8e1ef;
+    --color-promo-200: #d6cae2;
+    --color-promo-300: #bfaed1;
+    --color-promo-600: #6f5b8e;
+    --color-promo-700: #5b4a75;
+    --color-promo-800: #47395c;
 }
 
 @layer base {

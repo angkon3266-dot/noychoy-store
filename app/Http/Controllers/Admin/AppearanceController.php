@@ -103,7 +103,7 @@ class AppearanceController extends Controller
             'menu_icon_height' => ['nullable', 'integer', 'min:16', 'max:80'],
             // Editable trust strip
             'trust_badges' => ['nullable', 'array'],
-            'trust_badges.*.icon' => ['nullable', 'string', 'max:8'],
+            'trust_badges.*.icon' => ['nullable', 'string', 'max:24'],
             'trust_badges.*.title' => ['nullable', 'string', 'max:40'],
             'trust_badges.*.text' => ['nullable', 'string', 'max:60'],
             // Editable homepage content
@@ -114,7 +114,7 @@ class AppearanceController extends Controller
 
             // Storefront homepage builder
             'feature_strip' => ['nullable', 'array'],
-            'feature_strip.*.icon' => ['nullable', 'string', 'max:8'],
+            'feature_strip.*.icon' => ['nullable', 'string', 'max:24'],
             'feature_strip.*.title' => ['nullable', 'string', 'max:60'],
             'highlight_category_ids' => ['nullable', 'array'],
             'highlight_category_ids.*' => ['integer'],

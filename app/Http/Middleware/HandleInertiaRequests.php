@@ -64,7 +64,7 @@ class HandleInertiaRequests extends Middleware
                 ->sortBy(fn ($c) => $footerIds->search($c->id))->values();
 
         $customer = auth('customer')->user();
-        $announceMsgs = array_values(array_filter((array) (theme('announcement_messages') ?? [])));
+        $announceMsgs = announcement_messages();
 
         return [
             'storeName' => store_name(),
@@ -122,7 +122,9 @@ class HandleInertiaRequests extends Middleware
             ],
             'footer' => [
                 'brand' => theme('footer_brand') ?: store_name(),
-                'about' => theme('footer_about') ?: 'Handpicked jewelry, delivered across Bangladesh. Cash on delivery available.',
+                // Default lives in config/theme.php — do NOT duplicate it here, or
+                // editing the config alone silently changes nothing.
+                'about' => theme('footer_about'),
                 'showTrust' => (bool) theme('footer_show_trust'),
                 'trustBadges' => collect(theme('trust_badges') ?? [])
                     ->filter(fn ($b) => filled($b['title'] ?? null))->take(3)->values(),
@@ -147,6 +149,7 @@ class HandleInertiaRequests extends Middleware
                 'checkout' => route('checkout'),
                 'track' => route('track'),
                 'contact' => route('page.contact'),
+                'about' => route('page.about'),
                 'privacy' => route('page.privacy'),
                 'terms' => route('page.terms'),
                 'refund' => route('page.refund'),

@@ -5,7 +5,7 @@ import Carousel from '../Shared/Carousel';
 import HomeBlocks from '../Shared/HomeBlocks';
 import SmartLink from '../Shared/SmartLink';
 import useCountdown from '../Shared/useCountdown';
-import { Star } from '../Shared/Icons';
+import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
 
 // The Meridian Éclat homepage — conversion-first and gift-led.
 //
@@ -16,10 +16,10 @@ import { Star } from '../Shared/Icons';
 // Every section is admin-toggleable/editable through the same home_content
 // settings the old templates used; copy falls back to sensible defaults.
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks, heroTrust } = props;
     return (
         <>
-            <Hero hero={hero} hasReviews={reviews?.length > 0} />
+            <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} />
             <FeatureStrip strip={featureStrip} />
             <Occasions section={occasions} />
             <Deals deals={deals} />
@@ -55,7 +55,7 @@ function Heading({ eyebrow, title, subtitle = null, action = null, center = fals
 const underlineLink = 'text-sm border-b border-ink-900/30 hover:border-gold-700 hover:text-gold-700 transition pb-0.5';
 
 /* ── Hero: editorial split + cross-fading slideshow + gift entry ─────────── */
-function Hero({ hero, hasReviews = false }) {
+function Hero({ hero, hasReviews = false, trust = [] }) {
     const slides = hero.slides || [];
     const [i, setI] = useState(0);
     const timer = useRef(null);
@@ -97,7 +97,7 @@ function Hero({ hero, hasReviews = false }) {
                             </SmartLink>
                             {/* Gift entry point: scrolls to the finder below. */}
                             <a href="#gift-finder" className="inline-flex items-center gap-2 rounded-full border border-gold-300 bg-gold-50 text-gold-800 px-6 py-3.5 text-sm tracking-wide hover:bg-gold-100 hover:border-gold-400 transition-colors">
-                                <span aria-hidden="true">🎁</span> Shopping for someone?
+                                <Icon name="gift" className="w-4 h-4" /> Shopping for someone?
                             </a>
                         </div>
                         {hero.secondaryText && (
@@ -108,10 +108,12 @@ function Hero({ hero, hasReviews = false }) {
                             {hasReviews
                                 ? <span className="inline-flex items-center gap-1.5"><span className="text-gold-500">★★★★★</span> Loved by customers</span>
                                 : <span>Hand-checked before it ships</span>}
-                            <span className="hidden sm:inline">·</span>
-                            <span>Cash on delivery</span>
-                            <span className="hidden sm:inline">·</span>
-                            <span>Gift message included</span>
+                            {trust.map((line, i) => (
+                                <span key={i} className="contents">
+                                    <span className="hidden sm:inline">·</span>
+                                    <span>{line}</span>
+                                </span>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -187,7 +189,7 @@ function FeatureStrip({ strip }) {
             <div className={`mx-auto max-w-7xl px-4 grid grid-cols-2 ${cols} divide-x divide-ink-100`}>
                 {strip.items.map((f, i) => (
                     <div key={i} className="flex flex-col items-center text-center gap-1.5 py-6 px-3">
-                        <span className="text-xl">{f.icon}</span>
+                        <IconOrGlyph value={f.icon} fallback="check" className="w-6 h-6 text-gold-700" />
                         <span className="text-[11px] sm:text-xs tracking-wide uppercase text-ink-800 font-medium">{f.title}</span>
                         {f.text && <span className="text-[11px] text-ink-700/50">{f.text}</span>}
                     </div>
@@ -338,20 +340,16 @@ function GiftFinder({ finder }) {
             <div className="mx-auto max-w-5xl px-4 text-center">
                 <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3">Gift finder</p>
                 <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl leading-tight">{finder.title}</h2>
-                <p className="mt-4 text-white/60 max-w-xl mx-auto">Pick a budget and we'll show you everything that fits it — every piece arrives gift-ready, with a card message if you want one.</p>
+                {finder.text && <p className="mt-4 text-white/60 max-w-xl mx-auto">{finder.text}</p>}
                 <div className="mt-9 flex flex-wrap justify-center gap-3">
                     {finder.budgets.map((b, i) => (
                         <SmartLink key={i} href={b.url} className="rounded-full border border-white/25 px-6 sm:px-8 py-3 text-sm tracking-wide hover:bg-white hover:text-ink-900 hover:border-white transition-colors duration-300">{b.label}</SmartLink>
                     ))}
                 </div>
                 <div className="mt-10 grid grid-cols-3 gap-4 text-center max-w-2xl mx-auto">
-                    {[
-                        ['🎁', 'Gift-ready packing', 'No price slip in the box'],
-                        ['💌', 'Personal card', 'Add a message at checkout'],
-                        ['💵', 'Cash on delivery', 'Pay when it arrives'],
-                    ].map(([icon, title, text]) => (
+                    {(finder.promises || []).map(({ icon, title, text }) => (
                         <div key={title}>
-                            <div className="text-2xl">{icon}</div>
+                            <div className="flex justify-center text-gold-300"><IconOrGlyph value={icon} fallback="gift" className="w-6 h-6" /></div>
                             <div className="mt-1.5 text-sm font-medium">{title}</div>
                             <div className="text-[11px] text-white/50 mt-0.5">{text}</div>
                         </div>
@@ -407,12 +405,8 @@ function Featured({ featured }) {
 
 /* ── How gifting works ────────────────────────────────────────────────────── */
 function GiftingSteps({ giftFinder }) {
-    const steps = [
-        ['1', 'Pick a piece', 'Browse by occasion, budget or category.'],
-        ['2', 'Tick "This is a gift"', 'At checkout — add a card message if you like.'],
-        ['3', 'We pack it gift-ready', 'Hand-checked, no price slip in the box.'],
-        ['4', 'Pay on delivery', 'Anywhere in Bangladesh, via Steadfast.'],
-    ];
+    const steps = giftFinder?.steps || [];
+    if (steps.length === 0) return null;
     return (
         <section className="mx-auto max-w-7xl px-4 py-14 lg:py-16">
             <div className="rounded-3xl border border-gold-200 bg-gradient-to-br from-gold-50 via-white to-gold-50 p-6 sm:p-10">
@@ -421,9 +415,9 @@ function GiftingSteps({ giftFinder }) {
                     <h2 className="font-display text-2xl sm:text-3xl text-ink-900">Send it straight to them — we handle the rest</h2>
                 </div>
                 <ol className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-                    {steps.map(([n, title, text]) => (
-                        <li key={n} className="flex gap-3">
-                            <span className="shrink-0 w-8 h-8 rounded-full bg-ink-900 text-white grid place-items-center text-sm font-semibold">{n}</span>
+                    {steps.map(({ title, text }, n) => (
+                        <li key={title} className="flex gap-3">
+                            <span className="shrink-0 w-8 h-8 rounded-full bg-ink-900 text-white grid place-items-center text-sm font-semibold">{n + 1}</span>
                             <div>
                                 <h3 className="font-medium text-sm">{title}</h3>
                                 <p className="text-xs text-ink-700/60 mt-0.5 leading-relaxed">{text}</p>

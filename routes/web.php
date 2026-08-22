@@ -158,7 +158,8 @@ Route::middleware('auth:customer')->group(function () {
 
 Route::get('/discover', [DiscoverController::class, 'index'])->name('discover');
 
-// Footer content pages (privacy / terms / refund) + contact.
+// Footer content pages (about / privacy / terms / refund) + contact.
+Route::get('/about', [PageController::class, 'legal'])->defaults('page', 'about')->name('page.about');
 Route::get('/privacy-policy', [PageController::class, 'legal'])->defaults('page', 'privacy')->name('page.privacy');
 Route::get('/terms-and-conditions', [PageController::class, 'legal'])->defaults('page', 'terms')->name('page.terms');
 Route::get('/refund-policy', [PageController::class, 'legal'])->defaults('page', 'refund')->name('page.refund');

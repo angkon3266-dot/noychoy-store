@@ -11,7 +11,7 @@
             <a href="{{ route('shop') }}" class="btn-primary mt-4">Start shopping</a>
         </div>
     @else
-        @php $freeThreshold = config('store.shipping.free_threshold'); @endphp
+        @php $freeThreshold = free_shipping_threshold(); @endphp
         @if(theme('free_shipping_bar') && $freeThreshold)
             @php $remaining = max(0, $freeThreshold - $cart->subtotal()); @endphp
             <div class="card p-4 mb-6">

@@ -17,10 +17,20 @@
                 <div><label class="label">Store phone</label><input name="store_phone" value="{{ $general['store_phone'] }}" class="input"></div>
             </div>
             <div><label class="label">Store email</label><input name="store_email" type="email" value="{{ $general['store_email'] }}" class="input"></div>
-            <p class="text-xs text-ink-700/50">The scrolling announcement bar is managed in <a href="{{ route('admin.appearance') }}" class="text-gold-700 underline">Appearance → Announcement top bar</a>.</p>
             <div class="grid sm:grid-cols-2 gap-4">
                 <div><label class="label">Shipping inside Dhaka (৳)</label><input name="shipping_inside" type="number" value="{{ $general['shipping_inside'] }}" class="input"></div>
                 <div><label class="label">Shipping outside Dhaka (৳)</label><input name="shipping_outside" type="number" value="{{ $general['shipping_outside'] }}" class="input"></div>
+            </div>
+            <div>
+                <label class="label">Free delivery over (৳)</label>
+                <input name="free_shipping_threshold" type="number" min="0" step="1" value="{{ $general['free_shipping_threshold'] }}" class="input" placeholder="Leave blank to charge delivery on every order">
+                <p class="text-xs text-ink-700/50 mt-1">
+                    Carts at or above this subtotal ship free. <strong>Leave it blank to switch the promise off</strong> — this is a margin decision, so nothing is assumed for you.
+                    Whatever you set here is what the checkout charges <em>and</em> what the announcement bar advertises: write
+                    <code class="px-1 rounded bg-ink-100">{free_delivery}</code> in an
+                    <a href="{{ route('admin.appearance') }}" class="text-gold-700 underline">Appearance → Announcement top bar</a>
+                    message and it prints the live amount — or disappears entirely while the promise is off, so the bar can never advertise something the checkout will not honour.
+                </p>
             </div>
             <button class="btn-primary">Save settings</button>
         </form>

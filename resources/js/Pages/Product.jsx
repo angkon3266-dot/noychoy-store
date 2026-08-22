@@ -298,17 +298,17 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 {purchase.onSale && (!purchase.hasVariants || purchase.matched) && (
                     <>
                         <span className="text-ink-400 line-through">{money(purchase.compareAt)}</span>
-                        <span className="badge bg-red-100 text-red-700">Save {purchase.discountPct}%</span>
+                        <span className="badge bg-danger-100 text-danger-700">Save {purchase.discountPct}%</span>
                     </>
                 )}
                 {purchase.offerPercent > 0 && (
-                    <span className="badge bg-green-100 text-green-700">Bundle price · save {money(purchase.savings)}</span>
+                    <span className="badge bg-success-100 text-success-700">Bundle price · save {money(purchase.savings)}</span>
                 )}
             </div>
 
             {memberBanner && (
                 <div className="mt-3 rounded-lg bg-gold-100/70 border border-gold-300 px-3 py-2.5 text-sm text-gold-800 flex items-center gap-2">
-                    <span className="text-lg">🎖️</span>
+                    <Icon name="medal" className="w-5 h-5 shrink-0" />
                     <span>
                         <strong>Member price {memberBanner.price_text}</strong>{' '}
                         <span className="text-gold-700/70">· save {memberBanner.pct}%{memberBanner.savings_text ? ` (${memberBanner.savings_text})` : ''}</span>
@@ -323,7 +323,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                     href={ui.registerUrl}
                     className="mt-4 flex items-center gap-3 rounded-xl border border-gold-300 bg-gradient-to-r from-gold-100/70 to-white px-4 py-3 hover:border-gold-400 transition-colors group"
                 >
-                    <span className="text-xl" aria-hidden="true">🎖️</span>
+                    <Icon name="medal" className="w-5 h-5 shrink-0" />
                     <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold text-gold-800">
                             Members get {ui.registerPct}% off this piece
@@ -340,9 +340,10 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
 
             {/* Quantity / bundle offer tiers */}
             {offerTiers.length > 0 && (
-                <div className={`mt-5 rounded-xl border p-4 ${allPreorder ? 'border-violet-200 bg-violet-50/60' : 'border-gold-200 bg-gold-50/60'}`}>
+                <div className={`mt-5 rounded-xl border p-4 ${allPreorder ? 'border-promo-200 bg-promo-50/60' : 'border-gold-200 bg-gold-50/60'}`}>
                     <p className="text-sm font-semibold text-ink-800 flex items-center gap-1.5">
-                        {allPreorder ? '📅 Pre-order offer' : hasBundle ? '🎁 Buy more, save more' : '🎁 Offer on this piece'}
+                        <Icon name={allPreorder ? 'calendar' : 'gift'} className="w-4 h-4 shrink-0" />
+                        {allPreorder ? 'Pre-order offer' : hasBundle ? 'Buy more, save more' : 'Offer on this piece'}
                     </p>
                     <div className="mt-3 grid gap-2">
                         {offerTiers.map((tier, i) => {
@@ -352,16 +353,16 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                                     key={i}
                                     type="button"
                                     onClick={() => purchase.setQty(Math.max(purchase.qty, tier.min_qty))}
-                                    className={`relative w-full text-left rounded-lg border px-3 py-2.5 text-sm transition ${tier.preorder_only ? 'border-violet-300' : (tier.highlight ? 'border-gold-400 shadow-sm' : 'border-ink-100')} ${applied ? 'border-green-500 bg-green-50' : 'hover:border-gold-300 bg-white'}`}
+                                    className={`relative w-full text-left rounded-lg border px-3 py-2.5 text-sm transition ${tier.preorder_only ? 'border-promo-300' : (tier.highlight ? 'border-gold-400 shadow-sm' : 'border-ink-100')} ${applied ? 'border-success-500 bg-success-50' : 'hover:border-gold-300 bg-white'}`}
                                 >
                                     {tier.badge && (
-                                        <span className={`absolute -top-2 right-3 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${tier.preorder_only ? 'bg-violet-600' : 'bg-gold-600'}`}>
+                                        <span className={`absolute -top-2 right-3 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${tier.preorder_only ? 'bg-promo-600' : 'bg-gold-600'}`}>
                                             {tier.badge}
                                         </span>
                                     )}
                                     <span className="flex items-center justify-between gap-3">
                                         <span className="font-medium">{tier.label}</span>
-                                        {applied && <span className="text-xs text-green-700 font-medium shrink-0">✓ applied</span>}
+                                        {applied && <span className="text-xs text-success-700 font-medium shrink-0 inline-flex items-center gap-1"><Icon name="check" className="w-3.5 h-3.5" />applied</span>}
                                     </span>
                                     <span className="mt-0.5 block text-xs text-ink-700/60">
                                         {tier.min_qty >= 2
@@ -377,14 +378,14 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
 
             {/* Storewide offers shown on the PDP */}
             {pdpOffers.length > 0 && (
-                <div className="mt-5 rounded-xl border border-green-200 bg-green-50/70 p-4">
-                    <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5">🎉 Offers on this order</p>
+                <div className="mt-5 rounded-xl border border-success-200 bg-success-50/70 p-4">
+                    <p className="text-sm font-semibold text-success-800 flex items-center gap-1.5"><Icon name="sparkle" className="w-4 h-4 shrink-0" />Offers on this order</p>
                     <ul className="mt-2 space-y-1.5">
                         {pdpOffers.map((o, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-ink-800">
-                                <span className="text-green-600 mt-0.5">✓</span>
+                                <Icon name="check" className="w-4 h-4 text-success-600 mt-0.5 shrink-0" />
                                 <span>
-                                    {o.badge && <span className="badge bg-green-600 text-white text-[10px] mr-1">{o.badge}</span>}
+                                    {o.badge && <span className="badge bg-success-600 text-white text-[10px] mr-1">{o.badge}</span>}
                                     <strong>{o.title}</strong>
                                     {o.description && <> — <span className="text-ink-700/70">{o.description}</span></>}
                                     {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-gold-700 underline">Register to unlock</a></>}
@@ -398,14 +399,14 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
             {/* Personalised offers */}
             {myOffers.length > 0 && (
                 <div className="mt-5 rounded-xl border-2 border-gold-400 bg-gradient-to-r from-gold-100/80 to-white p-4">
-                    <p className="text-sm font-semibold text-gold-800 flex items-center gap-1.5">🎁 Exclusive offer just for you</p>
+                    <p className="text-sm font-semibold text-gold-800 flex items-center gap-1.5"><Icon name="gift" className="w-4 h-4 shrink-0" />Exclusive offer just for you</p>
                     <ul className="mt-2 space-y-2">
                         {myOffers.map((o, i) => (
                             <li key={i} className="text-sm text-ink-800">
                                 <span className="badge bg-gold-600 text-white text-[10px] mr-1">{o.reward}</span>
                                 <strong>{o.title}</strong>
                                 {o.message && <span className="block text-xs text-ink-700/70 italic mt-0.5">{o.message}</span>}
-                                <span className="block text-xs text-green-700 mt-0.5">Applied automatically at checkout{o.until ? ` · until ${o.until}` : ''}</span>
+                                <span className="block text-xs text-success-700 mt-0.5">Applied automatically at checkout{o.until ? ` · until ${o.until}` : ''}</span>
                             </li>
                         ))}
                     </ul>
@@ -420,10 +421,10 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
             )}
 
             {product.low_stock != null && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-red-600 font-medium">
+                <div className="mt-4 flex items-center gap-2 text-sm text-danger-600 font-medium">
                     <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative rounded-full h-2 w-2 bg-red-500"></span>
+                        <span className="animate-ping absolute h-2 w-2 rounded-full bg-danger-400 opacity-75"></span>
+                        <span className="relative rounded-full h-2 w-2 bg-danger-500"></span>
                     </span>
                     Hurry — only {product.low_stock} left in stock!
                 </div>
@@ -434,7 +435,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 <div className="mt-6 space-y-4">
                     <AttributePickers purchase={purchase} />
                     {!purchase.matched && <p className="text-xs text-ink-700/50">Select options to see price &amp; availability.</p>}
-                    {purchase.matched && purchase.variantStock <= 0 && <p className="text-xs text-red-600 font-medium">This combination is sold out.</p>}
+                    {purchase.matched && purchase.variantStock <= 0 && <p className="text-xs text-danger-600 font-medium">This combination is sold out.</p>}
                 </div>
             )}
 
@@ -449,9 +450,9 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
             </div>
 
             {preorder && (
-                <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50 p-4">
-                    <p className="text-sm font-semibold text-violet-800 flex items-center gap-1.5">📅 Pre-order item</p>
-                    <p className="text-sm text-violet-700/80 mt-1">
+                <div className="mt-5 rounded-xl border border-promo-200 bg-promo-50 p-4">
+                    <p className="text-sm font-semibold text-promo-800 flex items-center gap-1.5"><Icon name="calendar" className="w-4 h-4 shrink-0" />Pre-order item</p>
+                    <p className="text-sm text-promo-700/80 mt-1">
                         {preorder.note}
                         <br />Estimated delivery: <strong>{preorder.eta}</strong>.
                     </p>
@@ -465,11 +466,11 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                         <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline w-full">
                             {preorder ? 'Add pre-order to cart' : 'Add to cart'}
                         </button>
-                        <button type="button" onClick={buyNow} disabled={!purchase.canBuy || buying} className={`w-full ${preorder ? 'inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2.5 font-medium text-white hover:bg-violet-700 transition disabled:opacity-50' : 'btn-primary'}`}>
+                        <button type="button" onClick={buyNow} disabled={!purchase.canBuy || buying} className={`w-full ${preorder ? 'inline-flex items-center justify-center rounded-md bg-promo-600 px-4 py-2.5 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}>
                             {buying ? 'Taking you to checkout…' : (preorder ? 'Book now (Pre-order)' : 'Buy now')}
                         </button>
                     </div>
-                    {!purchase.canBuy && <p className="mt-2 text-xs text-red-600">Please choose an option above.</p>}
+                    {!purchase.canBuy && <p className="mt-2 text-xs text-danger-600">Please choose an option above.</p>}
                 </>
             ) : (
                 <>
@@ -556,8 +557,8 @@ function LoveButton({ url, loved: initialLoved, count: initialCount }) {
     };
 
     return (
-        <button type="button" onClick={toggle} className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-700/70 hover:text-red-500 transition" aria-pressed={loved} title={loved ? 'Remove from loved' : 'Love this'}>
-            <svg className={`w-5 h-5 transition ${loved ? 'text-red-500' : ''}`} fill={loved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+        <button type="button" onClick={toggle} className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-700/70 hover:text-danger-500 transition" aria-pressed={loved} title={loved ? 'Remove from loved' : 'Love this'}>
+            <svg className={`w-5 h-5 transition ${loved ? 'text-danger-500' : ''}`} fill={loved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
             <span>{count > 0 ? count : 'Love'}</span>
         </button>
     );
@@ -587,7 +588,7 @@ function StockNotify({ productId }) {
     };
 
     if (state === 'done') {
-        return <p className="text-sm text-green-700 text-center mt-3">✓ We'll notify you the moment it's back in stock.</p>;
+        return <p className="text-sm text-success-700 text-center mt-3 flex items-center justify-center gap-1.5"><Icon name="check" className="w-4 h-4" />We'll notify you the moment it's back in stock.</p>;
     }
 
     return (
@@ -697,12 +698,12 @@ function Reviews({ product, reviews, ui, flash }) {
                         <div className="md:col-span-3">
                             {ui.isMember ? (
                                 <div className="flex items-start gap-3 rounded-xl border border-gold-200 bg-gold-100/60 px-4 py-3 text-sm text-gold-800">
-                                    <span className="text-lg leading-none">🎁</span>
+                                    <Icon name="gift" className="w-5 h-5 shrink-0" />
                                     <p><span className="font-semibold">Share a review, earn {reviews.perk.toLocaleString()} bonus points</span>{reviews.photoPerk > 0 ? ` — add a photo for +${reviews.photoPerk.toLocaleString()} more` : ''}. Points are added to your account as soon as your review is approved.</p>
                                 </div>
                             ) : (
                                 <div className="flex items-start gap-3 rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm text-ink-700/80">
-                                    <span className="text-lg leading-none">🎁</span>
+                                    <Icon name="gift" className="w-5 h-5 shrink-0" />
                                     <p>Members earn <span className="font-semibold text-gold-700">{reviews.perk.toLocaleString()} bonus points</span> for every approved review{reviews.photoPerk > 0 ? ` (+${reviews.photoPerk.toLocaleString()} with a photo)` : ''}. <a href={ui.loginUrl} className="font-medium text-gold-700 underline">Sign in</a> or <a href={ui.registerUrl} className="font-medium text-gold-700 underline">join free</a> to start earning.</p>
                                 </div>
                             )}
@@ -747,7 +748,7 @@ function Reviews({ product, reviews, ui, flash }) {
                                         {[1, 2, 3, 4, 5].map((s) => <Star key={s} off={s > review.rating} />)}
                                     </span>
                                     <span className="font-medium text-sm">{review.author}</span>
-                                    {review.verified && <span className="badge bg-green-100 text-green-700 text-[10px]">✓ Verified buyer</span>}
+                                    {review.verified && <span className="badge bg-success-100 text-success-700 text-[10px]">Verified buyer</span>}
                                     <span className="text-xs text-ink-700/40 ml-auto">{review.date}</span>
                                 </div>
                                 {review.title && <p className="font-medium mt-2">{review.title}</p>}
@@ -762,11 +763,11 @@ function Reviews({ product, reviews, ui, flash }) {
 
                         <details className="rounded-xl border border-ink-100 p-5">
                             <summary className="font-medium cursor-pointer">
-                                ✍️ Write a review
-                                {reviews.perk > 0 && ui.isMember && <span className="badge bg-gold-100 text-gold-800 ml-1">🎁 +{reviews.perk.toLocaleString()} points</span>}
+                                <span className="inline-flex items-center gap-1.5"><Icon name="pen" className="w-4 h-4 shrink-0" />Write a review</span>
+                                {reviews.perk > 0 && ui.isMember && <span className="badge bg-gold-100 text-gold-800 ml-1">+{reviews.perk.toLocaleString()} points</span>}
                             </summary>
-                            {flash?.success && <p className="mt-3 text-sm text-green-700 bg-green-50 rounded p-2">{flash.success}</p>}
-                            {errorMsg && <div className="mt-3 text-sm text-red-700 bg-red-50 rounded p-2">{errorMsg}</div>}
+                            {flash?.success && <p className="mt-3 text-sm text-success-700 bg-success-50 rounded p-2">{flash.success}</p>}
+                            {errorMsg && <div className="mt-3 text-sm text-danger-700 bg-danger-50 rounded p-2">{errorMsg}</div>}
                             <form onSubmit={submit} className="mt-4 space-y-3" encType="multipart/form-data">
                                 <div>
                                     <span className="label">Your rating *</span>
@@ -920,7 +921,7 @@ function StickyBar({ product, purchase, ui }) {
                             router.post(product.buynow_url, { variant_id: purchase.variantId === 'none' ? '' : purchase.variantId, qty: purchase.qty });
                         }}
                         disabled={!purchase.canBuy}
-                        className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2.5 font-medium text-white hover:bg-violet-700 transition disabled:opacity-50' : 'btn-primary'}`}
+                        className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-md bg-promo-600 px-4 py-2.5 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}
                     >
                         {preorder ? 'Book now' : 'Buy now'}
                     </button>

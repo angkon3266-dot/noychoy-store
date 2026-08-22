@@ -2,6 +2,7 @@ import { usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
 import { useCart } from '../CartContext';
 import SmartLink from '../SmartLink';
+import Icon from '../Icons';
 
 // Mini-cart slide-over — same /cart/mini data contract as the Alpine drawer.
 export default function MiniCart() {
@@ -39,7 +40,7 @@ export default function MiniCart() {
                             <button
                                 type="button"
                                 onClick={() => remove(item.key)}
-                                className="absolute top-0 right-0 p-1 text-ink-700/40 hover:text-red-600 transition"
+                                className="absolute top-0 right-0 p-1 text-ink-700/40 hover:text-danger-600 transition"
                                 title={`Remove ${item.name}`}
                                 aria-label="Remove item"
                             >
@@ -52,13 +53,13 @@ export default function MiniCart() {
                     <div className="border-t border-ink-100 p-5 space-y-3">
                         <div className="flex justify-between text-sm"><span className="text-ink-700/70">Subtotal</span><span>{subtotalText}</span></div>
                         {discountLines.map((d) => (
-                            <div key={d.label} className="flex justify-between text-sm text-green-700"><span>{d.label}</span><span>−{d.amount_text}</span></div>
+                            <div key={d.label} className="flex justify-between text-sm text-success-700"><span>{d.label}</span><span>−{d.amount_text}</span></div>
                         ))}
                         {freeShipping && (
-                            <div className="flex justify-between text-sm text-green-700"><span>Free delivery</span><span>✓</span></div>
+                            <div className="flex justify-between text-sm text-success-700"><span>Free delivery</span><Icon name="check" className="w-4 h-4" /></div>
                         )}
                         {hints.map((h) => (
-                            <div key={h} className="rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {h}</div>
+                            <div key={h} className="rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{h}</div>
                         ))}
                         <Link href={urls.cart || '/cart'} onClick={() => setDrawer(false)} className="btn-outline w-full block text-center">View cart</Link>
                         <SmartLink href={urls.checkout || '/checkout'} onClick={() => setDrawer(false)} className="btn-primary w-full block text-center">Checkout</SmartLink>

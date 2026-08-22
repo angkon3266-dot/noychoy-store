@@ -16,6 +16,7 @@ class PageController extends Controller
     {
         return view('admin.pages.edit', [
             'pages' => [
+                'about' => page_content('about'),
                 'privacy' => page_content('privacy'),
                 'terms' => page_content('terms'),
                 'refund' => page_content('refund'),
@@ -29,6 +30,8 @@ class PageController extends Controller
     {
         $data = $request->validate([
             'pages' => ['required', 'array'],
+            'pages.about.title' => ['nullable', 'string', 'max:150'],
+            'pages.about.body' => ['nullable', 'string'],
             'pages.privacy.title' => ['nullable', 'string', 'max:150'],
             'pages.privacy.body' => ['nullable', 'string'],
             'pages.terms.title' => ['nullable', 'string', 'max:150'],

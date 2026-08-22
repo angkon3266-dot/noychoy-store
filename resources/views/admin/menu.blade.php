@@ -118,8 +118,9 @@
                     </select>
                 </div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="menu_show_search" value="1" @checked($theme['menu_show_search'] ?? true)> Show search box in header</label>
-                <div><label class="label">CTA button label (optional)</label><input name="menu_cta_label" value="{{ $theme['menu_cta_label'] ?? '' }}" class="input" placeholder="Track order"></div>
-                <div><label class="label">CTA button link</label><input name="menu_cta_link" value="{{ $theme['menu_cta_link'] ?? '' }}" class="input" placeholder="/track"></div>
+                <div><label class="label">CTA button label</label><input name="menu_cta_label" value="{{ $theme['menu_cta_label'] ?? '' }}" class="input" placeholder="Shop gifts"></div>
+                <div><label class="label">CTA button link</label><input name="menu_cta_link" value="{{ $theme['menu_cta_link'] ?? '' }}" class="input" placeholder="/shop"></div>
+                <p class="text-xs text-ink-700/50">This is the only filled button in your header — the most prominent thing on the site. Spend it on something you sell. Order tracking is already in the mobile menu and the footer, which is where people look for it. Leave blank to fall back to “Shop gifts”.</p>
             </div>
             <div class="card p-6">
                 <button class="btn-primary w-full">Save menu</button>

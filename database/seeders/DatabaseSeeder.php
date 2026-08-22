@@ -14,7 +14,7 @@ class DatabaseSeeder extends Seeder
     {
         // ── Admin account ───────────────────────────────────────────────
         User::updateOrCreate(
-            ['email' => 'admin@noychoy.com'],
+            ['email' => 'admin@meridianeclat.shop'],
             ['name' => 'Store Admin', 'password' => 'password', 'role' => 'admin'],
         );
 
@@ -62,7 +62,7 @@ class DatabaseSeeder extends Seeder
 
             if ($product->images()->count() === 0) {
                 $product->images()->create([
-                    'path' => "https://picsum.photos/seed/noychoy{$i}/800/800",
+                    'path' => "https://picsum.photos/seed/meridian{$i}/800/800",
                     'alt' => $name,
                     'is_primary' => true,
                     'position' => 0,

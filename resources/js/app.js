@@ -449,8 +449,8 @@ document.addEventListener('alpine:init', () => {
                 cell.innerHTML = '<span class="text-xs text-ink-700/40">—</span>';
                 return;
             }
-            const tone = data.margin_percent < 0 ? 'text-red-600'
-                : (data.margin_percent < 20 ? 'text-amber-600' : 'text-green-700');
+            const tone = data.margin_percent < 0 ? 'text-danger-600'
+                : (data.margin_percent < 20 ? 'text-warning-600' : 'text-success-700');
             cell.innerHTML = `<span class="font-medium ${tone}">${data.margin_percent}%</span>`
                 + `<div class="text-xs text-ink-700/50">${data.margin_amount ?? ''}/unit</div>`;
         },
@@ -470,7 +470,7 @@ document.addEventListener('alpine:init', () => {
                     const on = data.status === 'published';
                     badge.textContent = data.status;
                     badge.className = 'badge capitalize '
-                        + (on ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700');
+                        + (on ? 'bg-success-100 text-success-700' : 'bg-ink-100 text-ink-700');
                 }
             }
 
@@ -544,7 +544,7 @@ document.addEventListener('alpine:init', () => {
             if (badge && data.status) {
                 const on = data.status === 'published';
                 badge.textContent = data.status;
-                badge.className = 'badge capitalize ' + (on ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700');
+                badge.className = 'badge capitalize ' + (on ? 'bg-success-100 text-success-700' : 'bg-ink-100 text-ink-700');
             }
 
             const thumb = row.querySelector('[data-row-thumb]');
@@ -564,8 +564,8 @@ document.addEventListener('alpine:init', () => {
                 if (data.margin_percent === null) {
                     cell.innerHTML = '<span class="text-xs text-ink-700/40">—</span>';
                 } else {
-                    const tone = data.margin_percent < 0 ? 'text-red-600'
-                        : (data.margin_percent < 20 ? 'text-amber-600' : 'text-green-700');
+                    const tone = data.margin_percent < 0 ? 'text-danger-600'
+                        : (data.margin_percent < 20 ? 'text-warning-600' : 'text-success-700');
                     cell.innerHTML = `<span class="font-medium ${tone}">${data.margin_percent}%</span>`
                         + `<div class="text-xs text-ink-700/50">${data.margin_amount ?? ''}/unit</div>`;
                 }

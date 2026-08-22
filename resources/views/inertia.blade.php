@@ -78,7 +78,7 @@
         $metaDesc = \Illuminate\Support\Str::limit(trim(strip_tags((string) $metaDesc)), 160);
     @endphp
     <meta name="description" content="{{ $metaDesc }}">
-    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">@endif
+    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any"><link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">@endif
     <link rel="manifest" href="{{ route('manifest') }}">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">

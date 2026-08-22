@@ -49,7 +49,7 @@ export default function Addresses({ addresses, storeUrl, defaults }) {
                                             <button onClick={() => router.post(a.defaultUrl, {}, { preserveScroll: true })} className="text-ink-700/70 hover:underline">Set default</button>
                                             <button
                                                 onClick={() => confirm('Remove this address?') && router.delete(a.deleteUrl, { preserveScroll: true })}
-                                                className="text-red-600 hover:underline"
+                                                className="text-danger-600 hover:underline"
                                             >
                                                 Delete
                                             </button>
@@ -101,7 +101,7 @@ function AddressForm({ initial, onSubmit, onCancel = null, submitLabel }) {
 
     return (
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(data); }} className="space-y-3">
-            {firstError && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-sm">{firstError}</div>}
+            {firstError && <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-700 px-3 py-2 text-sm">{firstError}</div>}
             <div className="grid sm:grid-cols-2 gap-3">
                 <div><label className="label text-xs">Label (optional)</label><input value={data.label} onChange={set('label')} className="input" placeholder="Home / Office" /></div>
                 <div><label className="label text-xs">Full name</label><input value={data.name} onChange={set('name')} className="input" required /></div>

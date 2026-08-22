@@ -157,6 +157,14 @@
         </div>
     </div>
 
+    {{-- Icon-name picker shared by the trust badges and the feature strip.
+         These fields used to be free-text emoji boxes. --}}
+    <datalist id="storefront-icons">
+        @foreach(\App\Support\StorefrontIcons::names() as $iconName)
+            <option value="{{ $iconName }}"></option>
+        @endforeach
+    </datalist>
+
     <!-- Announcement bar -->
     <div class="card p-6" x-show="tab==='branding'">
         <div class="flex items-center justify-between mb-4">
@@ -164,8 +172,13 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="announcement_enabled" value="1" @checked($theme['announcement_enabled'])> Enabled</label>
         </div>
         <label class="label">Offer messages — one per line</label>
-        <textarea name="announcement_messages" rows="4" class="input" placeholder="Free delivery on orders over ৳3000&#10;Cash on delivery available&#10;Eid sale — up to 30% off">{{ implode("\n", (array) $theme['announcement_messages']) }}</textarea>
-        <p class="text-xs text-ink-700/50 mt-1">These scroll continuously across the top bar. Add as many offers as you like — one per line.</p>
+        <textarea name="announcement_messages" rows="4" class="input" placeholder="Free delivery on orders over {free_delivery}&#10;Cash on delivery available&#10;Eid sale — up to 30% off">{{ implode("\n", (array) $theme['announcement_messages']) }}</textarea>
+        <p class="text-xs text-ink-700/50 mt-1">
+            These scroll continuously across the top bar. Add as many offers as you like — one per line.
+            Write <code class="px-1 rounded bg-ink-100">{free_delivery}</code> to print the live free-delivery threshold from
+            <a href="{{ route('admin.settings') }}" class="text-gold-700 underline">Settings</a>; while that promise is switched off the whole line is hidden,
+            so the bar can never advertise free delivery the checkout will not honour.
+        </p>
         <div class="grid sm:grid-cols-4 gap-4 mt-4">
             <div><label class="label">Background</label><input type="color" name="announcement_bg" value="{{ $theme['announcement_bg'] }}" class="h-10 w-14 rounded border border-ink-100"></div>
             <div><label class="label">Text colour</label><input type="color" name="announcement_color" value="{{ $theme['announcement_color'] }}" class="h-10 w-14 rounded border border-ink-100"></div>
@@ -476,12 +489,13 @@
         <div x-data="{ rows: @js(array_values($home['feature_strip'] ?? [])) }">
             <template x-for="(r, i) in rows" :key="i">
                 <div class="flex gap-2 mb-2">
-                    <input :name="`feature_strip[${i}][icon]`" x-model="r.icon" class="input w-16 text-center" placeholder="🚚" maxlength="4">
+                    <input :name="`feature_strip[${i}][icon]`" x-model="r.icon" list="storefront-icons" class="input w-40" placeholder="truck" maxlength="24">
                     <input :name="`feature_strip[${i}][title]`" x-model="r.title" class="input flex-1" placeholder="Fastest Shipping Countrywide">
                     <button type="button" @click="rows.splice(i,1)" class="text-red-500 px-2 text-xl leading-none">&times;</button>
                 </div>
             </template>
-            <button type="button" @click="rows.push({icon:'✓',title:''})" class="btn-outline text-sm">+ Add feature</button>
+            <button type="button" @click="rows.push({icon:'check',title:''})" class="btn-outline text-sm">+ Add feature</button>
+            <p class="text-xs text-ink-700/50 mt-2">Icon is a name from the site's own icon set — start typing and pick from the list ({{ implode(', ', \App\Support\StorefrontIcons::suggested()) }}…).</p>
         </div>
 
         {{-- Highlighted categories (ordered) --}}
@@ -1066,19 +1080,19 @@
     {{-- Trust badges --}}
     <div class="card p-6" x-show="tab==='branding'" x-data="{ badges: @js(array_values($theme['trust_badges'] ?? config('theme.defaults.trust_badges', []))) }">
         <h2 class="font-semibold mb-1">Trust badges</h2>
-        <p class="text-xs text-ink-700/60 mb-4">The reassurance strip shown on product &amp; checkout pages. Add, remove or reorder freely — each badge has an icon (emoji), a title and an optional line of text.</p>
+        <p class="text-xs text-ink-700/60 mb-4">The reassurance strip shown on product &amp; checkout pages. Add, remove or reorder freely — each badge has an icon, a title and an optional line of text.</p>
         <div class="space-y-3">
             <template x-for="(b, i) in badges" :key="i">
                 <div class="flex gap-2 items-start">
-                    <input :name="`trust_badges[${i}][icon]`" x-model="b.icon" class="input w-16 text-center" placeholder="💵" maxlength="4">
+                    <input :name="`trust_badges[${i}][icon]`" x-model="b.icon" list="storefront-icons" class="input w-40" placeholder="cash" maxlength="24">
                     <input :name="`trust_badges[${i}][title]`" x-model="b.title" class="input flex-1" placeholder="Title (e.g. Cash on delivery)">
                     <input :name="`trust_badges[${i}][text]`" x-model="b.text" class="input flex-1" placeholder="Subtext (optional)">
                     <button type="button" @click="badges.splice(i, 1)" class="text-red-500 px-2 text-xl leading-none" title="Remove">&times;</button>
                 </div>
             </template>
         </div>
-        <button type="button" @click="badges.push({icon:'✓', title:'', text:''})" class="btn-outline mt-3 text-sm">+ Add badge</button>
-        <p class="text-xs text-ink-700/50 mt-2">Tip: 3–4 badges look best. Use emojis for icons (🔒 🚚 ↩️ ⭐ 💎 ✨).</p>
+        <button type="button" @click="badges.push({icon:'check', title:'', text:''})" class="btn-outline mt-3 text-sm">+ Add badge</button>
+        <p class="text-xs text-ink-700/50 mt-2">Tip: 3–4 badges look best. Icons are names from the site's own set — {{ implode(', ', \App\Support\StorefrontIcons::suggested()) }}… — so they match the rest of the storefront instead of being emoji.</p>
     </div>
 
     {{-- ── Thank-you cards & print ───────────────────────────────────────── --}}

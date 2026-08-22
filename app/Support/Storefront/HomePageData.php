@@ -75,7 +75,7 @@ class HomePageData
                 'show' => (bool) home_content('show_feature_strip'),
                 'items' => collect(home_content('feature_strip') ?? [])
                     ->filter(fn ($f) => filled($f['title'] ?? null))->take(4)->values()
-                    ->map(fn ($f) => ['icon' => $f['icon'] ?? '✓', 'title' => $f['title'], 'text' => $f['text'] ?? null]),
+                    ->map(fn ($f) => ['icon' => $f['icon'] ?? null, 'title' => $f['title'], 'text' => $f['text'] ?? null]),
             ],
             // Gift-led entry points. Unlike the old Blade template, a tile
             // renders with or without a photo (typographic tile when none) so
@@ -110,7 +110,15 @@ class HomePageData
                         'url' => route('shop', array_filter(['price_min' => $min, 'price_max' => $max])),
                     ];
                 })->values(),
+                'text' => home_content('gift_finder_text'),
+                'promises' => collect(home_content('gift_promises') ?? [])
+                    ->filter(fn ($p) => filled($p['title'] ?? null))->take(3)->values()
+                    ->map(fn ($p) => ['icon' => $p['icon'] ?? null, 'title' => $p['title'], 'text' => $p['text'] ?? null]),
+                'steps' => collect(home_content('gifting_steps') ?? [])
+                    ->filter(fn ($p) => filled($p['title'] ?? null))->take(4)->values()
+                    ->map(fn ($p) => ['title' => $p['title'], 'text' => $p['text'] ?? null]),
             ],
+            'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
             // Social proof: recent 4–5★ approved reviews, sitewide.
             'reviews' => \App\Models\Review::approved()->with('product:id,name,slug')
                 ->where('rating', '>=', 4)->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))

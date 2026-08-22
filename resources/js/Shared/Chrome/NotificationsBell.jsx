@@ -59,7 +59,7 @@ export default function NotificationsBell() {
             <button type="button" onClick={toggle} className="relative p-2 hover:text-gold-700" title="Notifications">
                 <Icon name="bell" />
                 {unread > 0 && (
-                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center">
+                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger-600 text-white text-[10px] font-semibold flex items-center justify-center">
                         {unread > 9 ? '9+' : unread}
                     </span>
                 )}
@@ -72,7 +72,7 @@ export default function NotificationsBell() {
                     </div>
                     {showOptIn && (
                         <div className="mx-1 mb-1 rounded-lg bg-gold-50 border border-gold-200 px-2.5 py-2 flex items-center gap-2">
-                            <span className="text-lg">🔔</span>
+                            <Icon name="bell" className="w-5 h-5" />
                             <p className="text-xs flex-1 text-ink-700/70">Get notified about new drops &amp; your offers — even when the site is closed.</p>
                             <button
                                 type="button"

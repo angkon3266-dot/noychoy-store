@@ -60,7 +60,7 @@ return [
         'announcement_bg' => '#161618',
         'announcement_color' => '#f5edda',
         'announcement_messages' => [
-            'Free delivery on orders over ৳3000',
+            'Free delivery on orders over {free_delivery}',
             'Cash on delivery available all over Bangladesh',
             'Handcrafted jewelry · Authentic quality guaranteed',
         ],
@@ -95,8 +95,11 @@ return [
         // Navigation menu behaviour
         'menu_desktop_trigger' => 'hover',   // hover | click
         'menu_show_search' => true,          // show the search box in the header
-        'menu_cta_label' => null,            // optional highlighted nav button label
-        'menu_cta_link' => null,             // optional highlighted nav button link
+        // The header's one filled button. Defaulted to something the store sells:
+        // an empty label used to leave the header with no call to action at all,
+        // and the admin placeholder used to suggest order tracking.
+        'menu_cta_label' => 'Shop gifts',
+        'menu_cta_link' => null,             // falls back to the shop route
 
         // Footer (editable in Appearance → Footer)
         'footer_brand' => null,              // footer heading text; defaults to store name
@@ -134,10 +137,12 @@ return [
         'card_show_logo' => true,
 
         // Trust strip (editable in Appearance → Trust badges). Each: icon, title, text.
+        // `icon` is a name from App\Support\StorefrontIcons — these used to be
+        // emoji, which read bazaar rather than boutique on a fine-jewelry site.
         'trust_badges' => [
-            ['icon' => '💵', 'title' => 'Cash on delivery', 'text' => 'Pay when you receive'],
-            ['icon' => '🚚', 'title' => 'Fast nationwide', 'text' => 'Delivered everywhere'],
-            ['icon' => '✨', 'title' => 'Quality assured', 'text' => 'Hand-checked pieces'],
+            ['icon' => 'cash', 'title' => 'Cash on delivery', 'text' => 'Pay when you receive'],
+            ['icon' => 'truck', 'title' => 'Fast nationwide', 'text' => 'Delivered everywhere'],
+            ['icon' => 'shieldCheck', 'title' => 'Quality assured', 'text' => 'Hand-checked pieces'],
         ],
     ],
 

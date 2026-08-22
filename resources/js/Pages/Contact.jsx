@@ -1,5 +1,6 @@
 import { useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
+import Icon from '../Shared/Icons';
 
 export default function Contact({ title, intro, details, submitUrl }) {
     const { props } = usePage();
@@ -29,16 +30,16 @@ export default function Contact({ title, intro, details, submitUrl }) {
                 <div className="space-y-4">
                     <h2 className="font-display text-lg font-semibold">Reach us</h2>
                     <ul className="space-y-3 text-sm">
-                        {details.phone && <li className="flex items-center gap-2">📞 <a href={`tel:${details.phone}`} className="hover:text-gold-700">{details.phone}</a></li>}
-                        {details.email && <li className="flex items-center gap-2">✉️ <a href={`mailto:${details.email}`} className="hover:text-gold-700">{details.email}</a></li>}
-                        {details.whatsapp && <li className="flex items-center gap-2">💬 <a href={`https://wa.me/${details.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="hover:text-gold-700">WhatsApp us</a></li>}
-                        {details.address && <li className="flex items-start gap-2">📍 <span>{details.address}</span></li>}
+                        {details.phone && <li className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 shrink-0" /> <a href={`tel:${details.phone}`} className="hover:text-gold-700">{details.phone}</a></li>}
+                        {details.email && <li className="flex items-center gap-2"><Icon name="mail" className="w-4 h-4 shrink-0" /> <a href={`mailto:${details.email}`} className="hover:text-gold-700">{details.email}</a></li>}
+                        {details.whatsapp && <li className="flex items-center gap-2"><Icon name="chat" className="w-4 h-4 shrink-0" /> <a href={`https://wa.me/${details.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="hover:text-gold-700">WhatsApp us</a></li>}
+                        {details.address && <li className="flex items-start gap-2"><Icon name="pin" className="w-4 h-4 shrink-0 mt-0.5" /> <span>{details.address}</span></li>}
                     </ul>
                 </div>
 
                 <div className="card p-6">
                     {firstError && (
-                        <div className="rounded-md bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 text-sm mb-4">{firstError}</div>
+                        <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-700 px-4 py-2.5 text-sm mb-4">{firstError}</div>
                     )}
                     <form onSubmit={submit} className="space-y-3">
                         <div className="grid sm:grid-cols-2 gap-3">

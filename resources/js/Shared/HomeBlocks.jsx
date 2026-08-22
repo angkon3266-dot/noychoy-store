@@ -4,6 +4,7 @@ import Carousel from './Carousel';
 import SmartLink from './SmartLink';
 import useCountdown from './useCountdown';
 import { useCart } from './CartContext';
+import { IconOrGlyph } from './Icons';
 
 // Renders the admin section-builder blocks — the React port of
 // <x-home-block>. Data shapes come from HomePageData::block().
@@ -182,7 +183,7 @@ function Block({ block }) {
                     <div className={`grid gap-6 sm:grid-cols-2 ${{ 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' }[Math.min(4, Math.max(2, block.items.length))]}`}>
                         {block.items.map((b, i) => (
                             <div key={i} className="text-center px-4">
-                                <div className="text-3xl mb-3">{b.icon || '✨'}</div>
+                                <div className="mb-3 flex justify-center text-gold-700"><IconOrGlyph value={b.icon} fallback="sparkle" className="w-8 h-8" /></div>
                                 <h3 className="font-semibold mb-1.5">{b.title}</h3>
                                 {b.text && <p className="text-sm text-ink-700/70 leading-relaxed">{b.text}</p>}
                             </div>

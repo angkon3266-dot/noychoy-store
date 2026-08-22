@@ -13,7 +13,7 @@
 
     <form action="{{ route('admin.pages.update') }}" method="POST" class="space-y-5">
         @csrf
-        @foreach(['privacy' => 'Privacy Policy', 'terms' => 'Terms & Conditions', 'refund' => 'Refund & Return Policy'] as $key => $label)
+        @foreach(['about' => 'Our story (/about)', 'privacy' => 'Privacy Policy', 'terms' => 'Terms & Conditions', 'refund' => 'Refund & Return Policy'] as $key => $label)
             <div class="card p-5 space-y-3">
                 <div class="flex items-center justify-between">
                     <h2 class="font-semibold">{{ $label }}</h2>

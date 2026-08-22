@@ -34,17 +34,17 @@ export default function Profile({ profile, genders }) {
                     <div>
                         <label className="label">Name</label>
                         <input value={info.data.name} onChange={(e) => info.setData('name', e.target.value)} className="input" required />
-                        {err('name') && <p className="text-xs text-red-600 mt-1">{err('name')}</p>}
+                        {err('name') && <p className="text-xs text-danger-600 mt-1">{err('name')}</p>}
                     </div>
                     <div>
                         <label className="label">Phone</label>
                         <input value={info.data.phone} onChange={(e) => info.setData('phone', e.target.value)} className="input" required />
-                        {err('phone') && <p className="text-xs text-red-600 mt-1">{err('phone')}</p>}
+                        {err('phone') && <p className="text-xs text-danger-600 mt-1">{err('phone')}</p>}
                     </div>
                     <div>
                         <label className="label">Email</label>
                         <input type="email" value={info.data.email} onChange={(e) => info.setData('email', e.target.value)} className="input" placeholder="you@example.com" />
-                        {err('email') && <p className="text-xs text-red-600 mt-1">{err('email')}</p>}
+                        {err('email') && <p className="text-xs text-danger-600 mt-1">{err('email')}</p>}
                     </div>
                     <div>
                         <label className="label">Gender (optional)</label>
@@ -70,13 +70,13 @@ export default function Profile({ profile, genders }) {
                         <div>
                             <label className="label">Current password</label>
                             <input type="password" value={pass.data.current_password} onChange={(e) => pass.setData('current_password', e.target.value)} className="input" required />
-                            {err('current_password') && <p className="text-xs text-red-600 mt-1">{err('current_password')}</p>}
+                            {err('current_password') && <p className="text-xs text-danger-600 mt-1">{err('current_password')}</p>}
                         </div>
                     )}
                     <div>
                         <label className="label">New password</label>
                         <input type="password" value={pass.data.password} onChange={(e) => pass.setData('password', e.target.value)} className="input" required minLength={8} />
-                        {err('password') && <p className="text-xs text-red-600 mt-1">{err('password')}</p>}
+                        {err('password') && <p className="text-xs text-danger-600 mt-1">{err('password')}</p>}
                     </div>
                     <div>
                         <label className="label">Confirm new password</label>

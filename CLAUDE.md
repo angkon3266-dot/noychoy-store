@@ -4,6 +4,15 @@ Operational rules for Claude on this repository. Project documentation lives in
 `README.md`, `DEPLOY.md`, `GITHUB-GUIDE.md` and `docs/` — this file does not
 repeat any of it.
 
+## Where the work stands
+
+`docs/ROADMAP-STATUS.md` is the running tracker for the 22 Aug 2026 storefront
+review: what is done, what is left, and who can close each item (a developer, or
+the store owner in the admin panel). **Read it before picking up roadmap work,
+and update the row plus the changelog when you finish something** — statuses
+there are re-verified against the code, so treat it as truer than the review
+dossier it came from.
+
 ## Working copy
 
 Work from **`E:\G Drive\ClaudeWorkspace\noychoy-store`**. It is the canonical

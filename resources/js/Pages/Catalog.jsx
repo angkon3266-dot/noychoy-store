@@ -3,6 +3,7 @@ import { router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import Pagination from '../Shared/Pagination';
+import Icon from '../Shared/Icons';
 import { Link } from '@inertiajs/react';
 
 // Shop / category / best-sellers grid. Filters and sort submit as GET query
@@ -70,7 +71,7 @@ export default function Catalog({ title, description = null, products, filters, 
                 {/* Sidebar filters */}
                 <aside className="mb-6 lg:mb-0">
                     <div className="flex items-center justify-between lg:hidden mb-3">
-                        <button type="button" onClick={() => setShowFilters(!showFilters)} className="btn-outline py-2">⚙ Filters</button>
+                        <button type="button" onClick={() => setShowFilters(!showFilters)} className="btn-outline py-2 inline-flex items-center gap-1.5"><Icon name="funnel" className="w-4 h-4 shrink-0" /> Filters</button>
                     </div>
                     <div className={showFilters ? 'block' : 'hidden lg:block'}>
                         <div className="flex items-center justify-between mb-3">

@@ -54,6 +54,54 @@ if (! function_exists('upload_limit_mb')) {
     }
 }
 
+if (! function_exists('free_shipping_threshold')) {
+    /**
+     * Subtotal at or above which delivery is free, or null when the promise is
+     * switched off entirely.
+     *
+     * This is the ONE place the number is resolved. The cart, the checkout and
+     * the announcement bar all read it here, so the banner can never advertise
+     * a threshold the checkout does not honour. Admin → Settings wins; the
+     * env/config value is only the fallback for a fresh install.
+     *
+     * Zero and blank both mean "disabled" — a genuinely free-for-everyone
+     * store is a free-shipping Offer, not a threshold of 0.
+     */
+    function free_shipping_threshold(): ?float
+    {
+        $value = Setting::get('free_shipping_threshold', config('store.shipping.free_threshold'));
+
+        return is_numeric($value) && (float) $value > 0 ? (float) $value : null;
+    }
+}
+
+if (! function_exists('announcement_messages')) {
+    /**
+     * Announcement-bar messages with the free-delivery promise resolved.
+     *
+     * A message containing {free_delivery} prints the live threshold. When the
+     * promise is switched off the whole message is DROPPED rather than rendered
+     * with a hole in it — that is the point: the bar cannot keep advertising
+     * free delivery after the checkout stopped honouring it.
+     *
+     * @return array<int, string>
+     */
+    function announcement_messages(): array
+    {
+        $threshold = free_shipping_threshold();
+
+        return array_values(array_filter(array_map(function ($message) use ($threshold) {
+            $message = trim((string) $message);
+
+            if (! str_contains($message, '{free_delivery}')) {
+                return $message;
+            }
+
+            return $threshold === null ? '' : str_replace('{free_delivery}', money($threshold), $message);
+        }, (array) (theme('announcement_messages') ?? []))));
+    }
+}
+
 if (! function_exists('member_pricing')) {
     /** Shared MemberPricingService instance. */
     function member_pricing(): MemberPricingService

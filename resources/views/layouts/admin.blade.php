@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Admin') — {{ store_name() }} Admin</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any"><link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">@endif
     {{-- Installable admin app — iOS only delivers push to a Home-Screen install. --}}
     <link rel="manifest" href="{{ url('/site.webmanifest?admin=1') }}">
     <meta name="apple-mobile-web-app-capable" content="yes">

@@ -70,17 +70,17 @@ export default function FloatingStack() {
                                 title="Your exclusive offers"
                             >
                                 <Icon name="gift" className="w-full h-full" strokeWidth={1.8} />
-                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold">{offers.badge}</span>
+                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-danger-600 text-white text-[11px] font-semibold">{offers.badge}</span>
                             </button>
                             {offersOpen && (
                                 <div className="absolute bottom-16 right-0 w-72 max-h-[70vh] overflow-y-auto rounded-xl bg-white shadow-2xl border border-ink-100 p-4">
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="font-semibold text-sm flex items-center gap-1.5">🎁 Your exclusive offers</p>
+                                        <p className="font-semibold text-sm flex items-center gap-1.5"><Icon name="gift" className="w-4 h-4 shrink-0" /> Your exclusive offers</p>
                                         <button type="button" onClick={() => setOffersOpen(false)} className="text-ink-700/40 hover:text-ink-900 text-lg leading-none">×</button>
                                     </div>
                                     {offers.member && (
                                         <div className="rounded-lg border border-gold-300 bg-gold-600 text-white p-2.5 mb-2">
-                                            <p className="text-sm font-medium">💎 {offers.member.percent}% member discount</p>
+                                            <p className="text-sm font-medium flex items-center gap-1.5"><Icon name="diamond" className="w-4 h-4 shrink-0" /> {offers.member.percent}% member discount</p>
                                             {offers.member.capped ? (
                                                 <p className="text-[11px] text-white/85 mt-0.5">
                                                     {offers.member.remaining > 0
@@ -99,7 +99,7 @@ export default function FloatingStack() {
                                                 <span className="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{o.reward}</span>
                                                 {o.scope && <span className="text-[10px] text-ink-700/50 ml-1">· {o.scope}</span>}
                                                 {o.message && <p className="text-xs text-ink-700/70 italic mt-1">{o.message}</p>}
-                                                <p className="text-[11px] text-green-700 mt-1">✓ Auto-applied at checkout{o.until ? ` · until ${o.until}` : ''}</p>
+                                                <p className="text-[11px] text-success-700 mt-1">✓ Auto-applied at checkout{o.until ? ` · until ${o.until}` : ''}</p>
                                             </div>
                                         ))}
                                     </div>

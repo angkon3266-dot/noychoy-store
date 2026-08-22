@@ -3,6 +3,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import SmartLink from '../Shared/SmartLink';
+import Icon from '../Shared/Icons';
 
 // Full cart page. Mutations go through Inertia (server redirects back to /cart
 // with fresh props + flash), with optimistic qty display while in flight.
@@ -54,7 +55,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
             {freeBar && (
                 <div className="card p-4 mb-6">
                     {freeBar.unlocked ? (
-                        <p className="text-sm text-center mb-2 text-green-700 font-medium">🎉 You've unlocked free delivery!</p>
+                        <p className="text-sm text-center mb-2 text-success-700 font-medium inline-flex items-center justify-center gap-1.5 w-full"><Icon name="truck" className="w-4 h-4" /> You've unlocked free delivery!</p>
                     ) : (
                         <p className="text-sm text-center mb-2">Add <strong>{freeBar.remaining_text}</strong> more to unlock <strong>free delivery!</strong></p>
                     )}
@@ -67,7 +68,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
             {offersPanel && (
                 <div className="card p-4 mb-6 space-y-2">
                     {offersPanel.matched.map((o, i) => (
-                        <p key={i} className="text-sm text-green-700 flex items-center gap-2">✓ <strong>{o.title}</strong> applied</p>
+                        <p key={i} className="text-sm text-success-700 flex items-center gap-2"><Icon name="check" className="w-4 h-4 shrink-0" /><strong>{o.title}</strong> applied</p>
                     ))}
                     {offersPanel.nearly && (
                         <>
@@ -78,7 +79,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                         </>
                     )}
                     {offersPanel.register_hint && (
-                        <p className="text-sm text-ink-700/70">💡 <a href={urls.register} className="text-gold-700 underline">Register</a> to unlock members-only savings.</p>
+                        <p className="text-sm text-ink-700/70 flex items-center gap-2"><Icon name="bulb" className="w-4 h-4 shrink-0" /><a href={urls.register} className="text-gold-700 underline">Register</a> to unlock members-only savings.</p>
                     )}
                 </div>
             )}
@@ -95,7 +96,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                                 {item.attributes && <p className="text-xs text-ink-700/60">{item.attributes}</p>}
                                 <p className="text-sm text-gold-700 font-semibold mt-1">{item.price_text}</p>
                                 {item.offer && (
-                                    <p className="mt-1 inline-block badge bg-green-100 text-green-700 text-[11px]">
+                                    <p className="mt-1 inline-block badge bg-success-100 text-success-700 text-[11px]">
                                         {item.offer.label} (you save {item.offer.saving_text})
                                     </p>
                                 )}
@@ -107,7 +108,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                             </div>
                             <div className="text-right w-24">
                                 <p className="font-semibold">{item.line_total_text}</p>
-                                <button type="button" onClick={() => removeItem(item.key)} className="text-xs text-red-600 hover:underline mt-1">Remove</button>
+                                <button type="button" onClick={() => removeItem(item.key)} className="text-xs text-danger-600 hover:underline mt-1">Remove</button>
                             </div>
                         </div>
                     ))}
@@ -118,8 +119,8 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
 
                     {coupon ? (
                         <div className="flex justify-between text-sm mb-2">
-                            <span className="text-green-700">Coupon {coupon.code}</span>
-                            <button type="button" onClick={() => router.delete(cartUrls.couponRemove, { preserveScroll: true })} className="text-xs text-red-600 hover:underline">remove</button>
+                            <span className="text-success-700">Coupon {coupon.code}</span>
+                            <button type="button" onClick={() => router.delete(cartUrls.couponRemove, { preserveScroll: true })} className="text-xs text-danger-600 hover:underline">remove</button>
                         </div>
                     ) : (
                         <form onSubmit={applyCoupon} className="flex gap-2 mb-4">
@@ -131,10 +132,10 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                     <dl className="space-y-2 text-sm border-t border-ink-100 pt-4">
                         <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{summary.subtotal_text}</dd></div>
                         {summary.discount_lines.map((line, i) => (
-                            <div key={i} className="flex justify-between text-green-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
+                            <div key={i} className="flex justify-between text-success-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
                         ))}
                         {summary.free_shipping_offer && (
-                            <div className="flex justify-between text-green-700"><dt>Free delivery offer</dt><dd>unlocked 🎉</dd></div>
+                            <div className="flex justify-between text-success-700"><dt>Free delivery offer</dt><dd>unlocked</dd></div>
                         )}
                         <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd className="text-ink-700/60">calculated at checkout</dd></div>
                         <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3">
@@ -143,15 +144,15 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                     </dl>
 
                     {memberUsage && (
-                        <p className={`mt-2 text-xs ${memberUsage.remaining > 0 ? 'text-green-700' : 'text-ink-700/60'}`}>
+                        <p className={`mt-2 text-xs ${memberUsage.remaining > 0 ? 'text-success-700' : 'text-ink-700/60'}`}>
                             {memberUsage.remaining > 0
-                                ? <>💎 Member discount: <strong>{memberUsage.remaining} of {memberUsage.max}</strong> uses left{memberUsage.resets ? ` (resets ${memberUsage.resets})` : ''}.</>
-                                : <>💎 Member discount used up for now{memberUsage.resets ? ` — resets ${memberUsage.resets}` : ''}.</>}
+                                ? <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount: <strong>{memberUsage.remaining} of {memberUsage.max}</strong> uses left{memberUsage.resets ? ` (resets ${memberUsage.resets})` : ''}.</>
+                                : <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount used up for now{memberUsage.resets ? ` — resets ${memberUsage.resets}` : ''}.</>}
                         </p>
                     )}
 
                     {summary.hints.map((hint, i) => (
-                        <div key={i} className="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {hint}</div>
+                        <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                     ))}
 
                     <SmartLink href={urls.checkout || '/checkout'} className="btn-primary w-full mt-6">Proceed to checkout</SmartLink>

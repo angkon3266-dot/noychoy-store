@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/react';
-import { Facebook, Instagram, WhatsApp } from '../Icons';
+import Icon, { Facebook, IconOrGlyph, Instagram, WhatsApp } from '../Icons';
 import SmartLink from '../SmartLink';
 
 export default function Footer() {
@@ -15,7 +15,7 @@ export default function Footer() {
                     <div className="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                         {footer.trustBadges.map((b, i) => (
                             <div key={i} className="flex items-center justify-center gap-2">
-                                {b.icon && <span className="text-xl">{b.icon}</span>}
+                                <IconOrGlyph value={b.icon} fallback="check" className="w-6 h-6 text-gold-300 shrink-0" />
                                 <div className="text-left">
                                     <div className="text-sm font-medium text-gold-100">{b.title}</div>
                                     {b.text && <div className="text-xs text-gold-100/60">{b.text}</div>}
@@ -47,6 +47,7 @@ export default function Footer() {
                 <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Help</h3>
                     <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
+                        <li><a href={urls.about} className="hover:text-white">Our story</a></li>
                         <li><a href={urls.track} className="hover:text-white">Track your order</a></li>
                         <li><a href={urls.contact} className="hover:text-white">Contact us</a></li>
                         <li><a href={urls.privacy} className="hover:text-white">Privacy Policy</a></li>
@@ -58,8 +59,8 @@ export default function Footer() {
                 <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Contact</h3>
                     <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
-                        {footer.phone && <li>📞 {footer.phone}</li>}
-                        <li>✉️ {footer.email}</li>
+                        {footer.phone && <li className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-gold-300 shrink-0" />{footer.phone}</li>}
+                        <li className="flex items-center gap-2"><Icon name="mail" className="w-4 h-4 text-gold-300 shrink-0" />{footer.email}</li>
                         {footer.whatsapp && (
                             <li>
                                 <a href={`https://wa.me/${footer.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="hover:text-white inline-flex items-center gap-1">

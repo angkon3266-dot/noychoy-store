@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Meridian Éclat">
+  <rect width="64" height="64" rx="12" fill="#161618"/>
+  <!-- Meridian: a rising arc over the horizon, with the É acute as the point of light. -->
+  <path d="M10 44a22 22 0 0 1 44 0" fill="none" stroke="#cfa055" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="8" y1="49" x2="56" y2="49" stroke="#7a5326" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="32" cy="24" r="4.5" fill="#ead7b0"/>
+</svg>

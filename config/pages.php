@@ -16,6 +16,18 @@
 
 return [
 
+    // The brand story. A "brand_story" landing template already shipped, but it
+    // lived at /lp/{slug} and nothing linked to it, so the site had no answer to
+    // "who are you?" at the moment a shopper checks whether you are real.
+    'about' => [
+        'title' => 'Our story',
+        'body' => '<p>Write the story behind the brand here — who makes the pieces, why you started, and what a customer is really buying. Two or three short paragraphs beat one long one.</p>
+<h3>What we make</h3>
+<p>Say what the jewelry is and who it is for, in plain words. Not "premium quality product" — the piece, the material, the person.</p>
+<h3>How we work</h3>
+<p>Hand-checked before it ships, delivered nationwide, paid for on your doorstep. Say it once, here, and let the rest of the site talk about the jewelry.</p>',
+    ],
+
     'privacy' => [
         'title' => 'Privacy Policy',
         'body' => '<p>We respect your privacy and are committed to protecting the personal information you share with us.</p>

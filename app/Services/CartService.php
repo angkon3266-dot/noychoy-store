@@ -576,7 +576,7 @@ class CartService
         if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
             return true;
         }
-        $threshold = config('store.shipping.free_threshold');
+        $threshold = free_shipping_threshold();
 
         return $threshold !== null && $this->subtotal() >= $threshold;
     }
@@ -618,7 +618,7 @@ class CartService
         if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
             return 0.0;
         }
-        $threshold = config('store.shipping.free_threshold');
+        $threshold = free_shipping_threshold();
         if ($threshold !== null && $this->subtotal() >= $threshold) {
             return 0.0;
         }

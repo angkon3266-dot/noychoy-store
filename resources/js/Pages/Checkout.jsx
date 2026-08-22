@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import { csrf, fetchJson, money } from '../Shared/format';
+import Icon, { IconOrGlyph } from '../Shared/Icons';
 
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
@@ -95,7 +96,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
             <h1 className="font-display text-3xl font-semibold mb-6">Checkout</h1>
 
             {errorList.length > 0 && (
-                <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm mb-6">
+                <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-4 py-3 text-sm mb-6">
                     <ul className="list-disc list-inside">{errorList.map((e, i) => <li key={i}>{e}</li>)}</ul>
                 </div>
             )}
@@ -143,11 +144,11 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         /* Nothing to choose between when both zones cost ৳0 —
                            the zone still travels with the order, inferred from
                            the address above. */
-                        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3.5 flex items-center gap-3">
-                            <span className="text-2xl" aria-hidden="true">🎉</span>
+                        <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3.5 flex items-center gap-3">
+                            <Icon name="sparkle" className="w-6 h-6 text-gold-700 shrink-0" />
                             <div>
-                                <p className="text-sm font-semibold text-green-800">Free delivery unlocked</p>
-                                <p className="text-xs text-green-700/80 mt-0.5">
+                                <p className="text-sm font-semibold text-success-800">Free delivery unlocked</p>
+                                <p className="text-xs text-success-700/80 mt-0.5">
                                     Anywhere in Bangladesh — we cover the courier on this order.
                                 </p>
                             </div>
@@ -182,7 +183,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                     className="mt-1 h-4 w-4 accent-gold-600"
                                 />
                                 <span>
-                                    <span className="block text-sm font-semibold">🎁 {gift.title}</span>
+                                    <span className="flex items-center gap-1.5 text-sm font-semibold"><Icon name="gift" className="w-4 h-4 shrink-0" />{gift.title}</span>
                                     <span className="block text-xs text-ink-700/60 mt-0.5">{gift.note}</span>
                                 </span>
                             </label>
@@ -219,10 +220,10 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     <h2 className="font-display text-xl font-semibold mb-4">Your order</h2>
 
                     {props.flash?.success && (
-                        <div className="mb-3 rounded-md bg-green-50 border border-green-200 text-green-800 px-3 py-2 text-sm">{props.flash.success}</div>
+                        <div className="mb-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm">{props.flash.success}</div>
                     )}
                     {props.flash?.error && (
-                        <div className="mb-3 rounded-md bg-red-50 border border-red-200 text-red-800 px-3 py-2 text-sm">{props.flash.error}</div>
+                        <div className="mb-3 rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-3 py-2 text-sm">{props.flash.error}</div>
                     )}
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                         {items.map((item, i) => (
@@ -236,9 +237,9 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         here or there behaves identically. */}
                     <div className="mt-4 pt-4 border-t border-ink-100">
                         {coupon ? (
-                            <div className="flex items-center justify-between text-sm rounded-md bg-green-50 border border-green-200 px-3 py-2">
-                                <span className="text-green-800">🏷️ Coupon <strong className="font-mono">{coupon.code}</strong> applied</span>
-                                <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-red-600 hover:underline disabled:opacity-50">Remove</button>
+                            <div className="flex items-center justify-between text-sm rounded-md bg-success-50 border border-success-200 px-3 py-2">
+                                <span className="text-success-800 inline-flex items-center gap-1.5"><Icon name="tag" className="w-4 h-4 shrink-0" />Coupon <strong className="font-mono">{coupon.code}</strong> applied</span>
+                                <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-danger-600 hover:underline disabled:opacity-50">Remove</button>
                             </div>
                         ) : (
                             <div className="flex gap-2">
@@ -261,34 +262,34 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     <dl className="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
                         <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{summary.subtotalText}</dd></div>
                         {summary.discountLines.length ? summary.discountLines.map((line, i) => (
-                            <div key={i} className="flex justify-between text-green-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
+                            <div key={i} className="flex justify-between text-success-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
                         )) : (summary.discountText && (
-                            <div className="flex justify-between text-green-700"><dt>Discount</dt><dd>−{summary.discountText}</dd></div>
+                            <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{summary.discountText}</dd></div>
                         ))}
                         <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>৳{ship}</dd></div>
                         <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{money(total)}</dd></div>
                     </dl>
 
                     {summary.discountText && (
-                        <div className="mt-3 rounded-md bg-green-50 border border-green-200 text-green-800 px-3 py-2 text-sm font-medium">
-                            🎉 You're saving {summary.discountText}{summary.discountPct > 0 ? ` (${summary.discountPct}% off)` : ''}
+                        <div className="mt-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm font-medium">
+                            You're saving {summary.discountText}{summary.discountPct > 0 ? ` (${summary.discountPct}% off)` : ''}
                         </div>
                     )}
 
                     {summary.hints.map((hint, i) => (
-                        <div key={i} className="mt-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 text-xs">🎁 {hint}</div>
+                        <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                     ))}
 
                     {loyalty && <Points loyalty={loyalty} />}
 
                     {registerPct && (
                         <div className="mt-3 rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs flex items-center justify-between gap-2">
-                            <span>🎉 Get an extra <strong>{registerPct}%</strong> off — plus loyalty points on every order.</span>
+                            <span className="inline-flex items-center gap-1.5"><Icon name="sparkle" className="w-4 h-4 shrink-0" />Get an extra <strong>{registerPct}%</strong> off — plus loyalty points on every order.</span>
                             <a href={chromeUrls.register} className="shrink-0 underline font-medium">Create account</a>
                         </div>
                     )}
 
-                    <div className="mt-4 rounded-md bg-gold-100/60 p-3 text-sm">💵 <strong>Cash on Delivery</strong> — pay when you receive your order.</div>
+                    <div className="mt-4 rounded-md bg-gold-100/60 p-3 text-sm flex items-center gap-2"><Icon name="cash" className="w-5 h-5 shrink-0" /><span><strong>Cash on Delivery</strong> — pay when you receive your order.</span></div>
                     <button type="submit" className="btn-primary w-full mt-6" disabled={form.processing}>
                         {form.processing ? 'Placing order…' : 'Place order'}
                     </button>
@@ -297,7 +298,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         <div className="mt-4 grid gap-2 text-center text-xs text-ink-700/70" style={{ gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, trustBadges.length))}, minmax(0,1fr))` }}>
                             {trustBadges.map((b, i) => (
                                 <div key={i} className="rounded-lg bg-gold-100/60 p-3">
-                                    <span className="text-base">{b.icon || '✓'}</span><br />
+                                    <span className="mx-auto mb-1 flex w-fit text-gold-700"><IconOrGlyph value={b.icon} fallback="shieldCheck" className="w-5 h-5" /></span>
                                     <span className="font-medium">{b.title}</span>
                                     {b.text && <><br /><span className="text-[10px] text-ink-700/50">{b.text}</span></>}
                                 </div>
@@ -337,8 +338,8 @@ function Points({ loyalty }) {
         <div className="mt-3 rounded-md border border-gold-200 bg-gold-50 p-3 text-sm">
             {loyalty.applied > 0 ? (
                 <div className="flex items-center justify-between">
-                    <span>✓ <strong>{loyalty.applied}</strong> points redeemed (−{loyalty.appliedDiscountText})</span>
-                    <button type="button" onClick={() => apply(true)} disabled={busy} className="text-xs text-red-600 hover:underline">Remove</button>
+                    <span className="inline-flex items-center gap-1.5"><Icon name="check" className="w-4 h-4 shrink-0" /><strong>{loyalty.applied}</strong> points redeemed (−{loyalty.appliedDiscountText})</span>
+                    <button type="button" onClick={() => apply(true)} disabled={busy} className="text-xs text-danger-600 hover:underline">Remove</button>
                 </div>
             ) : (
                 <>

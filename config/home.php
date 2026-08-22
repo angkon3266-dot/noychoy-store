@@ -29,12 +29,40 @@ return [
         'show_highlights' => true,
         'show_videos' => true,
 
-        // Feature strip (4 reassurance items). Each: icon (emoji) + title.
+        // Feature strip (4 reassurance items). Each: icon + title.
+        // `icon` is a name from App\Support\StorefrontIcons; an emoji saved
+        // before the picker existed still renders, it just looks like an emoji.
         'feature_strip' => [
-            ['icon' => '🚚', 'title' => 'Fastest Shipping Countrywide'],
-            ['icon' => '↩️', 'title' => 'Easy Return Policy'],
-            ['icon' => '💎', 'title' => 'Premium Quality Product'],
-            ['icon' => '🎧', 'title' => 'Online Support 24/7'],
+            ['icon' => 'truck', 'title' => 'Fastest Shipping Countrywide'],
+            ['icon' => 'check', 'title' => 'Easy Return Policy'],
+            ['icon' => 'diamond', 'title' => 'Premium Quality Product'],
+            ['icon' => 'chat', 'title' => 'Online Support 24/7'],
+        ],
+
+        // Short reassurance line under the hero headline. These used to be
+        // hardcoded in Home.jsx, which is how "cash on delivery" ended up on
+        // the homepage six times with no way to edit any of them.
+        'hero_trust' => [
+            'Cash on delivery',
+            'Gift message included',
+        ],
+
+        // Gift finder blurb (the band under the hero CTA).
+        'gift_finder_text' => 'Pick a budget and we will show you everything that fits it — every piece arrives gift-ready, with a card message if you want one.',
+
+        // The three gift promises beside the finder. icon = StorefrontIcons name.
+        'gift_promises' => [
+            ['icon' => 'gift', 'title' => 'Gift-ready packing', 'text' => 'No price slip in the box'],
+            ['icon' => 'mail', 'title' => 'Personal card', 'text' => 'Add a message at checkout'],
+            ['icon' => 'cash', 'title' => 'Cash on delivery', 'text' => 'Pay when it arrives'],
+        ],
+
+        // "How gifting works" — the four-step band.
+        'gifting_steps' => [
+            ['title' => 'Pick a piece', 'text' => 'Browse by occasion, budget or category.'],
+            ['title' => 'Tick "This is a gift"', 'text' => 'At checkout — add a card message if you like.'],
+            ['title' => 'We pack it gift-ready', 'text' => 'Hand-checked, no price slip in the box.'],
+            ['title' => 'Pay on delivery', 'text' => 'Anywhere in Bangladesh, via Steadfast.'],
         ],
 
         // Hero slider — list of { image, link, alt }. Empty = fall back to hero_image / featured.

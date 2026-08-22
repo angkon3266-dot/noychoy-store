@@ -4,9 +4,9 @@ import AccountShell from '../../Shared/AccountShell';
 import Pagination from '../../Shared/Pagination';
 
 const statusClass = (st) =>
-    st === 'approved' ? 'bg-green-100 text-green-700'
-        : st === 'rejected' ? 'bg-red-100 text-red-700'
-            : 'bg-amber-100 text-amber-700';
+    st === 'approved' ? 'bg-success-100 text-success-700'
+        : st === 'rejected' ? 'bg-danger-100 text-danger-700'
+            : 'bg-warning-100 text-warning-700';
 
 export default function Reviews({ reviews }) {
     return (

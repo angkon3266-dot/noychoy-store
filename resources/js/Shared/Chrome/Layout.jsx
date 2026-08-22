@@ -73,10 +73,10 @@ function FlashBanners({ flash }) {
     return (
         <div className="mx-auto max-w-7xl px-4 mt-4 w-full" ref={seen}>
             {flash.success && (
-                <div className="rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm">{flash.success}</div>
+                <div className="rounded-md bg-success-50 border border-success-200 text-success-800 px-4 py-3 text-sm">{flash.success}</div>
             )}
             {flash.error && (
-                <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">{flash.error}</div>
+                <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-4 py-3 text-sm">{flash.error}</div>
             )}
         </div>
     );

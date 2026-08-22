@@ -28,9 +28,9 @@ export default function ProductCard({ product: p }) {
                         </div>
                     )}
                     {p.preorder ? (
-                        <span className="absolute top-2 left-2 badge bg-violet-600 text-white">Pre-order</span>
+                        <span className="absolute top-2 left-2 badge bg-promo-600 text-white">Pre-order</span>
                     ) : p.on_sale ? (
-                        <span className="absolute top-2 left-2 badge bg-red-600 text-white">-{p.discount_percent}%</span>
+                        <span className="absolute top-2 left-2 badge bg-danger-600 text-white">-{p.discount_percent}%</span>
                     ) : null}
                     {soldOut && <span className="absolute top-2 right-2 badge bg-ink-900/80 text-white">Sold out</span>}
                 </div>

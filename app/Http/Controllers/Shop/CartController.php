@@ -30,7 +30,7 @@ class CartController extends Controller
             ->sortBy(fn ($o) => $o->remainingToUnlock($sub))
             ->first();
 
-        $freeThreshold = (float) config('store.shipping.free_threshold');
+        $freeThreshold = (float) free_shipping_threshold();
         $customer = auth('customer')->user();
         $memberUsage = ($customer && member_pricing()->enabled()) ? member_pricing()->usageStatus($customer) : null;
 

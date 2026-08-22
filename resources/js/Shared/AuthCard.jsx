@@ -17,7 +17,7 @@ export default function AuthCard({ title, subtitle = null, children }) {
                 {/* Flash is rendered once, by the Layout; validation errors are
                     page-local and belong beside the form. */}
                 {errorList.length > 0 && (
-                    <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2 text-sm mt-4" role="alert">
+                    <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-4 py-2 text-sm mt-4" role="alert">
                         {errorList.length === 1 ? errorList[0] : (
                             <ul className="list-disc list-inside">{errorList.map((e, i) => <li key={i}>{e}</li>)}</ul>
                         )}

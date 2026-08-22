@@ -23,7 +23,7 @@ export default function OrderDetail({ order, tracking, reorderUrl }) {
                 </div>
                 <dl className="border-t border-ink-100 mt-4 pt-4 space-y-1 text-sm">
                     <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{order.subtotalText}</dd></div>
-                    {order.discountText && <div className="flex justify-between text-green-700"><dt>Discount</dt><dd>−{order.discountText}</dd></div>}
+                    {order.discountText && <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{order.discountText}</dd></div>}
                     <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>{order.shippingText}</dd></div>
                     <div className="flex justify-between font-semibold text-base"><dt>Total</dt><dd>{order.totalText}</dd></div>
                 </dl>

@@ -19,6 +19,7 @@ class SettingController extends Controller
                 'store_email' => Setting::get('store_email', config('store.email')),
                 'shipping_inside' => Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
                 'shipping_outside' => Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
+                'free_shipping_threshold' => free_shipping_threshold(),
             ],
             'integrations' => [
                 'steadfast_configured' => $steadfast->isConfigured(),
@@ -94,10 +95,11 @@ class SettingController extends Controller
             'store_email' => ['nullable', 'email', 'max:160'],
             'shipping_inside' => ['nullable', 'numeric', 'min:0'],
             'shipping_outside' => ['nullable', 'numeric', 'min:0'],
+            'free_shipping_threshold' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         foreach ($data as $key => $value) {
-            Setting::put($key, $value);
+            Setting::put($key, $value === '' ? null : $value);
         }
 
         return back()->with('success', 'Settings saved.');

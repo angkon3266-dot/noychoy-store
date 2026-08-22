@@ -5,7 +5,7 @@
 <div class="mx-auto max-w-6xl px-4 py-8"
      x-data="{ inside: {{ old('is_inside_dhaka', $address->is_inside_dhaka ?? false) ? 'true' : 'false' }},
                sub: {{ $cart->subtotal() - $cart->discount() }},
-               get ship(){ {{ ($t = config('store.shipping.free_threshold')) !== null ? "if ({$cart->subtotal()} >= {$t}) return 0;" : '' }} return this.inside ? {{ \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')) }} : {{ \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')) }} },
+               get ship(){ {{ ($t = free_shipping_threshold()) !== null ? "if ({$cart->subtotal()} >= {$t}) return 0;" : '' }} return this.inside ? {{ \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')) }} : {{ \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')) }} },
                leadSent: false,
                captureLead(phone, name, email){
                    if (this.leadSent) return;

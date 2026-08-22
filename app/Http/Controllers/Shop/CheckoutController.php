@@ -61,8 +61,7 @@ class CheckoutController extends Controller
                 'rawSubtotal' => (float) $this->cart->subtotal(),
                 'shipInside' => (int) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
                 'shipOutside' => (int) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
-                'freeThreshold' => config('store.shipping.free_threshold') !== null
-                    ? (float) config('store.shipping.free_threshold') : null,
+                'freeThreshold' => free_shipping_threshold(),
             ],
             'prefill' => [
                 'name' => old('name', $customer->name ?? ''),

@@ -29,7 +29,7 @@ export default function Track({ query, notFound, order, tracking }) {
                 <div className="sm:col-span-2"><button className="btn-primary w-full">Track</button></div>
             </form>
 
-            {notFound && <p className="text-center text-red-600 mt-6 text-sm">No order found with those details.</p>}
+            {notFound && <p className="text-center text-danger-600 mt-6 text-sm">No order found with those details.</p>}
 
             {order && (
                 <div className="card p-6 mt-6">
