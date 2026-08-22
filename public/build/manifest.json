@@ -196,7 +196,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BdRk5iwU.css",
+    "file": "assets/app-DmDpc-Q5.css",
     "name": "app",
     "names": [
       "app.css"
@@ -442,7 +442,7 @@
     ]
   },
   "resources/js/Pages/Product.jsx": {
-    "file": "assets/Product-DNcncVHZ.js",
+    "file": "assets/Product-d5Ff0Xd0.js",
     "name": "Product",
     "src": "resources/js/Pages/Product.jsx",
     "isDynamicEntry": true,
@@ -471,7 +471,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-BKS-jPL5.js",
+    "file": "assets/inertia-DswuVuyv.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,

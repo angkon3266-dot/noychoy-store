@@ -79,6 +79,45 @@ class BrandChromeTest extends TestCase
             ->where('chrome.urls.about', route('page.about')));
     }
 
+    public function test_no_react_view_renders_a_settings_icon_as_raw_text(): void
+    {
+        // Retiring the emoji turned the trust-badge and feature-strip settings
+        // into icon NAMES. A renderer still printing the value directly shows
+        // the literal word "cash" / "truck" / "sparkle" instead of an icon —
+        // exactly what the product page did after the first pass. <IconOrGlyph>
+        // is the only correct way to render one.
+        //
+        // Scoped to the settings-backed lists (b = badge, f = feature); the
+        // per-notification `n.icon` is a separate, still-emoji field.
+        $offenders = [];
+
+        foreach ($this->jsxFiles() as $file) {
+            $source = file_get_contents($file);
+
+            // A raw render, not the `value={…}` prop of IconOrGlyph itself.
+            if (preg_match('/(?<!value=)[{]{1}[ ]*[bf][.]icon[ ]*([|]{2}[^}]*)?[}]/', $source, $m)) {
+                $offenders[] = basename($file).' renders '.$m[0].' directly';
+            }
+        }
+
+        $this->assertSame([], $offenders, 'Render these through <IconOrGlyph value={...} /> instead');
+    }
+
+    /** @return array<int, string> */
+    protected function jsxFiles(): array
+    {
+        $files = [];
+        $dir = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('js')));
+
+        foreach ($dir as $file) {
+            if ($file->isFile() && $file->getExtension() === 'jsx') {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        return $files;
+    }
+
     public function test_a_real_favicon_ships_instead_of_an_empty_file(): void
     {
         $this->assertGreaterThan(1000, filesize(public_path('favicon.ico')), 'favicon.ico is empty again');

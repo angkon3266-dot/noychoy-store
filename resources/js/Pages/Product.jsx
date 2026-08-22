@@ -3,7 +3,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import ShareButton from '../Shared/ShareButton';
-import Icon, { Star, WhatsApp } from '../Shared/Icons';
+import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money } from '../Shared/format';
 
@@ -243,6 +243,16 @@ function Gallery({ product, img, setImg }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────────── */
+/** Small solid status chip — the one piece of gold in the buy box. */
+function MemberPill() {
+    return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold-700 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.08em] text-white">
+            <Icon name="medal" className="w-3 h-3" strokeWidth={2} />
+            Member
+        </span>
+    );
+}
+
 function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBanner, delivery, reviews, loved, lovesCount, ui }) {
     const { add } = useCart();
     const { props } = usePage();
@@ -306,37 +316,32 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 )}
             </div>
 
+            {product.short_description && <p className="mt-3 text-[15px] leading-relaxed text-ink-700/80">{product.short_description}</p>}
+
+            {/* One compact line, not a filled banner. The old box cost three
+                lines of vertical space on a phone for two numbers. */}
             {memberBanner && (
-                <div className="mt-3 rounded-lg bg-gold-100/70 border border-gold-300 px-3 py-2.5 text-sm text-gold-800 flex items-center gap-2">
-                    <Icon name="medal" className="w-5 h-5 shrink-0" />
-                    <span>
-                        <strong>Member price {memberBanner.price_text}</strong>{' '}
-                        <span className="text-gold-700/70">· save {memberBanner.pct}%{memberBanner.savings_text ? ` (${memberBanner.savings_text})` : ''}</span>
-                        {' '}— applied automatically at checkout.
+                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                    <MemberPill />
+                    <span className="text-ink-800">
+                        <strong className="font-semibold">{memberBanner.price_text}</strong>
+                        <span className="text-ink-700/55"> · save {memberBanner.pct}%{memberBanner.savings_text ? ` (${memberBanner.savings_text})` : ''}</span>
                     </span>
+                    <span className="text-[12px] text-ink-700/40">applied at checkout</span>
                 </div>
             )}
 
-            {/* Guests: say what membership is worth right where the price is. */}
+            {/* Guests: what membership is worth, on the same one line. */}
             {!ui.isMember && ui.registerPct && (
-                <a
-                    href={ui.registerUrl}
-                    className="mt-4 flex items-center gap-3 rounded-xl border border-gold-300 bg-gradient-to-r from-gold-100/70 to-white px-4 py-3 hover:border-gold-400 transition-colors group"
-                >
-                    <Icon name="medal" className="w-5 h-5 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-gold-800">
-                            Members get {ui.registerPct}% off this piece
-                        </span>
-                        <span className="block text-xs text-ink-700/65 mt-0.5">
-                            Free to join — plus loyalty points on every order and members-only offers.
-                        </span>
+                <a href={ui.registerUrl} className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] group">
+                    <MemberPill />
+                    <span className="text-ink-800">
+                        <strong className="font-semibold">{ui.registerPct}% off</strong>
+                        <span className="text-ink-700/55"> this piece for members</span>
                     </span>
-                    <span className="shrink-0 text-sm font-medium text-gold-700 group-hover:underline whitespace-nowrap">Join free →</span>
+                    <span className="text-[12px] font-medium text-gold-700 group-hover:underline">Join free</span>
                 </a>
             )}
-
-            {product.short_description && <p className="mt-4 text-ink-700/80">{product.short_description}</p>}
 
             {/* Quantity / bundle offer tiers */}
             {offerTiers.length > 0 && (
@@ -378,39 +383,36 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
 
             {/* Storewide offers shown on the PDP */}
             {pdpOffers.length > 0 && (
-                <div className="mt-5 rounded-xl border border-success-200 bg-success-50/70 p-4">
-                    <p className="text-sm font-semibold text-success-800 flex items-center gap-1.5"><Icon name="sparkle" className="w-4 h-4 shrink-0" />Offers on this order</p>
-                    <ul className="mt-2 space-y-1.5">
-                        {pdpOffers.map((o, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-ink-800">
-                                <Icon name="check" className="w-4 h-4 text-success-600 mt-0.5 shrink-0" />
-                                <span>
-                                    {o.badge && <span className="badge bg-success-600 text-white text-[10px] mr-1">{o.badge}</span>}
-                                    <strong>{o.title}</strong>
-                                    {o.description && <> — <span className="text-ink-700/70">{o.description}</span></>}
-                                    {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-gold-700 underline">Register to unlock</a></>}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                <ul className="mt-4 flex flex-col gap-2">
+                    {pdpOffers.map((o, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13px] text-ink-800">
+                            <Icon name="check" className="w-3.5 h-3.5 text-success-600 mt-[3px] shrink-0" strokeWidth={2.5} />
+                            <span>
+                                {o.badge && <span className="mr-1.5 inline-block rounded-full bg-success-600 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.badge}</span>}
+                                <strong className="font-semibold">{o.title}</strong>
+                                {o.description && <span className="text-ink-700/55"> — {o.description}</span>}
+                                {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-gold-700 underline">Register to unlock</a></>}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
             )}
 
             {/* Personalised offers */}
             {myOffers.length > 0 && (
-                <div className="mt-5 rounded-xl border-2 border-gold-400 bg-gradient-to-r from-gold-100/80 to-white p-4">
-                    <p className="text-sm font-semibold text-gold-800 flex items-center gap-1.5"><Icon name="gift" className="w-4 h-4 shrink-0" />Exclusive offer just for you</p>
-                    <ul className="mt-2 space-y-2">
-                        {myOffers.map((o, i) => (
-                            <li key={i} className="text-sm text-ink-800">
-                                <span className="badge bg-gold-600 text-white text-[10px] mr-1">{o.reward}</span>
-                                <strong>{o.title}</strong>
-                                {o.message && <span className="block text-xs text-ink-700/70 italic mt-0.5">{o.message}</span>}
-                                <span className="block text-xs text-success-700 mt-0.5">Applied automatically at checkout{o.until ? ` · until ${o.until}` : ''}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                <ul className="mt-3 flex flex-col gap-2">
+                    {myOffers.map((o, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13px] text-ink-800">
+                            <Icon name="gift" className="w-3.5 h-3.5 text-gold-700 mt-[3px] shrink-0" strokeWidth={2} />
+                            <span>
+                                <span className="mr-1.5 inline-block rounded-full bg-gold-700 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.reward}</span>
+                                <strong className="font-semibold">{o.title}</strong>
+                                {o.message && <span className="text-ink-700/55"> — {o.message}</span>}
+                                <span className="text-ink-700/40">{o.until ? ` · until ${o.until}` : ''}</span>
+                            </span>
+                        </li>
+                    ))}
+                </ul>
             )}
 
             {delivery && (
@@ -491,7 +493,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 <div className="mt-6 grid grid-cols-3 gap-3">
                     {trustBadges.map((b, i) => (
                         <div key={i} className="rounded-lg border border-gold-100 bg-white px-3 py-2.5 text-center">
-                            {b.icon && <div className="text-xl">{b.icon}</div>}
+                            <div className="flex justify-center text-gold-700"><IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5" /></div>
                             <div className="text-xs font-medium mt-0.5">{b.title}</div>
                             {b.text && <div className="text-[11px] text-ink-700/50">{b.text}</div>}
                         </div>
