@@ -186,6 +186,32 @@ class LoyaltyService
         return $tx;
     }
 
+    /**
+     * Undo the earn-on-delivery award for an order that came back.
+     *
+     * Deliberately not a plain negative award(): award() dedupes on
+     * (type, reference), so a second 'earn_order' row for the same order would
+     * be dropped. This writes its own reversal type, and only once.
+     */
+    public function reverseForOrder(\App\Models\Order $order): ?PointTransaction
+    {
+        $earned = (int) $order->points_earned;
+        if (! $order->customer || $earned <= 0) {
+            return null;
+        }
+
+        $tx = $this->award(
+            $order->customer, -$earned, 'reverse_order',
+            'Order '.$order->order_number.' returned — points reversed', $order,
+        );
+
+        if ($tx) {
+            $order->update(['points_earned' => 0]);
+        }
+
+        return $tx;
+    }
+
     // ── Weekly milestones ─────────────────────────────────────────────────────
 
     /**

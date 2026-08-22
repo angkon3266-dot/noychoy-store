@@ -159,6 +159,15 @@ class ProductPageData
                 ] : null,
                 'webPushReady' => app(WebPushService::class)->ready(),
                 'isMember' => (bool) $customer,
+                // Guests: what joining is actually worth on this product.
+                'registerPct' => (function () use ($customer) {
+                    if ($customer) {
+                        return null;
+                    }
+                    $pct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
+
+                    return $pct > 0 ? rtrim(rtrim(number_format($pct, 2), '0'), '.') : null;
+                })(),
                 'customerName' => $customer?->name,
                 'loginUrl' => route('customer.login'),
                 'registerUrl' => route('customer.register'),

@@ -36,16 +36,20 @@
             {{-- Everything wanting attention, in one place. Alerts are derived
                  from live data, so one disappears by itself once it's dealt
                  with — the read state only silences things you can't fix now. --}}
-            <div class="relative shrink-0" x-data="{ bell: false }" @click.outside="bell = false" @keydown.escape.window="bell = false">
+            <div class="relative shrink-0"
+                 x-data="adminAlerts({ feed: '{{ route('admin.alerts.feed') }}', unread: {{ $alertUnread }}, latestOrderId: {{ (int) \App\Models\Order::max('id') }} })"
+                 x-init="start()"
+                 @click.outside="bell = false" @keydown.escape.window="bell = false">
                 <button type="button" @click="bell = !bell"
                         class="relative grid h-9 w-9 place-items-center rounded-lg text-gold-100/70 hover:text-white hover:bg-white/10 transition"
                         :aria-expanded="bell" aria-label="Notifications">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
                     </svg>
-                    @if($alertUnread > 0)
-                        <span class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold inline-flex items-center justify-center">{{ $alertUnread > 9 ? '9+' : $alertUnread }}</span>
-                    @endif
+                    <span x-show="unread > 0" x-cloak
+                          class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold inline-flex items-center justify-center"
+                          :class="pulse && 'animate-ping-once'"
+                          x-text="unread > 9 ? '9+' : unread"></span>
                 </button>
 
                 <div x-show="bell" x-cloak x-transition
@@ -60,6 +64,30 @@
                         @endif
                     </div>
 
+                    {{-- Live rows (from the poll). The server-rendered list
+                         below stays as the no-JS / first-paint fallback. --}}
+                    <template x-if="items.length">
+                        <div>
+                            <template x-for="a in items" :key="a.key">
+                                <form method="POST" action="{{ route('admin.alerts.read') }}" class="block border-b border-ink-50 last:border-0">
+                                    @csrf
+                                    <input type="hidden" name="key" :value="a.key">
+                                    <input type="hidden" name="url" :value="a.url">
+                                    <button class="w-full text-left px-4 py-3 hover:bg-ink-50 transition flex gap-3" :class="a.read && 'opacity-45'">
+                                        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                                              :class="a.read ? 'bg-ink-300' : (a.level === 'urgent' ? 'bg-red-500' : (a.level === 'warning' ? 'bg-amber-500' : 'bg-sky-500'))"></span>
+                                        <span class="min-w-0">
+                                            <span class="block text-sm font-medium" x-text="a.title"></span>
+                                            <span class="block text-xs text-ink-700/60 mt-0.5" x-text="a.body"></span>
+                                            <span class="block text-[11px] text-ink-700/40 mt-1" x-text="a.at"></span>
+                                        </span>
+                                    </button>
+                                </form>
+                            </template>
+                        </div>
+                    </template>
+
+                    <div x-show="!items.length">
                     @forelse($alertList as $a)
                         <form method="POST" action="{{ route('admin.alerts.read') }}" class="block border-b border-ink-50 last:border-0">
                             @csrf
@@ -79,6 +107,19 @@
                     @empty
                         <p class="px-4 py-8 text-center text-sm text-ink-700/50">Nothing needs your attention.</p>
                     @endforelse
+                    </div>
+                </div>
+
+                {{-- New-order toast: appears the moment the poll sees an id
+                     higher than the one this page was rendered with. --}}
+                <div x-show="toast" x-cloak x-transition
+                     class="absolute left-0 top-11 z-[60] w-72 rounded-xl bg-ink-900 text-white shadow-2xl px-4 py-3 flex items-start gap-3">
+                    <span class="text-xl leading-none">🛎️</span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold" x-text="toast"></p>
+                        <a href="{{ route('admin.orders.index') }}" class="text-xs text-gold-300 hover:underline">Open orders →</a>
+                    </div>
+                    <button type="button" @click="toast = ''" class="text-white/50 hover:text-white leading-none">&times;</button>
                 </div>
             </div>
         </div>

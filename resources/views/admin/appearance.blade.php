@@ -257,7 +257,7 @@
 
         {{-- "Deals of the Day" — driven by Admin → Offers --}}
         <div class="mt-6 border-t border-ink-100 pt-5">
-            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_deals" value="1" @checked($home['show_deals'] ?? true)> Show “Deals of the Day”</label>
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="hidden" name="home_show_deals_present" value="1"><input type="checkbox" name="home_show_deals" value="1" @checked($home['show_deals'] ?? true)> Show “Deals of the Day”</label>
             <p class="text-xs text-ink-700/50 mb-3">
                 One card per <strong>active offer</strong> under <a href="{{ route('admin.offers.index') }}" class="underline">Offers</a> — that is where you choose whether a deal promotes
                 a specific product, a whole category, or the entire order. The section hides itself when no offers are running.
@@ -287,7 +287,7 @@
 
         {{-- "Our promise" editorial brand band (Couture template) --}}
         <div class="mt-6 border-t border-ink-100 pt-5">
-            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_promise" value="1" @checked($home['show_promise'] ?? true)> Show the “Our promise” brand band</label>
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="hidden" name="home_show_promise_present" value="1"><input type="checkbox" name="home_show_promise" value="1" @checked($home['show_promise'] ?? true)> Show the “Our promise” brand band</label>
             <p class="text-xs text-ink-700/50 mb-3">The image + text band on the Couture homepage. Leave the image empty to auto-use your newest product photo.</p>
             <div class="grid sm:grid-cols-2 gap-4">
                 <div><label class="label">Eyebrow (small text)</label><input name="home[promise_eyebrow]" value="{{ $home['promise_eyebrow'] ?? '' }}" class="input" placeholder="Our promise"></div>
@@ -413,7 +413,7 @@
 
         {{-- Shop by occasion (Meridian template) --}}
         <div class="mt-8 border-t border-ink-100 pt-5">
-            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="checkbox" name="home_show_occasions" value="1" @checked($home['show_occasions'] ?? true)> Show “Shop by occasion”</label>
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1"><input type="hidden" name="home_show_occasions_present" value="1"><input type="checkbox" name="home_show_occasions" value="1" @checked($home['show_occasions'] ?? true)> Show “Shop by occasion”</label>
             <p class="text-xs text-ink-700/50 mb-4">
                 Used by the <strong>Meridian</strong> homepage template. A tile only appears once it has an image, and the whole
                 section stays hidden until at least one does — so a half-finished row never shows on the storefront.
@@ -438,6 +438,37 @@
                 @endforeach
             </div>
             <p class="text-xs text-ink-700/50 mt-2">Clear a label to delete that tile. Point a link at a category, a landing page (<code>/lp/eid</code>) or any URL.</p>
+        </div>
+
+        {{-- Gift finder (budget bands) --}}
+        <div class="mt-8 border-t border-ink-100 pt-5">
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1">
+                <input type="hidden" name="home_show_gift_finder_present" value="1">
+                <input type="checkbox" name="home_show_gift_finder" value="1" @checked($home['show_gift_finder'] ?? true)>
+                Show the gift finder (“Shopping for someone?”)
+            </label>
+            <p class="text-xs text-ink-700/50 mb-4">
+                Budget buttons on the homepage that drop the shopper straight into the shop with a price
+                filter applied. This is also what the “Find a gift by budget” button on the gifting band
+                scrolls to — with the section off, that button falls back to the shop.
+            </p>
+            <div class="grid sm:grid-cols-2 gap-4 mb-4">
+                <div><label class="label">Section heading</label><input name="home[gift_finder_title]" value="{{ $home['gift_finder_title'] ?? '' }}" class="input" placeholder="{{ config('home.defaults.gift_finder_title') }}"></div>
+            </div>
+
+            @php $budgets = collect($home['gift_budgets'] ?? config('home.defaults.gift_budgets', []))->values(); @endphp
+            <div x-data="{ rows: @js($budgets->map(fn ($b) => ['min' => $b['min'] ?? '', 'max' => $b['max'] ?? ''])->all()) }">
+                <template x-for="(r, i) in rows" :key="i">
+                    <div class="flex items-center gap-2 mb-2">
+                        <input :name="`gift_budgets[${i}][min]`" x-model="r.min" type="number" min="0" step="1" class="input w-32" placeholder="From (৳)">
+                        <span class="text-ink-700/40">–</span>
+                        <input :name="`gift_budgets[${i}][max]`" x-model="r.max" type="number" min="0" step="1" class="input w-32" placeholder="To (৳)">
+                        <button type="button" @click="rows.splice(i,1)" class="text-red-500 px-2 text-xl leading-none">&times;</button>
+                    </div>
+                </template>
+                <button type="button" @click="rows.push({min:'',max:''})" class="btn-outline text-sm">+ Add budget band</button>
+                <p class="text-xs text-ink-700/50 mt-2">Leave “From” empty for “Under ৳X”, or “To” empty for “৳X+”.</p>
+            </div>
         </div>
 
         {{-- Feature strip --}}
@@ -943,6 +974,50 @@
         <div class="mt-4 max-w-xs">
             <label class="label">Low-stock threshold</label>
             <input name="low_stock_threshold" type="number" value="{{ $theme['low_stock_threshold'] }}" class="input">
+        </div>
+    </div>
+
+    <!-- Gift orders -->
+    <div class="card p-6" x-show="tab==='homepage'">
+        <h2 class="font-semibold mb-1">Gift orders</h2>
+        <p class="text-xs text-ink-700/60 mb-4">
+            The “this is a gift” option at checkout. When a customer ticks it the order is flagged for
+            your packing team (no price slip in the box) and their message is saved to the order, ready
+            to print from the thank-you card panel on the order page.
+        </p>
+
+        <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm mb-4">
+            <input type="checkbox" name="gift_enabled" value="1" @checked($theme['gift_enabled'] ?? true)>
+            Offer the gift option at checkout
+        </label>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+                <label class="label">Checkbox label</label>
+                <input name="gift_title" value="{{ $theme['gift_title'] ?? '' }}" class="input" placeholder="{{ config('theme.defaults.gift_title') }}">
+            </div>
+            <div>
+                <label class="label">Message field label</label>
+                <input name="gift_message_label" value="{{ $theme['gift_message_label'] ?? '' }}" class="input" placeholder="{{ config('theme.defaults.gift_message_label') }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label class="label">Explanation under the checkbox</label>
+                <input name="gift_note" value="{{ $theme['gift_note'] ?? '' }}" class="input" placeholder="{{ config('theme.defaults.gift_note') }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label class="label">Example message (placeholder)</label>
+                <input name="gift_message_placeholder" value="{{ $theme['gift_message_placeholder'] ?? '' }}" class="input" placeholder="{{ config('theme.defaults.gift_message_placeholder') }}">
+            </div>
+            <div>
+                <label class="label">Note under the message box</label>
+                <input name="gift_message_help" value="{{ $theme['gift_message_help'] ?? '' }}" class="input" placeholder="{{ config('theme.defaults.gift_message_help') }}">
+                <p class="text-xs text-ink-700/50 mt-1">Say how the message actually reaches the box — printed, hand-written, or tucked in with the invoice.</p>
+            </div>
+            <div>
+                <label class="label">Character limit</label>
+                <input name="gift_message_max" type="number" min="20" max="240" value="{{ $theme['gift_message_max'] ?? 100 }}" class="input">
+                <p class="text-xs text-ink-700/50 mt-1">What fits on your card. Enforced in the browser and on the server.</p>
+            </div>
         </div>
     </div>
 

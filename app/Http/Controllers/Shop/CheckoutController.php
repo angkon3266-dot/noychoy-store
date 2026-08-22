@@ -93,6 +93,18 @@ class CheckoutController extends Controller
                 'numItems' => (int) $this->cart->count(),
             ],
             'coupon' => ($c = $this->cart->coupon()) ? ['code' => $c->code] : null,
+            // Free delivery already won: the zone picker is noise at that
+            // point, so the page shows a badge instead (the zone still
+            // travels with the order, inferred from the address).
+            'freeShipping' => $this->cart->hasFreeShipping(),
+            'gift' => theme('gift_enabled', true) ? [
+                'title' => theme('gift_title'),
+                'note' => theme('gift_note'),
+                'messageLabel' => theme('gift_message_label'),
+                'messagePlaceholder' => theme('gift_message_placeholder'),
+                'messageHelp' => theme('gift_message_help'),
+                'max' => max(20, min(240, (int) theme('gift_message_max', 100))),
+            ] : null,
             'urls' => [
                 'store' => route('checkout.store'),
                 'lead' => route('checkout.lead'),
@@ -118,7 +130,7 @@ class CheckoutController extends Controller
             'is_inside_dhaka' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:500'],
             'is_gift' => ['nullable', 'boolean'],
-            'card_message' => ['nullable', 'string', 'max:240'],
+            'card_message' => ['nullable', 'string', 'max:'.max(20, min(240, (int) theme('gift_message_max', 100)))],
         ], [
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);

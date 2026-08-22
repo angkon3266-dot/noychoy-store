@@ -20,6 +20,15 @@ return [
 
     // Default appearance — overridable from Admin → Appearance (stored in settings table).
     'defaults' => [
+        // ── Gift orders (checkout) ───────────────────────────────────────
+        'gift_enabled' => true,
+        'gift_title' => 'This is a gift',
+        'gift_note' => 'We pack it gift-ready with no price slip in the box, and you can add a short message on a card.',
+        'gift_message_label' => 'Message for the card (optional)',
+        'gift_message_placeholder' => 'Happy anniversary, Nadia — every year with you shines brighter. Love, Rafi',
+        'gift_message_help' => 'Printed on our gift card and tucked inside the box.',
+        'gift_message_max' => 100,
+
         'logo' => null,                // desktop logo
         'logo_mobile' => null,         // mobile logo (used instead of the desktop logo on phones)
         'logo_align' => 'left',        // logo placement: left | center | right

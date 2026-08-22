@@ -22,7 +22,7 @@ class Offer extends Model
     protected $fillable = [
         'title', 'description', 'type', 'applies_to', 'category_ids', 'product_ids',
         'percent', 'min_subtotal', 'min_qty',
-        'members_only', 'badge_label', 'show_on_pdp', 'is_active', 'sort',
+        'members_only', 'badge_label', 'image', 'show_on_pdp', 'is_active', 'sort',
     ];
 
     protected $casts = [

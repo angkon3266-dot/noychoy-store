@@ -54,6 +54,7 @@ Route::middleware('admin')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Notification bell (alerts are computed live; only read state is stored)
+    Route::get('alerts/feed', [AlertController::class, 'feed'])->name('alerts.feed');
     Route::post('alerts/read', [AlertController::class, 'read'])->name('alerts.read');
     Route::post('alerts/read-all', [AlertController::class, 'readAll'])->name('alerts.read-all');
 

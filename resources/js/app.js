@@ -125,6 +125,71 @@ document.addEventListener('alpine:init', () => {
         },
     });
 
+    // ── Admin: live notification bell ────────────────────────────────────────
+    // Shared hosting gives us no websocket, so the panel polls a small JSON
+    // endpoint instead of making the admin reload the page to see a new order.
+    // Polling pauses while the tab is hidden so a forgotten tab costs nothing.
+    window.Alpine.data('adminAlerts', (config) => ({
+        bell: false,
+        unread: config.unread || 0,
+        items: [],
+        latestOrderId: config.latestOrderId || 0,
+        toast: '',
+        pulse: false,
+        _timer: null,
+
+        start() {
+            this.poll();
+            this._timer = setInterval(() => {
+                if (!document.hidden) this.poll();
+            }, 25000);
+            // Catch up immediately when the admin comes back to the tab.
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) this.poll();
+            });
+        },
+
+        async poll() {
+            try {
+                const res = await fetch(config.feed, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (data.latestOrderId > this.latestOrderId) {
+                    const isFirstPoll = this.latestOrderId === 0;
+                    this.latestOrderId = data.latestOrderId;
+                    if (!isFirstPoll) this.announce(data);
+                }
+
+                if (data.unread !== this.unread) {
+                    this.unread = data.unread;
+                    this.flash();
+                }
+                this.items = data.items || [];
+            } catch (e) { /* offline or a blip — the next tick tries again */ }
+        },
+
+        /** A new order deserves more than a silent badge. */
+        announce(data) {
+            this.toast = 'New order received' + (data.orders ? ` · ${data.orders} today` : '');
+            this.flash();
+            try {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('New order', { body: 'A new order just came in.' });
+                }
+            } catch (e) { /* notifications are a bonus, never a requirement */ }
+            clearTimeout(this._toastTimer);
+            this._toastTimer = setTimeout(() => { this.toast = ''; }, 12000);
+        },
+
+        flash() {
+            this.pulse = true;
+            setTimeout(() => { this.pulse = false; }, 1200);
+        },
+    }));
+
     // ── Admin: amend order amounts (items, adjustments, shipping, discount) ──
     window.Alpine.data('orderAmend', (init) => ({
         editing: false,

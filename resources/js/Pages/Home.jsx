@@ -27,7 +27,7 @@ export default function Home(props) {
             <GiftFinder finder={giftFinder} />
             <CategoryLookbook section={categoriesSection} />
             <Featured featured={featured} />
-            <GiftingSteps />
+            <GiftingSteps giftFinder={giftFinder} />
             <ReviewsBand reviews={reviews} />
             <Promise promise={promise} />
             <CardSection section={newArrivals} eyebrow="Just in" viewAll="/shop?sort=new" viewAllLabel="See what's new" tinted />
@@ -406,7 +406,7 @@ function Featured({ featured }) {
 }
 
 /* ── How gifting works ────────────────────────────────────────────────────── */
-function GiftingSteps() {
+function GiftingSteps({ giftFinder }) {
     const steps = [
         ['1', 'Pick a piece', 'Browse by occasion, budget or category.'],
         ['2', 'Tick "This is a gift"', 'At checkout — add a card message if you like.'],
@@ -432,7 +432,13 @@ function GiftingSteps() {
                     ))}
                 </ol>
                 <div className="text-center mt-8">
-                    <a href="#gift-finder" className="inline-flex items-center gap-2 rounded-full bg-gold-600 text-white px-7 py-3 text-sm tracking-wide hover:bg-gold-700 transition-colors">Find a gift by budget</a>
+                    {/* Only jump to the finder when it is actually on the page;
+                        otherwise send them somewhere real. */}
+                    {giftFinder?.show && giftFinder.budgets?.length ? (
+                        <a href="#gift-finder" className="inline-flex items-center gap-2 rounded-full bg-gold-600 text-white px-7 py-3 text-sm tracking-wide hover:bg-gold-700 transition-colors">Find a gift by budget</a>
+                    ) : (
+                        <SmartLink href="/shop" className="inline-flex items-center gap-2 rounded-full bg-gold-600 text-white px-7 py-3 text-sm tracking-wide hover:bg-gold-700 transition-colors">Browse the collection</SmartLink>
+                    )}
                 </div>
             </div>
         </section>

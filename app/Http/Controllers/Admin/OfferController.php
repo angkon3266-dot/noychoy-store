@@ -142,8 +142,19 @@ class OfferController extends Controller
             'min_subtotal' => ['nullable', 'numeric', 'min:0'],
             'min_qty' => ['nullable', 'integer', 'min:1'],
             'badge_label' => ['nullable', 'string', 'max:30'],
+            'offer_image' => ['nullable', 'file', 'image', 'max:5120'],
+            'offer_image_url' => ['nullable', 'string', 'max:500'],
             'sort' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        // Deal-card picture: an upload, a pick from the media library, or
+        // cleared. Absent (and not cleared) means "leave whatever is there".
+        if ($image = resolve_media($request, 'offer_image', 'offers')) {
+            $data['image'] = $image;
+        } elseif ($request->boolean('offer_image_cleared')) {
+            $data['image'] = null;
+        }
+        unset($data['offer_image'], $data['offer_image_url']);
 
         $data['members_only'] = $request->boolean('members_only');
         $data['show_on_pdp'] = $request->boolean('show_on_pdp');

@@ -196,7 +196,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Da4pMJwb.css",
+    "file": "assets/app-BxHOuVZt.css",
     "name": "app",
     "names": [
       "app.css"
@@ -378,7 +378,7 @@
     ]
   },
   "resources/js/Pages/Checkout.jsx": {
-    "file": "assets/Checkout-CQB7OkCz.js",
+    "file": "assets/Checkout-Bxjfs5VA.js",
     "name": "Checkout",
     "src": "resources/js/Pages/Checkout.jsx",
     "isDynamicEntry": true,
@@ -420,7 +420,7 @@
     ]
   },
   "resources/js/Pages/Home.jsx": {
-    "file": "assets/Home-DX7i1VYz.js",
+    "file": "assets/Home-BFnu5a3Q.js",
     "name": "Home",
     "src": "resources/js/Pages/Home.jsx",
     "isDynamicEntry": true,
@@ -442,7 +442,7 @@
     ]
   },
   "resources/js/Pages/Product.jsx": {
-    "file": "assets/Product-DYmnCEsA.js",
+    "file": "assets/Product-DdsMIFy7.js",
     "name": "Product",
     "src": "resources/js/Pages/Product.jsx",
     "isDynamicEntry": true,
@@ -465,13 +465,13 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-Bck3IviW.js",
+    "file": "assets/app-CrlVeePQ.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-CbtBCFyB.js",
+    "file": "assets/inertia-_jFKFont.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,

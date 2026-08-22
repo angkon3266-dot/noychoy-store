@@ -74,6 +74,13 @@ class AppearanceController extends Controller
             'urgency_low_stock' => ['nullable', 'boolean'],
             'low_stock_threshold' => ['nullable', 'integer', 'min:1', 'max:100'],
             'sticky_buy_bar' => ['nullable', 'boolean'],
+            'gift_enabled' => ['nullable', 'boolean'],
+            'gift_title' => ['nullable', 'string', 'max:80'],
+            'gift_note' => ['nullable', 'string', 'max:300'],
+            'gift_message_label' => ['nullable', 'string', 'max:80'],
+            'gift_message_placeholder' => ['nullable', 'string', 'max:200'],
+            'gift_message_help' => ['nullable', 'string', 'max:200'],
+            'gift_message_max' => ['nullable', 'integer', 'min:20', 'max:240'],
             'exit_intent' => ['nullable', 'boolean'],
             'logo' => ['nullable', 'image', 'max:2048'],
             'logo_mobile' => ['nullable', 'image', 'max:2048'],
@@ -276,8 +283,24 @@ class AppearanceController extends Controller
 
         // ---- Storefront homepage builder ----
         // Section toggles
+        // Only touch a toggle the form actually submitted. The gift-finder
+        // checkbox did not exist on this form for a while, so every save was
+        // silently writing it false and hiding the section on the storefront.
         foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals', 'show_occasions', 'show_gift_finder'] as $t) {
-            $home[$t] = $request->boolean('home_'.$t);
+            if ($request->has('home_'.$t.'_present')) {
+                $home[$t] = $request->boolean('home_'.$t);
+            }
+        }
+
+        // Gift-finder budget bands (min/max in taka; blank = open-ended).
+        if ($request->has('gift_budgets')) {
+            $home['gift_budgets'] = collect($request->input('gift_budgets', []))
+                ->map(fn ($b) => [
+                    'min' => filled($b['min'] ?? null) ? (float) $b['min'] : null,
+                    'max' => filled($b['max'] ?? null) ? (float) $b['max'] : null,
+                ])
+                ->filter(fn ($b) => $b['min'] !== null || $b['max'] !== null)
+                ->values()->all();
         }
 
         // Feature strip
@@ -394,7 +417,7 @@ class AppearanceController extends Controller
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo'] as $bool) {
+        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo', 'gift_enabled'] as $bool) {
             $current[$bool] = $request->boolean($bool);
         }
 

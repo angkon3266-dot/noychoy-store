@@ -317,6 +317,25 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 </div>
             )}
 
+            {/* Guests: say what membership is worth right where the price is. */}
+            {!ui.isMember && ui.registerPct && (
+                <a
+                    href={ui.registerUrl}
+                    className="mt-4 flex items-center gap-3 rounded-xl border border-gold-300 bg-gradient-to-r from-gold-100/70 to-white px-4 py-3 hover:border-gold-400 transition-colors group"
+                >
+                    <span className="text-xl" aria-hidden="true">🎖️</span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-gold-800">
+                            Members get {ui.registerPct}% off this piece
+                        </span>
+                        <span className="block text-xs text-ink-700/65 mt-0.5">
+                            Free to join — plus loyalty points on every order and members-only offers.
+                        </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-medium text-gold-700 group-hover:underline whitespace-nowrap">Join free →</span>
+                </a>
+            )}
+
             {product.short_description && <p className="mt-4 text-ink-700/80">{product.short_description}</p>}
 
             {/* Quantity / bundle offer tiers */}

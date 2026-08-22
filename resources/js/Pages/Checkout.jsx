@@ -6,7 +6,7 @@ import { csrf, fetchJson, money } from '../Shared/format';
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
 // loyalty point redemption, and the InitiateCheckout pixel event.
-export default function Checkout({ items, summary, prefill, isMember, loyalty, registerPct, trustBadges, ic, urls, coupon }) {
+export default function Checkout({ items, summary, prefill, isMember, loyalty, registerPct, trustBadges, ic, urls, coupon, freeShipping, gift }) {
     const { props } = usePage();
     const chromeUrls = props.chrome?.urls || {};
     const errors = props.errors || {};
@@ -67,9 +67,9 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
         const text = `${form.data.address} ${form.data.area}`.toLowerCase();
         if (/\bdhaka\b/.test(text) && form.data.is_inside_dhaka !== '1') form.setData('is_inside_dhaka', '1');
     }, [form.data.address, form.data.area]);
-    const ship = (summary.freeThreshold !== null && summary.rawSubtotal >= summary.freeThreshold)
-        ? 0
-        : (inside ? summary.shipInside : summary.shipOutside);
+    // The server is the authority on free delivery (threshold, coupon, offer
+    // or a per-customer perk) — mirror its verdict rather than re-deriving it.
+    const ship = freeShipping ? 0 : (inside ? summary.shipInside : summary.shipOutside);
     const total = summary.sub + ship;
 
     // Capture the lead the moment a valid phone is typed — a COD order the
@@ -139,6 +139,20 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         <input value={form.data.area} onChange={(e) => form.setData('area', e.target.value)} className="input" autoComplete="address-level2" />
                     </div>
 
+                    {freeShipping ? (
+                        /* Nothing to choose between when both zones cost ৳0 —
+                           the zone still travels with the order, inferred from
+                           the address above. */
+                        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3.5 flex items-center gap-3">
+                            <span className="text-2xl" aria-hidden="true">🎉</span>
+                            <div>
+                                <p className="text-sm font-semibold text-green-800">Free delivery unlocked</p>
+                                <p className="text-xs text-green-700/80 mt-0.5">
+                                    Anywhere in Bangladesh — we cover the courier on this order.
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
                     <div>
                         <span className="label">Delivery zone</span>
                         <div className="flex gap-3">
@@ -152,40 +166,48 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                             </label>
                         </div>
                     </div>
+                    )}
 
-                    {/* Gift option: the message is stored on the order (card_message)
-                        and printed on the thank-you card the team already packs. */}
-                    <div className={`rounded-xl border p-4 transition-colors ${form.data.is_gift ? 'border-gold-400 bg-gold-50/60' : 'border-ink-100'}`}>
-                        <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.data.is_gift}
-                                onChange={(e) => form.setData('is_gift', e.target.checked)}
-                                className="mt-1 h-4 w-4 accent-gold-600"
-                            />
-                            <span>
-                                <span className="block text-sm font-semibold">🎁 This is a gift</span>
-                                <span className="block text-xs text-ink-700/60 mt-0.5">We pack it gift-ready with no price slip in the box, and you can add a personal message on a card.</span>
-                            </span>
-                        </label>
-                        {form.data.is_gift && (
-                            <div className="mt-3">
-                                <label className="label text-xs">Message for the card (optional)</label>
-                                <textarea
-                                    value={form.data.card_message}
-                                    onChange={(e) => form.setData('card_message', e.target.value.slice(0, 240))}
-                                    rows={3}
-                                    maxLength={240}
-                                    placeholder="Happy anniversary, Nadia — every year with you shines brighter. Love, Rafi"
-                                    className="input"
+                    {/* Gift option. Every string here is editable in
+                        Appearance → Gift orders, including the character
+                        limit. The message is stored on the order
+                        (card_message) and printed on the card the team packs. */}
+                    {gift && (
+                        <div className={`rounded-xl border p-4 transition-colors ${form.data.is_gift ? 'border-gold-400 bg-gold-50/60' : 'border-ink-100'}`}>
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.data.is_gift}
+                                    onChange={(e) => form.setData('is_gift', e.target.checked)}
+                                    className="mt-1 h-4 w-4 accent-gold-600"
                                 />
-                                <div className="flex items-center justify-between mt-1 text-[11px] text-ink-700/50">
-                                    <span>Hand-written on our card and tucked inside the box.</span>
-                                    <span>{form.data.card_message.length}/240</span>
+                                <span>
+                                    <span className="block text-sm font-semibold">🎁 {gift.title}</span>
+                                    <span className="block text-xs text-ink-700/60 mt-0.5">{gift.note}</span>
+                                </span>
+                            </label>
+                            {form.data.is_gift && (
+                                <div className="mt-3">
+                                    <label className="label text-xs" htmlFor="card_message">{gift.messageLabel}</label>
+                                    <textarea
+                                        id="card_message"
+                                        value={form.data.card_message}
+                                        onChange={(e) => form.setData('card_message', e.target.value.slice(0, gift.max))}
+                                        rows={3}
+                                        maxLength={gift.max}
+                                        placeholder={gift.messagePlaceholder}
+                                        className="input"
+                                    />
+                                    <div className="flex items-center justify-between mt-1 text-[11px] text-ink-700/50">
+                                        <span>{gift.messageHelp}</span>
+                                        <span className={form.data.card_message.length >= gift.max ? 'text-gold-700 font-medium' : ''}>
+                                            {form.data.card_message.length}/{gift.max}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
 
                     <div>
                         <label className="label">Order note (optional)</label>

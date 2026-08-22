@@ -56,6 +56,13 @@ class TransitionOrderStatus
             app(LoyaltyService::class)->awardForOrder($order->fresh('customer'));
         }
 
+        // Points are earned by a delivery that sticks. If a delivered order is
+        // later returned or cancelled, take them back — otherwise a returned
+        // parcel leaves the customer holding points for a sale that unwound.
+        if ($from === 'delivered' && in_array($status, ['returned', 'cancelled'], true)) {
+            app(LoyaltyService::class)->reverseForOrder($order->fresh('customer'));
+        }
+
         $this->push($order->fresh(), $status);
 
         return true;

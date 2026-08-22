@@ -81,6 +81,12 @@ class DailyDeals
     {
         [$image, $href] = static::target($offer);
 
+        // An image chosen for this offer always wins over the one borrowed
+        // from its products/categories.
+        if (filled($offer->image)) {
+            $image = theme_asset($offer->image);
+        }
+
         return [
             'title' => $offer->title,
             'description' => $offer->description,
