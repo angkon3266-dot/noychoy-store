@@ -764,20 +764,94 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: smart-collection rule builder ─────────────────────────────────
+    // Mirrors the segment builder's job for customers: pick conditions, see the
+    // match count update live before anything is saved.
+    window.Alpine.data('collectionBuilder', (cfg) => ({
+        rules: cfg.rules || [],
+        fields: cfg.fields || {},
+        operatorLabels: cfg.operatorLabels || {},
+        match: cfg.match || 'all',
+        type: cfg.type || 'smart',
+        count: cfg.count || 0,
+        ignored: 0,
+        previewUrl: cfg.previewUrl,
+
+        firstField() { return Object.keys(this.fields)[0] || 'tag'; },
+
+        addRule() {
+            const field = this.firstField();
+            this.rules.push({ field, operator: this.fields[field].operators[0], value: '' });
+        },
+
+        // Switching field can strand an operator the new field does not accept
+        // (price "is at least" -> in stock). Snap to the first valid one.
+        onFieldChange(r) {
+            const ops = this.fields[r.field]?.operators || [];
+            if (!ops.includes(r.operator)) r.operator = ops[0];
+            if (this.fields[r.field]?.type === 'boolean') r.value = '';
+            this.preview();
+        },
+
+        needsTypedValue(r) {
+            const type = this.fields[r.field]?.type;
+            return type !== 'boolean' && type !== 'select';
+        },
+
+        placeholderFor(r) {
+            const type = this.fields[r.field]?.type;
+            if (type === 'number') return 'e.g. 2000';
+            if (type === 'date') return 'days, e.g. 30';
+            return r.field === 'tag' ? 'e.g. gift' : 'value';
+        },
+
+        preview() {
+            if (!this.previewUrl) return;
+            clearTimeout(this._t);
+            this._t = setTimeout(async () => {
+                try {
+                    const res = await fetch(this.previewUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]')?.content || '',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ rules: this.rules, match: this.match }),
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    this.count = data.count;
+                    this.ignored = data.submitted_rules - data.usable_rules;
+                } catch (e) { /* leave the last good count on screen */ }
+            }, 250);
+        },
+    }));
+
     // ── Admin: mega-menu builder ─────────────────────────────────────────────
-    window.Alpine.data('menuBuilder', (initial) => ({
+    window.Alpine.data('menuBuilder', (initial, collections) => ({
         items: initial || [],
+        collections: collections || [],
         open: null,
-        blank() { return { label: 'New item', type: 'link', url: '#', new_tab: false, badge: '', view_all_mobile: true, children: [], columns: [] }; },
+        blank() { return { label: 'New item', type: 'link', url: '#', target: 'custom', collection_id: '', new_tab: false, badge: '', view_all_mobile: true, children: [], columns: [] }; },
+        // Point an entry at a collection: copy its URL in, and adopt its name
+        // when the label is still the placeholder.
+        applyTarget(o) {
+            if (o.target !== 'collection') { o.collection_id = ''; return; }
+            const c = this.collections.find((x) => String(x.id) === String(o.collection_id));
+            if (!c) return;
+            o.url = c.url;
+            if (!o.label || o.label === 'New item' || o.label === '') o.label = c.name;
+        },
         add() { this.items.push(this.blank()); this.open = this.items.length - 1; },
         remove(i) { this.items.splice(i, 1); this.open = null; },
         move(i, d) { const j = i + d; if (j < 0 || j >= this.items.length) return; [this.items[i], this.items[j]] = [this.items[j], this.items[i]]; this.open = j; },
         toggle(i) { this.open = this.open === i ? null : i; },
-        addChild(it) { it.children.push({ label: '', url: '#', new_tab: false }); },
+        addChild(it) { it.children.push({ label: '', url: '#', target: 'custom', collection_id: '', new_tab: false }); },
         removeChild(it, j) { it.children.splice(j, 1); },
         addColumn(it) { it.columns.push({ heading: 'New column', links: [{ label: '', url: '#', new_tab: false }] }); },
         removeColumn(it, k) { it.columns.splice(k, 1); },
-        addLink(col) { col.links.push({ label: '', url: '#', new_tab: false }); },
+        addLink(col) { col.links.push({ label: '', url: '#', target: 'custom', collection_id: '', new_tab: false }); },
         removeLink(col, l) { col.links.splice(l, 1); },
         get json() { return JSON.stringify(this.items); },
     }));

@@ -5,7 +5,7 @@
 @section('content')
 @if(session('success'))<div class="mb-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-2.5 text-sm">{{ session('success') }}</div>@endif
 
-<form action="{{ route('admin.menu.update') }}" method="POST" x-data="menuBuilder({{ Js::from($items) }})">
+<form action="{{ route('admin.menu.update') }}" method="POST" x-data="menuBuilder({{ Js::from($items) }}, {{ Js::from($collections) }})">
     @csrf
     <input type="hidden" name="menu_json" :value="json">
 
@@ -38,7 +38,26 @@
                     <div x-show="open===i" x-cloak class="p-4 space-y-4">
                         <div class="grid sm:grid-cols-2 gap-3">
                             <div><label class="label">Label *</label><input x-model="item.label" class="input"></div>
-                            <div><label class="label">URL</label><input x-model="item.url" class="input" placeholder="/shop or https://…"></div>
+                            <div>
+                                <label class="label">Links to</label>
+                                <div class="flex gap-2">
+                                    <select x-model="item.target" @change="applyTarget(item)" class="input w-36">
+                                        <option value="custom">A URL</option>
+                                        <option value="collection">A collection</option>
+                                    </select>
+                                    <input x-show="item.target!=='collection'" x-model="item.url" class="input flex-1" placeholder="/shop or https://…">
+                                    <select x-show="item.target==='collection'" x-model="item.collection_id" @change="applyTarget(item)" class="input flex-1">
+                                        <option value="">Choose a collection…</option>
+                                        <template x-for="c in collections" :key="c.id">
+                                            <option :value="c.id" x-text="c.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <p x-show="item.target==='collection' && collections.length===0" class="text-xs text-red-600 mt-1">
+                                    No collections are offered to the menu yet — tick “Offer in the menu builder” on a
+                                    <a href="{{ route('admin.collections.index') }}" class="underline">collection</a> first.
+                                </p>
+                            </div>
                         </div>
 
                         <div>
@@ -67,7 +86,17 @@
                             <template x-for="(c, j) in item.children" :key="j">
                                 <div class="flex gap-2 items-center">
                                     <input x-model="c.label" class="input py-1.5" placeholder="Label">
-                                    <input x-model="c.url" class="input py-1.5" placeholder="URL">
+                                    <select x-model="c.target" @change="applyTarget(c)" class="input py-1.5 w-28 shrink-0">
+                                        <option value="custom">URL</option>
+                                        <option value="collection">Collection</option>
+                                    </select>
+                                    <input x-show="c.target!=='collection'" x-model="c.url" class="input py-1.5" placeholder="URL">
+                                    <select x-show="c.target==='collection'" x-model="c.collection_id" @change="applyTarget(c)" class="input py-1.5">
+                                        <option value="">Choose…</option>
+                                        <template x-for="c2 in collections" :key="c2.id">
+                                            <option :value="c2.id" x-text="c2.name"></option>
+                                        </template>
+                                    </select>
                                     <label class="text-xs flex items-center gap-1"><input type="checkbox" x-model="c.new_tab"> ↗</label>
                                     <button type="button" @click="removeChild(item,j)" class="text-red-600">×</button>
                                 </div>
@@ -90,7 +119,17 @@
                                     <template x-for="(l, m) in col.links" :key="m">
                                         <div class="flex gap-2 items-center pl-3">
                                             <input x-model="l.label" class="input py-1.5" placeholder="Link label">
-                                            <input x-model="l.url" class="input py-1.5" placeholder="URL">
+                                            <select x-model="l.target" @change="applyTarget(l)" class="input py-1.5 w-28 shrink-0">
+                                        <option value="custom">URL</option>
+                                        <option value="collection">Collection</option>
+                                    </select>
+                                    <input x-show="l.target!=='collection'" x-model="l.url" class="input py-1.5" placeholder="URL">
+                                    <select x-show="l.target==='collection'" x-model="l.collection_id" @change="applyTarget(l)" class="input py-1.5">
+                                        <option value="">Choose…</option>
+                                        <template x-for="c2 in collections" :key="c2.id">
+                                            <option :value="c2.id" x-text="c2.name"></option>
+                                        </template>
+                                    </select>
                                             <button type="button" @click="removeLink(col,m)" class="text-red-600">×</button>
                                         </div>
                                     </template>

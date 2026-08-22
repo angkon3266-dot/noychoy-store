@@ -445,7 +445,18 @@
                         <div class="grid sm:grid-cols-3 gap-2 min-w-0">
                             <input name="occasions[{{ $i }}][label]" value="{{ $o['label'] ?? '' }}" class="input" placeholder="Label (e.g. Eid Gifts)">
                             <input name="occasions[{{ $i }}][tagline]" value="{{ $o['tagline'] ?? '' }}" class="input" placeholder="Tagline">
-                            <input name="occasions[{{ $i }}][link]" value="{{ $o['link'] ?? '' }}" class="input" placeholder="Link (defaults to Shop)">
+                            <input name="occasions[{{ $i }}][link]" value="{{ $o['link'] ?? '' }}" class="input" placeholder="Link (defaults to Shop)"
+                                   x-ref="occlink{{ $i }}" list="collection-urls">
+                            @if($menuCollections->isNotEmpty())
+                                <select class="input text-xs" onchange="if(this.value){this.closest('div').querySelector('input[name$='[link]']').value=this.value}">
+                                    <option value="">Point this tile at a collection…</option>
+                                    @foreach($menuCollections as $mc)
+                                        <option value="{{ $mc['url'] }}">{{ $mc['name'] }}</option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <p class="text-xs text-ink-700/50">Tip: build a <a href="{{ route('admin.collections.index') }}" class="text-gold-700 underline">collection</a> (e.g. “Eid Gifts”) and tick “Offer in the menu builder” to pick it here — otherwise this tile lands on the whole catalogue.</p>
+                            @endif
                         </div>
                     </div>
                 @endforeach

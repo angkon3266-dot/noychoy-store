@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Collection;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,11 @@ class MenuController extends Controller
             // site_menu() already returns the full render shape (stored or default).
             'items' => site_menu(),
             'categories' => Category::orderBy('name')->get(['id', 'name', 'slug', 'parent_id']),
+            // Collections the admin has offered to the menu (Collections →
+            // "Offer in the menu builder"), with their URLs pre-resolved.
+            'collections' => Collection::inMenu()->orderBy('position')->orderBy('name')->get(['id', 'name', 'slug'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'url' => route('collection.show', $c->slug)])
+                ->values(),
             'theme' => theme(),
         ]);
     }
@@ -43,6 +49,30 @@ class MenuController extends Controller
     }
 
     /** Clean posted items into the stored mega-menu structure. */
+    /**
+     * Resolve a menu entry's target into the stored {url, target, collection_id}.
+     *
+     * A collection's slug never changes on rename (Collection::booted only
+     * generates a blank slug), so the URL written here stays correct for the
+     * life of the collection.
+     */
+    protected function target(array $entry): array
+    {
+        $target = $entry['target'] ?? 'custom';
+        $target = in_array($target, ['custom', 'collection'], true) ? $target : 'custom';
+        $collectionId = ($entry['collection_id'] ?? null) ? (int) $entry['collection_id'] : null;
+        $url = trim((string) ($entry['url'] ?? '#'));
+
+        if ($target === 'collection' && $collectionId) {
+            $collection = Collection::find($collectionId);
+            $url = $collection ? route('collection.show', $collection->slug) : '#';
+        } else {
+            $collectionId = null;
+        }
+
+        return ['url' => $url ?: '#', 'target' => $target, 'collection_id' => $collectionId];
+    }
+
     protected function sanitize(array $items): array
     {
         $clean = [];
@@ -51,7 +81,8 @@ class MenuController extends Controller
             if ($label === '') {
                 continue;
             }
-            $type = in_array($item['type'] ?? 'link', ['link', 'dropdown', 'mega'], true) ? $item['type'] : 'link';
+            $type = $item['type'] ?? 'link';
+            $type = in_array($type, ['link', 'dropdown', 'mega'], true) ? $type : 'link';
 
             $children = [];
             foreach ($item['children'] ?? [] as $c) {
@@ -59,11 +90,10 @@ class MenuController extends Controller
                 if ($cl === '') {
                     continue;
                 }
-                $children[] = [
+                $children[] = array_merge([
                     'label' => mb_substr($cl, 0, 60),
-                    'url' => trim((string) ($c['url'] ?? '#')),
                     'new_tab' => (bool) ($c['new_tab'] ?? false),
-                ];
+                ], $this->target($c));
             }
 
             $columns = [];
@@ -74,11 +104,10 @@ class MenuController extends Controller
                     if ($ll === '') {
                         continue;
                     }
-                    $links[] = [
+                    $links[] = array_merge([
                         'label' => mb_substr($ll, 0, 60),
-                        'url' => trim((string) ($l['url'] ?? '#')),
                         'new_tab' => (bool) ($l['new_tab'] ?? false),
-                    ];
+                    ], $this->target($l));
                 }
                 $heading = trim((string) ($col['heading'] ?? ''));
                 if ($heading !== '' || ! empty($links)) {
@@ -86,16 +115,15 @@ class MenuController extends Controller
                 }
             }
 
-            $clean[] = [
+            $clean[] = array_merge([
                 'label' => mb_substr($label, 0, 60),
                 'type' => $type,
-                'url' => trim((string) ($item['url'] ?? '#')),
                 'new_tab' => (bool) ($item['new_tab'] ?? false),
                 'badge' => mb_substr(trim((string) ($item['badge'] ?? '')), 0, 30) ?: null,
                 'view_all_mobile' => (bool) ($item['view_all_mobile'] ?? false),
                 'children' => $children,
                 'columns' => $columns,
-            ];
+            ], $this->target($item));
         }
 
         return $clean;

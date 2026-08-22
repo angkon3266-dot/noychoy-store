@@ -20,7 +20,7 @@ class SitemapController extends Controller
         // ignored, so turning it off left the sitemap happily serving.
         abort_unless(config('seo.sitemap_enabled', true), 404);
 
-        $xml = Cache::remember('sitemap.xml.v1', 3600, function () {
+        $xml = Cache::remember('sitemap.xml.v2', 3600, function () {
             $urls = [];
 
             $add = function (string $loc, ?string $lastmod = null, string $freq = 'weekly', string $priority = '0.6') use (&$urls) {
@@ -36,9 +36,14 @@ class SitemapController extends Controller
             $add(route('page.privacy'), null, 'yearly', '0.2');
             $add(route('page.terms'), null, 'yearly', '0.2');
             $add(route('page.refund'), null, 'yearly', '0.2');
+            $add(route('page.about'), null, 'monthly', '0.4');
 
             Category::active()->get(['slug', 'updated_at'])->each(function ($c) use ($add) {
                 $add(route('category.show', $c->slug), $c->updated_at?->toAtomString(), 'weekly', '0.7');
+            });
+
+            \App\Models\Collection::active()->get(['slug', 'updated_at'])->each(function ($c) use ($add) {
+                $add(route('collection.show', $c->slug), $c->updated_at?->toAtomString(), 'weekly', '0.7');
             });
 
             Product::published()->get(['slug', 'updated_at'])->each(function ($p) use ($add) {

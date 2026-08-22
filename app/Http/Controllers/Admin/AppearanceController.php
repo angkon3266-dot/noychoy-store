@@ -23,6 +23,10 @@ class AppearanceController extends Controller
             'homeTemplates' => config('theme.homepage_templates'),
             'productTemplates' => config('theme.product_templates'),
             'allCategories' => Category::orderBy('name')->get(['id', 'name']),
+            // Collections offered to the menu, so an occasion tile can point at
+            // a real curated page instead of dead-ending on the whole shop.
+            'menuCollections' => \App\Models\Collection::inMenu()->orderBy('position')->orderBy('name')->get(['id', 'name', 'slug'])
+                ->map(fn ($c) => ['name' => $c->name, 'url' => route('collection.show', $c->slug)]),
             // For the section builder's "Customer reviews" block picker.
             'recentReviews' => Review::approved()->with('product:id,name')
                 ->latest()->take(60)->get(['id', 'product_id', 'author_name', 'rating', 'title', 'body']),

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ApiTokenController;
 use App\Http\Controllers\Admin\AppearanceController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\CollectionController;
 use App\Http\Controllers\Admin\ConfigBackupController;
 use App\Http\Controllers\Admin\ConfigHistoryController;
 use App\Http\Controllers\Admin\ContentTemplateController;
@@ -109,6 +110,17 @@ Route::middleware('admin')->group(function () {
     Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
     Route::post('categories/{category}/move', [CategoryController::class, 'move'])->name('categories.move');
     Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+
+    // Collections — Shopify-style curated groups. Names must all start with
+    // 'collections.' so the sidebar active-state and the section gate work.
+    Route::get('collections', [CollectionController::class, 'index'])->name('collections.index');
+    Route::get('collections/create', [CollectionController::class, 'create'])->name('collections.create');
+    Route::post('collections', [CollectionController::class, 'store'])->name('collections.store');
+    Route::post('collections/preview', [CollectionController::class, 'preview'])->name('collections.preview');
+    Route::get('collections/{collection}/edit', [CollectionController::class, 'edit'])->name('collections.edit');
+    Route::put('collections/{collection}', [CollectionController::class, 'update'])->name('collections.update');
+    Route::post('collections/{collection}/move', [CollectionController::class, 'move'])->name('collections.move');
+    Route::delete('collections/{collection}', [CollectionController::class, 'destroy'])->name('collections.destroy');
 
     // Orders
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');

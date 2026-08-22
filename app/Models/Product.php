@@ -183,6 +183,18 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    /**
+     * Collections this product has been hand-pinned into.
+     *
+     * Fully qualified on purpose: this file imports Illuminate\Support\Collection,
+     * so a bare `Collection::class` here would silently resolve to the support
+     * collection and fail at runtime rather than at parse time.
+     */
+    public function collections(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Collection::class);
+    }
+
     /** All categories this product belongs to (for filtering & Meta catalog). */
     public function categories(): BelongsToMany
     {
@@ -310,7 +322,12 @@ class Product extends Model
         return $query->where(function ($q) use ($term) {
             $q->where('name', 'like', "%{$term}%")
                 ->orWhere('sku', 'like', "%{$term}%")
-                ->orWhere('short_description', 'like', "%{$term}%");
+                ->orWhere('short_description', 'like', "%{$term}%")
+                // Searching "gift" used to return nothing, because the word
+                // lives in the tags and the long description, not the name.
+                ->orWhere('tags', 'like', "%{$term}%")
+                ->orWhere('description', 'like', "%{$term}%")
+                ->orWhereHas('category', fn ($c) => $c->where('name', 'like', "%{$term}%"));
         });
     }
 

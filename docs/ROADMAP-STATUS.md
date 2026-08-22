@@ -111,14 +111,14 @@ defaults, the emoji icon system and the palette are code.
 | Price/budget filtering | **Done** | code | `price_min` / `price_max` / `price_range[]` are honoured *(dossier stale)* |
 | Gift finder by budget | **Done** | code | Built, linked, honoured by the catalog (`7daefff` un-hid it) |
 | Products can carry tags today | **Done** | code | Admin form, quick-edit, CSV import, **and** the MCP/API layer can all set tags |
-| Budget inputs in the catalog UI | **Partial** | code | `price_min`/`price_max` work but are URL-only — no min/max box in the sidebar |
+| Budget inputs in the catalog UI | **Partial** | code | `price_min`/`price_max` work but are URL-only — no min/max box in the sidebar. A budget *collection* is now the better answer for the common bands |
 | In-stock / on-sale toggles | **Partial** | code | Configurable and query-honoured, but never rendered |
 | Tags sidebar group | **Partial** | setting | Works as a URL param; the sidebar group is off by default |
-| Search misses tags, description, category | **Todo** | code | Why `gift` returns nothing — the search scope covers too few fields |
-| **`q` is silently dropped on category pages** | **Todo** | code | **Bug found during this audit.** `CatalogController::category()` never calls `->search()`, yet still ships `searchQuery` to the page — so `/category/rings?q=gift` returns the whole category while the UI renders a "search results" state and fires a Meta Pixel `Search` event |
-| Occasion concept on products | **Todo** | code | Occasions exist only as homepage tile labels |
-| Occasion tiles link to unfiltered `/shop` | **Partial** | setting | They dead-end into the full catalogue until products are tagged |
-| Bulk "tag selected products" | **Todo** | code | Tagging 105 products one at a time is the real barrier to the two rows above |
+| Search misses tags, description, category | **Done** | code | `scopeSearch` now covers tags, the long description and the category name. `gift` returns products again |
+| **`q` is silently dropped on category pages** | **Done** | code | `category()` now calls `->search()` like the other two catalog routes. Regression test pins both the count and `searchQuery` |
+| Occasion concept on products | **Done** | code | **Collections.** A saved rule set (tag / price / category / stock / on-sale / colour / flags, matched all-or-any) with its own page, image, SEO and menu slot. Smart collections keep themselves up to date; manual ones are a picked list; a smart one can also pin products on top |
+| Occasion tiles link to unfiltered `/shop` | **Done (code) / Todo (content)** | code + content | Appearance → occasion tiles now has a “Point this tile at a collection” picker. **Building the collections and tagging products is yours** — the tiles still land on `/shop` until you do |
+| Bulk "tag selected products" | **Todo** | code | Still the real barrier: collections are only as good as the tags they match. Products already carry tags (admin form, quick-edit, CSV import, MCP/API) — what is missing is a “tag these 20 at once” action |
 
 ---
 
@@ -189,7 +189,8 @@ defaults, the emoji icon system and the palette are code.
 | 2026-08-22 | `0fb357a` | Stars, floats, zone default, CSRF, privacy |
 | 2026-08-22 | `ce4c9c7` | Bundle split, LCP preload, font caching |
 | 2026-08-22 | `7daefff` | Gift-card settings, free-delivery checkout, member nudge, live admin bell |
-| 2026-08-22 | *this change* | Roadmap re-audited against the code; steps 01 and 02 closed on the code side. 508 tests passing (was 485) |
+| 2026-08-22 | `9de7081` | Steps 01 and 02 closed on the code side; roadmap re-audited. 508 tests (was 485) |
+| 2026-08-22 | *this change* | Step 04: Collections — Shopify-style smart product groups, in the menu, the sitemap and the occasion tiles. 538 tests |
 
 ---
 
@@ -219,6 +220,44 @@ emit installable 192/512 maskable icons and follow the store palette; `/about`
 added so the brand-story template that already shipped finally has a URL and a
 footer link; and the homepage's hardcoded "cash on delivery" repeats made
 editable.
+
+### Collections (step 04)
+
+A **collection** is a saved rule set with its own page, image, SEO and menu slot
+— the thing the roadmap needed for "make gifts findable", and the answer to
+occasion tiles that dead-end on the full catalogue.
+
+- **Rules**: tag, title, SKU, description, colour, price, compare-at price,
+  stock, weight, category, in-stock, on-sale, featured, bestseller, pre-order,
+  has-options, date added — matched **all** or **any**. The vocabulary lives in
+  one place (`App\Support\CollectionRules`); the admin dropdowns, the query
+  compiler and the validation all read it, so adding a rule is a one-file change.
+- **Smart or manual**, mirroring `CustomerSegment`. A smart collection can also
+  pin products, which show on top of whatever the rules match.
+- **Empty means empty.** A smart collection with no usable rules returns
+  nothing, deliberately: showing the whole catalogue under a name like "Eid
+  Gifts" looks like it worked when it did not.
+- **Whole-tag matching.** `tag is gift` does not match `gift-card`. The
+  catalogue stores both `Gift` and `gift`, so matching is case-insensitive.
+- **Live preview** in the admin: the match count updates as you build the rules,
+  before anything is saved, and it tells you how many rows it had to ignore.
+- **Menu**: a menu item, a dropdown child or a mega-menu link can point at a
+  collection by name instead of a typed URL. Resolved once at save time —
+  `site_menu()` runs on every request, so resolving there would be a query per
+  item per page. Renaming a collection keeps its URL, so nav links never break.
+- Collections are in the **sitemap** (cache key bumped so a warm cache cannot
+  keep serving the old one) and are SPA-navigable.
+
+Three bugs fixed in the same pass, all confirmed against the code first:
+
+1. `/category/{slug}?q=` **silently dropped the search term** while the page
+   still rendered a search-results state and fired a Meta Pixel `Search` event.
+2. Storefront search **missed tags and the long description**, which is why
+   searching "gift" returned nothing.
+3. `/feed/meta.csv?category=x` **leaked draft products to Meta**: an
+   `orWhereHas` outside a closure compiled to `(published AND pivot) OR primary`.
+   Also fixed a latent `$type` crash in the menu sanitiser from the same
+   `??`-only-guards-the-check pattern.
 
 **Verified:** 508 tests passing, assets rebuilt and committed, and the promise
 chain checked in a browser in both directions — ৳5,550 unlocks free delivery

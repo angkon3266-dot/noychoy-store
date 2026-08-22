@@ -38,9 +38,13 @@ class ProductFeedController extends Controller
 
             Product::published()
                 ->with(['images', 'category', 'categories', 'variants'])
+                // The closure is load-bearing: without it the orWhereHas escapes
+                // published(), and ?category=x compiled to
+                // "(published AND pivot-match) OR primary-match" — which fed
+                // DRAFT products to Meta.
                 ->when(request('category'), function ($q, $slug) {
-                    $q->whereHas('categories', fn ($c) => $c->where('slug', $slug))
-                      ->orWhereHas('category', fn ($c) => $c->where('slug', $slug));
+                    $q->where(fn ($w) => $w->whereHas('categories', fn ($c) => $c->where('slug', $slug))
+                        ->orWhereHas('category', fn ($c) => $c->where('slug', $slug)));
                 })
                 ->chunk(200, function ($products) use ($out, $brand, $currency) {
                     foreach ($products as $p) {

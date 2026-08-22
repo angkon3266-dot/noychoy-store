@@ -272,6 +272,31 @@ if (! function_exists('site_menu')) {
     }
 }
 
+if (! function_exists('menu_target_url')) {
+    /**
+     * Resolve a menu entry's destination.
+     *
+     * A collection-targeted entry stores its URL at save time (see
+     * MenuController::sanitize) so the storefront pays nothing; this only
+     * back-fills an entry whose URL is missing — legacy rows, or a collection
+     * picked before the URL was written.
+     */
+    function menu_target_url(array $entry, string $url): string
+    {
+        if ($url !== '' && $url !== '#') {
+            return $url;
+        }
+
+        if (($entry['target'] ?? null) === 'collection' && ($id = (int) ($entry['collection_id'] ?? 0))) {
+            $collection = \App\Models\Collection::find($id);
+
+            return $collection ? route('collection.show', $collection->slug) : '#';
+        }
+
+        return $url;
+    }
+}
+
 if (! function_exists('normalize_menu_item')) {
     /** Normalise one stored menu item to the full render shape (handles legacy data). */
     function normalize_menu_item(array $item): ?array
@@ -298,14 +323,26 @@ if (! function_exists('normalize_menu_item')) {
             $cl = trim((string) ($c['label'] ?? ''));
             $cu = (string) ($c['url'] ?? $c['value'] ?? '#');
 
-            return $cl === '' ? null : ['label' => $cl, 'url' => $cu, 'new_tab' => (bool) ($c['new_tab'] ?? false)];
+            $cu = menu_target_url($c, $cu);
+
+            return $cl === '' ? null : [
+                'label' => $cl, 'url' => $cu, 'new_tab' => (bool) ($c['new_tab'] ?? false),
+                'target' => $c['target'] ?? 'custom',
+                'collection_id' => isset($c['collection_id']) ? (int) $c['collection_id'] : null,
+            ];
         })->filter()->values()->all();
 
         $columns = collect($item['columns'] ?? [])->map(function ($col) {
             $links = collect($col['links'] ?? [])->map(function ($l) {
                 $ll = trim((string) ($l['label'] ?? ''));
 
-                return $ll === '' ? null : ['label' => $ll, 'url' => (string) ($l['url'] ?? '#'), 'new_tab' => (bool) ($l['new_tab'] ?? false)];
+                return $ll === '' ? null : [
+                    'label' => $ll,
+                    'url' => menu_target_url($l, (string) ($l['url'] ?? '#')),
+                    'new_tab' => (bool) ($l['new_tab'] ?? false),
+                    'target' => $l['target'] ?? 'custom',
+                    'collection_id' => isset($l['collection_id']) ? (int) $l['collection_id'] : null,
+                ];
             })->filter()->values()->all();
 
             return empty($links) && trim((string) ($col['heading'] ?? '')) === '' ? null
@@ -315,10 +352,12 @@ if (! function_exists('normalize_menu_item')) {
         return [
             'label' => $label,
             'type' => $type,
-            'url' => $url ?: '#',
+            'url' => menu_target_url($item, $url) ?: '#',
             'new_tab' => (bool) ($item['new_tab'] ?? false),
             'badge' => ($item['badge'] ?? null) ?: null,
             'view_all_mobile' => (bool) ($item['view_all_mobile'] ?? false),
+            'target' => $item['target'] ?? 'custom',
+            'collection_id' => isset($item['collection_id']) ? (int) $item['collection_id'] : null,
             'children' => $children,
             'columns' => $columns,
         ];

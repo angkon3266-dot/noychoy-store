@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/react';
 // SPA-navigate (fast, no reload) to those; hard-navigate everywhere else so a
 // Blade destination never receives an Inertia XHR it can't answer.
 const INERTIA_PREFIXES = [
-    '/shop', '/best-sellers', '/category/', '/product/', '/cart',
+    '/shop', '/best-sellers', '/category/', '/collection/', '/product/', '/cart',
     '/discover', '/contact', '/about', '/privacy-policy', '/terms-and-conditions', '/refund-policy', '/track',
     // /account pages are Inertia — but /account/n/{id} (notification click-through)
     // redirects to arbitrary admin-authored URLs, so it must stay a full load.

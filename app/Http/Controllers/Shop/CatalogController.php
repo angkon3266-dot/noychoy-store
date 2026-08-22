@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Services\CollectionService;
 use App\Models\ProductLove;
 use App\Services\Meta\MetaTrackingService;
 use App\Services\StorefrontFilters;
@@ -37,14 +38,22 @@ class CatalogController extends Controller
     }
 
     /** Shared Inertia response for the shop / best-sellers / category grids. */
-    protected function renderCatalog(Request $request, Builder $base, string $filterKey, string $title, ?Category $category = null)
-    {
+    protected function renderCatalog(
+        Request $request,
+        Builder $base,
+        string $filterKey,
+        string $title,
+        ?Category $category = null,
+        ?string $description = null,
+    ) {
+        $description ??= $category?->description;
+
         $products = $this->paginate($base, $request);
 
         return \Inertia\Inertia::render('Catalog', [
             'pageTitle' => $title,
             'title' => $title,
-            'description' => $category?->description,
+            'description' => $description,
             'products' => [
                 'data' => \App\Support\Storefront\ProductCardData::collection($products->items()),
                 'links' => $products->linkCollection(),
@@ -56,7 +65,7 @@ class CatalogController extends Controller
             'searchQuery' => $request->query('q') ?: null,
         ])->withViewData([
             'pageTitle' => $title,
-            'metaDescription' => $category?->description,
+            'metaDescription' => $description,
         ]);
     }
 
@@ -133,9 +142,30 @@ class CatalogController extends Controller
 
         $base = Product::published()
             ->where(fn ($q) => $q->whereIn('category_id', $ids)
-                ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)));
+                ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids)))
+            ->search($request->query('q'));
 
         return $this->renderCatalog($request, $base, 'category:'.$category->id, $category->name, $category);
+    }
+
+    /**
+     * A collection page. Reuses the catalog grid wholesale — a collection is
+     * just a different way of choosing which products are in the base query.
+     */
+    public function collection(Request $request, \App\Models\Collection $collection, CollectionService $collections)
+    {
+        abort_unless($collection->is_active, 404);
+
+        $base = $collections->query($collection)->search($request->query('q'));
+
+        return $this->renderCatalog(
+            $request,
+            $base,
+            'collection:'.$collection->id,
+            $collection->name,
+            null,
+            $collection->description,
+        );
     }
 
     public function show(Request $request, Product $product)

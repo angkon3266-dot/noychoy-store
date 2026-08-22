@@ -167,5 +167,6 @@ Route::get('/contact', [PageController::class, 'contact'])->name('page.contact')
 Route::post('/contact', [PageController::class, 'submitContact'])->name('page.contact.submit');
 
 // Catalog (slug routes last so they don't shadow the above)
+Route::get('/collection/{collection:slug}', [CatalogController::class, 'collection'])->name('collection.show');
 Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');
 Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->name('product.show');
