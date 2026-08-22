@@ -7,7 +7,7 @@ import SmartLink from '../SmartLink';
 // Floating stacks: share + back-to-top (left), member offers / call /
 // messenger / WhatsApp (right).
 export default function FloatingStack() {
-    const { props } = usePage();
+    const { props, component } = usePage();
     const chrome = props.chrome || {};
     const floats = chrome.floats || {};
     const offers = chrome.offers;
@@ -32,10 +32,17 @@ export default function FloatingStack() {
 
     const anyRight = offers || floats.call || floats.messenger || floats.whatsapp;
 
+    // The money page gets no floating chrome over its form; product pages
+    // lift the stacks above the sticky buy bar so nothing covers "Buy now".
+    if (component === 'Checkout') return null;
+    const onProduct = component === 'Product';
+    const leftPos = onProduct ? 'bottom-[calc(9.5rem_+_env(safe-area-inset-bottom))] md:bottom-5' : 'bottom-20 md:bottom-5';
+    const rightPos = onProduct ? 'bottom-[calc(9.5rem_+_env(safe-area-inset-bottom))] md:bottom-5' : 'bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:bottom-5';
+
     return (
         <>
             {/* Left: share + back-to-top */}
-            <div className="fixed left-5 z-40 flex flex-col items-center gap-3 bottom-20 md:bottom-5">
+            <div className={`fixed left-5 z-40 flex flex-col items-center gap-3 ${leftPos}`}>
                 {floats.share && (
                     <div className="w-11 h-11 rounded-full bg-white shadow-lg border border-ink-100 flex items-center justify-center hover:border-gold-300 transition">
                         <ShareButton compact label="Share this page" placement="up-right" />
@@ -53,7 +60,7 @@ export default function FloatingStack() {
 
             {/* Right: offers, call, messenger, WhatsApp */}
             {anyRight && (
-                <div className="fixed right-5 z-50 flex flex-col items-center gap-3 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:bottom-5">
+                <div className={`fixed right-5 z-50 flex flex-col items-center gap-3 ${rightPos}`}>
                     {offers && (
                         <div className="relative" ref={offersRef}>
                             <button

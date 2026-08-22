@@ -7,7 +7,12 @@ import { createRoot } from 'react-dom/client';
 // the initial PageView on script init, so the very first `navigate` event
 // (the initial page) must not fire a second one.
 let firstNavigate = true;
-router.on('navigate', () => {
+router.on('navigate', (event) => {
+    // Keep the CSRF <meta> fresh — fetch() helpers read it on every call.
+    const token = event.detail?.page?.props?.csrf;
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (token && meta && meta.content !== token) meta.content = token;
+
     if (firstNavigate) {
         firstNavigate = false;
         return;

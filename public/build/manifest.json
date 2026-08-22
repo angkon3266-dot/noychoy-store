@@ -148,7 +148,7 @@
     "src": "_playfair-display-700-normal-Dw3uKy19.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CpJEbAVF.css",
+    "file": "assets/app-Da4pMJwb.css",
     "name": "app",
     "names": [
       "app.css"
@@ -163,7 +163,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-D7SRa7FU.js",
+    "file": "assets/inertia-CEKbUJTJ.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true

@@ -260,13 +260,12 @@ class HomePageData
 
             case 'reviews':
                 $reviews = collect($b['reviews'] ?? []);
-                $out['items'] = $reviews->isEmpty()
-                    ? [
-                        ['author' => 'Taslima S.', 'meta' => 'Dhaka', 'link' => null, 'rating' => 5, 'quote' => 'The earrings arrived beautifully packaged. The quality is amazing for this price — my friends thought I spent ten times more!'],
-                        ['author' => 'Rafiq H.', 'meta' => 'Chattogram', 'link' => null, 'rating' => 5, 'quote' => 'Ordered a ring for my wife. She absolutely loves it. The cash on delivery option made it so easy.'],
-                        ['author' => 'Nusrat A.', 'meta' => 'Sylhet', 'link' => null, 'rating' => 5, 'quote' => "I've ordered three times now and every piece has been perfect. The bracelets are my favorite — so elegant and well-made."],
-                    ]
-                    : $reviews->map(fn ($r) => [
+                // No real reviews picked → no section. Sample testimonials used to
+                // fill this slot; invented praise on a jewelry site is a trust risk.
+                if ($reviews->isEmpty()) {
+                    return null;
+                }
+                $out['items'] = $reviews->map(fn ($r) => [
                         'author' => $r->author_name,
                         'meta' => $r->product?->name,
                         'link' => $r->product ? route('product.show', $r->product->slug) : null,

@@ -1,7 +1,9 @@
 @php
     $tracking = app(\App\Services\Meta\MetaTrackingService::class);
     $pixelId = meta_pixel_id();
-    $pixelOn = $pixelId && $tracking->pixelEnabled();
+    // Never on password-reset pages: their URLs carry reset tokens and the
+    // customer's email/phone, and the Pixel reports the full page URL.
+    $pixelOn = $pixelId && $tracking->pixelEnabled() && ! request()->is('password/*');
     $events = $tracking->enabledEventsMap();
 
     // Advanced Matching: pass the visitor's details so the Pixel can hash and

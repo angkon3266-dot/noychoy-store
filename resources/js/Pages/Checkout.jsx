@@ -57,6 +57,16 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     }, [ic.eventId]);
 
     const inside = form.data.is_inside_dhaka === '1';
+
+    // Most guests never touch the zone picker, and the default (outside Dhaka)
+    // is the dearer one. If the typed address says Dhaka, pre-select inside —
+    // the customer can still override, and the server charges by the picker.
+    const zoneTouched = useRef(false);
+    useEffect(() => {
+        if (zoneTouched.current) return;
+        const text = `${form.data.address} ${form.data.area}`.toLowerCase();
+        if (/\bdhaka\b/.test(text) && form.data.is_inside_dhaka !== '1') form.setData('is_inside_dhaka', '1');
+    }, [form.data.address, form.data.area]);
     const ship = (summary.freeThreshold !== null && summary.rawSubtotal >= summary.freeThreshold)
         ? 0
         : (inside ? summary.shipInside : summary.shipOutside);
@@ -133,11 +143,11 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         <span className="label">Delivery zone</span>
                         <div className="flex gap-3">
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
-                                <input type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => form.setData('is_inside_dhaka', '1')} className="sr-only" />
+                                <input type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '1'); }} className="sr-only" />
                                 Inside Dhaka — ৳{summary.shipInside}
                             </label>
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${!inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
-                                <input type="radio" name="is_inside_dhaka" value="0" checked={!inside} onChange={() => form.setData('is_inside_dhaka', '0')} className="sr-only" />
+                                <input type="radio" name="is_inside_dhaka" value="0" checked={!inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '0'); }} className="sr-only" />
                                 Outside Dhaka — ৳{summary.shipOutside}
                             </label>
                         </div>
@@ -295,7 +305,7 @@ function Points({ loyalty }) {
                     body: JSON.stringify({ points: pts }),
                 });
             }
-            router.reload();
+            router.reload({ onFinish: () => setBusy(false) });
         } catch (e) {
             setBusy(false);
         }

@@ -19,7 +19,7 @@ export default function Home(props) {
     const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks } = props;
     return (
         <>
-            <Hero hero={hero} />
+            <Hero hero={hero} hasReviews={reviews?.length > 0} />
             <FeatureStrip strip={featureStrip} />
             <Occasions section={occasions} />
             <Deals deals={deals} />
@@ -55,7 +55,7 @@ function Heading({ eyebrow, title, subtitle = null, action = null, center = fals
 const underlineLink = 'text-sm border-b border-ink-900/30 hover:border-gold-700 hover:text-gold-700 transition pb-0.5';
 
 /* ── Hero: editorial split + cross-fading slideshow + gift entry ─────────── */
-function Hero({ hero }) {
+function Hero({ hero, hasReviews = false }) {
     const slides = hero.slides || [];
     const [i, setI] = useState(0);
     const timer = useRef(null);
@@ -93,7 +93,9 @@ function Hero({ hero }) {
                         )}
 
                         <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-700/55">
-                            <span className="inline-flex items-center gap-1.5"><span className="text-gold-500">★★★★★</span> Loved by customers</span>
+                            {hasReviews
+                                ? <span className="inline-flex items-center gap-1.5"><span className="text-gold-500">★★★★★</span> Loved by customers</span>
+                                : <span>Hand-checked before it ships</span>}
                             <span className="hidden sm:inline">·</span>
                             <span>Cash on delivery</span>
                             <span className="hidden sm:inline">·</span>

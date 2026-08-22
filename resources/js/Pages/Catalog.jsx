@@ -8,7 +8,7 @@ import { Link } from '@inertiajs/react';
 // Shop / category / best-sellers grid. Filters and sort submit as GET query
 // params — same URLs as before, so crawlers, ads and old links keep working.
 export default function Catalog({ title, description = null, products, filters, sort, searchQuery }) {
-    const { props } = usePage();
+    const { props, url } = usePage();
     const urls = props.chrome?.urls || {};
     const [showFilters, setShowFilters] = useState(false);
 
@@ -20,7 +20,7 @@ export default function Catalog({ title, description = null, products, filters, 
     const query = useMemo(() => {
         const params = new URLSearchParams(window.location.search);
         return params;
-    }, [products.current_page, sort]);   // re-read after each navigation
+    }, [url]);   // re-read after every navigation, including filter toggles
 
     const hasActiveFilters = ['attr', 'cf', 'tags', 'price_range', 'price_min', 'price_max', 'in_stock', 'on_sale', 'category']
         .some((k) => [...query.keys()].some((key) => key === k || key.startsWith(k + '[')));

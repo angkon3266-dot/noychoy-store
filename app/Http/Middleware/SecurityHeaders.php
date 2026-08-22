@@ -26,6 +26,10 @@ class SecurityHeaders
     {
         $response = $next($request);
 
+        // Advertises the exact PHP build for no benefit.
+        header_remove('X-Powered-By');
+        $response->headers->remove('X-Powered-By');
+
         foreach ((array) config('security.headers', []) as $name => $value) {
             if (filled($value) && ! $response->headers->has($name)) {
                 $response->headers->set($name, $value);

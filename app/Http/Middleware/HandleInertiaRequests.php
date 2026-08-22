@@ -24,6 +24,9 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         return array_merge(parent::share($request), [
+            // Re-read on every visit: login/logout regenerate it, and the <meta>
+            // tag in the root view is only rendered on the first full load.
+            'csrf' => fn () => csrf_token(),
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

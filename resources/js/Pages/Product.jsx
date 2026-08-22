@@ -271,10 +271,10 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
 
             <a href="#reviews" className="mt-2 flex items-center gap-2 text-sm group">
                 <span className="flex text-gold-500">
-                    {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={!!reviews.avg && i > Math.round(reviews.avg)} />)}
+                    {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={!reviews.avg || i > Math.round(reviews.avg)} />)}
                 </span>
                 <span className="text-ink-700/50 group-hover:text-gold-700">
-                    {reviews.count ? `${reviews.avg} · ${reviews.count} review${reviews.count > 1 ? 's' : ''}` : 'No reviews yet — be the first'}
+                    {reviews.count ? `${reviews.avg} · ${reviews.count} review${reviews.count > 1 ? 's' : ''}` : (lovesCount > 0 ? `Loved by ${lovesCount} ${lovesCount === 1 ? 'person' : 'people'}` : 'Be the first to review')}
                 </span>
             </a>
 
@@ -606,7 +606,8 @@ function Description({ text }) {
                 <h2 className="font-display text-2xl font-semibold">Description</h2>
                 <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
             </button>
-            {open && <div className="prose prose-sm max-w-none text-ink-700/85 mt-3 whitespace-pre-line">{text}</div>}
+            {/* Always in the DOM (collapsed via CSS) so search engines index the copy. */}
+            <div className={`prose prose-sm max-w-none text-ink-700/85 mt-3 whitespace-pre-line ${open ? '' : 'hidden'}`}>{text}</div>
         </section>
     );
 }
@@ -660,8 +661,9 @@ function Reviews({ product, reviews, ui, flash }) {
                 <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
             </button>
 
-            {open && (
-                <div className="grid md:grid-cols-3 gap-8 mt-6">
+            <div className={`grid md:grid-cols-3 gap-8 mt-6 ${open ? '' : 'hidden'}`}>
+                {true && (
+                <>
                     {reviews.perk > 0 && (
                         <div className="md:col-span-3">
                             {ui.isMember ? (
@@ -761,8 +763,9 @@ function Reviews({ product, reviews, ui, flash }) {
                             </form>
                         </details>
                     </div>
-                </div>
-            )}
+                </>
+                )}
+            </div>
         </section>
     );
 }
