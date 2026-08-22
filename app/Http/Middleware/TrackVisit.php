@@ -37,11 +37,16 @@ class TrackVisit
 
         if ($this->shouldTrack($request)) {
             $product = $request->route('product');
-
-            Visit::record($product ? 'product' : 'page', [
+            $payload = [
                 'visitor_token' => $token,
                 'product_id' => is_object($product) ? ($product->id ?? null) : null,
-            ]);
+            ];
+            $type = $product ? 'product' : 'page';
+
+            // After the response is flushed, not before the controller runs:
+            // this INSERT used to sit on the critical path of every pageview,
+            // ahead of the HTML, for a number only the dashboard ever reads.
+            app()->terminating(fn () => Visit::record($type, $payload));
         }
 
         return $next($request);

@@ -7,6 +7,15 @@ import { Link } from '@inertiajs/react';
 
 // Shop / category / best-sellers grid. Filters and sort submit as GET query
 // params — same URLs as before, so crawlers, ads and old links keep working.
+//
+// Filter/sort clicks ask for only the props that actually change, so the
+// server skips rebuilding the shared `chrome` payload (menus, footer,
+// notifications) on every checkbox.
+const PARTIAL = {
+    preserveState: true,
+    preserveScroll: true,
+    only: ['products', 'filters', 'sort', 'title', 'pageTitle'],
+};
 export default function Catalog({ title, description = null, products, filters, sort, searchQuery }) {
     const { props, url } = usePage();
     const urls = props.chrome?.urls || {};
@@ -33,14 +42,14 @@ export default function Catalog({ title, description = null, products, filters, 
         const next = checked ? [...existing, value] : existing.filter((v) => v !== value);
         next.forEach((v) => params.append(param, v));
         params.delete('page');
-        router.get(`${window.location.pathname}?${params.toString()}`, {}, { preserveState: true, preserveScroll: true });
+        router.get(`${window.location.pathname}?${params.toString()}`, {}, PARTIAL);
     };
 
     const applySort = (value) => {
         const params = new URLSearchParams(window.location.search);
         params.set('sort', value);
         params.delete('page');
-        router.get(`${window.location.pathname}?${params.toString()}`, {}, { preserveState: true, preserveScroll: true });
+        router.get(`${window.location.pathname}?${params.toString()}`, {}, PARTIAL);
     };
 
     const clearUrl = searchQuery

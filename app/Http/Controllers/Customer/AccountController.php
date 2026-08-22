@@ -471,7 +471,7 @@ class AccountController extends Controller
 
     public function loved()
     {
-        $products = $this->customer()->lovedProducts()->paginate(12);
+        $products = $this->customer()->lovedProducts()->with('images', 'approvedReviews', 'category')->paginate(12);
 
         return \Inertia\Inertia::render('Account/Loved', [
             'pageTitle' => 'Loved items',

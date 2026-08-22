@@ -215,7 +215,15 @@ class AppearanceController extends Controller
                 if (! empty($current[$fontFile])) {
                     Storage::disk('public')->delete($current[$fontFile]);
                 }
-                $current[$fontFile] = $request->file($fontFile)->store('fonts', 'public');
+                // storeAs (not store) so the file keeps its extension: the
+                // caching rules in public/.htaccess and Cloudflare's edge cache
+                // are both extension-driven.
+                $upload = $request->file($fontFile);
+                $current[$fontFile] = $upload->storeAs(
+                    'fonts',
+                    \Illuminate\Support\Str::random(40).'.'.strtolower($upload->getClientOriginalExtension()),
+                    'public',
+                );
             }
         }
 

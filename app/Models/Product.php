@@ -526,7 +526,7 @@ class Product extends Model
             return collect();
         }
 
-        return static::published()->whereIn('id', $ids)->with('images')->get()
+        return static::published()->whereIn('id', $ids)->with('images', 'approvedReviews', 'category')->get()
             ->sortBy(fn ($p) => $ids->search($p->id))->values();
     }
 }

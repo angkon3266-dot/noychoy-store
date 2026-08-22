@@ -164,6 +164,7 @@ function Gallery({ product, img, setImg }) {
     }, []);
 
     const current = img || product.images[0]?.url || '';
+    const currentImage = product.images.find((im) => im.url === current) || product.images[0];
 
     return (
         <div>
@@ -177,7 +178,15 @@ function Gallery({ product, img, setImg }) {
                 {!video && (
                     product.images.length ? (
                         <>
-                            <img src={current} alt={product.name} className="h-full w-full object-cover cursor-zoom-in transition duration-500 group-hover:scale-105" onClick={() => setZoom(true)} />
+                            <img
+                                src={current}
+                                alt={currentImage?.alt || product.name}
+                                {...(currentImage?.thumb ? { srcSet: `${currentImage.thumb} 450w, ${current} 1200w`, sizes: '(min-width: 1024px) 50vw, 100vw' } : {})}
+                                fetchPriority="high"
+                                decoding="async"
+                                className="h-full w-full object-cover cursor-zoom-in transition duration-500 group-hover:scale-105"
+                                onClick={() => setZoom(true)}
+                            />
                             <span className="absolute bottom-3 right-3 rounded-full bg-white/80 p-2 text-ink-700 opacity-0 group-hover:opacity-100 transition pointer-events-none">
                                 <Icon name="zoomIn" className="w-4 h-4" />
                             </span>
@@ -206,9 +215,10 @@ function Gallery({ product, img, setImg }) {
                         <button
                             key={image.id}
                             onClick={() => { setImg(image.url); setVideo(null); }}
+                            aria-label={`View photo ${product.images.indexOf(image) + 1}`}
                             className={`aspect-square overflow-hidden rounded-lg bg-gold-100 ring-2 ${current === image.url && !video ? 'ring-gold-500' : 'ring-transparent'}`}
                         >
-                            <img src={image.url} alt="" className="h-full w-full object-cover" />
+                            <img src={image.thumb || image.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                         </button>
                     ))}
                     {product.videos.map((v, i) => (

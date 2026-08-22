@@ -101,11 +101,21 @@ class HomeController extends Controller
         // template choices keep their Blade views until they're ported —
         // chrome.inertiaHome (HandleInertiaRequests) must agree with this.
         if ($view === 'shop.templates.home.couture') {
-            return \Inertia\Inertia::render('Home', \App\Support\Storefront\HomePageData::make(
+            $data = \App\Support\Storefront\HomePageData::make(
                 $featured, $newArrivals, $bestSellers, $categories, $sections,
-            ))->withViewData([
+            );
+
+            // First hero slide is the LCP element on almost every home visit.
+            $lcp = collect($data['hero']['slides'] ?? [])->first();
+            $lcpImage = ($lcp && ($lcp['type'] ?? null) === 'image') ? $lcp['image'] : null;
+
+            return \Inertia\Inertia::render('Home', $data)->withViewData([
                 'pageTitle' => home_content('seo_title') ?: 'Fine Jewelry',
                 'metaDescription' => home_content('hero_subtitle'),
+                'preloadImage' => $lcpImage,
+                'preloadSrcset' => ($lcpImage && ($lcp['image900'] ?? null))
+                    ? $lcp['image900'].' 900w, '.$lcpImage.' 1600w' : null,
+                'preloadSizes' => '(min-width: 1024px) 50vw, 100vw',
             ]);
         }
 

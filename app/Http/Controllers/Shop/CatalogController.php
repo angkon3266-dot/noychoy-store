@@ -223,6 +223,11 @@ class CatalogController extends Controller
         ))->withViewData([
             'pageTitle' => $product->meta_title ?: $product->name,
             'product' => $product,
+            // The main product photo is the LCP element here.
+            'preloadImage' => $mainImage = $product->images->first()?->url,
+            'preloadSrcset' => ($mainImage && ($v = image_variant($mainImage)))
+                ? $v.' 450w, '.$mainImage.' 1200w' : null,
+            'preloadSizes' => '(min-width: 1024px) 50vw, 100vw',
         ]);
     }
 

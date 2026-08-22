@@ -53,7 +53,14 @@ class ProductPageData
                 'description' => $product->description,
                 'price' => (float) $product->price,
                 'price_text' => money($product->price),
-                'images' => $product->images->map(fn ($i) => ['id' => $i->id, 'url' => $i->url])->values(),
+                'images' => $product->images->map(fn ($i) => [
+                    'id' => $i->id,
+                    'url' => $i->url,
+                    // Thumbnail strip and srcset: the originals are up to
+                    // 1600px and were being downloaded for a 64px thumb.
+                    'thumb' => image_variant($i->url),
+                    'alt' => $i->alt,
+                ])->values(),
                 'videos' => array_values($product->galleryVideos()),
                 'sections' => $product->content_sections ?? [],
                 'specs' => collect($product->customFieldList())->where('show', true)->values()

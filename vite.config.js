@@ -22,6 +22,20 @@ export default defineConfig({
         tailwindcss(),
         react(),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                // React + Inertia in their own chunk: it keeps its hash across
+                // deploys, so returning visitors re-use the cached copy instead
+                // of re-downloading the framework after every content change.
+                // (Rolldown — Vite 8's bundler — only accepts the function form.)
+                manualChunks: (id) =>
+                    /node_modules[\/](react|react-dom|scheduler|@inertiajs)[\/]/.test(id)
+                        ? 'vendor'
+                        : undefined,
+            },
+        },
+    },
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],

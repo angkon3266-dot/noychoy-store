@@ -61,6 +61,18 @@ function Hero({ hero, hasReviews = false }) {
     const timer = useRef(null);
     const touchX = useRef(null);
 
+    // Only the current slide (and the one queued behind it) is put in the
+    // DOM. They are all absolutely positioned inside the viewport, so
+    // loading="lazy" does nothing — six hero images would all be fetched at
+    // first paint, competing with the LCP image and the JS bundle.
+    const [mounted, setMounted] = useState(() => new Set(slides.length > 1 ? [0, 1] : [0]));
+    useEffect(() => {
+        setMounted((prev) => {
+            const next = new Set(prev).add(i).add((i + 1) % slides.length);
+            return next.size === prev.size ? prev : next;
+        });
+    }, [i, slides.length]);
+
     const go = (k) => setI(((k % slides.length) + slides.length) % slides.length);
     const stop = () => { clearInterval(timer.current); timer.current = null; };
     const start = () => {
@@ -121,6 +133,7 @@ function Hero({ hero, hasReviews = false }) {
                     {slides.map((s, k) => {
                         const active = slides.length <= 1 || i === k;
                         const cls = `absolute inset-0 block transition-opacity duration-1000 ease-out ${active ? 'opacity-100' : 'opacity-0 pointer-events-none'}`;
+                        if (!mounted.has(k)) return <div key={k} className={cls} aria-hidden="true" />;
                         const inner = s.type === 'video' && s.video?.type === 'file' ? (
                             <video src={s.video.src} autoPlay muted loop playsInline className="w-full h-full object-cover" />
                         ) : s.type === 'video' ? (
@@ -129,6 +142,7 @@ function Hero({ hero, hasReviews = false }) {
                             <img
                                 src={s.image}
                                 alt={s.alt}
+                                decoding="async"
                                 {...(k > 0 ? { loading: 'lazy' } : { fetchPriority: 'high' })}
                                 {...(s.image900 ? { srcSet: `${s.image900} 900w, ${s.image} 1600w`, sizes: '(min-width: 1024px) 50vw, 100vw' } : {})}
                                 className="w-full h-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"

@@ -1,6 +1,7 @@
 // React storefront entry (Inertia). Blade pages keep using app.js (Alpine);
 // this bundle only loads on routes whose controllers return Inertia::render().
 import { createInertiaApp, router } from '@inertiajs/react';
+import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 
 // Meta Pixel PageView for SPA navigations. The pixel snippet in <head> fires
@@ -21,10 +22,10 @@ router.on('navigate', (event) => {
 });
 
 createInertiaApp({
-    resolve: (name) => {
-        const pages = import.meta.glob('./Pages/**/*.jsx', { eager: true });
-        return pages[`./Pages/${name}.jsx`];
-    },
+    // Lazy, so Vite emits one chunk per page: a first-time visitor downloads
+    // the shell plus the page they asked for, not all 23 pages. The shared
+    // chrome (Layout, ProductCard…) stays in the entry chunk.
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
     setup({ el, App, props }) {
         createRoot(el).render(<App {...props} />);
     },

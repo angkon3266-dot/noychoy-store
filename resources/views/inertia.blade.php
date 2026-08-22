@@ -86,6 +86,16 @@
     <meta name="apple-mobile-web-app-title" content="{{ store_name() }}">
     <meta name="theme-color" content="#9a6c2e">
     <link rel="apple-touch-icon" href="{{ $fav ?: asset('favicon.ico') }}">
+    {{-- The body is client-rendered, so the browser cannot discover the
+         largest image until React runs. The server already knows what it will
+         be, so tell the browser now — this is the single biggest LCP win
+         available without a Node server. --}}
+    @isset($preloadImage)
+        @if($preloadImage)
+            <link rel="preload" as="image" href="{{ $preloadImage }}" fetchpriority="high"
+                  @isset($preloadSrcset)@if($preloadSrcset) imagesrcset="{{ $preloadSrcset }}" imagesizes="{{ $preloadSizes ?? '100vw' }}"@endif @endisset>
+        @endif
+    @endisset
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/inertia.jsx'])
 

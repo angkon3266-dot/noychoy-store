@@ -38,7 +38,7 @@ class CartController extends Controller
         if (! $cart->isEmpty()) {
             $inCart = $cart->items()->pluck('product_id')->all();
             $suggestions = \App\Models\Product::published()->whereNotIn('id', $inCart)
-                ->with('images', 'approvedReviews')->inRandomOrder()->take(4)->get();
+                ->with('images', 'approvedReviews', 'category')->inRandomOrder()->take(4)->get();
         }
 
         return \Inertia\Inertia::render('Cart', [

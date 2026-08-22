@@ -12,7 +12,7 @@ const NAV = [
 ];
 
 export default function AccountShell({ children, wide = false }) {
-    const { props, url } = usePage();
+    const { url } = usePage();
     const path = url.split('?')[0];
 
     return (
@@ -41,15 +41,8 @@ export default function AccountShell({ children, wide = false }) {
                     </div>
                 </aside>
 
-                <div className={`min-w-0 ${wide ? '' : 'max-w-2xl'}`}>
-                    {props.flash?.success && (
-                        <div className="rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-2.5 text-sm mb-4">{props.flash.success}</div>
-                    )}
-                    {props.flash?.error && (
-                        <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 text-sm mb-4">{props.flash.error}</div>
-                    )}
-                    {children}
-                </div>
+                {/* Flash messages are rendered once, by the Layout. */}
+                <div className={`min-w-0 ${wide ? '' : 'max-w-2xl'}`}>{children}</div>
             </div>
         </div>
     );
