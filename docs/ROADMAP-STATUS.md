@@ -31,6 +31,11 @@ code.
   changelog at the bottom with the commit sha. Do not delete rows — a row that
   reads *Done* with a date is the evidence.
 
+> **Read production from the database, not the browser.** LiteSpeed serves
+> cached HTML until it is flushed in cPanel, so a page can show a setting that
+> was changed long ago. One row in this file was wrong for exactly that reason.
+> To check a live setting, ssh in and read it: `php artisan tinker --execute="…"`.
+
 > Two caveats that apply to the whole file. Production's `.env` is gitignored,
 > so any claim about live environment values is inferred from `DEPLOY.md` and
 > must be confirmed on the server. And `deploy.sh` cannot flush the LiteSpeed
@@ -76,7 +81,7 @@ defaults, the emoji icon system and the palette are code.
 | Social URLs + footer legal line | **Todo** | setting | Not hardcoded anywhere — the `config/theme.php` defaults are `null`. `Noychoylove` etc. are rows in the production `settings` table. Admin → Appearance → Footer, and → Conversion for Messenger |
 | Repo-level brand leaks | **Done** | code | `.env.example` shipped `APP_NAME=Noychoy` and a typo'd `hello@nocyhoy.com`; the seeder created `admin@noychoy.com`; `app.css` called it the "Noychoy jewelry palette". All corrected |
 | `footer_about` default duplicated | **Done** | code | The string lived in both `config/theme.php` and `HandleInertiaRequests.php`, so editing the config alone changed nothing. Now one source |
-| Header's only filled button sells logistics | **Done (code) / Todo (setting)** | code + setting | Admin → Menu shipped `Track order` as the *placeholder*, nudging the owner to spend the store's one primary button on logistics. Placeholder changed, the default is now **Shop gifts**, and the field is explained. **The live label is a stored setting — still says “Track Orders” until you clear or change it in Admin → Menu.** Deliberately not overwritten: it is your button. Track order is already in the mobile drawer and the footer |
+| Header's only filled button sells logistics | **Done** | code + setting | Admin → Menu shipped `Track order` as the *placeholder*, nudging the owner to spend the store's one primary button on logistics. Placeholder changed, the default is now **Shop gifts**, and the field is explained. *Correction: the live setting already reads “Shop Gift” — an earlier note here said “Track Orders”, read off a LiteSpeed-cached page rather than the database. Checked directly on the server since.* |
 | Emoji as the icon system | **Done** | code | ~45 emoji literals across the React storefront replaced with the stroke icon set (`Icons.jsx` extended from 19 to 34 marks). The trust-badge and feature-strip settings now take an **icon name** from a picker instead of demanding an emoji, and a migration remapped the emoji already stored in the live settings — unrecognised glyphs are left alone rather than guessed, and still render. `IconSetParityTest` fails the build if the PHP picker list drifts from the JS set. **Not swept:** the three emoji in the legacy Blade trust strip (`resources/js/app.js`), which dies with the dead-Blade deletion in step 07 |
 | Palette roles muddled | **Partial** | code | Semantic `success` / `danger` / `warning` / `promo` tokens added, warmed toward the gold, and **all 136** stock Tailwind red/violet/green/amber classes across 19 storefront files swept onto them — so statuses now follow a palette change instead of clashing with it. **Remaining:** the announcement bar and member bar still carry their own literal `#161618`/`#f5edda` (which happen to equal ink-900/gold-100, so they look right but will not follow a palette swap), and `card_border_color` is a sixth colour. Both need a “follow brand colours” option in Appearance rather than a silent default change |
 | Favicon + app icon | **Done** | code | `public/favicon.ico` was a **0-byte file**; the admin layout ignored the uploaded favicon; the manifest emitted one `sizes:"any"` icon and hardcoded the gold palette. All fixed |
