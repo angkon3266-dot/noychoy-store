@@ -49,13 +49,14 @@ class CatalogController extends Controller
         $description ??= $category?->description;
 
         $products = $this->paginate($base, $request);
+        $cards = \App\Support\Storefront\ProductCardData::collection($products->items());
 
         return \Inertia\Inertia::render('Catalog', [
             'pageTitle' => $title,
             'title' => $title,
             'description' => $description,
             'products' => [
-                'data' => \App\Support\Storefront\ProductCardData::collection($products->items()),
+                'data' => $cards,
                 'links' => $products->linkCollection(),
                 'total' => $products->total(),
                 'current_page' => $products->currentPage(),
@@ -66,6 +67,11 @@ class CatalogController extends Controller
         ])->withViewData([
             'pageTitle' => $title,
             'metaDescription' => $description,
+            // A category's own picture makes the best sharing card; the shop
+            // and best-sellers grids fall back to the shop logo in the layout.
+            'ogImage' => $category?->image
+                ? \Illuminate\Support\Facades\Storage::disk('public')->url($category->image)
+                : ($cards[0]['thumb'] ?? null),
         ]);
     }
 

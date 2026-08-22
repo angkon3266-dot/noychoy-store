@@ -71,7 +71,6 @@ export default function Track({ query, notFound, order, tracking }) {
                         {order.history.map((h, i) => (
                             <li key={i}>
                                 <div className="font-medium capitalize">{h.status}</div>
-                                {h.note && <div className="text-sm text-ink-700/60">{h.note}</div>}
                                 <div className="text-xs text-ink-700/40">{h.date}</div>
                             </li>
                         ))}

@@ -58,7 +58,9 @@ class LinkPreviewMetaTest extends TestCase
 
             $html = $this->get('/')->assertOk()->getContent();
 
-            $this->assertStringNotContainsString('og:type', $html, "[$template] homepage claims to be a product");
+            // The homepage DOES carry a sharing card now — it just has to be
+            // the shop's own, never a product's.
+            $this->assertStringNotContainsString('og:type" content="product"', $html, "[$template] homepage claims to be a product");
             $this->assertStringNotContainsString('product:price:amount', $html, "[$template] homepage leaks a product price");
             $this->assertStringNotContainsString('Shared Product', $this->headOf($html), "[$template] homepage leaks a product title into <head>");
         }
@@ -81,8 +83,42 @@ class LinkPreviewMetaTest extends TestCase
 
         $html = $this->get('/shop')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('og:type', $html);
+        $this->assertStringNotContainsString('og:type" content="product"', $html);
         $this->assertStringNotContainsString('product:price:amount', $html);
+    }
+
+    public function test_every_page_type_gets_a_sharing_card(): void
+    {
+        // Before this, only /product/* had og:* tags, so the homepage and the
+        // category pages pasted into WhatsApp as a bare blue link.
+        $product = $this->product();
+        Setting::put('theme', ['homepage_template' => 'couture']);
+
+        foreach (['/', '/shop', '/category/rings'] as $path) {
+            $head = $this->headOf($this->get($path)->assertOk()->getContent());
+
+            $this->assertStringContainsString('og:type" content="website"', $head, "$path has no sharing card");
+            $this->assertStringContainsString('og:site_name', $head, "$path has no site name");
+            $this->assertStringContainsString('twitter:card', $head, "$path has no twitter card");
+        }
+    }
+
+    public function test_a_category_shares_with_a_picture(): void
+    {
+        // A category with no picture of its own borrows the first product in
+        // the grid, so the card is never imageless.
+        $product = $this->product();
+        \App\Models\ProductImage::create([
+            'product_id' => $product->id,
+            'path' => 'products/ring.webp',
+            'is_primary' => true,
+            'position' => 1,
+        ]);
+
+        $head = $this->headOf($this->get('/category/rings')->assertOk()->getContent());
+
+        $this->assertStringContainsString('og:image', $head);
+        $this->assertStringContainsString('ring.webp', $head);
     }
 
     public function test_a_product_page_still_gets_its_own_preview(): void

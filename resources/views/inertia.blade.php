@@ -78,6 +78,40 @@
         $metaDesc = \Illuminate\Support\Str::limit(trim(strip_tags((string) $metaDesc)), 160);
     @endphp
     <meta name="description" content="{{ $metaDesc }}">
+
+    {{-- Sharing card. Product pages set their own og:* block above (with the
+         richer product:* properties); every other page type gets one here, so
+         a link pasted into WhatsApp or Facebook always renders with a picture
+         instead of as bare text. --}}
+    @php
+        $absolute = function (?string $u) {
+            $u = trim((string) $u);
+            if ($u === '') {
+                return null;
+            }
+
+            return \Illuminate\Support\Str::startsWith($u, 'http')
+                ? $u
+                : rtrim(config('app.url'), '/').'/'.ltrim($u, '/');
+        };
+        // Best available picture, in order: one the controller chose, the
+        // page's own LCP image, the shop logo.
+        $shareImage = $absolute($ogImage ?? ($preloadImage ?? null) ?: theme_asset(theme('logo')));
+        $isProductPage = isset($product) && $product instanceof \App\Models\Product && request()->routeIs('product.show');
+    @endphp
+    @unless($isProductPage)
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="{{ ($pageTitle ?? null) ?: store_name() }}">
+        <meta property="og:description" content="{{ $metaDesc }}">
+        <meta property="og:url" content="{{ $canonicalUrl ?? url()->current() }}">
+        @if($shareImage)<meta property="og:image" content="{{ $shareImage }}">@endif
+    @endunless
+    <meta property="og:site_name" content="{{ store_name() }}">
+    <meta property="og:locale" content="en_GB">
+    <meta name="twitter:card" content="{{ $shareImage ? 'summary_large_image' : 'summary' }}">
+    <meta name="twitter:title" content="{{ ($pageTitle ?? null) ?: store_name() }}">
+    <meta name="twitter:description" content="{{ $metaDesc }}">
+    @if($shareImage)<meta name="twitter:image" content="{{ $shareImage }}">@endif
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any"><link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">@endif
     <link rel="manifest" href="{{ route('manifest') }}">
     <meta name="mobile-web-app-capable" content="yes">

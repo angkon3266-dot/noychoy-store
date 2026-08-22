@@ -128,7 +128,12 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 required
                                 autoComplete="tel"
                                 inputMode="numeric"
+                                aria-describedby="phone-help"
                             />
+                            <p id="phone-help" className="mt-1 text-[11px] text-ink-700/50">
+                                We save this so we can call you about the order — including if you
+                                do not finish checking out.
+                            </p>
                         </div>
                     </div>
                     <div>

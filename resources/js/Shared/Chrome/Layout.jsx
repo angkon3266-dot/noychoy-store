@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { usePage } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
+import { router, usePage } from '@inertiajs/react';
 import { CartProvider, useCart } from '../CartContext';
 import AnnouncementBar from './AnnouncementBar';
 import Header from './Header';
@@ -40,8 +40,41 @@ function Chrome({ children }) {
         if (props.pageTitle && store) document.title = `${props.pageTitle} — ${store}`;
     }, [props.pageTitle, props.chrome?.storeName]);
 
+    // A normal page load moves focus to the top of the document and a screen
+    // reader announces the new title. An SPA navigation does neither unless we
+    // do it: without this, keyboard focus stays on the link that was clicked
+    // (which no longer exists) and nothing is announced.
+    const mainRef = useRef(null);
+    const [announcement, setAnnouncement] = useState('');
+    const firstRender = useRef(true);
+
+    useEffect(() => {
+        if (firstRender.current) {
+            firstRender.current = false;
+            return;
+        }
+        mainRef.current?.focus({ preventScroll: true });
+        setAnnouncement(`${props.pageTitle || 'Page'} loaded`);
+    }, [url]);
+
+    // Anything mid-flight should say so, for anyone who cannot see the
+    // progress bar.
+    useEffect(() => router.on('start', () => setAnnouncement('Loading…')), []);
+
     return (
         <div className="min-h-screen flex flex-col bg-gold-50 text-ink-800">
+            {/* First tab stop on every page: keyboard users should not have to
+                walk the whole menu to reach the products. */}
+            <a
+                href="#main"
+                className="sr-only focus:not-sr-only focus:absolute focus:z-[200] focus:top-3 focus:left-3 focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-2.5 focus:text-sm focus:text-white focus:shadow-lg"
+            >
+                Skip to content
+            </a>
+
+            {/* Route changes announced to screen readers. */}
+            <div aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</div>
+
             <AnnouncementBar config={props.chrome?.announcement} />
             <Header />
             <MobileDrawer />
@@ -49,7 +82,7 @@ function Chrome({ children }) {
             <MiniCart />
             <FlashBanners flash={props.flash} />
 
-            <main className="flex-1">{children}</main>
+            <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 outline-none">{children}</main>
 
             <Footer />
             <FloatingStack />

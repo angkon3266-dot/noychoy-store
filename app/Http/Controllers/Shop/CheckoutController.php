@@ -230,9 +230,11 @@ class CheckoutController extends Controller
             'order' => $order ? [
                 'number' => $order->order_number,
                 'status' => $order->status,
+                // Deliberately no `note`: history notes are written by staff
+                // for staff ("customer unreachable, retry Sunday") and this
+                // page is reachable with an order number and a phone number.
                 'history' => $order->history->map(fn ($h) => [
                     'status' => $h->status,
-                    'note' => $h->note,
                     'date' => $h->created_at->format('d M Y, g:i a'),
                 ])->values(),
             ] : null,

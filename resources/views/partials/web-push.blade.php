@@ -7,7 +7,11 @@
                 const CSRF = @json(csrf_token());
                 // Auto-prompt once per browser: immediately for anyone, and right
                 // after a member registers (server flashes this flag).
-                const AUTOPROMPT = {{ (auth('customer')->check() ? session('prompt_push') : true) ? 'true' : 'false' }};
+                // Only ask once the visitor has done something that makes the
+                // permission make sense — placed an order, or registered
+                // (the server flashes prompt_push then). Asking a stranger on
+                // arrival is the fastest way to a permanent "Block".
+                const AUTOPROMPT = {{ (session('prompt_push') || session('placed_orders')) ? 'true' : 'false' }};
 
                 function urlB64ToUint8(base64) {
                     const pad = '='.repeat((4 - (base64.length % 4)) % 4);
