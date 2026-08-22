@@ -10,6 +10,9 @@ const INERTIA_PREFIXES = [
     // redirects to arbitrary admin-authored URLs, so it must stay a full load.
     '/account',
     '/checkout', '/order/',
+    // Auth pages are Inertia; a signed-in customer hitting them is redirected
+    // to "/" by the guest middleware, which is Inertia too.
+    '/login', '/register', '/password/',
 ];
 
 const HARD_NAV = ['/account/n/'];

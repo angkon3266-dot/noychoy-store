@@ -29,6 +29,15 @@ export default function Confirmation({ order, purchase, trackUrl }) {
                 </div>
                 <h1 className="font-display text-3xl font-semibold mt-4">Thank you, {order.name}!</h1>
                 <p className="text-ink-700/70 mt-2">Your order <strong>{order.number}</strong> has been placed. We'll call you shortly to confirm.</p>
+                {order.isGift && (
+                    <div className="mt-4 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm text-left">
+                        <p className="font-semibold text-gold-800">🎁 Packed as a gift</p>
+                        <p className="text-ink-700/70 mt-0.5">
+                            No price slip goes in the box.
+                            {order.cardMessage ? <> Your card will read: <em>“{order.cardMessage}”</em></> : ' You can still call us to add a card message.'}
+                        </p>
+                    </div>
+                )}
 
                 <div className="text-left mt-8 border-t border-ink-100 pt-6 space-y-3">
                     {order.items.map((item, i) => (

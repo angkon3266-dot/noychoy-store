@@ -1,6 +1,4 @@
-import { usePage } from '@inertiajs/react';
-import { Link } from '@inertiajs/react';
-import { csrf } from './format';
+import { Link, router, usePage } from '@inertiajs/react';
 
 // Account area shell: desktop sidebar nav + flash banners, port of
 // customer/_nav.blade.php + _flash.blade.php.
@@ -33,14 +31,12 @@ export default function AccountShell({ children, wide = false }) {
                                     </Link>
                                 );
                             })}
-                            {/* Logout is a plain post — a full reload cleanly resets all state. */}
-                            <form action="/logout" method="POST" className="pt-1">
-                                <input type="hidden" name="_token" value={csrf()} />
-                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition">
+                            <div className="pt-1">
+                                <button type="button" onClick={() => router.post('/logout')} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition">
                                     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
                                     Log out
                                 </button>
-                            </form>
+                            </div>
                         </nav>
                     </div>
                 </aside>

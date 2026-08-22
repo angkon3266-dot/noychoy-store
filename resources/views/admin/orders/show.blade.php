@@ -3,6 +3,19 @@
 @section('heading', 'Order '.$order->order_number)
 
 @section('content')
+@if($order->is_gift)
+    <div class="mb-4 rounded-xl border-2 border-gold-300 bg-gold-50 px-4 py-3 text-sm flex items-start gap-3">
+        <span class="text-xl">🎁</span>
+        <div>
+            <p class="font-semibold text-gold-800">Gift order — pack it as a gift (no invoice/price slip in the box).</p>
+            @if(filled($order->card_message))
+                <p class="text-ink-700/80 mt-0.5">Card message from the buyer: <em>“{{ $order->card_message }}”</em> — print it from the thank-you card panel below.</p>
+            @else
+                <p class="text-ink-700/60 mt-0.5">No card message was written.</p>
+            @endif
+        </div>
+    </div>
+@endif
 <div class="flex flex-wrap items-center justify-between gap-3">
     <a href="{{ route('admin.orders.index') }}" class="text-sm text-gold-700 hover:underline">← Back to orders</a>
     @php

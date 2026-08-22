@@ -2,6 +2,7 @@
 
 namespace App\Services\Api;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Services\ImageOptimizer;
@@ -113,19 +114,95 @@ class CatalogApi
         }
     }
 
+    /** Fields an agent may set on create or update. */
+    public const WRITABLE = [
+        'name', 'short_description', 'description', 'price', 'compare_at_price',
+        'stock_quantity', 'manage_stock', 'status', 'is_featured', 'is_bestseller', 'sku',
+        'meta_title', 'meta_description', 'category_id', 'tags', 'weight',
+        'is_preorder', 'preorder_note',
+    ];
+
     /** @param array<string,mixed> $fields */
     public function updateProduct(Product $product, array $fields): Product
     {
-        $allowed = array_intersect_key($fields, array_flip([
-            'name', 'short_description', 'description', 'price', 'compare_at_price',
-            'stock_quantity', 'status', 'is_featured', 'sku', 'meta_title', 'meta_description',
-        ]));
+        $allowed = $this->normalise(array_intersect_key($fields, array_flip(self::WRITABLE)));
 
         if ($allowed) {
             $product->update($allowed);
         }
 
         return $product->fresh('images');
+    }
+
+    /**
+     * Create a product the way the admin form does: unique slug + display
+     * serial, draft unless told otherwise, stock tracked when a quantity is
+     * given. Images are attached afterwards with addImage().
+     *
+     * @param array<string,mixed> $fields
+     */
+    public function createProduct(array $fields): Product
+    {
+        $data = $this->normalise(array_intersect_key($fields, array_flip(self::WRITABLE)));
+
+        $data['slug'] = Product::uniqueSlug((string) ($fields['slug'] ?? $data['name']));
+        $data['status'] = $data['status'] ?? 'draft';
+        $data['stock_quantity'] = (int) ($data['stock_quantity'] ?? 0);
+        $data['manage_stock'] = $data['manage_stock'] ?? ($data['stock_quantity'] > 0);
+        $data['in_stock'] = ! $data['manage_stock'] || $data['stock_quantity'] > 0;
+
+        return Product::createUnique($data)->fresh('images');
+    }
+
+    /**
+     * Archive (soft-delete) a product. Its files and order history stay, so
+     * past orders keep their line items and the product can be restored from
+     * the admin panel — an agent mistake should never be unrecoverable.
+     */
+    public function deleteProduct(Product $product): void
+    {
+        $product->delete();
+    }
+
+    /** @return array<int,array{id:int,name:string,slug:string,parent_id:?int,is_active:bool}> */
+    public function categories(): array
+    {
+        return Category::query()->orderBy('position')->orderBy('name')
+            ->get(['id', 'name', 'slug', 'parent_id', 'is_active'])
+            ->map(fn (Category $c) => [
+                'id' => $c->id, 'name' => $c->name, 'slug' => $c->slug,
+                'parent_id' => $c->parent_id, 'is_active' => (bool) $c->is_active,
+            ])->all();
+    }
+
+    /** Resolve a category by id, slug or exact name — agents rarely know ids. */
+    public function findCategory(string|int $ref): ?Category
+    {
+        return Category::query()
+            ->when(is_numeric($ref), fn ($q) => $q->where('id', (int) $ref))
+            ->when(! is_numeric($ref), fn ($q) => $q->where('slug', $ref)->orWhere('name', $ref))
+            ->first();
+    }
+
+    /**
+     * Accept the loose shapes an agent sends: tags as an array, booleans as
+     * strings.
+     *
+     * @param  array<string,mixed>  $fields
+     * @return array<string,mixed>
+     */
+    private function normalise(array $fields): array
+    {
+        if (isset($fields['tags']) && is_array($fields['tags'])) {
+            $fields['tags'] = implode(',', array_map('trim', $fields['tags']));
+        }
+        foreach (['is_featured', 'is_bestseller', 'is_preorder', 'manage_stock'] as $flag) {
+            if (array_key_exists($flag, $fields)) {
+                $fields[$flag] = filter_var($fields[$flag], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        return $fields;
     }
 
     /** @return array<string,mixed> */
@@ -143,6 +220,13 @@ class CatalogApi
             'stock_quantity' => (int) $product->stock_quantity,
             'in_stock' => (bool) $product->in_stock,
             'is_featured' => (bool) $product->is_featured,
+            'is_bestseller' => (bool) $product->is_bestseller,
+            'category' => $product->category ? ['id' => $product->category->id, 'name' => $product->category->name, 'slug' => $product->category->slug] : null,
+            'short_description' => $product->short_description,
+            'description' => $product->description,
+            'tags' => $product->tags,
+            'meta_title' => $product->meta_title,
+            'meta_description' => $product->meta_description,
             'url' => route('product.show', $product),
             'images' => $product->images->sortBy('position')->values()->map(fn (ProductImage $i) => [
                 'id' => $i->id,

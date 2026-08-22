@@ -6,12 +6,31 @@ import { csrf, fetchJson, money } from '../Shared/format';
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
 // loyalty point redemption, and the InitiateCheckout pixel event.
-export default function Checkout({ items, summary, prefill, isMember, loyalty, registerPct, trustBadges, ic, urls }) {
+export default function Checkout({ items, summary, prefill, isMember, loyalty, registerPct, trustBadges, ic, urls, coupon }) {
     const { props } = usePage();
     const chromeUrls = props.chrome?.urls || {};
     const errors = props.errors || {};
     const errorList = Object.values(errors).flat();
     const leadSent = useRef(false);
+    const [code, setCode] = useState('');
+    const [couponBusy, setCouponBusy] = useState(false);
+
+    // Coupon apply/remove go through Inertia: the server answers with
+    // back() → this page re-renders with the new totals + a flash message.
+    const applyCoupon = (e) => {
+        e.preventDefault();
+        if (!code.trim() || couponBusy) return;
+        setCouponBusy(true);
+        router.post(urls.couponApply, { code }, {
+            preserveScroll: true,
+            onSuccess: () => setCode(''),
+            onFinish: () => setCouponBusy(false),
+        });
+    };
+    const removeCoupon = () => {
+        setCouponBusy(true);
+        router.delete(urls.couponRemove, { preserveScroll: true, onFinish: () => setCouponBusy(false) });
+    };
 
     const form = useForm({
         name: prefill.name,
@@ -20,6 +39,8 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
         area: prefill.area,
         is_inside_dhaka: prefill.inside ? '1' : '0',
         notes: '',
+        is_gift: false,
+        card_message: '',
     });
 
     // InitiateCheckout — same event id as the server's CAPI call (dedup).
@@ -122,6 +143,40 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         </div>
                     </div>
 
+                    {/* Gift option: the message is stored on the order (card_message)
+                        and printed on the thank-you card the team already packs. */}
+                    <div className={`rounded-xl border p-4 transition-colors ${form.data.is_gift ? 'border-gold-400 bg-gold-50/60' : 'border-ink-100'}`}>
+                        <label className="flex items-start gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={form.data.is_gift}
+                                onChange={(e) => form.setData('is_gift', e.target.checked)}
+                                className="mt-1 h-4 w-4 accent-gold-600"
+                            />
+                            <span>
+                                <span className="block text-sm font-semibold">🎁 This is a gift</span>
+                                <span className="block text-xs text-ink-700/60 mt-0.5">We pack it gift-ready with no price slip in the box, and you can add a personal message on a card.</span>
+                            </span>
+                        </label>
+                        {form.data.is_gift && (
+                            <div className="mt-3">
+                                <label className="label text-xs">Message for the card (optional)</label>
+                                <textarea
+                                    value={form.data.card_message}
+                                    onChange={(e) => form.setData('card_message', e.target.value.slice(0, 240))}
+                                    rows={3}
+                                    maxLength={240}
+                                    placeholder="Happy anniversary, Nadia — every year with you shines brighter. Love, Rafi"
+                                    className="input"
+                                />
+                                <div className="flex items-center justify-between mt-1 text-[11px] text-ink-700/50">
+                                    <span>Hand-written on our card and tucked inside the box.</span>
+                                    <span>{form.data.card_message.length}/240</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <div>
                         <label className="label">Order note (optional)</label>
                         <textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} className="input" />
@@ -130,6 +185,13 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
 
                 <div className="card p-6 h-fit">
                     <h2 className="font-display text-xl font-semibold mb-4">Your order</h2>
+
+                    {props.flash?.success && (
+                        <div className="mb-3 rounded-md bg-green-50 border border-green-200 text-green-800 px-3 py-2 text-sm">{props.flash.success}</div>
+                    )}
+                    {props.flash?.error && (
+                        <div className="mb-3 rounded-md bg-red-50 border border-red-200 text-red-800 px-3 py-2 text-sm">{props.flash.error}</div>
+                    )}
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                         {items.map((item, i) => (
                             <div key={i} className="flex justify-between text-sm gap-2">
@@ -138,6 +200,32 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                             </div>
                         ))}
                     </div>
+                    {/* Coupon — same endpoints as the cart page, so a code entered
+                        here or there behaves identically. */}
+                    <div className="mt-4 pt-4 border-t border-ink-100">
+                        {coupon ? (
+                            <div className="flex items-center justify-between text-sm rounded-md bg-green-50 border border-green-200 px-3 py-2">
+                                <span className="text-green-800">🏷️ Coupon <strong className="font-mono">{coupon.code}</strong> applied</span>
+                                <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-red-600 hover:underline disabled:opacity-50">Remove</button>
+                            </div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <input
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon(e); }}
+                                    placeholder="Coupon code"
+                                    autoComplete="off"
+                                    className="input py-2 font-mono uppercase"
+                                    aria-label="Coupon code"
+                                />
+                                <button type="button" onClick={applyCoupon} disabled={!code.trim() || couponBusy} className="btn-outline whitespace-nowrap disabled:opacity-50">
+                                    {couponBusy ? '…' : 'Apply'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     <dl className="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
                         <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{summary.subtotalText}</dd></div>
                         {summary.discountLines.length ? summary.discountLines.map((line, i) => (

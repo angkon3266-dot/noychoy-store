@@ -29,9 +29,11 @@
                 <th class="px-4 py-3 text-right">Actions</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-ink-100">
-            @forelse($offers as $offer)
-                <tr class="hover:bg-ink-50" x-data="{ edit: false }">
+        {{-- One <tbody> per offer: the summary row and its edit row must share
+             the same Alpine scope, or the Edit toggle has nothing to show. --}}
+        @forelse($offers as $offer)
+            <tbody x-data="{ edit: false }" class="border-t border-ink-100">
+                <tr class="hover:bg-ink-50">
                     <td class="px-4 py-3">
                         @if($offer->customer)
                             <a href="{{ route('admin.customers.show', $offer->customer) }}" class="text-gold-700 hover:underline">{{ $offer->customer->name }}</a>
@@ -82,10 +84,10 @@
                         </td>
                     </tr>
                 @endif
-            @empty
-                <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No offers in this view.</td></tr>
-            @endforelse
-        </tbody>
+            </tbody>
+        @empty
+            <tbody><tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No offers in this view.</td></tr></tbody>
+        @endforelse
     </table>
 </div>
 

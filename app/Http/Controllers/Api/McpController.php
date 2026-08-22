@@ -58,10 +58,12 @@ class McpController extends Controller
             'protocolVersion' => self::PROTOCOL_VERSION,
             'capabilities' => ['tools' => ['listChanged' => false]],
             'serverInfo' => ['name' => store_name().' storefront', 'version' => '1.0.0'],
-            'instructions' => 'Manage the '.store_name().' catalogue: search products, upload and arrange '
-                .'product photos, and edit product details. Image uploads take a URL — the store downloads, '
-                .'converts to WebP, applies the shop watermark if one is configured, and generates the '
-                .'responsive variant, exactly as the admin panel would.',
+            'instructions' => 'Manage the '.store_name().' catalogue end to end: list categories, create products '
+                .'(draft by default — set status=published when ready), search and edit products, upload and '
+                .'arrange product photos, and archive products (soft delete, restorable from the admin panel). '
+                .'Image uploads take a URL — the store downloads, converts to WebP, applies the shop watermark if '
+                .'one is configured, and generates the responsive variant, exactly as the admin panel would. '
+                .'Typical flow for a new item: list_categories → create_product → upload_product_image (primary) → update_product status=published.',
         ];
     }
 
@@ -143,6 +145,56 @@ class McpController extends Controller
                         'stock_quantity' => ['type' => 'integer'],
                         'status' => ['type' => 'string', 'enum' => ['published', 'draft']],
                         'is_featured' => ['type' => 'boolean'],
+                        'is_bestseller' => ['type' => 'boolean'],
+                        'manage_stock' => ['type' => 'boolean', 'description' => 'Track stock_quantity and hide the product at 0.'],
+                        'sku' => ['type' => 'string'],
+                        'category' => ['type' => 'string', 'description' => 'Category id, slug or exact name (see list_categories).'],
+                        'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'weight' => ['type' => 'number'],
+                        'meta_title' => ['type' => 'string'],
+                        'meta_description' => ['type' => 'string'],
+                    ],
+                ],
+            ],
+            [
+                'name' => 'list_categories',
+                'description' => 'All product categories (id, name, slug, parent, active). Use before create_product.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) []],
+            ],
+            [
+                'name' => 'create_product',
+                'description' => 'Create a new product. Created as a DRAFT unless status=published is passed; add photos with upload_product_image afterwards. Returns the new product incl. id and slug.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'required' => ['name', 'price'],
+                    'properties' => [
+                        'name' => ['type' => 'string'],
+                        'price' => ['type' => 'number'],
+                        'compare_at_price' => ['type' => 'number', 'description' => 'Was-price, for showing a discount.'],
+                        'category' => ['type' => 'string', 'description' => 'Category id, slug or exact name (see list_categories).'],
+                        'sku' => ['type' => 'string'],
+                        'short_description' => ['type' => 'string', 'description' => 'One or two sentences shown under the title.'],
+                        'description' => ['type' => 'string', 'description' => 'Full description (plain text, newlines kept).'],
+                        'stock_quantity' => ['type' => 'integer'],
+                        'status' => ['type' => 'string', 'enum' => ['published', 'draft']],
+                        'is_featured' => ['type' => 'boolean'],
+                        'is_bestseller' => ['type' => 'boolean'],
+                        'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'weight' => ['type' => 'number'],
+                        'meta_title' => ['type' => 'string'],
+                        'meta_description' => ['type' => 'string'],
+                    ],
+                ],
+            ],
+            [
+                'name' => 'delete_product',
+                'description' => 'Archive a product (soft delete). It disappears from the storefront immediately; past orders keep their line items and an admin can restore it. Pass confirm=true.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'required' => ['product', 'confirm'],
+                    'properties' => [
+                        'product' => ['type' => 'string', 'description' => 'Product id, slug or SKU.'],
+                        'confirm' => ['type' => 'boolean', 'description' => 'Must be true — guards against accidental calls.'],
                     ],
                 ],
             ],
@@ -190,8 +242,28 @@ class McpController extends Controller
             })(),
 
             'update_product' => $this->catalog->present(
-                $this->catalog->updateProduct($product(), array_diff_key($args, array_flip(['product'])))
+                $this->catalog->updateProduct($product(), $this->withCategory(array_diff_key($args, array_flip(['product']))))
             ),
+
+            'list_categories' => ['categories' => $this->catalog->categories()],
+
+            'create_product' => (function () use ($args) {
+                if (blank($args['name'] ?? null) || ! isset($args['price'])) {
+                    throw new \DomainException('create_product needs at least name and price.', -32602);
+                }
+
+                return $this->catalog->present($this->catalog->createProduct($this->withCategory($args)));
+            })(),
+
+            'delete_product' => (function () use ($args, $product) {
+                if (! filter_var($args['confirm'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                    throw new \DomainException('Pass confirm=true to archive this product.', -32602);
+                }
+                $p = $product();
+                $this->catalog->deleteProduct($p);
+
+                return ['deleted' => true, 'id' => $p->id, 'name' => $p->name, 'restorable' => true];
+            })(),
 
             default => throw new \DomainException("Unknown tool: {$name}", -32602),
         };
@@ -205,6 +277,19 @@ class McpController extends Controller
             ]],
             'isError' => false,
         ];
+    }
+
+    /** Map an agent's `category` (id / slug / name) onto `category_id`. */
+    private function withCategory(array $args): array
+    {
+        if (filled($args['category'] ?? null)) {
+            $cat = $this->catalog->findCategory((string) $args['category'])
+                ?: throw new \DomainException('No category matches "'.$args['category'].'". Call list_categories to see them.', -32602);
+            $args['category_id'] = $cat->id;
+        }
+        unset($args['category']);
+
+        return $args;
     }
 
     private function error($id, int $code, string $message)

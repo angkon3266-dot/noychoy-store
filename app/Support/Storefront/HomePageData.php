@@ -66,6 +66,61 @@ class HomePageData
                 'title' => home_content('new_arrivals_title') ?: 'New Arrivals',
                 'cards' => ProductCardData::collection($newArrivals),
             ],
+            'bestSellers' => [
+                'show' => (bool) home_content('show_best_selling'),
+                'title' => home_content('best_selling_title') ?: 'Best sellers',
+                'cards' => ProductCardData::collection($bestSellers->take(8)),
+            ],
+            'featureStrip' => [
+                'show' => (bool) home_content('show_feature_strip'),
+                'items' => collect(home_content('feature_strip') ?? [])
+                    ->filter(fn ($f) => filled($f['title'] ?? null))->take(4)->values()
+                    ->map(fn ($f) => ['icon' => $f['icon'] ?? '✓', 'title' => $f['title'], 'text' => $f['text'] ?? null]),
+            ],
+            // Gift-led entry points. Unlike the old Blade template, a tile
+            // renders with or without a photo (typographic tile when none) so
+            // the gifting path exists from day one.
+            'occasions' => [
+                'show' => (bool) home_content('show_occasions'),
+                'title' => home_content('occasions_title') ?: 'Shop by occasion',
+                'subtitle' => home_content('occasions_subtitle'),
+                'items' => collect(home_content('occasions') ?? [])
+                    ->filter(fn ($o) => filled($o['label'] ?? null))->take(8)->values()
+                    ->map(function ($o) {
+                        $image = theme_asset($o['image'] ?? null);
+
+                        return [
+                            'label' => $o['label'],
+                            'tagline' => $o['tagline'] ?? null,
+                            'link' => filled($o['link'] ?? null) ? $o['link'] : route('shop'),
+                            'image' => $image,
+                            'image450' => $image ? image_variant($image, 450) : null,
+                        ];
+                    }),
+            ],
+            'giftFinder' => [
+                'show' => (bool) home_content('show_gift_finder'),
+                'title' => home_content('gift_finder_title') ?: 'Shopping for someone?',
+                'budgets' => collect(home_content('gift_budgets') ?? [])->map(function ($b) {
+                    $min = $b['min'] ?? null;
+                    $max = $b['max'] ?? null;
+
+                    return [
+                        'label' => $max === null ? money($min).'+' : ($min === null ? 'Under '.money($max) : money($min).' – '.money($max)),
+                        'url' => route('shop', array_filter(['price_min' => $min, 'price_max' => $max])),
+                    ];
+                })->values(),
+            ],
+            // Social proof: recent 4–5★ approved reviews, sitewide.
+            'reviews' => \App\Models\Review::approved()->with('product:id,name,slug')
+                ->where('rating', '>=', 4)->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))
+                ->latest()->take(6)->get()
+                ->map(fn ($r) => [
+                    'author' => $r->author_name,
+                    'rating' => (int) $r->rating,
+                    'quote' => $r->body ?: $r->title,
+                    'product' => $r->product ? ['name' => $r->product->name, 'url' => route('product.show', $r->product->slug)] : null,
+                ])->values(),
             'blocks' => $sections->map(fn ($b) => self::block($b))->filter()->values(),
         ];
     }

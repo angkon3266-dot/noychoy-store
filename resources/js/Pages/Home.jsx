@@ -5,19 +5,32 @@ import Carousel from '../Shared/Carousel';
 import HomeBlocks from '../Shared/HomeBlocks';
 import SmartLink from '../Shared/SmartLink';
 import useCountdown from '../Shared/useCountdown';
+import { Star } from '../Shared/Icons';
 
-// The React homepage — a faithful port of the "couture" Blade template:
-// editorial split hero with cross-fading slides, deals of the day, category
-// lookbook, featured edit, promise band, new arrivals, then builder blocks.
-export default function Home({ hero, deals, categoriesSection, featured, promise, newArrivals, blocks }) {
+// The Meridian Éclat homepage — conversion-first and gift-led.
+//
+// Order is deliberate (mobile-first, every step earns the next scroll):
+//   hero → reassurance → shop by occasion (the gift path) → deals → best
+//   sellers → gift finder by budget → categories → featured edit → how gifting
+//   works → customer love → our promise → new arrivals → admin builder blocks.
+// Every section is admin-toggleable/editable through the same home_content
+// settings the old templates used; copy falls back to sensible defaults.
+export default function Home(props) {
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks } = props;
     return (
         <>
             <Hero hero={hero} />
+            <FeatureStrip strip={featureStrip} />
+            <Occasions section={occasions} />
             <Deals deals={deals} />
+            <CardSection section={bestSellers} eyebrow="Most loved" viewAll="/best-sellers" viewAllLabel="View all best sellers" />
+            <GiftFinder finder={giftFinder} />
             <CategoryLookbook section={categoriesSection} />
             <Featured featured={featured} />
+            <GiftingSteps />
+            <ReviewsBand reviews={reviews} />
             <Promise promise={promise} />
-            <NewArrivals section={newArrivals} />
+            <CardSection section={newArrivals} eyebrow="Just in" viewAll="/shop?sort=new" viewAllLabel="See what's new" tinted />
             <HomeBlocks blocks={blocks} />
         </>
     );
@@ -25,7 +38,23 @@ export default function Home({ hero, deals, categoriesSection, featured, promise
 
 Home.layout = (page) => <Layout>{page}</Layout>;
 
-/* ── Hero: editorial split with cross-fade slideshow ─────────────────────── */
+/* ── Shared section heading ─────────────────────────────────────────────── */
+function Heading({ eyebrow, title, subtitle = null, action = null, center = false }) {
+    return (
+        <div className={`mb-10 ${center ? 'text-center max-w-2xl mx-auto' : 'flex items-end justify-between gap-6'}`}>
+            <div>
+                {eyebrow && <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-2">{eyebrow}</p>}
+                <h2 className="font-display text-3xl sm:text-4xl text-ink-900 leading-tight">{title}</h2>
+                {subtitle && <p className="mt-3 text-ink-700/60">{subtitle}</p>}
+            </div>
+            {action && <div className="hidden sm:block shrink-0">{action}</div>}
+        </div>
+    );
+}
+
+const underlineLink = 'text-sm border-b border-ink-900/30 hover:border-gold-700 hover:text-gold-700 transition pb-0.5';
+
+/* ── Hero: editorial split + cross-fading slideshow + gift entry ─────────── */
 function Hero({ hero }) {
     const slides = hero.slides || [];
     const [i, setI] = useState(0);
@@ -33,40 +62,48 @@ function Hero({ hero }) {
     const touchX = useRef(null);
 
     const go = (k) => setI(((k % slides.length) + slides.length) % slides.length);
-
+    const stop = () => { clearInterval(timer.current); timer.current = null; };
     const start = () => {
         stop();
         if (slides.length > 1) timer.current = setInterval(() => setI((v) => (v + 1) % slides.length), 5500);
     };
-    const stop = () => { clearInterval(timer.current); timer.current = null; };
-
     useEffect(() => { start(); return stop; }, [slides.length]);
 
     return (
         <section className="relative">
             <div className="mx-auto max-w-7xl grid lg:grid-cols-2 items-stretch">
-                <div className="flex items-center px-6 sm:px-10 py-10 sm:py-16 lg:py-28 order-2 lg:order-1">
+                <div className="flex items-center px-6 sm:px-10 py-10 sm:py-16 lg:py-24 order-2 lg:order-1">
                     <div className="max-w-lg">
                         <p className="uppercase tracking-[0.35em] text-[11px] text-gold-700 mb-5">{hero.eyebrow}</p>
                         <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl leading-[1.05] text-ink-900" dangerouslySetInnerHTML={{ __html: hero.headingHtml }} />
                         <p className="mt-6 text-ink-700/70 text-lg leading-relaxed">{hero.subtitle}</p>
-                        <div className="mt-9 flex flex-wrap gap-4">
-                            <SmartLink href={hero.ctaLink} className="inline-flex items-center gap-2 rounded-full bg-ink-900 text-white px-7 py-3.5 text-sm tracking-wide hover:bg-ink-800 transition">
+
+                        <div className="mt-8 flex flex-wrap gap-3">
+                            <SmartLink href={hero.ctaLink} className="inline-flex items-center gap-2 rounded-full bg-ink-900 text-white px-7 py-3.5 text-sm tracking-wide hover:bg-ink-800 hover:-translate-y-0.5 transition-all duration-300 shadow-lg shadow-ink-900/10">
                                 {hero.ctaText}
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
                             </SmartLink>
-                            {hero.secondaryText && (
-                                <a href={hero.secondaryLink} className="inline-flex items-center px-6 py-3.5 text-sm tracking-wide border-b border-ink-900/30 hover:border-gold-700 hover:text-gold-700 transition">{hero.secondaryText}</a>
-                            )}
+                            {/* Gift entry point: scrolls to the finder below. */}
+                            <a href="#gift-finder" className="inline-flex items-center gap-2 rounded-full border border-gold-300 bg-gold-50 text-gold-800 px-6 py-3.5 text-sm tracking-wide hover:bg-gold-100 hover:border-gold-400 transition-colors">
+                                <span aria-hidden="true">🎁</span> Shopping for someone?
+                            </a>
                         </div>
-                        <div className="mt-10 flex items-center gap-6 text-xs text-ink-700/50">
-                            <span>★★★★★ Loved by customers</span><span>·</span><span>Cash on delivery</span><span>·</span><span>Nationwide</span>
+                        {hero.secondaryText && (
+                            <a href={hero.secondaryLink} className={`inline-block mt-4 ${underlineLink}`}>{hero.secondaryText}</a>
+                        )}
+
+                        <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-700/55">
+                            <span className="inline-flex items-center gap-1.5"><span className="text-gold-500">★★★★★</span> Loved by customers</span>
+                            <span className="hidden sm:inline">·</span>
+                            <span>Cash on delivery</span>
+                            <span className="hidden sm:inline">·</span>
+                            <span>Gift message included</span>
                         </div>
                     </div>
                 </div>
 
                 <div
-                    className="order-1 lg:order-2 relative min-h-[34vh] sm:min-h-[42vh] lg:min-h-[80vh] bg-gold-100 overflow-hidden group"
+                    className="order-1 lg:order-2 relative min-h-[38vh] sm:min-h-[46vh] lg:min-h-[82vh] bg-gold-100 overflow-hidden group"
                     onMouseEnter={stop}
                     onMouseLeave={start}
                     onTouchStart={(e) => { touchX.current = e.changedTouches[0].clientX; stop(); }}
@@ -92,27 +129,27 @@ function Hero({ hero }) {
                                 alt={s.alt}
                                 {...(k > 0 ? { loading: 'lazy' } : { fetchPriority: 'high' })}
                                 {...(s.image900 ? { srcSet: `${s.image900} 900w, ${s.image} 1600w`, sizes: '(min-width: 1024px) 50vw, 100vw' } : {})}
-                                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                                className="w-full h-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"
                             />
                         );
                         return s.link ? (
-                            <SmartLink key={k} href={s.link} aria-label={s.alt || 'View the collection'} aria-hidden={!active} className={cls}>{inner}</SmartLink>
+                            <SmartLink key={k} href={s.link} aria-label={s.alt || 'View the collection'} aria-hidden={!active} tabIndex={active ? 0 : -1} className={cls}>{inner}</SmartLink>
                         ) : (
                             <div key={k} aria-hidden={!active} className={cls}>{inner}</div>
                         );
                     })}
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent pointer-events-none"></div>
 
                     {slides.length > 1 && (
                         <>
                             <button type="button" onClick={() => go(i - 1)} aria-label="Previous"
-                                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/75 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">‹</button>
+                                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/80 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">‹</button>
                             <button type="button" onClick={() => go(i + 1)} aria-label="Next"
-                                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/75 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">›</button>
+                                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 grid place-items-center rounded-full bg-white/80 text-ink-900 shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition">›</button>
                             <div className="absolute bottom-1 inset-x-0 flex justify-center">
                                 {slides.map((_, k) => (
-                                    <button key={k} type="button" onClick={() => go(k)} aria-label={`Go to slide ${k + 1}`} className="p-2.5 grid place-items-center">
+                                    <button key={k} type="button" onClick={() => go(k)} aria-label={`Go to slide ${k + 1}`} className="w-11 h-11 grid place-items-center">
                                         <span className={`h-1.5 rounded-full transition-all duration-300 ${i === k ? 'bg-white w-5' : 'bg-white/55 w-1.5'}`}></span>
                                     </button>
                                 ))}
@@ -120,6 +157,78 @@ function Hero({ hero }) {
                         </>
                     )}
                 </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Reassurance strip ──────────────────────────────────────────────────── */
+function FeatureStrip({ strip }) {
+    if (!strip?.show || !strip.items?.length) return null;
+    const cols = { 1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' }[strip.items.length] || 'lg:grid-cols-4';
+    return (
+        <section className="border-y border-ink-100 bg-white">
+            <div className={`mx-auto max-w-7xl px-4 grid grid-cols-2 ${cols} divide-x divide-ink-100`}>
+                {strip.items.map((f, i) => (
+                    <div key={i} className="flex flex-col items-center text-center gap-1.5 py-6 px-3">
+                        <span className="text-xl">{f.icon}</span>
+                        <span className="text-[11px] sm:text-xs tracking-wide uppercase text-ink-800 font-medium">{f.title}</span>
+                        {f.text && <span className="text-[11px] text-ink-700/50">{f.text}</span>}
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+/* ── Shop by occasion: the gift path ────────────────────────────────────── */
+// Typographic tiles when no photo is set — four rotating premium palettes so
+// a row of eight still reads as designed, not as placeholders.
+const TILE_PALETTES = [
+    'bg-gradient-to-br from-ink-900 to-ink-800 text-white',
+    'bg-gradient-to-br from-gold-200 via-gold-100 to-white text-ink-900',
+    'bg-gradient-to-br from-gold-700 to-gold-900 text-white',
+    'bg-gradient-to-br from-white via-gold-50 to-gold-100 text-ink-900',
+];
+
+function Occasions({ section }) {
+    if (!section?.show || !section.items?.length) return null;
+    return (
+        <section className="mx-auto max-w-7xl px-4 py-14 lg:py-20">
+            <Heading eyebrow="For every moment" title={section.title} subtitle={section.subtitle} center />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+                {section.items.map((o, i) => (
+                    <SmartLink key={i} href={o.link} className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 rounded-2xl">
+                        <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl transition-transform duration-500 group-hover:-translate-y-1 ${o.image ? 'bg-gold-100' : TILE_PALETTES[i % TILE_PALETTES.length]}`}>
+                            {o.image ? (
+                                <>
+                                    <img
+                                        src={o.image} alt={o.label} loading="lazy" width="450" height="562"
+                                        {...(o.image450 ? { srcSet: `${o.image450} 450w, ${o.image} 1200w`, sizes: '(min-width: 768px) 25vw, 50vw' } : {})}
+                                        className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent"></div>
+                                    <div className="absolute inset-x-0 bottom-0 p-4">
+                                        <h3 className="font-display text-lg text-white leading-tight">{o.label}</h3>
+                                        {o.tagline && <p className="text-[11px] text-white/75 mt-0.5 leading-snug">{o.tagline}</p>}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="absolute inset-0 p-4 sm:p-5 flex flex-col justify-between">
+                                    <span className="text-[10px] uppercase tracking-[0.3em] opacity-60">Gift idea</span>
+                                    <div>
+                                        <h3 className="font-display text-xl sm:text-2xl leading-tight">{o.label}</h3>
+                                        {o.tagline && <p className="text-[11px] sm:text-xs opacity-70 mt-1 leading-snug">{o.tagline}</p>}
+                                        <span className="inline-flex items-center gap-1 mt-3 text-[11px] tracking-wide opacity-80 group-hover:opacity-100 transition">
+                                            Explore
+                                            <svg className="w-3.5 h-3.5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </SmartLink>
+                ))}
             </div>
         </section>
     );
@@ -187,24 +296,68 @@ function DealsInner({ deals }) {
     );
 }
 
+/* ── Product grid section (best sellers / new arrivals) ─────────────────── */
+function CardSection({ section, eyebrow, viewAll, viewAllLabel, tinted = false }) {
+    if (!section?.show || !section.cards?.length) return null;
+    return (
+        <section className={tinted ? 'bg-gold-50/60 py-16 lg:py-20' : 'py-16 lg:py-20'}>
+            <div className="mx-auto max-w-7xl px-4">
+                <Heading eyebrow={eyebrow} title={section.title} action={<SmartLink href={viewAll} className={underlineLink}>{viewAllLabel}</SmartLink>} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-5 gap-y-10">
+                    {section.cards.map((p) => <ProductCard key={p.id} product={p} />)}
+                </div>
+                <div className="mt-8 text-center sm:hidden">
+                    <SmartLink href={viewAll} className="inline-flex items-center gap-2 rounded-full border border-ink-900/20 px-6 py-3 text-sm tracking-wide">{viewAllLabel} →</SmartLink>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Gift finder: budget bands + the gifting promise ────────────────────── */
+function GiftFinder({ finder }) {
+    if (!finder?.show || !finder.budgets?.length) return null;
+    return (
+        <section id="gift-finder" className="bg-ink-900 text-white py-16 lg:py-20 scroll-mt-20">
+            <div className="mx-auto max-w-5xl px-4 text-center">
+                <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3">Gift finder</p>
+                <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl leading-tight">{finder.title}</h2>
+                <p className="mt-4 text-white/60 max-w-xl mx-auto">Pick a budget and we'll show you everything that fits it — every piece arrives gift-ready, with a card message if you want one.</p>
+                <div className="mt-9 flex flex-wrap justify-center gap-3">
+                    {finder.budgets.map((b, i) => (
+                        <SmartLink key={i} href={b.url} className="rounded-full border border-white/25 px-6 sm:px-8 py-3 text-sm tracking-wide hover:bg-white hover:text-ink-900 hover:border-white transition-colors duration-300">{b.label}</SmartLink>
+                    ))}
+                </div>
+                <div className="mt-10 grid grid-cols-3 gap-4 text-center max-w-2xl mx-auto">
+                    {[
+                        ['🎁', 'Gift-ready packing', 'No price slip in the box'],
+                        ['💌', 'Personal card', 'Add a message at checkout'],
+                        ['💵', 'Cash on delivery', 'Pay when it arrives'],
+                    ].map(([icon, title, text]) => (
+                        <div key={title}>
+                            <div className="text-2xl">{icon}</div>
+                            <div className="mt-1.5 text-sm font-medium">{title}</div>
+                            <div className="text-[11px] text-white/50 mt-0.5">{text}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
 /* ── Category lookbook (first tile large) ─────────────────────────────────── */
 function CategoryLookbook({ section }) {
-    if (!section.show || !section.items.length) return null;
+    if (!section?.show || !section.items?.length) return null;
     return (
-        <section className="mx-auto max-w-7xl px-4 py-16 lg:py-24">
-            <div className="flex items-end justify-between mb-10">
-                <div>
-                    <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-2">Explore</p>
-                    <h2 className="font-display text-3xl sm:text-4xl text-ink-900">{section.title}</h2>
-                </div>
-                <SmartLink href="/shop" className="hidden sm:inline-block text-sm border-b border-ink-900/30 hover:border-gold-700 hover:text-gold-700 transition pb-0.5">View all</SmartLink>
-            </div>
+        <section className="mx-auto max-w-7xl px-4 py-16 lg:py-20">
+            <Heading eyebrow="Explore" title={section.title} action={<SmartLink href="/shop" className={underlineLink}>View all</SmartLink>} />
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6">
                 {section.items.map((cat, i) => (
                     <SmartLink key={cat.url} href={cat.url}
                         className={`group relative block overflow-hidden rounded-2xl bg-gold-100 ${i === 0 ? 'md:col-span-2 md:row-span-2 aspect-[4/3] md:aspect-auto' : 'aspect-square'}`}>
-                        {cat.image && <img src={cat.image} alt={cat.name} className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105" />}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent"></div>
+                        {cat.image && <img src={cat.image} alt={cat.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105" />}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
                         <div className="absolute bottom-0 left-0 p-5">
                             <h3 className="font-display text-xl lg:text-2xl text-white">{cat.name}</h3>
                             <span className="text-white/80 text-xs tracking-wide inline-flex items-center gap-1 mt-1">
@@ -220,30 +373,91 @@ function CategoryLookbook({ section }) {
 }
 
 function Featured({ featured }) {
-    if (!featured.cards.length) return null;
+    if (!featured?.cards?.length) return null;
     return (
-        <section className="bg-gold-50/60 py-16 lg:py-24">
+        <section className="bg-gold-50/60 py-16 lg:py-20">
             <div className="mx-auto max-w-7xl px-4">
-                <div className="text-center max-w-2xl mx-auto mb-12">
-                    <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-2">Curated</p>
-                    <h2 className="font-display text-3xl sm:text-4xl text-ink-900">{featured.title}</h2>
-                    <p className="mt-3 text-ink-700/60">Our most-loved pieces, chosen for the season.</p>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-10">
+                <Heading eyebrow="Curated" title={featured.title} subtitle="Our most-loved pieces, chosen for the season." center />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-5 gap-y-10">
                     {featured.cards.map((p) => <ProductCard key={p.id} product={p} />)}
                 </div>
                 <div className="text-center mt-12">
-                    <SmartLink href="/shop" className="inline-flex items-center gap-2 rounded-full border border-ink-900/20 px-8 py-3.5 text-sm tracking-wide hover:bg-ink-900 hover:text-white transition">Shop all jewelry</SmartLink>
+                    <SmartLink href="/shop" className="inline-flex items-center gap-2 rounded-full border border-ink-900/20 px-8 py-3.5 text-sm tracking-wide hover:bg-ink-900 hover:text-white transition-colors duration-300">Shop all jewelry</SmartLink>
                 </div>
             </div>
         </section>
     );
 }
 
-function Promise({ promise }) {
-    if (!promise.show) return null;
+/* ── How gifting works ────────────────────────────────────────────────────── */
+function GiftingSteps() {
+    const steps = [
+        ['1', 'Pick a piece', 'Browse by occasion, budget or category.'],
+        ['2', 'Tick "This is a gift"', 'At checkout — add a card message if you like.'],
+        ['3', 'We pack it gift-ready', 'Hand-checked, no price slip in the box.'],
+        ['4', 'Pay on delivery', 'Anywhere in Bangladesh, via Steadfast.'],
+    ];
     return (
-        <section className="mx-auto max-w-7xl px-4 py-16 lg:py-24">
+        <section className="mx-auto max-w-7xl px-4 py-14 lg:py-16">
+            <div className="rounded-3xl border border-gold-200 bg-gradient-to-br from-gold-50 via-white to-gold-50 p-6 sm:p-10">
+                <div className="text-center max-w-xl mx-auto mb-8">
+                    <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-2">Gifting, made effortless</p>
+                    <h2 className="font-display text-2xl sm:text-3xl text-ink-900">Send it straight to them — we handle the rest</h2>
+                </div>
+                <ol className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+                    {steps.map(([n, title, text]) => (
+                        <li key={n} className="flex gap-3">
+                            <span className="shrink-0 w-8 h-8 rounded-full bg-ink-900 text-white grid place-items-center text-sm font-semibold">{n}</span>
+                            <div>
+                                <h3 className="font-medium text-sm">{title}</h3>
+                                <p className="text-xs text-ink-700/60 mt-0.5 leading-relaxed">{text}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ol>
+                <div className="text-center mt-8">
+                    <a href="#gift-finder" className="inline-flex items-center gap-2 rounded-full bg-gold-600 text-white px-7 py-3 text-sm tracking-wide hover:bg-gold-700 transition-colors">Find a gift by budget</a>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Customer love (sitewide recent 4–5★ reviews) ────────────────────────── */
+function ReviewsBand({ reviews }) {
+    if (!reviews?.length) return null;
+    return (
+        <section className="py-14 bg-white border-y border-ink-100">
+            <div className="mx-auto max-w-7xl px-4">
+                <Heading eyebrow="Customer love" title="What they're saying" center />
+                <Carousel>
+                    {reviews.map((t, i) => (
+                        <div key={i} className="snap-start shrink-0 w-[300px] rounded-2xl bg-gold-50/60 border border-gold-100 p-6 flex flex-col">
+                            <div className="flex text-gold-500 mb-3" aria-label={`${t.rating} star review`}>
+                                {[1, 2, 3, 4, 5].map((s) => <Star key={s} className="w-4 h-4" off={s > t.rating} />)}
+                            </div>
+                            <p className="font-display italic text-ink-800 leading-relaxed flex-1 line-clamp-5">“{t.quote}”</p>
+                            <div className="flex items-center gap-3 mt-5">
+                                <div className="w-10 h-10 rounded-full bg-gold-100 text-gold-700 text-xs font-semibold flex items-center justify-center shrink-0">
+                                    {(t.author || '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('')}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-ink-900">{t.author}</p>
+                                    {t.product && <SmartLink href={t.product.url} className="text-xs text-ink-700/50 hover:text-gold-700 truncate block">{t.product.name}</SmartLink>}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </Carousel>
+            </div>
+        </section>
+    );
+}
+
+function Promise({ promise }) {
+    if (!promise?.show) return null;
+    return (
+        <section className="mx-auto max-w-7xl px-4 py-16 lg:py-20">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                 <div className="relative aspect-[5/4] rounded-2xl overflow-hidden bg-gold-100">
                     {promise.image && <img src={promise.image} alt="" className="w-full h-full object-cover" loading="lazy" />}
@@ -261,21 +475,6 @@ function Promise({ promise }) {
                         ))}
                     </div>
                 </div>
-            </div>
-        </section>
-    );
-}
-
-function NewArrivals({ section }) {
-    if (!section.show || !section.cards.length) return null;
-    return (
-        <section className="mx-auto max-w-7xl px-4 pb-20">
-            <div className="flex items-end justify-between mb-10">
-                <h2 className="font-display text-3xl sm:text-4xl text-ink-900">{section.title}</h2>
-                <SmartLink href="/shop?sort=new" className="text-sm border-b border-ink-900/30 hover:border-gold-700 hover:text-gold-700 transition pb-0.5">See what's new</SmartLink>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-10">
-                {section.cards.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
         </section>
     );

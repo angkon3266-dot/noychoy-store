@@ -24,7 +24,7 @@ class PlaceOrder
     ) {}
 
     /**
-     * @param  array{name:string,phone:string,email?:string,address:string,area?:string,district?:string,is_inside_dhaka?:bool,notes?:string}  $data
+     * @param  array{name:string,phone:string,email?:string,address:string,area?:string,district?:string,is_inside_dhaka?:bool,notes?:string,is_gift?:bool,card_message?:string}  $data
      */
     public function handle(array $data): Order
     {
@@ -104,6 +104,10 @@ class PlaceOrder
                 'status' => 'processing',
                 'coupon_code' => $coupon?->code,
                 'notes' => $data['notes'] ?? null,
+                // Gift orders: the buyer's message lands in card_message so the
+                // existing thank-you-card printer picks it up as-is.
+                'is_gift' => (bool) ($data['is_gift'] ?? false),
+                'card_message' => ($data['is_gift'] ?? false) ? ($data['card_message'] ?? null) : null,
                 'source' => 'web',
             ]);
 

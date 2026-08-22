@@ -249,6 +249,19 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
         });
     };
 
+    // Buy now → Inertia POST; the server adds the line and redirects to
+    // /checkout, which then renders in place (no page reload).
+    const [buying, setBuying] = useState(false);
+    const buyNow = () => {
+        if (!purchase.canBuy || buying) return;
+        purchase.makeAddEvent();
+        setBuying(true);
+        router.post(product.buynow_url, {
+            variant_id: purchase.variantId === 'none' ? '' : purchase.variantId,
+            qty: purchase.qty,
+        }, { onFinish: () => setBuying(false) });
+    };
+
     const hasBundle = offerTiers.some((t) => t.min_qty >= 2);
     const allPreorder = offerTiers.length > 0 && offerTiers.every((t) => t.preorder_only);
 
@@ -423,14 +436,9 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                         <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline w-full">
                             {preorder ? 'Add pre-order to cart' : 'Add to cart'}
                         </button>
-                        <form action={product.buynow_url} method="POST" onSubmit={() => purchase.makeAddEvent()}>
-                            <input type="hidden" name="_token" value={csrf()} />
-                            <input type="hidden" name="variant_id" value={purchase.variantId === 'none' ? '' : purchase.variantId} />
-                            <input type="hidden" name="qty" value={purchase.qty} />
-                            <button type="submit" disabled={!purchase.canBuy} className={`w-full ${preorder ? 'inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2.5 font-medium text-white hover:bg-violet-700 transition disabled:opacity-50' : 'btn-primary'}`}>
-                                {preorder ? 'Book now (Pre-order)' : 'Buy now'}
-                            </button>
-                        </form>
+                        <button type="button" onClick={buyNow} disabled={!purchase.canBuy || buying} className={`w-full ${preorder ? 'inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2.5 font-medium text-white hover:bg-violet-700 transition disabled:opacity-50' : 'btn-primary'}`}>
+                            {buying ? 'Taking you to checkout…' : (preorder ? 'Book now (Pre-order)' : 'Buy now')}
+                        </button>
                     </div>
                     {!purchase.canBuy && <p className="mt-2 text-xs text-red-600">Please choose an option above.</p>}
                 </>
@@ -765,11 +773,24 @@ function FrequentlyBought({ fbt }) {
         (fbt?.items || []).forEach((p) => { init[p.id] = p.selectable; });
         return init;
     });
-    const [redirect, setRedirect] = useState('');
+    const { showToast, refresh } = useCart();
     if (!fbt) return null;
 
     const total = fbt.items.reduce((t, p) => t + (sel[p.id] ? p.price : 0), 0);
     const none = !Object.values(sel).some(Boolean);
+
+    // "Buy now" → server redirects to /checkout (rendered in place);
+    // "Add selected" → server redirects back here with a flash, and the
+    // mini-cart badge refreshes from the new props.
+    const submitBundle = (redirect) => {
+        router.post(fbt.add_many_url, {
+            product_ids: fbt.items.filter((p) => p.selectable && sel[p.id]).map((p) => p.id),
+            redirect,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { if (!redirect) refresh(); },
+        });
+    };
 
     return (
         <section className="mt-16">
@@ -800,15 +821,10 @@ function FrequentlyBought({ fbt }) {
                 <div className="card p-5">
                     <p className="text-sm text-ink-700/70">Total for selected</p>
                     <p className="text-2xl font-semibold text-gold-700">{money(total)}</p>
-                    <form action={fbt.add_many_url} method="POST" className="mt-3 space-y-2">
-                        <input type="hidden" name="_token" value={csrf()} />
-                        {fbt.items.filter((p) => p.selectable && sel[p.id]).map((p) => (
-                            <input key={p.id} type="hidden" name="product_ids[]" value={p.id} />
-                        ))}
-                        <input type="hidden" name="redirect" value={redirect} />
-                        <button type="submit" className="btn-primary w-full" disabled={none} onClick={() => setRedirect('checkout')}>Buy now</button>
-                        <button type="submit" className="btn-outline w-full" disabled={none} onClick={() => setRedirect('')}>Add selected to cart</button>
-                    </form>
+                    <div className="mt-3 space-y-2">
+                        <button type="button" className="btn-primary w-full" disabled={none} onClick={() => submitBundle('checkout')}>Buy now</button>
+                        <button type="button" className="btn-outline w-full" disabled={none} onClick={() => submitBundle('')}>Add selected to cart</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -864,14 +880,18 @@ function StickyBar({ product, purchase, ui }) {
                         <div className="font-semibold text-gold-700">{money(purchase.price * purchase.qty)}</div>
                     </div>
                     <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline whitespace-nowrap hidden sm:inline-flex">Add to cart</button>
-                    <form action={product.buynow_url} method="POST" className="flex-1" onSubmit={() => purchase.makeAddEvent()}>
-                        <input type="hidden" name="_token" value={csrf()} />
-                        <input type="hidden" name="variant_id" value={purchase.variantId === 'none' ? '' : purchase.variantId} />
-                        <input type="hidden" name="qty" value={purchase.qty} />
-                        <button type="submit" disabled={!purchase.canBuy} className={`w-full ${preorder ? 'inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2.5 font-medium text-white hover:bg-violet-700 transition disabled:opacity-50' : 'btn-primary'}`}>
-                            {preorder ? 'Book now' : 'Buy now'}
-                        </button>
-                    </form>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (!purchase.canBuy) return;
+                            purchase.makeAddEvent();
+                            router.post(product.buynow_url, { variant_id: purchase.variantId === 'none' ? '' : purchase.variantId, qty: purchase.qty });
+                        }}
+                        disabled={!purchase.canBuy}
+                        className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2.5 font-medium text-white hover:bg-violet-700 transition disabled:opacity-50' : 'btn-primary'}`}
+                    >
+                        {preorder ? 'Book now' : 'Buy now'}
+                    </button>
                 </div>
             </div>
             <div className="md:hidden h-32" />

@@ -92,9 +92,12 @@ class CheckoutController extends Controller
                 'value' => $icValue,
                 'numItems' => (int) $this->cart->count(),
             ],
+            'coupon' => ($c = $this->cart->coupon()) ? ['code' => $c->code] : null,
             'urls' => [
                 'store' => route('checkout.store'),
                 'lead' => route('checkout.lead'),
+                'couponApply' => route('cart.coupon'),
+                'couponRemove' => route('cart.coupon.remove'),
             ],
         ])->withViewData(['pageTitle' => 'Checkout']);
     }
@@ -114,11 +117,14 @@ class CheckoutController extends Controller
             'district' => ['nullable', 'string', 'max:120'],
             'is_inside_dhaka' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'is_gift' => ['nullable', 'boolean'],
+            'card_message' => ['nullable', 'string', 'max:240'],
         ], [
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);
 
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
+        $data['is_gift'] = $request->boolean('is_gift');
 
         try {
             $order = $placeOrder->handle($data);
@@ -169,6 +175,8 @@ class CheckoutController extends Controller
                 'discountText' => $order->discount > 0 ? money($order->discount) : null,
                 'shippingText' => money($order->shipping_cost),
                 'totalText' => money($order->total),
+                'isGift' => (bool) $order->is_gift,
+                'cardMessage' => $order->card_message,
             ],
             // Purchase Pixel event — eventID is the order number, so Meta dedups
             // against the server CAPI Purchase and against page refreshes alike.

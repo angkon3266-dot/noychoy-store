@@ -1,10 +1,8 @@
 import { usePage } from '@inertiajs/react';
-import { csrf } from './format';
 
 // Shared shell for the auth pages: centered card, heading, flash + validation
-// banners. Auth forms post as PLAIN form submissions (not Inertia XHR) — their
-// redirect targets (intended URLs, /account) may still be Blade pages, and a
-// browser-followed redirect works for both worlds.
+// banners. Forms submit through Inertia (no page reload); every redirect target
+// they can land on (/account, /login, the OTP page, "/") is an Inertia page.
 export default function AuthCard({ title, subtitle = null, children }) {
     const { props } = usePage();
     const errors = props.errors || {};
@@ -23,7 +21,7 @@ export default function AuthCard({ title, subtitle = null, children }) {
                     <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2 text-sm mt-4">{props.flash.error}</div>
                 )}
                 {errorList.length > 0 && (
-                    <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2 text-sm mt-4">
+                    <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2 text-sm mt-4" role="alert">
                         {errorList.length === 1 ? errorList[0] : (
                             <ul className="list-disc list-inside">{errorList.map((e, i) => <li key={i}>{e}</li>)}</ul>
                         )}
@@ -36,7 +34,5 @@ export default function AuthCard({ title, subtitle = null, children }) {
     );
 }
 
-/** Hidden CSRF field for plain (non-Inertia) form posts. */
-export function CsrfField() {
-    return <input type="hidden" name="_token" value={csrf()} />;
-}
+/** Keep the typed values when the server bounces back with validation errors. */
+export const keepOnErrors = { preserveState: (page) => Object.keys(page.props.errors || {}).length > 0 };

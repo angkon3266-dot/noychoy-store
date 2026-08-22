@@ -152,4 +152,57 @@ class CheckoutTest extends TestCase
         // The placing session is authorized, so the confirmation renders.
         $this->get('/order/'.$order->order_number.'/confirmation')->assertOk();
     }
+
+    // ── Gift orders ──────────────────────────────────────────────────────────
+
+    public function test_a_gift_order_keeps_its_flag_and_card_message(): void
+    {
+        $this->addToCart($this->product());
+
+        $this->post('/checkout', $this->checkoutData([
+            'is_gift' => 1,
+            'card_message' => 'Happy birthday, Mina.',
+        ]))->assertRedirect();
+
+        $order = Order::first();
+        $this->assertTrue($order->is_gift);
+        $this->assertSame('Happy birthday, Mina.', $order->card_message);
+    }
+
+    public function test_a_card_message_is_dropped_when_the_order_is_not_a_gift(): void
+    {
+        $this->addToCart($this->product());
+
+        $this->post('/checkout', $this->checkoutData(['card_message' => 'stray text']))->assertRedirect();
+
+        $order = Order::first();
+        $this->assertFalse($order->is_gift);
+        $this->assertNull($order->card_message);
+    }
+
+    // ── Coupons on the checkout page ─────────────────────────────────────────
+
+    public function test_the_checkout_page_exposes_coupon_state_and_applies_one_in_place(): void
+    {
+        \App\Models\Coupon::create([
+            'code' => 'WELCOME10', 'type' => 'percent', 'value' => 10, 'applies_to' => 'all', 'is_active' => true,
+        ]);
+        $this->addToCart($this->product(['price' => 1000]));
+
+        $this->get('/checkout')->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Checkout')
+                ->where('coupon', null)
+                ->has('urls.couponApply')
+                ->has('urls.couponRemove'));
+
+        // Applying from the checkout page returns to the checkout page
+        // (back()), now carrying the coupon and the reduced total.
+        $this->from('/checkout')->post('/cart/coupon', ['code' => 'welcome10'])
+            ->assertRedirect('/checkout');
+
+        $this->get('/checkout')->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Checkout')
+                ->where('coupon.code', 'WELCOME10')
+                ->where('summary.sub', fn ($v) => (float) $v === 900.0));
+    }
 }

@@ -1,7 +1,6 @@
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import Icon, { Star } from './Icons';
 import { useCart } from './CartContext';
-import { csrf } from './format';
 
 // Storefront product card — data shape comes from ProductCardData::make().
 export default function ProductCard({ product: p }) {
@@ -80,14 +79,15 @@ export default function ProductCard({ product: p }) {
                             <Icon name="cart" className="w-4 h-4" strokeWidth={1.8} />
                             <span className="hidden sm:inline">Add</span>
                         </button>
-                        <form action={p.buynow_url} method="POST" className="flex-1">
-                            <input type="hidden" name="_token" value={csrf()} />
-                            <input type="hidden" name="variant_id" value="" />
-                            <input type="hidden" name="qty" value="1" />
-                            <button type="submit" className="w-full rounded-full bg-gold-700 px-3 py-2 text-xs font-medium text-white hover:bg-gold-800 transition">
-                                {p.preorder ? 'Book now' : 'Buy now'}
-                            </button>
-                        </form>
+                        {/* Buy now posts through Inertia: the server adds to the
+                            cart and redirects to /checkout, which renders in place. */}
+                        <button
+                            type="button"
+                            onClick={() => router.post(p.buynow_url, { variant_id: '', qty: 1 })}
+                            className="flex-1 rounded-full bg-gold-700 px-3 py-2 text-xs font-medium text-white hover:bg-gold-800 transition"
+                        >
+                            {p.preorder ? 'Book now' : 'Buy now'}
+                        </button>
                     </div>
                 )}
             </div>

@@ -22,9 +22,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['api.token', 'throttle:60,1'])->group(function () {
     Route::prefix('api/v1')->group(function () {
+        Route::get('categories', [ProductApiController::class, 'categories']);
         Route::get('products', [ProductApiController::class, 'index']);
+        Route::post('products', [ProductApiController::class, 'store']);
         Route::get('products/{product}', [ProductApiController::class, 'show']);
         Route::patch('products/{product}', [ProductApiController::class, 'update']);
+        Route::delete('products/{product}', [ProductApiController::class, 'destroy']);
 
         Route::post('products/{product}/images', [ProductImageApiController::class, 'store']);
         Route::patch('products/{product}/images/{image}', [ProductImageApiController::class, 'update']);
