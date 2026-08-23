@@ -39,16 +39,6 @@
 
         <div class="card p-5 h-fit space-y-4">
             <div>
-                <label class="label">Product page template</label>
-                <select name="product_template" class="input">
-                    <option value="">Use store default</option>
-                    @foreach(config('theme.product_templates') as $key => $tpl)
-                        <option value="{{ $key }}" @selected(old('product_template', $category->product_template) == $key)>{{ $tpl['name'] }}</option>
-                    @endforeach
-                </select>
-                <p class="text-xs text-ink-700/50 mt-1">Products in this category use this layout.</p>
-            </div>
-            <div>
                 <label class="label">Google product category</label>
                 @php $gc = old('google_category', $category->google_category ?? ''); @endphp
                 <select name="google_category" class="input">

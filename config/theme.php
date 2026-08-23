@@ -167,12 +167,9 @@ return [
         'heritage' => ['name' => 'Heritage — Traditional', 'inspiration' => 'Tanishq / Kalyan', 'view' => 'shop.templates.home.heritage'],
     ],
 
-    // Single product page templates.
-    'product_templates' => [
-        'showcase' => ['name' => 'Showcase — Gallery left', 'inspiration' => 'Blue Nile', 'view' => 'shop.templates.product.showcase'],
-        'minimal' => ['name' => 'Minimal — Editorial', 'inspiration' => 'Mejuri', 'view' => 'shop.templates.product.minimal'],
-        'luxe' => ['name' => 'Luxe — Dark immersive', 'inspiration' => 'Cartier', 'view' => 'shop.templates.product.luxe'],
-        'sticky' => ['name' => 'Sticky — Conversion-focused', 'inspiration' => 'Pandora', 'view' => 'shop.templates.product.sticky'],
-        'classic' => ['name' => 'Classic — Centered', 'inspiration' => 'Tanishq', 'view' => 'shop.templates.product.classic'],
-    ],
+    // The product-page template picker is gone. There is one React product
+    // page now, and CatalogController has rendered it unconditionally since the
+    // migration — the setting was saved, validated and shown in two places
+    // while changing precisely nothing, and the Blade templates it chose
+    // between have been deleted.
 ];

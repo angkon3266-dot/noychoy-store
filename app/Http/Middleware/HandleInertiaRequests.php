@@ -76,8 +76,7 @@ class HandleInertiaRequests extends Middleware
             'storeName' => store_name(),
             // SmartLink uses this to decide whether "/" is SPA-navigable —
             // must agree with HomeController's template → Inertia condition.
-            'inertiaHome' => config('theme.homepage_templates.'.theme('homepage_template').'.view')
-                === 'shop.templates.home.couture',
+            'inertiaHome' => \App\Support\HomePage::isReact(),
             'announcement' => theme('announcement_enabled') && $announceMsgs ? [
                 'messages' => $announceMsgs,
                 'speed' => max(10, count($announceMsgs) * (int) (theme('announcement_speed') ?? 6)),

@@ -92,15 +92,16 @@ class HomeController extends Controller
             $key = $request->query('preview_home');
         }
 
-        $view = config('theme.homepage_templates.'.$key.'.view');
-        if (! $view || ! view()->exists($view)) {
-            $view = 'shop.templates.home.storefront';
-        }
-
-        // The live "couture" design is served by the React homepage. Other
-        // template choices keep their Blade views until they're ported —
-        // chrome.inertiaHome (HandleInertiaRequests) must agree with this.
-        if ($view === 'shop.templates.home.couture') {
+        // The live "couture" design is served by the React homepage; other
+        // template choices keep their Blade views until they are ported.
+        //
+        // Decided on the template NAME, via HomePage::isReact(), which
+        // HandleInertiaRequests calls too. It used to be decided by comparing a
+        // resolved view name — after falling back when the file was missing —
+        // which meant the React homepage hung off the existence of a Blade file
+        // it never renders, and deleting that file would have quietly served
+        // the old Blade homepage instead.
+        if (\App\Support\HomePage::isReact($key)) {
             $data = \App\Support\Storefront\HomePageData::make(
                 $featured, $newArrivals, $bestSellers, $categories, $sections,
             );
@@ -117,6 +118,12 @@ class HomeController extends Controller
                     ? $lcp['image900'].' 900w, '.$lcpImage.' 1600w' : null,
                 'preloadSizes' => '(min-width: 1024px) 50vw, 100vw',
             ]);
+        }
+
+        $view = config('theme.homepage_templates.'.$key.'.view');
+
+        if (! $view || ! view()->exists($view)) {
+            $view = 'shop.templates.home.storefront';
         }
 
         return view($view, compact(

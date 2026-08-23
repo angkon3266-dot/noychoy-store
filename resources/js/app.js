@@ -1293,127 +1293,13 @@ document.addEventListener('alpine:init', () => {
         copy(o) { navigator.clipboard.writeText(typeof o === 'string' ? o : this.pretty(o)); },
     }));
 
-    window.Alpine.data('productPage', (config) => ({
-        img: config.image || '',
-        qty: 1,
-        hasVariants: !!config.hasVariants,
-        attributes: config.attributes || [],     // [{name, values:[]}]
-        variantList: config.variants || [],       // [{id, attrs:{}, price, stock}]
-        selected: {},                              // {Size:'7', Color:'Gold'}
-        basePrice: config.price || 0,
-        baseCompare: config.compare || 0,          // simple-product original price
-        // Catalog retailer_id ("prod-{id}") so Pixel/CAPI events link to catalog
-        // products — must match MetaProductMapper::retailerId on the server.
-        contentId: 'prod-' + (config.id || ''),
-        name: config.name || '',
-        // Every tier arrives with a resolved `percent`, whatever type the admin
-        // picked (see Product::offerTiers), so the maths here stays percent-based.
-        offers: (config.offers || []).map(o => ({ min_qty: Number(o.min_qty), percent: Number(o.percent) })),
+    // The `productPage` Alpine component lived here. Its only consumers were
+    // the Blade product templates (showcase / minimal / luxe / sticky / classic),
+    // which have been deleted — CatalogController has rendered the React product
+    // page unconditionally since the migration. It had already drifted, building
+    // a Meta content id of "prod-{id}" where both MetaProductMapper and
+    // Product.jsx emit "prod-{id}-var-{variantId}" for a variant.
 
-        init() {
-            // Pre-select any attribute that has only one value.
-            for (const a of this.attributes) {
-                if ((a.values || []).length === 1) this.selected[a.name] = a.values[0];
-            }
-        },
-
-        // The variant matching every selected attribute (null until all chosen).
-        get matched() {
-            if (!this.hasVariants) return null;
-            if (this.attributes.some(a => !this.selected[a.name])) return null;
-            return this.variantList.find(v =>
-                this.attributes.every(a => String(v.attrs[a.name]) === String(this.selected[a.name]))) || null;
-        },
-        // variant_id posted to the cart: id when matched, '' when variable-unmatched, 'none' when simple.
-        get variant() { return this.hasVariants ? (this.matched ? String(this.matched.id) : '') : 'none'; },
-        get variantStock() { return this.matched ? this.matched.stock : null; },
-
-        selectAttr(name, val) {
-            this.selected[name] = val;
-            // Jump the gallery to the chosen variation's photo, if it has one.
-            if (this.matched && this.matched.image) this.img = this.matched.image;
-        },
-        isSelected(name, val) { return String(this.selected[name]) === String(val); },
-        // Disable a value if no variant with it is in stock.
-        valueInStock(name, val) {
-            return this.variantList.some(v => String(v.attrs[name]) === String(val) && v.stock > 0);
-        },
-
-        get unitPrice() {
-            if (this.hasVariants) return this.matched ? this.matched.price : this.basePrice;
-            return this.basePrice;
-        },
-        // "Compare-at" (original) price for the current selection, 0 if none.
-        get compareAt() {
-            if (this.hasVariants) return this.matched ? (this.matched.compare || 0) : 0;
-            return this.baseCompare || 0;
-        },
-        get onSale() { return this.compareAt > this.unitPrice; },
-        get discountPct() { return this.onSale ? Math.round((1 - this.unitPrice / this.compareAt) * 100) : 0; },
-        get offerPercent() {
-            let best = 0;
-            for (const o of this.offers) {
-                if (this.qty >= o.min_qty && o.percent > best) best = o.percent;
-            }
-            return best;
-        },
-        get price() {
-            return this.offerPercent > 0
-                ? Math.round(this.unitPrice * (1 - this.offerPercent / 100) * 100) / 100
-                : this.unitPrice;
-        },
-        get lineTotal() { return this.price * this.qty; },
-        get savings() { return Math.round((this.unitPrice - this.price) * this.qty * 100) / 100; },
-        get canBuy() {
-            if (!this.hasVariants) return true;
-            return !!this.matched && this.matched.stock > 0;
-        },
-        fmt(n) { return '৳' + Number(n).toLocaleString(); },
-        priceText() {
-            if (this.hasVariants && !this.matched) {
-                const prices = this.variantList.map(v => v.price).filter(p => p > 0);
-                return prices.length ? 'From ' + this.fmt(Math.min(...prices)) : this.fmt(this.basePrice);
-            }
-            return this.fmt(this.price);
-        },
-        inc() { this.qty++; },
-        dec() { this.qty = Math.max(1, this.qty - 1); },
-
-        fireAddToCart(form) {
-            // Variant-aware content id (matches the catalog retailer_id).
-            const cid = (this.hasVariants && this.matched)
-                ? (this.contentId + '-var-' + this.matched.id)
-                : this.contentId;
-
-            // One event id shared by the browser Pixel and the server CAPI call.
-            const eventId = 'AddToCart.' + ((self.crypto && crypto.randomUUID)
-                ? crypto.randomUUID()
-                : (Date.now() + '-' + Math.random().toString(16).slice(2)));
-
-            // Hand the id to the cart POST so the server fires the matching,
-            // deduplicated CAPI AddToCart (CartController@add reads `event_id`).
-            if (form) {
-                let input = form.querySelector('input[name="event_id"]');
-                if (!input) {
-                    input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'event_id';
-                    form.appendChild(input);
-                }
-                input.value = eventId;
-            }
-
-            if (window.track) {
-                window.track('AddToCart', {
-                    content_ids: [cid],
-                    content_name: this.name,
-                    content_type: 'product',
-                    value: this.price * this.qty,
-                    currency: 'BDT',
-                }, { eventID: eventId });
-            }
-        },
-    }));
 
 /**
  * Live preview for the printed thank-you card (Appearance → Cards & print).

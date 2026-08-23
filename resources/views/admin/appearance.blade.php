@@ -206,21 +206,6 @@
             @endforeach
         </div>
 
-        <h2 class="font-semibold mb-1 mt-8">Product page template</h2>
-        <p class="text-xs text-ink-700/60 mb-4">Default for all products. Per-category overrides are set on each category.</p>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" x-data="{ sel: '{{ $theme['product_template'] }}' }">
-            @foreach($productTemplates as $key => $tpl)
-                <label class="cursor-pointer rounded-lg border p-4 transition"
-                       :class="sel === '{{ $key }}' ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-400' : 'border-ink-100 hover:border-gold-300'">
-                    <input type="radio" name="product_template" value="{{ $key }}" class="sr-only" x-model="sel" @checked($theme['product_template']==$key)>
-                    <div class="flex items-center justify-between">
-                        <div class="font-medium text-sm">{{ $tpl['name'] }}</div>
-                        <svg x-show="sel === '{{ $key }}'" class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                    </div>
-                    <div class="text-xs text-ink-700/50 mt-1">Inspired by {{ $tpl['inspiration'] }}</div>
-                </label>
-            @endforeach
-        </div>
     </div>
 
     <!-- Homepage content -->

@@ -140,7 +140,6 @@ class CategoryController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'is_preorder' => ['nullable', 'boolean'],
             'image' => ['nullable', 'image', 'max:4096'],
-            'product_template' => ['nullable', 'string', 'in:'.implode(',', array_keys(config('theme.product_templates')))],
             'google_category' => ['nullable', 'string', 'max:120'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
@@ -148,7 +147,6 @@ class CategoryController extends Controller
         $data['is_active'] = $request->boolean('is_active');
         $data['is_preorder'] = $request->boolean('is_preorder');
         $data['position'] = $data['position'] ?? 0;
-        $data['product_template'] = $data['product_template'] ?: null;
         $data['google_category'] = $data['google_category'] ?: null;
         $data['parent_id'] = $data['parent_id'] ?: null;
         unset($data['image']); // handled by caller
