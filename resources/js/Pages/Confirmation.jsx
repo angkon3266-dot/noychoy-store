@@ -4,7 +4,7 @@ import Layout from '../Shared/Chrome/Layout';
 import SmartLink from '../Shared/SmartLink';
 import Icon from '../Shared/Icons';
 
-export default function Confirmation({ order, purchase, trackUrl }) {
+export default function Confirmation({ order, purchase, trackUrl, estimate, storePhone }) {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
 
@@ -43,7 +43,7 @@ export default function Confirmation({ order, purchase, trackUrl }) {
                 <div className="text-left mt-8 border-t border-ink-100 pt-6 space-y-3">
                     {order.items.map((item, i) => (
                         <div key={i} className="flex justify-between text-sm">
-                            <span>{item.name} <span className="text-ink-700/50">× {item.qty}</span></span>
+                            <span>{item.name} <span className="text-ink-700/70">× {item.qty}</span></span>
                             <span className="font-medium">{item.subtotalText}</span>
                         </div>
                     ))}
@@ -53,6 +53,38 @@ export default function Confirmation({ order, purchase, trackUrl }) {
                         <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>{order.shippingText}</dd></div>
                         <div className="flex justify-between font-semibold text-base"><dt>Total (COD)</dt><dd>{order.totalText}</dd></div>
                     </dl>
+                </div>
+
+                {/* What actually happens next. Without this the page ends the
+                    conversation at "thank you" — and a cash-on-delivery buyer
+                    still has two things to do: take a call, and have the money
+                    ready on the day. Both are worth saying plainly. */}
+                <div className="text-left mt-6 rounded-xl border border-gold-200 bg-gold-50/60 p-5">
+                    <h2 className="font-semibold text-sm">What happens next</h2>
+                    <ol className="mt-3 space-y-3 text-sm">
+                        <li className="flex gap-3">
+                            <span aria-hidden="true" className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold-200 text-[11px] font-semibold text-gold-800">1</span>
+                            <span className="min-w-0">
+                                We call you to confirm the order
+                                {storePhone && <> — from <strong className="whitespace-nowrap">{storePhone}</strong></>}.
+                            </span>
+                        </li>
+                        {estimate && (
+                            <li className="flex gap-3">
+                                <span aria-hidden="true" className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold-200 text-[11px] font-semibold text-gold-800">2</span>
+                                <span className="min-w-0">
+                                    The courier delivers <strong>{estimate.label}</strong>
+                                    <span className="text-ink-700/70"> ({estimate.zoneText}). Fridays excluded.</span>
+                                </span>
+                            </li>
+                        )}
+                        <li className="flex gap-3">
+                            <span aria-hidden="true" className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold-200 text-[11px] font-semibold text-gold-800">{estimate ? 3 : 2}</span>
+                            <span className="min-w-0">
+                                Keep <strong className="whitespace-nowrap">{order.totalText}</strong> ready for the courier — payment is on delivery.
+                            </span>
+                        </li>
+                    </ol>
                 </div>
 
                 <div className="mt-8 flex justify-center gap-3">

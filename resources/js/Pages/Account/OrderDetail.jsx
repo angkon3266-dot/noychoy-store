@@ -11,12 +11,12 @@ export default function OrderDetail({ order, tracking, reorderUrl }) {
                     <h1 className="font-display text-2xl font-semibold">{order.number}</h1>
                     <span className="badge bg-gold-100 text-gold-800 capitalize">{order.status}</span>
                 </div>
-                <p className="text-sm text-ink-700/60 mt-1">{order.date}</p>
+                <p className="text-sm text-ink-700/70 mt-1">{order.date}</p>
 
                 <div className="mt-6 space-y-3">
                     {order.items.map((item, i) => (
                         <div key={i} className="flex justify-between text-sm">
-                            <span>{item.name} <span className="text-ink-700/50">× {item.qty}</span></span>
+                            <span>{item.name} <span className="text-ink-700/70">× {item.qty}</span></span>
                             <span className="font-medium">{item.subtotalText}</span>
                         </div>
                     ))}

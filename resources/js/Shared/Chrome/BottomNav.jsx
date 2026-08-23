@@ -15,6 +15,7 @@ export default function BottomNav() {
         <>
             <div className="md:hidden" style={{ height: 'calc(3.5rem + env(safe-area-inset-bottom))' }} />
             <nav
+                aria-label="Quick links"
                 className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-ink-100 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >

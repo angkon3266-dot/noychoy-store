@@ -112,11 +112,10 @@ class ProductPageData
                 'pct' => rtrim(rtrim(number_format($memberPct, 1), '0'), '.'),
                 'savings_text' => $product->has_variants ? null : money(member_pricing()->savings($product)),
             ] : null,
-            'delivery' => theme('show_delivery_estimate') ? [
-                'from' => now()->addDays($dmin = (int) theme('delivery_days_min', 2))->format('D, d M'),
-                'to' => ($dmax = (int) theme('delivery_days_max', 4)) > $dmin
-                    ? now()->addDays($dmax)->format('d M') : null,
-            ] : null,
+            // The zone is unknown on a product page, so this quotes the
+            // slower nationwide window rather than over-promising. The builder
+            // also skips the days the courier does not work.
+            'delivery' => \App\Support\DeliveryEstimate::for()?->productPageShape(),
             'reviews' => [
                 'avg' => $product->average_rating,
                 'count' => $count,

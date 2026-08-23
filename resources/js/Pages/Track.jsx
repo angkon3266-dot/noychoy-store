@@ -19,12 +19,10 @@ export default function Track({ query, notFound, order, tracking }) {
 
             <form onSubmit={submit} className="card p-6 grid sm:grid-cols-2 gap-4">
                 <div>
-                    <label className="label">Order number</label>
-                    <input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="NOY-260615-0001" className="input" required />
+                    <label className="label">Order number<input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="NOY-260615-0001" className="input" required /></label>
                 </div>
                 <div>
-                    <label className="label">Mobile number</label>
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" className="input" required />
+                    <label className="label">Mobile number<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" className="input" required /></label>
                 </div>
                 <div className="sm:col-span-2"><button className="btn-primary w-full">Track</button></div>
             </form>
@@ -48,14 +46,14 @@ export default function Track({ query, notFound, order, tracking }) {
                                 {STEPS.map((s, i) => (
                                     <div key={s} className={`flex items-center ${i === STEPS.length - 1 ? '' : 'flex-1'}`}>
                                         <div className="flex flex-col items-center">
-                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${i <= tracking.step ? 'bg-gold-600 text-white' : 'bg-ink-100 text-ink-400'}`}>
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${i <= tracking.step ? 'bg-gold-600 text-white' : 'bg-ink-100 text-ink-700'}`}>
                                                 {i < tracking.step ? (
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                                    <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                                                 ) : (
                                                     i + 1
                                                 )}
                                             </div>
-                                            <span className={`mt-1 text-[10px] text-center ${i <= tracking.step ? 'text-ink-800' : 'text-ink-400'}`}>{s}</span>
+                                            <span className={`mt-1 text-[10px] text-center ${i <= tracking.step ? 'text-ink-800' : 'text-ink-700'}`}>{s}</span>
                                         </div>
                                         {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-1 -mt-4 ${i < tracking.step ? 'bg-gold-600' : 'bg-ink-100'}`}></div>}
                                     </div>
@@ -71,7 +69,7 @@ export default function Track({ query, notFound, order, tracking }) {
                         {order.history.map((h, i) => (
                             <li key={i}>
                                 <div className="font-medium capitalize">{h.status}</div>
-                                <div className="text-xs text-ink-700/40">{h.date}</div>
+                                <div className="text-xs text-ink-700/70">{h.date}</div>
                             </li>
                         ))}
                     </ol>

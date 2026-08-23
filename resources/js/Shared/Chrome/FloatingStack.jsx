@@ -68,15 +68,17 @@ export default function FloatingStack() {
                                 onClick={() => setOffersOpen(!offersOpen)}
                                 className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gold-600 text-white shadow-lg hover:scale-105 transition p-3.5"
                                 title="Your exclusive offers"
+                                aria-label={`Your exclusive offers (${offers.badge})`}
+                                aria-expanded={offersOpen}
                             >
                                 <Icon name="gift" className="w-full h-full" strokeWidth={1.8} />
-                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-danger-600 text-white text-[11px] font-semibold">{offers.badge}</span>
+                                <span aria-hidden="true" className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-danger-600 text-white text-[11px] font-semibold">{offers.badge}</span>
                             </button>
                             {offersOpen && (
                                 <div className="absolute bottom-16 right-0 w-72 max-h-[70vh] overflow-y-auto rounded-xl bg-white shadow-2xl border border-ink-100 p-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <p className="font-semibold text-sm flex items-center gap-1.5"><Icon name="gift" className="w-4 h-4 shrink-0" /> Your exclusive offers</p>
-                                        <button type="button" onClick={() => setOffersOpen(false)} className="text-ink-700/40 hover:text-ink-900 text-lg leading-none">×</button>
+                                        <button type="button" onClick={() => setOffersOpen(false)} aria-label="Close offers" className="text-ink-700/40 hover:text-ink-900 text-lg leading-none">×</button>
                                     </div>
                                     {offers.member && (
                                         <div className="rounded-lg border border-gold-300 bg-gold-600 text-white p-2.5 mb-2">
@@ -97,7 +99,7 @@ export default function FloatingStack() {
                                             <div key={i} className="rounded-lg border border-gold-200 bg-gold-50/60 p-2.5">
                                                 <p className="text-sm font-medium">{o.title}</p>
                                                 <span className="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{o.reward}</span>
-                                                {o.scope && <span className="text-[10px] text-ink-700/50 ml-1">· {o.scope}</span>}
+                                                {o.scope && <span className="text-[10px] text-ink-700/70 ml-1">· {o.scope}</span>}
                                                 {o.message && <p className="text-xs text-ink-700/70 italic mt-1">{o.message}</p>}
                                                 <p className="text-[11px] text-success-700 mt-1">✓ Auto-applied at checkout{o.until ? ` · until ${o.until}` : ''}</p>
                                             </div>
@@ -109,17 +111,17 @@ export default function FloatingStack() {
                         </div>
                     )}
                     {floats.call && (
-                        <a href={`tel:${floats.call.replace(/[^0-9+]/g, '')}`} className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gold-600 text-white shadow-lg hover:scale-105 transition p-3.5" title="Call us now">
+                        <a href={`tel:${floats.call.replace(/[^0-9+]/g, '')}`} className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gold-600 text-white shadow-lg hover:scale-105 transition p-3.5" title="Call us now" aria-label="Call us now">
                             <Phone className="w-full h-full" />
                         </a>
                     )}
                     {floats.messenger && (
-                        <a href={floats.messenger} target="_blank" rel="noopener" className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-[#0084FF] text-white shadow-lg hover:scale-105 transition p-3" title="Message us">
+                        <a href={floats.messenger} target="_blank" rel="noopener" className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-[#0084FF] text-white shadow-lg hover:scale-105 transition p-3" title="Message us" aria-label="Message us on Messenger">
                             <Messenger className="w-full h-full" />
                         </a>
                     )}
                     {floats.whatsapp && (
-                        <a href={`https://wa.me/${floats.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg hover:scale-105 transition p-3" title="Order on WhatsApp">
+                        <a href={`https://wa.me/${floats.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg hover:scale-105 transition p-3" title="Order on WhatsApp" aria-label="Order on WhatsApp">
                             <WhatsApp className="w-full h-full" />
                         </a>
                     )}

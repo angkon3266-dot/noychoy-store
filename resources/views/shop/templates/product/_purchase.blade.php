@@ -152,16 +152,10 @@
     @endauth
 
     {{-- Delivery estimate --}}
-    @if(theme('show_delivery_estimate'))
-        @php
-            $dmin = (int) theme('delivery_days_min', 2);
-            $dmax = (int) theme('delivery_days_max', 4);
-            $from = now()->addDays($dmin);
-            $to = now()->addDays($dmax);
-        @endphp
+    @if($deliveryEstimate = \App\Support\DeliveryEstimate::for())
         <div class="mt-4 flex items-center gap-2 text-sm text-ink-700/80">
             <svg class="w-5 h-5 text-gold-700" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-6"/></svg>
-            <span>Order now — estimated delivery <strong>{{ $from->format('D, d M') }}{{ $dmax > $dmin ? ' – '.$to->format('d M') : '' }}</strong></span>
+            <span>Order now — estimated delivery <strong>{{ $deliveryEstimate->label() }}</strong></span>
         </div>
     @endif
 

@@ -73,7 +73,7 @@ export default function Header() {
                     )}
 
                     {/* Desktop nav */}
-                    <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+                    <nav className="hidden md:flex items-center gap-6 text-sm font-medium" aria-label="Main">
                         {(menu.items || []).map((item, i) => (
                             <DesktopItem key={i} item={item} trigger={menu.trigger} />
                         ))}
@@ -96,19 +96,19 @@ export default function Header() {
                         {props.customer ? (
                             <>
                                 <NotificationsBell />
-                                <a href={urls.account} className="p-2 hover:text-gold-700" title="My account">
+                                <a href={urls.account} className="p-2 hover:text-gold-700" title="My account" aria-label="My account">
                                     <Icon name="user" />
                                 </a>
                             </>
                         ) : (
-                            <a href={urls.login} className="p-2 hover:text-gold-700" title="Login">
+                            <a href={urls.login} className="p-2 hover:text-gold-700" title="Login" aria-label="Sign in">
                                 <Icon name="user" />
                             </a>
                         )}
-                        <button type="button" onClick={openDrawer} className="relative p-2 hover:text-gold-700" title="Cart">
+                        <button type="button" onClick={openDrawer} className="relative p-2 hover:text-gold-700" title="Cart" aria-label={count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'}>
                             <Icon name="cart" />
                             {count > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 badge bg-gold-600 text-white px-1.5 min-w-5 justify-center">{count}</span>
+                                <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 badge bg-gold-600 text-white px-1.5 min-w-5 justify-center">{count}</span>
                             )}
                         </button>
                     </div>

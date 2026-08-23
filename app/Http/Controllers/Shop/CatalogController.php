@@ -243,7 +243,11 @@ class CatalogController extends Controller
                 'attrs' => $v->attributes ?? [],
                 'price' => (float) ($v->price ?? $product->price),
                 'compare' => (float) $v->compare_at_price,
-                'stock' => (int) $v->stock_quantity,
+                // Boolean only. The UI never shows a per-variant count, and
+                // the exact number is competitor-readable inventory. PlaceOrder
+                // re-validates the real quantity server-side, so a client that
+                // no longer knows it cannot over-order.
+                'inStock' => (int) $v->stock_quantity > 0,
                 // Variation photo — the gallery jumps to it when this variant is picked.
                 'image' => $v->image_id ? $product->images->firstWhere('id', $v->image_id)?->url : null,
             ])->values(),

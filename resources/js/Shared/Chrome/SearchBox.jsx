@@ -44,12 +44,13 @@ export default function SearchBox({ compact = false, autoFocus = false, onNaviga
 
     return (
         <div className="relative" ref={boxRef}>
-            <form action={urls.shop || '/shop'} method="GET">
+            <form action={urls.shop || '/shop'} method="GET" role="search">
                 <input
                     name="q"
                     value={q}
                     onChange={(e) => onInput(e.target.value)}
                     onFocus={() => q.length >= 2 && setOpen(true)}
+                    aria-label="Search jewelry"
                     placeholder="Search jewelry…"
                     autoComplete="off"
                     autoFocus={autoFocus}
@@ -72,7 +73,7 @@ export default function SearchBox({ compact = false, autoFocus = false, onNaviga
                 </div>
             )}
             {open && !results.length && !loading && q.length >= 2 && (
-                <div className={`absolute ${compact ? 'right-0 w-80' : 'inset-x-0'} mt-1 rounded-xl border border-ink-100 bg-white shadow-xl z-50 p-3 text-sm text-ink-700/60`}>
+                <div className={`absolute ${compact ? 'right-0 w-80' : 'inset-x-0'} mt-1 rounded-xl border border-ink-100 bg-white shadow-xl z-50 p-3 text-sm text-ink-700/70`}>
                     No matches — press Enter to search all.
                 </div>
             )}

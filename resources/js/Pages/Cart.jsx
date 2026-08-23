@@ -41,7 +41,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
             <div className="mx-auto max-w-5xl px-4 py-8">
                 <h1 className="font-display text-3xl font-semibold mb-6">Your cart</h1>
                 <div className="card p-12 text-center">
-                    <p className="text-ink-700/60">Your cart is empty.</p>
+                    <p className="text-ink-700/70">Your cart is empty.</p>
                     <Link href={urls.shop || '/shop'} className="btn-primary mt-4">Start shopping</Link>
                 </div>
             </div>
@@ -93,7 +93,7 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                             </div>
                             <div className="flex-1 min-w-0">
                                 <Link href={item.url} className="font-medium hover:text-gold-700">{item.name}</Link>
-                                {item.attributes && <p className="text-xs text-ink-700/60">{item.attributes}</p>}
+                                {item.attributes && <p className="text-xs text-ink-700/70">{item.attributes}</p>}
                                 <p className="text-sm text-gold-700 font-semibold mt-1">{item.price_text}</p>
                                 {item.offer && (
                                     <p className="mt-1 inline-block badge bg-success-100 text-success-700 text-[11px]">
@@ -137,14 +137,14 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                         {summary.free_shipping_offer && (
                             <div className="flex justify-between text-success-700"><dt>Free delivery offer</dt><dd>unlocked</dd></div>
                         )}
-                        <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd className="text-ink-700/60">calculated at checkout</dd></div>
+                        <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd className="text-ink-700/70">calculated at checkout</dd></div>
                         <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3">
                             <dt>Estimated total</dt><dd>{summary.total_text}</dd>
                         </div>
                     </dl>
 
                     {memberUsage && (
-                        <p className={`mt-2 text-xs ${memberUsage.remaining > 0 ? 'text-success-700' : 'text-ink-700/60'}`}>
+                        <p className={`mt-2 text-xs ${memberUsage.remaining > 0 ? 'text-success-700' : 'text-ink-700/70'}`}>
                             {memberUsage.remaining > 0
                                 ? <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount: <strong>{memberUsage.remaining} of {memberUsage.max}</strong> uses left{memberUsage.resets ? ` (resets ${memberUsage.resets})` : ''}.</>
                                 : <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount used up for now{memberUsage.resets ? ` — resets ${memberUsage.resets}` : ''}.</>}

@@ -43,12 +43,12 @@ export default function Contact({ title, intro, details, submitUrl }) {
                     )}
                     <form onSubmit={submit} className="space-y-3">
                         <div className="grid sm:grid-cols-2 gap-3">
-                            <input {...field('name', { placeholder: 'Your name *', required: true })} className="input" />
-                            <input {...field('phone', { placeholder: 'Phone' })} className="input" />
+                            <input {...field('name', { placeholder: 'Your name *', required: true })} aria-label="Your name" className="input" />
+                            <input {...field('phone', { placeholder: 'Phone' })} aria-label="Phone" className="input" />
                         </div>
-                        <input {...field('email', { type: 'email', placeholder: 'Email (optional)' })} className="input" />
-                        <input {...field('subject', { placeholder: 'Subject' })} className="input" />
-                        <textarea {...field('message', { rows: 5, placeholder: 'How can we help? *', required: true })} className="input" />
+                        <input {...field('email', { type: 'email', placeholder: 'Email (optional)' })} aria-label="Email" className="input" />
+                        <input {...field('subject', { placeholder: 'Subject' })} aria-label="Subject" className="input" />
+                        <textarea {...field('message', { rows: 5, placeholder: 'How can we help? *', required: true })} aria-label="Message" className="input" />
                         <button className="btn-primary w-full" disabled={processing}>{processing ? 'Sending…' : 'Send message'}</button>
                     </form>
                 </div>

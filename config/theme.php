@@ -110,8 +110,17 @@ return [
 
         // Product page conversion helpers
         'show_delivery_estimate' => true,
+        // Nationwide / outside-Dhaka window. These keep their names: the
+        // product page reads them when it has no zone to go on, and saved
+        // theme rows in production already carry them.
         'delivery_days_min' => 2,
         'delivery_days_max' => 4,
+        // Inside Dhaka is faster. Used once an order knows its zone.
+        'delivery_days_inside_min' => 1,
+        'delivery_days_inside_max' => 2,
+        // Carbon day numbers the courier does not deliver on.
+        // 5 = Friday, the Bangladeshi weekend day.
+        'delivery_off_days' => [5],
         'show_pdp_whatsapp' => true,
         'show_frequently_bought' => true,
 

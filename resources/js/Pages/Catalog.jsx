@@ -63,27 +63,27 @@ export default function Catalog({ title, description = null, products, filters, 
                 <div>
                     <h1 className="font-display text-3xl font-semibold">{title}</h1>
                     {description && <p className="text-ink-700/70 mt-1 max-w-2xl">{description}</p>}
-                    <p className="text-sm text-ink-700/60 mt-1">{products.total} item(s)</p>
+                    <p className="text-sm text-ink-700/70 mt-1">{products.total} item(s)</p>
                 </div>
             </div>
 
             <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-8">
                 {/* Sidebar filters */}
-                <aside className="mb-6 lg:mb-0">
+                <aside className="mb-6 lg:mb-0" aria-label="Product filters">
                     <div className="flex items-center justify-between lg:hidden mb-3">
-                        <button type="button" onClick={() => setShowFilters(!showFilters)} className="btn-outline py-2 inline-flex items-center gap-1.5"><Icon name="funnel" className="w-4 h-4 shrink-0" /> Filters</button>
+                        <button type="button" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters} className="btn-outline py-2 inline-flex items-center gap-1.5"><Icon name="funnel" className="w-4 h-4 shrink-0" /> Filters</button>
                     </div>
                     <div className={showFilters ? 'block' : 'hidden lg:block'}>
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="font-display text-lg tracking-wide">FILTER BY</h2>
                             {hasActiveFilters && (
-                                <Link href={clearUrl} className="text-xs text-ink-700/60 hover:text-gold-700">Clear all</Link>
+                                <Link href={clearUrl} className="text-xs text-ink-700/70 hover:text-gold-700">Clear all</Link>
                             )}
                         </div>
 
                         {filters.length ? filters.map((group) => (
                             <div key={group.label} className="border-t border-ink-100 py-3">
-                                <h3 className="text-xs uppercase tracking-wide text-ink-700/60 mb-2">
+                                <h3 className="text-xs uppercase tracking-wide text-ink-700/70 mb-2">
                                     {group.label}
                                     <span className="block h-0.5 w-8 bg-gold-400 mt-1"></span>
                                 </h3>
@@ -109,7 +109,7 @@ export default function Catalog({ title, description = null, products, filters, 
                                 </div>
                             </div>
                         )) : (
-                            <p className="text-sm text-ink-700/50">No filters configured.</p>
+                            <p className="text-sm text-ink-700/70">No filters configured.</p>
                         )}
                     </div>
                 </aside>
@@ -117,7 +117,7 @@ export default function Catalog({ title, description = null, products, filters, 
                 {/* Products */}
                 <div>
                     <div className="flex flex-wrap items-center justify-end gap-2 mb-4">
-                        <select value={sort} onChange={(e) => applySort(e.target.value)} className="input py-2 w-auto">
+                        <select value={sort} onChange={(e) => applySort(e.target.value)} aria-label="Sort products" className="input py-2 w-auto">
                             <option value="new">Newest</option>
                             <option value="popular">Most popular</option>
                             <option value="best_selling">Best selling</option>
@@ -128,7 +128,7 @@ export default function Catalog({ title, description = null, products, filters, 
                     </div>
 
                     {products.data.length === 0 ? (
-                        <div className="card p-12 text-center text-ink-700/60">
+                        <div className="card p-12 text-center text-ink-700/70">
                             <p>No products match these filters.</p>
                             <Link href={urls.shop || '/shop'} className="btn-outline mt-4">Browse all jewelry</Link>
                         </div>

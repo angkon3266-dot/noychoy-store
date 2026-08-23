@@ -37,7 +37,7 @@ export default function Footer() {
                     )}
                 </div>
                 <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Shop</h3>
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Shop</h2>
                     <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
                         {(footer.categories || []).map((cat) => (
                             <li key={cat.url}><SmartLink href={cat.url} className="hover:text-white">{cat.name}</SmartLink></li>
@@ -45,7 +45,7 @@ export default function Footer() {
                     </ul>
                 </div>
                 <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Help</h3>
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Help</h2>
                     <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
                         <li><a href={urls.about} className="hover:text-white">Our story</a></li>
                         <li><a href={urls.track} className="hover:text-white">Track your order</a></li>
@@ -57,7 +57,7 @@ export default function Footer() {
                     </ul>
                 </div>
                 <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Contact</h3>
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Contact</h2>
                     <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
                         {footer.phone && <li className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-gold-300 shrink-0" />{footer.phone}</li>}
                         <li className="flex items-center gap-2"><Icon name="mail" className="w-4 h-4 text-gold-300 shrink-0" />{footer.email}</li>

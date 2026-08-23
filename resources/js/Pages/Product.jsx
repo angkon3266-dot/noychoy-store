@@ -83,7 +83,7 @@ function usePurchase(pp) {
     const offerPercent = offers.reduce((best, o) => (qty >= o.min_qty && o.percent > best ? o.percent : best), 0);
     const price = offerPercent > 0 ? Math.round(unitPrice * (1 - offerPercent / 100) * 100) / 100 : unitPrice;
     const savings = Math.round((unitPrice - price) * qty * 100) / 100;
-    const canBuy = !pp.hasVariants || (!!matched && matched.stock > 0);
+    const canBuy = !pp.hasVariants || (!!matched && !!matched.inStock);
 
     const selectAttr = (name, val) => {
         setSelected((prev) => {
@@ -95,7 +95,7 @@ function usePurchase(pp) {
     };
 
     const valueInStock = (name, val) =>
-        variants.some((v) => String(v.attrs[name]) === String(val) && v.stock > 0);
+        variants.some((v) => String(v.attrs[name]) === String(val) && v.inStock);
 
     const priceText = () => {
         if (pp.hasVariants && !matched) {
@@ -131,7 +131,7 @@ function usePurchase(pp) {
         offerPercent, price, savings, canBuy, priceText, makeAddEvent,
         hasVariants: !!pp.hasVariants,
         attributesList: attributes,
-        variantStock: matched ? matched.stock : null,
+        variantInStock: matched ? !!matched.inStock : null,
     };
 }
 
@@ -140,7 +140,7 @@ function Breadcrumb({ product }) {
     const home = props.chrome?.urls?.home || '/';
 
     return (
-        <nav aria-label="Breadcrumb" className="text-sm text-ink-700/60 mb-6">
+        <nav aria-label="Breadcrumb" className="text-sm text-ink-700/70 mb-6">
             <a href={home} className="hover:text-gold-700">Home</a>{' / '}
             {product.category && (
                 <>
@@ -205,7 +205,7 @@ function Gallery({ product, img, setImg }) {
             {zoom && (
                 <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4" onClick={() => setZoom(false)}>
                     <img src={current} alt={product.name} className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
-                    <button className="absolute top-4 right-4 text-white text-3xl leading-none">×</button>
+                    <button type="button" aria-label="Close image" className="absolute top-4 right-4 text-white text-3xl leading-none">×</button>
                 </div>
             )}
 
@@ -226,12 +226,13 @@ function Gallery({ product, img, setImg }) {
                             key={i}
                             type="button"
                             onClick={() => setVideo(v.embed ? { embed: v.embed } : { src: v.src })}
+                            aria-label={`Play video ${i + 1}`}
                             className={`relative aspect-square overflow-hidden rounded-lg bg-ink-900 ring-2 hover:ring-gold-500 ${video && (video.embed === v.embed && video.src === v.src) ? 'ring-gold-500' : 'ring-transparent'}`}
                         >
                             {v.thumb && <img src={v.thumb} alt="" className="h-full w-full object-cover opacity-80" />}
                             <span className="absolute inset-0 grid place-items-center">
                                 <span className="bg-white/90 rounded-full w-8 h-8 grid place-items-center">
-                                    <svg className="w-4 h-4 text-ink-900" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                    <svg aria-hidden="true" className="w-4 h-4 text-ink-900" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                                 </span>
                             </span>
                         </button>
@@ -293,7 +294,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 <span className="flex text-gold-500">
                     {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={!reviews.avg || i > Math.round(reviews.avg)} />)}
                 </span>
-                <span className="text-ink-700/50 group-hover:text-gold-700">
+                <span className="text-ink-700/70 group-hover:text-gold-700">
                     {reviews.count ? `${reviews.avg} · ${reviews.count} review${reviews.count > 1 ? 's' : ''}` : (lovesCount > 0 ? `Loved by ${lovesCount} ${lovesCount === 1 ? 'person' : 'people'}` : 'Be the first to review')}
                 </span>
             </a>
@@ -307,7 +308,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 <span className="text-2xl font-semibold text-gold-700">{purchase.priceText()}</span>
                 {purchase.onSale && (!purchase.hasVariants || purchase.matched) && (
                     <>
-                        <span className="text-ink-400 line-through">{money(purchase.compareAt)}</span>
+                        <span className="text-ink-500 line-through">{money(purchase.compareAt)}</span>
                         <span className="badge bg-danger-100 text-danger-700">Save {purchase.discountPct}%</span>
                     </>
                 )}
@@ -325,9 +326,9 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                     <MemberPill />
                     <span className="text-ink-800">
                         <strong className="font-semibold">{memberBanner.price_text}</strong>
-                        <span className="text-ink-700/55"> · save {memberBanner.pct}%{memberBanner.savings_text ? ` (${memberBanner.savings_text})` : ''}</span>
+                        <span className="text-ink-700/70"> · save {memberBanner.pct}%{memberBanner.savings_text ? ` (${memberBanner.savings_text})` : ''}</span>
                     </span>
-                    <span className="text-[12px] text-ink-700/40">applied at checkout</span>
+                    <span className="text-[12px] text-ink-700/70">applied at checkout</span>
                 </div>
             )}
 
@@ -337,7 +338,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                     <MemberPill />
                     <span className="text-ink-800">
                         <strong className="font-semibold">{ui.registerPct}% off</strong>
-                        <span className="text-ink-700/55"> this piece for members</span>
+                        <span className="text-ink-700/70"> this piece for members</span>
                     </span>
                     <span className="text-[12px] font-medium text-gold-700 group-hover:underline">Join free</span>
                 </a>
@@ -369,7 +370,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                                         <span className="font-medium">{tier.label}</span>
                                         {applied && <span className="text-xs text-success-700 font-medium shrink-0 inline-flex items-center gap-1"><Icon name="check" className="w-3.5 h-3.5" />applied</span>}
                                     </span>
-                                    <span className="mt-0.5 block text-xs text-ink-700/60">
+                                    <span className="mt-0.5 block text-xs text-ink-700/70">
                                         {tier.min_qty >= 2
                                             ? `${tier.each_text} each · save ${tier.save_total_text} on ${tier.min_qty}`
                                             : `${tier.each_text} instead of ${tier.price_text} · you save ${tier.save_each_text}`}
@@ -390,7 +391,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                             <span>
                                 {o.badge && <span className="mr-1.5 inline-block rounded-full bg-success-600 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.badge}</span>}
                                 <strong className="font-semibold">{o.title}</strong>
-                                {o.description && <span className="text-ink-700/55"> — {o.description}</span>}
+                                {o.description && <span className="text-ink-700/70"> — {o.description}</span>}
                                 {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-gold-700 underline">Register to unlock</a></>}
                             </span>
                         </li>
@@ -407,8 +408,8 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                             <span>
                                 <span className="mr-1.5 inline-block rounded-full bg-gold-700 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.reward}</span>
                                 <strong className="font-semibold">{o.title}</strong>
-                                {o.message && <span className="text-ink-700/55"> — {o.message}</span>}
-                                <span className="text-ink-700/40">{o.until ? ` · until ${o.until}` : ''}</span>
+                                {o.message && <span className="text-ink-700/70"> — {o.message}</span>}
+                                <span className="text-ink-700/70">{o.until ? ` · until ${o.until}` : ''}</span>
                             </span>
                         </li>
                     ))}
@@ -436,19 +437,19 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
             {purchase.hasVariants && (
                 <div className="mt-6 space-y-4">
                     <AttributePickers purchase={purchase} />
-                    {!purchase.matched && <p className="text-xs text-ink-700/50">Select options to see price &amp; availability.</p>}
-                    {purchase.matched && purchase.variantStock <= 0 && <p className="text-xs text-danger-600 font-medium">This combination is sold out.</p>}
+                    {!purchase.matched && <p className="text-xs text-ink-700/70">Select options to see price &amp; availability.</p>}
+                    {purchase.matched && !purchase.variantInStock && <p className="text-xs text-danger-600 font-medium">This combination is sold out.</p>}
                 </div>
             )}
 
             {/* Quantity */}
             <div className="mt-6 flex items-center gap-4">
                 <div className="inline-flex items-center rounded-md border border-ink-100">
-                    <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} className="px-3 py-2.5">−</button>
+                    <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="px-3 py-2.5">−</button>
                     <span className="w-10 text-center">{purchase.qty}</span>
-                    <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} className="px-3 py-2.5">+</button>
+                    <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="px-3 py-2.5">+</button>
                 </div>
-                <span className="text-sm text-ink-700/50">Cash on delivery available</span>
+                <span className="text-sm text-ink-700/70">Cash on delivery available</span>
             </div>
 
             {preorder && (
@@ -495,7 +496,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                         <div key={i} className="rounded-lg border border-gold-100 bg-white px-3 py-2.5 text-center">
                             <div className="flex justify-center text-gold-700"><IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5" /></div>
                             <div className="text-xs font-medium mt-0.5">{b.title}</div>
-                            {b.text && <div className="text-[11px] text-ink-700/50">{b.text}</div>}
+                            {b.text && <div className="text-[11px] text-ink-700/70">{b.text}</div>}
                         </div>
                     ))}
                 </div>
@@ -510,7 +511,7 @@ function AttributePickers({ purchase }) {
             {(purchase.attributesList || []).map((attr) => (
                 <div key={attr.name}>
                     <span className="label">
-                        {attr.name}: <span className="text-ink-700/60 font-normal">{purchase.selected[attr.name] || 'Choose'}</span>
+                        {attr.name}: <span className="text-ink-700/70 font-normal">{purchase.selected[attr.name] || 'Choose'}</span>
                     </span>
                     <div className="flex flex-wrap gap-2">
                         {attr.values.map((val) => {
@@ -599,7 +600,7 @@ function StockNotify({ productId }) {
                 <Icon name="bell" className="w-4 h-4" strokeWidth={1.6} />
                 <span>{busy ? 'Setting up…' : 'Notify me when available'}</span>
             </button>
-            {state === 'denied' && <p className="text-xs text-ink-700/60 text-center mt-1">Enable notifications in your browser to use this.</p>}
+            {state === 'denied' && <p className="text-xs text-ink-700/70 text-center mt-1">Enable notifications in your browser to use this.</p>}
         </div>
     );
 }
@@ -634,7 +635,7 @@ function Description({ text }) {
     if (!text) return null;
     return (
         <section className="mt-12 max-w-3xl border-t border-ink-100 pt-8">
-            <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between gap-4 text-left">
+            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
                 <h2 className="font-display text-2xl font-semibold">Description</h2>
                 <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
             </button>
@@ -652,7 +653,7 @@ function Specs({ specs }) {
             <div className="flex flex-wrap gap-2">
                 {specs.map((spec, i) => (
                     <div key={i} className="inline-flex items-center gap-2 rounded-lg bg-gold-50 border border-gold-100 px-4 py-2 text-sm">
-                        <span className="text-ink-700/60">{spec.label}:</span>
+                        <span className="text-ink-700/70">{spec.label}:</span>
                         <span className="font-medium">{spec.value}</span>
                     </div>
                 ))}
@@ -680,11 +681,11 @@ function Reviews({ product, reviews, ui, flash }) {
 
     return (
         <section className="mt-16 border-t border-ink-100 pt-10" id="reviews">
-            <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between gap-4 text-left">
+            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
                 <h2 className="font-display text-2xl font-semibold flex items-center gap-3">
                     Customer reviews
                     {reviews.count > 0 && (
-                        <span className="text-sm font-normal text-ink-700/60 flex items-center gap-1">
+                        <span className="text-sm font-normal text-ink-700/70 flex items-center gap-1">
                             <Star className="w-4 h-4 text-gold-500" />
                             {Number(reviews.avg).toFixed(1)} · {reviews.count} review{reviews.count > 1 ? 's' : ''}
                         </span>
@@ -718,26 +719,26 @@ function Reviews({ product, reviews, ui, flash }) {
                             <>
                                 <div className="flex items-end gap-2">
                                     <span className="text-4xl font-semibold">{reviews.avg}</span>
-                                    <span className="text-ink-700/50 mb-1">/ 5</span>
+                                    <span className="text-ink-700/70 mb-1">/ 5</span>
                                 </div>
                                 <div className="flex text-gold-500 mt-1">
                                     {[1, 2, 3, 4, 5].map((i) => <Star key={i} className="w-5 h-5" off={i > Math.round(reviews.avg)} />)}
                                 </div>
-                                <p className="text-sm text-ink-700/60 mt-1">{reviews.count} review{reviews.count > 1 ? 's' : ''}</p>
+                                <p className="text-sm text-ink-700/70 mt-1">{reviews.count} review{reviews.count > 1 ? 's' : ''}</p>
                                 <div className="mt-4 space-y-1.5">
                                     {Object.entries(reviews.dist).sort((a, b) => b[0] - a[0]).map(([star, n]) => (
                                         <div key={star} className="flex items-center gap-2 text-xs">
-                                            <span className="w-6 text-ink-700/60">{star}★</span>
+                                            <span className="w-6 text-ink-700/70">{star}★</span>
                                             <div className="flex-1 h-2 rounded-full bg-ink-100 overflow-hidden">
                                                 <div className="h-full bg-gold-500" style={{ width: `${reviews.count ? Math.round(n / reviews.count * 100) : 0}%` }} />
                                             </div>
-                                            <span className="w-6 text-right text-ink-700/50">{n}</span>
+                                            <span className="w-6 text-right text-ink-700/70">{n}</span>
                                         </div>
                                     ))}
                                 </div>
                             </>
                         ) : (
-                            <p className="text-ink-700/60">No reviews yet. Be the first to review this piece!</p>
+                            <p className="text-ink-700/70">No reviews yet. Be the first to review this piece!</p>
                         )}
                     </div>
 
@@ -751,7 +752,7 @@ function Reviews({ product, reviews, ui, flash }) {
                                     </span>
                                     <span className="font-medium text-sm">{review.author}</span>
                                     {review.verified && <span className="badge bg-success-100 text-success-700 text-[10px]">Verified buyer</span>}
-                                    <span className="text-xs text-ink-700/40 ml-auto">{review.date}</span>
+                                    <span className="text-xs text-ink-700/70 ml-auto">{review.date}</span>
                                 </div>
                                 {review.title && <p className="font-medium mt-2">{review.title}</p>}
                                 {review.body && <p className="text-sm text-ink-700/80 mt-1">{review.body}</p>}
@@ -773,25 +774,25 @@ function Reviews({ product, reviews, ui, flash }) {
                             <form onSubmit={submit} className="mt-4 space-y-3" encType="multipart/form-data">
                                 <div>
                                     <span className="label">Your rating *</span>
-                                    <div className="flex gap-1" onMouseLeave={() => setHover(0)}>
+                                    <div className="flex gap-1" role="group" aria-label="Your rating" onMouseLeave={() => setHover(0)}>
                                         {[1, 2, 3, 4, 5].map((i) => (
-                                            <button key={i} type="button" onClick={() => setRating(i)} onMouseEnter={() => setHover(i)} className={`text-2xl transition ${(hover || rating) >= i ? 'text-gold-500' : 'text-ink-200'}`}>★</button>
+                                            <button key={i} type="button" onClick={() => setRating(i)} onMouseEnter={() => setHover(i)} aria-label={`${i} star${i > 1 ? 's' : ''}`} aria-pressed={rating === i} className={`text-2xl transition ${(hover || rating) >= i ? 'text-gold-500' : 'text-ink-200'}`}>★</button>
                                         ))}
                                     </div>
                                     <input type="hidden" name="rating" value={rating || ''} required />
                                 </div>
                                 <div className="grid sm:grid-cols-2 gap-3">
-                                    <input name="author_name" placeholder="Your name *" className="input" required defaultValue={ui.customerName || ''} />
-                                    <input name="phone" placeholder="Phone (for verified badge)" className="input" />
+                                    <input name="author_name" aria-label="Your name" placeholder="Your name *" className="input" required defaultValue={ui.customerName || ''} />
+                                    <input name="phone" aria-label="Phone" placeholder="Phone (for verified badge)" className="input" />
                                 </div>
-                                <input name="title" placeholder="Headline (optional)" className="input" />
-                                <textarea name="body" rows={3} placeholder="Share your experience…" className="input" />
+                                <input name="title" aria-label="Headline" placeholder="Headline (optional)" className="input" />
+                                <textarea name="body" aria-label="Your review" rows={3} placeholder="Share your experience…" className="input" />
                                 <div>
-                                    <label className="label">Add photos (optional, up to 4)</label>
-                                    <input type="file" name="photos[]" accept="image/*" multiple className="input text-sm" />
+                                    <label className="label" htmlFor="review-photos">Add photos (optional, up to 4)</label>
+                                    <input id="review-photos" type="file" name="photos[]" accept="image/*" multiple className="input text-sm" />
                                 </div>
                                 <button className="btn-primary" disabled={!rating}>Submit review</button>
-                                <p className="text-xs text-ink-700/50">Reviews appear after approval.</p>
+                                <p className="text-xs text-ink-700/70">Reviews appear after approval.</p>
                             </form>
                         </details>
                     </div>
@@ -847,7 +848,7 @@ function FrequentlyBought({ fbt }) {
                                 </span>
                                 <span className="mt-1 block text-xs truncate">{p.name}</span>
                                 <span className="block text-xs font-semibold text-gold-700">{p.price_text}</span>
-                                {p.has_variants && <span className="block text-[10px] text-ink-700/50">choose options on its page</span>}
+                                {p.has_variants && <span className="block text-[10px] text-ink-700/70">choose options on its page</span>}
                             </label>
                             {i < fbt.items.length - 1 && <span className="text-2xl text-ink-300">+</span>}
                         </span>
@@ -911,7 +912,7 @@ function StickyBar({ product, purchase, ui }) {
                         <div className="font-medium text-sm truncate max-w-[14rem]">{product.name}</div>
                     </div>
                     <div className="shrink-0">
-                        <div className="text-xs text-ink-700/50">Total</div>
+                        <div className="text-xs text-ink-700/70">Total</div>
                         <div className="font-semibold text-gold-700">{money(purchase.price * purchase.qty)}</div>
                     </div>
                     <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline whitespace-nowrap hidden sm:inline-flex">Add to cart</button>

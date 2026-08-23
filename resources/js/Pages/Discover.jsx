@@ -26,7 +26,7 @@ export default function Discover({ tiles, categories }) {
                     ))}
                 </div>
             ) : (
-                <p className="text-center text-sm text-ink-700/60 py-10">Discover tiles haven't been set up yet.</p>
+                <p className="text-center text-sm text-ink-700/70 py-10">Discover tiles haven't been set up yet.</p>
             )}
         </div>
     );

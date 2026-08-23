@@ -10,19 +10,19 @@ export default function ForgotPassword({ old }) {
 
     return (
         <AuthCard title="Reset your password">
-            <p className="text-sm text-ink-700/60 mt-4 mb-2">Enter your email and we'll send you a reset link.</p>
+            <p className="text-sm text-ink-700/70 mt-4 mb-2">Enter your email and we'll send you a reset link.</p>
             <form onSubmit={(e) => { e.preventDefault(); emailForm.post('/password/email', keepOnErrors); }} className="space-y-3">
-                <div><label className="label">Email address</label><input type="email" value={emailForm.data.email} onChange={(e) => emailForm.setData('email', e.target.value)} className="input" required autoComplete="email" /></div>
+                <div><label className="label">Email address<input type="email" value={emailForm.data.email} onChange={(e) => emailForm.setData('email', e.target.value)} className="input" required autoComplete="email" /></label></div>
                 <button className="btn-primary w-full" disabled={emailForm.processing}>{emailForm.processing ? 'Sending…' : 'Email me a reset link'}</button>
             </form>
 
-            <div className="flex items-center gap-3 my-6 text-xs text-ink-700/40">
+            <div aria-hidden="true" className="flex items-center gap-3 my-6 text-xs text-ink-700/70">
                 <span className="h-px flex-1 bg-ink-100"></span>OR<span className="h-px flex-1 bg-ink-100"></span>
             </div>
 
-            <p className="text-sm text-ink-700/60 mb-2">Prefer SMS? We'll text a 6-digit code to your mobile.</p>
+            <p className="text-sm text-ink-700/70 mb-2">Prefer SMS? We'll text a 6-digit code to your mobile.</p>
             <form onSubmit={(e) => { e.preventDefault(); smsForm.post('/password/forgot', keepOnErrors); }} className="space-y-3">
-                <div><label className="label">Mobile number</label><input value={smsForm.data.phone} onChange={(e) => smsForm.setData('phone', e.target.value)} placeholder="01XXXXXXXXX" className="input" required autoComplete="tel" inputMode="numeric" /></div>
+                <div><label className="label">Mobile number<input value={smsForm.data.phone} onChange={(e) => smsForm.setData('phone', e.target.value)} placeholder="01XXXXXXXXX" className="input" required autoComplete="tel" inputMode="numeric" /></label></div>
                 <button className="btn-outline w-full" disabled={smsForm.processing}>{smsForm.processing ? 'Sending…' : 'Send code by SMS'}</button>
             </form>
 

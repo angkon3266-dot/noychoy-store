@@ -15,8 +15,8 @@ export default function Login({ old }) {
     return (
         <AuthCard title="Welcome back" subtitle="Log in to your account">
             <form onSubmit={submit} className="mt-6 space-y-4">
-                <div><label className="label">Mobile number</label><input value={form.data.phone} onChange={(e) => form.setData('phone', e.target.value)} className="input" required autoComplete="tel" inputMode="numeric" /></div>
-                <div><label className="label">Password</label><input type="password" value={form.data.password} onChange={(e) => form.setData('password', e.target.value)} className="input" required autoComplete="current-password" /></div>
+                <div><label className="label">Mobile number<input value={form.data.phone} onChange={(e) => form.setData('phone', e.target.value)} className="input" required autoComplete="tel" inputMode="numeric" /></label></div>
+                <div><label className="label">Password<input type="password" value={form.data.password} onChange={(e) => form.setData('password', e.target.value)} className="input" required autoComplete="current-password" /></label></div>
                 <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.data.remember} onChange={(e) => form.setData('remember', e.target.checked)} /> Remember me</label>
                     <Link href="/password/forgot" className="text-sm text-gold-700 hover:underline">Forgot password?</Link>

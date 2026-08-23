@@ -31,6 +31,12 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            // Push opt-in trigger ('register' | 'order' | null).
+            // partials/web-push.blade.php lives in the root view, which an
+            // Inertia visit never re-renders — so the flash has to reach React
+            // as a prop or nobody ever sees it. That, not the localStorage key,
+            // is why the post-registration prompt could never fire.
+            'pushPrompt' => fn () => $request->session()->get('prompt_push'),
             'errors' => fn () => $request->session()->get('errors')
                 ? $request->session()->get('errors')->getBag('default')->getMessages()
                 : (object) [],

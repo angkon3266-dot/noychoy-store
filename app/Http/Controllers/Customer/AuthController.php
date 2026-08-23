@@ -90,7 +90,7 @@ class AuthController extends Controller
 
         return redirect()->route('account')
             ->with('success', 'Welcome to '.store_name().'!')
-            ->with('prompt_push', true);   // trigger the web-push opt-in prompt on landing
+            ->with('prompt_push', 'register');   // per-trigger key; see Shared/Chrome/PushPrompt.jsx
     }
 
     public function logout(Request $request)

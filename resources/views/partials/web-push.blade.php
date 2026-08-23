@@ -5,14 +5,6 @@
                 const SUBSCRIBE = @json(route('push.subscribe'));
                 const WATCH = @json(route('push.watch-stock'));
                 const CSRF = @json(csrf_token());
-                // Auto-prompt once per browser: immediately for anyone, and right
-                // after a member registers (server flashes this flag).
-                // Only ask once the visitor has done something that makes the
-                // permission make sense — placed an order, or registered
-                // (the server flashes prompt_push then). Asking a stranger on
-                // arrival is the fastest way to a permanent "Block".
-                const AUTOPROMPT = {{ (session('prompt_push') || session('placed_orders')) ? 'true' : 'false' }};
-
                 function urlB64ToUint8(base64) {
                     const pad = '='.repeat((4 - (base64.length % 4)) % 4);
                     const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
@@ -125,17 +117,11 @@
                     };
                 };
 
-                // Immediate opt-in prompt (once per browser).
-                if (supported && AUTOPROMPT && Notification.permission === 'default' && !localStorage.getItem('wp_asked')) {
-                    localStorage.setItem('wp_asked', '1');
-                    // A tiny delay so it doesn't fire before first paint.
-                    setTimeout(() => {
-                        Notification.requestPermission().then((perm) => {
-                            if (perm === 'granted') ensure().catch(() => {});
-                        });
-                    }, 1500);
-                } else if (supported && Notification.permission === 'granted') {
-                    // Keep the subscription (and its customer link) fresh on every load.
+                // The opt-in ask lives in resources/js/Shared/Chrome/PushPrompt.jsx.
+                // This root view is not re-rendered on an Inertia visit, so it
+                // can never see the trigger. All that is left here is keeping an
+                // existing subscription (and its customer link) fresh.
+                if (supported && Notification.permission === 'granted') {
                     ensure().catch(() => {});
                 }
             })();

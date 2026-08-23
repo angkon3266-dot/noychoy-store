@@ -56,10 +56,10 @@ export default function NotificationsBell() {
 
     return (
         <div className="relative" ref={ref}>
-            <button type="button" onClick={toggle} className="relative p-2 hover:text-gold-700" title="Notifications">
+            <button type="button" onClick={toggle} className="relative p-2 hover:text-gold-700" title="Notifications" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={open}>
                 <Icon name="bell" />
                 {unread > 0 && (
-                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger-600 text-white text-[10px] font-semibold flex items-center justify-center">
+                    <span aria-hidden="true" className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger-600 text-white text-[10px] font-semibold flex items-center justify-center">
                         {unread > 9 ? '9+' : unread}
                     </span>
                 )}
@@ -87,11 +87,11 @@ export default function NotificationsBell() {
                     {data.items.length ? data.items.map((n, i) => (
                         <a key={i} href={n.url} className="block px-2 py-2 rounded-lg hover:bg-ink-50">
                             <p className="text-sm font-medium">{n.icon} {n.title}</p>
-                            {n.body && <p className="text-xs text-ink-700/60 line-clamp-2">{n.body}</p>}
-                            <p className="text-[11px] text-ink-700/40 mt-0.5">{n.time}</p>
+                            {n.body && <p className="text-xs text-ink-700/70 line-clamp-2">{n.body}</p>}
+                            <p className="text-[11px] text-ink-700/70 mt-0.5">{n.time}</p>
                         </a>
                     )) : (
-                        <p className="px-2 py-6 text-sm text-ink-700/50 text-center">No notifications yet.</p>
+                        <p className="px-2 py-6 text-sm text-ink-700/70 text-center">No notifications yet.</p>
                     )}
                 </div>
             )}

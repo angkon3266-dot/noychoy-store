@@ -19,6 +19,10 @@ export function CartProvider({ children }) {
     const [toast, setToast] = useState(null);
     const busyRef = useRef(false);
     const toastTimer = useRef(null);
+    // What opened the mini-cart. It lives here, not in MiniCart, because the
+    // drawer has two triggers (the header button and the bottom nav) and both
+    // funnel through openDrawer.
+    const cartTrigger = useRef(null);
 
     // Server-rendered count wins after every Inertia navigation/redirect.
     useEffect(() => {
@@ -78,6 +82,7 @@ export function CartProvider({ children }) {
     }, [apply, refresh]);
 
     const openDrawer = useCallback(() => {
+        cartTrigger.current = document.activeElement;
         refresh();
         setDrawer(true);
     }, [refresh]);
@@ -85,7 +90,7 @@ export function CartProvider({ children }) {
     return (
         <CartContext.Provider value={{
             count, items, subtotalText, discountLines, hints, freeShipping,
-            drawer, setDrawer, openDrawer, toast, showToast, add, remove, refresh,
+            drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, remove, refresh,
         }}>
             {children}
         </CartContext.Provider>

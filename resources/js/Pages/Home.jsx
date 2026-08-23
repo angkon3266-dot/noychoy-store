@@ -45,7 +45,7 @@ function Heading({ eyebrow, title, subtitle = null, action = null, center = fals
             <div>
                 {eyebrow && <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-2">{eyebrow}</p>}
                 <h2 className="font-display text-3xl sm:text-4xl text-ink-900 leading-tight">{title}</h2>
-                {subtitle && <p className="mt-3 text-ink-700/60">{subtitle}</p>}
+                {subtitle && <p className="mt-3 text-ink-700/70">{subtitle}</p>}
             </div>
             {action && <div className="hidden sm:block shrink-0">{action}</div>}
         </div>
@@ -93,7 +93,7 @@ function Hero({ hero, hasReviews = false, trust = [] }) {
                         <div className="mt-8 flex flex-wrap gap-3">
                             <SmartLink href={hero.ctaLink} className="inline-flex items-center gap-2 rounded-full bg-ink-900 text-white px-7 py-3.5 text-sm tracking-wide hover:bg-ink-800 hover:-translate-y-0.5 transition-all duration-300 shadow-lg shadow-ink-900/10">
                                 {hero.ctaText}
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
+                                <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
                             </SmartLink>
                             {/* Gift entry point: scrolls to the finder below. */}
                             <a href="#gift-finder" className="inline-flex items-center gap-2 rounded-full border border-gold-300 bg-gold-50 text-gold-800 px-6 py-3.5 text-sm tracking-wide hover:bg-gold-100 hover:border-gold-400 transition-colors">
@@ -104,7 +104,7 @@ function Hero({ hero, hasReviews = false, trust = [] }) {
                             <a href={hero.secondaryLink} className={`inline-block mt-4 ${underlineLink}`}>{hero.secondaryText}</a>
                         )}
 
-                        <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-700/55">
+                        <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-700/70">
                             {hasReviews
                                 ? <span className="inline-flex items-center gap-1.5"><span className="text-gold-500">★★★★★</span> Loved by customers</span>
                                 : <span>Hand-checked before it ships</span>}
@@ -191,7 +191,7 @@ function FeatureStrip({ strip }) {
                     <div key={i} className="flex flex-col items-center text-center gap-1.5 py-6 px-3">
                         <IconOrGlyph value={f.icon} fallback="check" className="w-6 h-6 text-gold-700" />
                         <span className="text-[11px] sm:text-xs tracking-wide uppercase text-ink-800 font-medium">{f.title}</span>
-                        {f.text && <span className="text-[11px] text-ink-700/50">{f.text}</span>}
+                        {f.text && <span className="text-[11px] text-ink-700/70">{f.text}</span>}
                     </div>
                 ))}
             </div>
@@ -239,7 +239,7 @@ function Occasions({ section }) {
                                         {o.tagline && <p className="text-[11px] sm:text-xs opacity-70 mt-1 leading-snug">{o.tagline}</p>}
                                         <span className="inline-flex items-center gap-1 mt-3 text-[11px] tracking-wide opacity-80 group-hover:opacity-100 transition">
                                             Explore
-                                            <svg className="w-3.5 h-3.5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
+                                            <svg aria-hidden="true" className="w-3.5 h-3.5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
                                         </span>
                                     </div>
                                 </div>
@@ -268,11 +268,11 @@ function DealsInner({ deals }) {
                 <div>
                     <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-2">Today only</p>
                     <h2 className="font-display text-3xl sm:text-4xl text-ink-900">{deals.title}</h2>
-                    {deals.subtitle && <p className="mt-2 text-ink-700/60">{deals.subtitle}</p>}
+                    {deals.subtitle && <p className="mt-2 text-ink-700/70">{deals.subtitle}</p>}
                 </div>
                 {deals.endsAt && (
                     <div className="flex items-center gap-2">
-                        <span className="text-xs uppercase tracking-widest text-ink-700/50 mr-1">Ends in</span>
+                        <span className="text-xs uppercase tracking-widest text-ink-700/70 mr-1">Ends in</span>
                         {units.map((u) => (
                             <div key={u.label} className="rounded-lg bg-ink-900 text-white px-2.5 py-1.5 text-center w-12">
                                 <div className="text-base font-semibold tabular-nums">{String(u.value).padStart(2, '0')}</div>
@@ -294,16 +294,16 @@ function DealsInner({ deals }) {
                         <div className="flex-1 p-5 flex flex-col justify-between gap-4">
                             <div className="space-y-2">
                                 <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-gold-700">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.878.53 2.31-.354A11.95 11.95 0 0021 15.75c0-.98-.117-1.933-.338-2.846M6.375 6.375h.008v.008H6.375V6.375z" /></svg>
+                                    <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.878.53 2.31-.354A11.95 11.95 0 0021 15.75c0-.98-.117-1.933-.338-2.846M6.375 6.375h.008v.008H6.375V6.375z" /></svg>
                                     {card.tag}
                                 </p>
                                 <h3 className="font-semibold text-ink-900 leading-snug">{card.title}</h3>
-                                {card.description && <p className="text-sm text-ink-700/60 line-clamp-2">{card.description}</p>}
+                                {card.description && <p className="text-sm text-ink-700/70 line-clamp-2">{card.description}</p>}
                             </div>
                             <div className="flex items-center justify-between pt-3 border-t border-ink-100">
-                                <span className="text-xs tracking-wide text-ink-700/60">Shop this deal</span>
+                                <span className="text-xs tracking-wide text-ink-700/70">Shop this deal</span>
                                 <span className="w-8 h-8 rounded-full bg-ink-50 text-ink-900 grid place-items-center transition duration-300 group-hover:-rotate-45 group-hover:bg-ink-900 group-hover:text-white">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
+                                    <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
                                 </span>
                             </div>
                         </div>
@@ -376,7 +376,7 @@ function CategoryLookbook({ section }) {
                             <h3 className="font-display text-xl lg:text-2xl text-white">{cat.name}</h3>
                             <span className="text-white/80 text-xs tracking-wide inline-flex items-center gap-1 mt-1">
                                 Discover
-                                <svg className="w-3.5 h-3.5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
+                                <svg aria-hidden="true" className="w-3.5 h-3.5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
                             </span>
                         </div>
                     </SmartLink>
@@ -420,7 +420,7 @@ function GiftingSteps({ giftFinder }) {
                             <span className="shrink-0 w-8 h-8 rounded-full bg-ink-900 text-white grid place-items-center text-sm font-semibold">{n + 1}</span>
                             <div>
                                 <h3 className="font-medium text-sm">{title}</h3>
-                                <p className="text-xs text-ink-700/60 mt-0.5 leading-relaxed">{text}</p>
+                                <p className="text-xs text-ink-700/70 mt-0.5 leading-relaxed">{text}</p>
                             </div>
                         </li>
                     ))}
@@ -459,7 +459,7 @@ function ReviewsBand({ reviews }) {
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-semibold text-ink-900">{t.author}</p>
-                                    {t.product && <SmartLink href={t.product.url} className="text-xs text-ink-700/50 hover:text-gold-700 truncate block">{t.product.name}</SmartLink>}
+                                    {t.product && <SmartLink href={t.product.url} className="text-xs text-ink-700/70 hover:text-gold-700 truncate block">{t.product.name}</SmartLink>}
                                 </div>
                             </div>
                         </div>
@@ -486,7 +486,7 @@ function Promise({ promise }) {
                         {promise.badges.map((b, i) => (
                             <div key={i}>
                                 <div className="font-display text-lg text-gold-700">{b.title}</div>
-                                <p className="text-xs text-ink-700/60 mt-1">{b.text}</p>
+                                <p className="text-xs text-ink-700/70 mt-1">{b.text}</p>
                             </div>
                         ))}
                     </div>

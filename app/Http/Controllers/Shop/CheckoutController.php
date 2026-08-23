@@ -179,7 +179,8 @@ class CheckoutController extends Controller
         )), -5);
         session()->put('placed_orders', $placed);
 
-        return redirect()->route('order.confirmation', $order->order_number);
+        return redirect()->route('order.confirmation', $order->order_number)
+            ->with('prompt_push', 'order');   // ask about notifications now they have bought
     }
 
     public function confirmation(Request $request, string $orderNumber)
@@ -214,6 +215,7 @@ class CheckoutController extends Controller
                 'totalText' => money($order->total),
                 'isGift' => (bool) $order->is_gift,
                 'cardMessage' => $order->card_message,
+                'insideDhaka' => (bool) $order->is_inside_dhaka,
             ],
             // Purchase Pixel event — eventID is the order number, so Meta dedups
             // against the server CAPI Purchase and against page refreshes alike.
@@ -226,6 +228,19 @@ class CheckoutController extends Controller
                 'eventId' => $order->order_number,
             ],
             'trackUrl' => route('track').'?order_number='.$order->order_number,
+            // The window the courier will actually hit: Fridays skipped, and
+            // inside Dhaka quoted faster than outside.
+            // Dropped once the window has passed: this page can be revisited
+            // days later, and "the courier delivers Sun 23" on the 30th reads
+            // as broken rather than reassuring. The tracking link is the
+            // honest answer at that point.
+            'estimate' => ($est = \App\Support\DeliveryEstimate::for((bool) $order->is_inside_dhaka, $order->created_at))
+                && ($est->to ?? $est->from)->endOfDay()->isFuture() ? [
+                    'label' => $est->label(),
+                    'zoneText' => $order->is_inside_dhaka ? 'inside Dhaka' : 'outside Dhaka',
+                ] : null,
+            // A human rings before the parcel moves — say so, and on what number.
+            'storePhone' => \App\Models\Setting::get('store_phone', config('store.phone')),
         ])->withViewData(['pageTitle' => 'Order Confirmed']);
     }
 

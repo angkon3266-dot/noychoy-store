@@ -18,22 +18,22 @@ export default function AccountShell({ children, wide = false }) {
     return (
         <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
             <div className="grid md:grid-cols-[220px_1fr] gap-8">
-                <aside className="hidden md:block">
+                <aside className="hidden md:block" aria-label="Account navigation">
                     <div className="card p-3 sticky top-20">
-                        <nav className="space-y-1">
+                        <nav className="space-y-1" aria-label="Account">
                             {NAV.map(([href, label, icon]) => {
                                 const active = path === href || (href === '/account/orders' && path.startsWith('/account/orders/'));
                                 return (
                                     <Link key={href} href={href}
                                         className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? 'bg-gold-50 text-gold-700 font-medium' : 'text-ink-700 hover:bg-ink-50'}`}>
-                                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={icon} /></svg>
+                                        <svg aria-hidden="true" className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={icon} /></svg>
                                         {label}
                                     </Link>
                                 );
                             })}
                             <div className="pt-1">
                                 <button type="button" onClick={() => router.post('/logout')} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-danger-600 hover:bg-danger-50 transition">
-                                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+                                    <svg aria-hidden="true" className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
                                     Log out
                                 </button>
                             </div>

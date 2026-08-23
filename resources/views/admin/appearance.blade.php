@@ -985,6 +985,7 @@
                 'free_shipping_bar' => 'Free-shipping progress bar',
                 'sticky_buy_bar' => 'Sticky mobile buy-bar',
                 'urgency_low_stock' => 'Low-stock urgency badges',
+                'show_delivery_estimate' => 'Delivery estimate',
                 'show_reviews' => 'Product reviews & ratings',
                 'show_recently_viewed' => 'Recently viewed products',
                 'show_frequently_bought' => 'Frequently bought together',
@@ -999,6 +1000,34 @@
         <div class="mt-4 max-w-xs">
             <label class="label">Low-stock threshold</label>
             <input name="low_stock_threshold" type="number" value="{{ $theme['low_stock_threshold'] }}" class="input">
+        </div>
+
+        <div class="mt-6 border-t border-ink-100 pt-4">
+            <h3 class="font-medium text-sm">Delivery window</h3>
+            <p class="text-xs text-ink-700/70 mt-0.5">
+                Working days, counted from the order. Fridays are skipped automatically, so the
+                date quoted is always one the courier actually works. The product page shows the
+                nationwide window, because it does not know where the buyer is yet; the order
+                confirmation uses whichever zone the customer picked.
+            </p>
+            <div class="grid sm:grid-cols-2 gap-4 mt-3 max-w-lg">
+                <div>
+                    <label class="label text-xs">Inside Dhaka — fastest (days)</label>
+                    <input name="delivery_days_inside_min" type="number" min="0" max="60" value="{{ $theme['delivery_days_inside_min'] }}" class="input">
+                </div>
+                <div>
+                    <label class="label text-xs">Inside Dhaka — slowest (days)</label>
+                    <input name="delivery_days_inside_max" type="number" min="0" max="60" value="{{ $theme['delivery_days_inside_max'] }}" class="input">
+                </div>
+                <div>
+                    <label class="label text-xs">Outside Dhaka — fastest (days)</label>
+                    <input name="delivery_days_min" type="number" min="0" max="60" value="{{ $theme['delivery_days_min'] }}" class="input">
+                </div>
+                <div>
+                    <label class="label text-xs">Outside Dhaka — slowest (days)</label>
+                    <input name="delivery_days_max" type="number" min="0" max="60" value="{{ $theme['delivery_days_max'] }}" class="input">
+                </div>
+            </div>
         </div>
     </div>
 

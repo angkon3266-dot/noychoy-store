@@ -9,6 +9,7 @@ import MiniCart from './MiniCart';
 import Footer from './Footer';
 import FloatingStack from './FloatingStack';
 import BottomNav from './BottomNav';
+import PushPrompt from './PushPrompt';
 import { initReveal } from '../reveal';
 
 // Persistent layout: assigned via `Page.layout = (page) => <Layout>{page}</Layout>`
@@ -81,6 +82,7 @@ function Chrome({ children }) {
             <MemberBar config={props.chrome?.memberBar} />
             <MiniCart />
             <FlashBanners flash={props.flash} />
+            <PushPrompt />
 
             <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 outline-none">{children}</main>
 

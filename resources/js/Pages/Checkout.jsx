@@ -173,7 +173,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                 <div className="lg:col-span-2 card p-6 space-y-4">
                     <h2 className="font-display text-xl font-semibold">Delivery details</h2>
                     {!isMember && (
-                        <p className="text-sm text-ink-700/60">Have an account? <a href={chromeUrls.login} className="text-gold-700 hover:underline">Log in</a> for faster checkout.</p>
+                        <p className="text-sm text-ink-700/70">Have an account? <a href={chromeUrls.login} className="text-gold-700 hover:underline">Log in</a> for faster checkout.</p>
                     )}
 
                     <div className="grid sm:grid-cols-2 gap-4">
@@ -199,7 +199,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 autoComplete="tel"
                                 inputMode="numeric"
                             />
-                            <p id="phone-help" className="mt-1 text-[11px] text-ink-700/50">
+                            <p id="phone-help" className="mt-1 text-[11px] text-ink-700/70">
                                 We save this so we can call you about the order — including if you
                                 do not finish checking out.
                             </p>
@@ -233,7 +233,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     ) : (
                     <div data-field="is_inside_dhaka">
                         <span className="label">Delivery zone</span>
-                        <div className="flex gap-3">
+                        <div className="flex gap-3" role="radiogroup" aria-label="Delivery zone">
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
                                 <input id="co-is_inside_dhaka" aria-invalid={err('is_inside_dhaka') ? 'true' : undefined} type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '1'); }} className="sr-only" />
                                 Inside Dhaka — ৳{summary.shipInside}
@@ -264,7 +264,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 />
                                 <span>
                                     <span className="flex items-center gap-1.5 text-sm font-semibold"><Icon name="gift" className="w-4 h-4 shrink-0" />{gift.title}</span>
-                                    <span className="block text-xs text-ink-700/60 mt-0.5">{gift.note}</span>
+                                    <span className="block text-xs text-ink-700/70 mt-0.5">{gift.note}</span>
                                 </span>
                             </label>
                             {form.data.is_gift && (
@@ -279,7 +279,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                         placeholder={gift.messagePlaceholder}
                                         className="input"
                                     />
-                                    <div className="flex items-center justify-between mt-1 text-[11px] text-ink-700/50">
+                                    <div className="flex items-center justify-between mt-1 text-[11px] text-ink-700/70">
                                         <span>{gift.messageHelp}</span>
                                         <span className={form.data.card_message.length >= gift.max ? 'text-gold-700 font-medium' : ''}>
                                             {form.data.card_message.length}/{gift.max}
@@ -310,7 +310,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                         {items.map((item, i) => (
                             <div key={i} className="flex justify-between text-sm gap-2">
-                                <span className="text-ink-700/80">{item.name} <span className="text-ink-700/50">× {item.qty}</span></span>
+                                <span className="text-ink-700/80">{item.name} <span className="text-ink-700/70">× {item.qty}</span></span>
                                 <span className="font-medium shrink-0">{item.lineText}</span>
                             </div>
                         ))}
@@ -408,12 +408,12 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 <div key={i} className="rounded-lg bg-gold-100/60 p-3">
                                     <span className="mx-auto mb-1 flex w-fit text-gold-700"><IconOrGlyph value={b.icon} fallback="shieldCheck" className="w-5 h-5" /></span>
                                     <span className="font-medium">{b.title}</span>
-                                    {b.text && <><br /><span className="text-[10px] text-ink-700/50">{b.text}</span></>}
+                                    {b.text && <><br /><span className="text-[10px] text-ink-700/70">{b.text}</span></>}
                                 </div>
                             ))}
                         </div>
                     )}
-                    <p className="mt-3 text-center text-xs text-ink-700/50">No advance payment needed · We call to confirm every order</p>
+                    <p className="mt-3 text-center text-xs text-ink-700/70">No advance payment needed · We call to confirm every order</p>
                 </div>
             </form>
         </div>
@@ -460,6 +460,7 @@ function Points({ loyalty }) {
                             max={loyalty.points}
                             value={pts}
                             onChange={(e) => setPts(e.target.value)}
+                            aria-label="Points to redeem"
                             className="input py-1.5 w-28 text-sm"
                         />
                         <button type="button" onClick={() => apply(false)} disabled={busy} className="btn-outline text-xs py-1.5 px-3">Apply points</button>

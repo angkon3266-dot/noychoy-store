@@ -10,7 +10,7 @@ export default function Pagination({ links = [] }) {
             {links.map((link, i) => {
                 const label = link.label.replace('&laquo;', '‹').replace('&raquo;', '›');
                 if (!link.url) {
-                    return <span key={i} className="px-3 py-2 text-sm text-ink-700/40">{label}</span>;
+                    return <span key={i} className="px-3 py-2 text-sm text-ink-700/70">{label}</span>;
                 }
                 return (
                     <Link

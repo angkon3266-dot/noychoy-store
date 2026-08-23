@@ -13,7 +13,7 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
         <AccountShell wide>
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <p className="text-sm text-ink-700/60">Welcome back,</p>
+                    <p className="text-sm text-ink-700/70">Welcome back,</p>
                     <h1 className="font-display text-2xl md:text-3xl font-semibold">{customer.name}</h1>
                 </div>
             </div>
@@ -32,19 +32,19 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
                 <Link href="/account/orders" className="card p-4 hover:border-gold-300 transition">
                     <div className="text-2xl font-semibold text-gold-700">{customer.totalOrders}</div>
-                    <div className="text-xs text-ink-700/60">Orders</div>
+                    <div className="text-xs text-ink-700/70">Orders</div>
                 </Link>
                 <div className="card p-4">
                     <div className="text-2xl font-semibold text-gold-700">{customer.totalSpentText}</div>
-                    <div className="text-xs text-ink-700/60">Total spent</div>
+                    <div className="text-xs text-ink-700/70">Total spent</div>
                 </div>
                 <Link href="/account/loved" className="card p-4 hover:border-gold-300 transition">
                     <div className="text-2xl font-semibold text-danger-500">{stats.loved}</div>
-                    <div className="text-xs text-ink-700/60">Loved items</div>
+                    <div className="text-xs text-ink-700/70">Loved items</div>
                 </Link>
                 <Link href="/account/reviews" className="card p-4 hover:border-gold-300 transition">
                     <div className="text-2xl font-semibold text-gold-700">{stats.reviews}</div>
-                    <div className="text-xs text-ink-700/60">Reviews</div>
+                    <div className="text-xs text-ink-700/70">Reviews</div>
                 </Link>
             </div>
 
@@ -59,7 +59,7 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
                                     <div className="min-w-0">
                                         <p className="text-sm font-semibold">{offer.title}</p>
                                         <span className="inline-block badge bg-gold-600 text-white text-[10px] mt-0.5">{offer.reward}</span>
-                                        {offer.scope && <span className="inline-block text-[10px] text-ink-700/60 ml-1">· {offer.scope}</span>}
+                                        {offer.scope && <span className="inline-block text-[10px] text-ink-700/70 ml-1">· {offer.scope}</span>}
                                         {offer.message && <p className="text-xs text-ink-700/70 italic mt-1">{offer.message}</p>}
                                         <p className="text-xs text-success-700 mt-1 flex items-center gap-1"><Icon name="check" className="w-3.5 h-3.5" />Applied automatically at checkout{offer.until ? ` · until ${offer.until}` : ''}</p>
                                     </div>
@@ -86,7 +86,7 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
                         <p className="text-sm text-ink-700/70">{defaultAddress.line}</p>
                     </>
                 ) : (
-                    <p className="text-sm text-ink-700/60">No saved address yet. <Link href="/account/addresses" className="text-gold-700 hover:underline">Add one</Link> for faster checkout.</p>
+                    <p className="text-sm text-ink-700/70">No saved address yet. <Link href="/account/addresses" className="text-gold-700 hover:underline">Add one</Link> for faster checkout.</p>
                 )}
             </div>
 
@@ -99,13 +99,13 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
                 <div key={order.number} className="card p-4 mb-3 flex flex-wrap items-center gap-3">
                     <div className="flex-1 min-w-0">
                         <Link href={order.url} className="font-medium text-gold-700 hover:underline">#{order.number}</Link>
-                        <span className="text-xs text-ink-700/50 ml-2">{order.date}</span>
+                        <span className="text-xs text-ink-700/70 ml-2">{order.date}</span>
                         <div className="text-sm text-ink-700/70">{order.totalText} · <span className="badge bg-gold-100 text-gold-800 capitalize">{order.status}</span></div>
                     </div>
                     <button type="button" onClick={() => router.post(order.reorderUrl)} className="btn-outline text-sm py-1.5">Reorder</button>
                 </div>
             )) : (
-                <div className="card p-6 text-center text-sm text-ink-700/60">
+                <div className="card p-6 text-center text-sm text-ink-700/70">
                     No orders yet. <SmartLink href={urls.shop || '/shop'} className="text-gold-700 hover:underline">Start shopping →</SmartLink>
                 </div>
             )}
@@ -121,12 +121,12 @@ function Rewards({ loyalty, shopUrl }) {
 
     return (
         <div className="card mb-8 overflow-hidden">
-            <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between p-5 text-left">
+            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between p-5 text-left">
                 <span className="flex items-center gap-3">
                     <Icon name="gift" className="w-6 h-6 text-gold-700" />
                     <span>
                         <span className="block font-semibold">Rewards &amp; offers</span>
-                        <span className="block text-xs text-ink-700/60">{loyalty.points} points · {loyalty.pointsValueText} value</span>
+                        <span className="block text-xs text-ink-700/70">{loyalty.points} points · {loyalty.pointsValueText} value</span>
                     </span>
                 </span>
                 <Icon name="chevronDown" className={`w-5 h-5 text-ink-700/50 transition ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
@@ -137,7 +137,7 @@ function Rewards({ loyalty, shopUrl }) {
                     <div className="rounded-xl bg-gold-50 border border-gold-200 p-4 flex items-center justify-between flex-wrap gap-3">
                         <div>
                             <div className="text-3xl font-semibold text-gold-700">{loyalty.points} <span className="text-base font-normal">points</span></div>
-                            <div className="text-xs text-ink-700/60">Worth <strong>{loyalty.pointsValueText}</strong> — 100 points = {loyalty.value100Text} to redeem at checkout</div>
+                            <div className="text-xs text-ink-700/70">Worth <strong>{loyalty.pointsValueText}</strong> — 100 points = {loyalty.value100Text} to redeem at checkout</div>
                         </div>
                         <SmartLink href={shopUrl} className="btn-primary text-sm py-2">Shop &amp; earn more</SmartLink>
                     </div>
@@ -149,13 +149,13 @@ function Rewards({ loyalty, shopUrl }) {
                                 <span className="text-lg">{loyalty.tier.emoji}</span>
                                 {loyalty.tier.label} member
                             </span>
-                            <span className="text-xs text-ink-700/50">{loyalty.tier.lifetime} lifetime pts</span>
+                            <span className="text-xs text-ink-700/70">{loyalty.tier.lifetime} lifetime pts</span>
                         </div>
-                        <p className="text-xs text-ink-700/60 mt-1">{loyalty.tier.perk}</p>
+                        <p className="text-xs text-ink-700/70 mt-1">{loyalty.tier.perk}</p>
                         {loyalty.tier.next && (
                             <div className="mt-3">
                                 <div className="h-2 rounded-full bg-ink-100 overflow-hidden"><div className="h-full bg-gold-600" style={{ width: `${loyalty.tier.next.progress}%` }} /></div>
-                                <p className="text-xs text-ink-700/50 mt-1">Earn {loyalty.tier.next.toNext} more points to reach <strong>{loyalty.tier.next.label}</strong> ({loyalty.tier.next.perk}).</p>
+                                <p className="text-xs text-ink-700/70 mt-1">Earn {loyalty.tier.next.toNext} more points to reach <strong>{loyalty.tier.next.label}</strong> ({loyalty.tier.next.perk}).</p>
                             </div>
                         )}
                     </div>
@@ -185,7 +185,7 @@ function Rewards({ loyalty, shopUrl }) {
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-semibold">This week's milestones</h3>
-                            <span className="text-xs text-ink-700/60">{msDone}/{msTotal} done</span>
+                            <span className="text-xs text-ink-700/70">{msDone}/{msTotal} done</span>
                         </div>
                         <div className="h-2 rounded-full bg-ink-100 overflow-hidden mb-3">
                             <div className="h-full bg-gold-600 transition-all" style={{ width: `${msTotal ? Math.round(msDone / msTotal * 100) : 0}%` }} />
@@ -193,10 +193,10 @@ function Rewards({ loyalty, shopUrl }) {
                         <ul className="space-y-2">
                             {loyalty.milestones.map((m, i) => (
                                 <li key={i} className="flex items-center gap-3 text-sm">
-                                    <span className={`w-7 h-7 grid place-items-center rounded-full ${m.done ? 'bg-success-100 text-success-700' : 'bg-ink-100 text-ink-400'}`}>
+                                    <span className={`w-7 h-7 grid place-items-center rounded-full ${m.done ? 'bg-success-100 text-success-700' : 'bg-ink-100 text-ink-700'}`}>
                                         {m.done ? <Icon name="check" className="w-4 h-4" /> : m.icon}
                                     </span>
-                                    <span className={`flex-1 ${m.done ? 'text-ink-700/50 line-through' : ''}`}>{m.label}</span>
+                                    <span className={`flex-1 ${m.done ? 'text-ink-700/70 line-through' : ''}`}>{m.label}</span>
                                     <span className="text-xs font-medium text-gold-700">+{m.points}</span>
                                 </li>
                             ))}

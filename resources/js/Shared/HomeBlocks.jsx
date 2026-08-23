@@ -35,7 +35,7 @@ function Block({ block }) {
                 <section className="mx-auto max-w-7xl px-4 py-6">
                     <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
                         {block.images.map((im, i) => (
-                            <SmartLink key={i} href={im.link || '#'} className="block overflow-hidden rounded-2xl group">
+                            <SmartLink key={i} href={im.link || '#'} aria-label={block.title || 'Shop the collection'} className="block overflow-hidden rounded-2xl group">
                                 <img src={im.image} alt="" className="w-full h-full object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
                             </SmartLink>
                         ))}
@@ -59,10 +59,15 @@ function Block({ block }) {
         case 'banner_carousel':
             return (
                 <section className="mx-auto max-w-7xl px-4 py-8">
-                    {block.title && <h2 className="font-display text-2xl sm:text-3xl text-ink-900 mb-4">{block.title}</h2>}
+                    {/* The heading exists so the blocks below it are not
+                        orphaned h3s. When the owner leaves the title blank it
+                        stays in the accessibility tree but off the page —
+                        putting words there that nobody wrote is a content
+                        decision, not an accessibility fix. */}
+                    <h2 className={block.title ? 'font-display text-2xl sm:text-3xl text-ink-900 mb-4' : 'sr-only'}>{block.title || 'Shop the collection'}</h2>
                     <div className="grid md:grid-cols-[300px_1fr] gap-5 items-stretch">
                         {block.banner && (
-                            <SmartLink href={block.banner.link || '#'} className="relative block overflow-hidden rounded-2xl group min-h-[220px]">
+                            <SmartLink href={block.banner.link || '#'} aria-label={block.title || 'Shop the collection'} className="relative block overflow-hidden rounded-2xl group min-h-[220px]">
                                 <img src={block.banner.image} alt="" className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
                             </SmartLink>
                         )}
@@ -82,7 +87,9 @@ function Block({ block }) {
         case 'video':
             return (
                 <>
-                    {block.title && <SectionHeading title={block.title} />}
+                    {block.title
+                        ? <SectionHeading title={block.title} />
+                        : <h2 className="sr-only">Video</h2>}
                     <section className="mx-auto max-w-7xl px-4 pb-12 grid gap-6 md:grid-cols-2">
                         {block.videos.map((v, i) => (
                             <div key={i}>
@@ -129,7 +136,7 @@ function Block({ block }) {
                 <section className="py-14 bg-gold-50/60">
                     <div className="mx-auto max-w-7xl px-4">
                         <div className="text-center mb-10">
-                            <p className="uppercase tracking-[0.3em] text-xs text-gold-600 mb-3">Customer love</p>
+                            <p className="uppercase tracking-[0.3em] text-xs text-gold-700 mb-3">Customer love</p>
                             <h2 className="font-display text-3xl sm:text-4xl text-ink-900">{block.title || "What they're saying"}</h2>
                         </div>
                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -144,8 +151,8 @@ function Block({ block }) {
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-ink-900">{t.author}</p>
                                             {t.meta && (t.link
-                                                ? <SmartLink href={t.link} className="text-xs text-ink-700/50 hover:text-gold-700 truncate block">{t.meta}</SmartLink>
-                                                : <p className="text-xs text-ink-700/50 truncate">{t.meta}</p>)}
+                                                ? <SmartLink href={t.link} className="text-xs text-ink-700/70 hover:text-gold-700 truncate block">{t.meta}</SmartLink>
+                                                : <p className="text-xs text-ink-700/70 truncate">{t.meta}</p>)}
                                         </div>
                                     </div>
                                 </div>
@@ -163,14 +170,14 @@ function Block({ block }) {
                     {h.image && <img src={h.image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     {h.image && <div className={`absolute inset-0 ${h.dark ? 'bg-black/50' : 'bg-white/60'}`}></div>}
                     <div className="relative mx-auto max-w-5xl px-5 py-20 sm:py-28 text-center">
-                        {h.eyebrow && <p className={`uppercase tracking-[0.35em] text-xs mb-4 ${dark ? 'text-white/80' : 'text-gold-600'}`}>{h.eyebrow}</p>}
-                        <h1 className={`font-display text-4xl sm:text-6xl font-semibold leading-tight ${dark ? 'text-white' : 'text-ink-900'}`}>{h.heading}</h1>
+                        {h.eyebrow && <p className={`uppercase tracking-[0.35em] text-xs mb-4 ${dark ? 'text-white/80' : 'text-gold-700'}`}>{h.eyebrow}</p>}
+                        <h2 className={`font-display text-4xl sm:text-6xl font-semibold leading-tight ${dark ? 'text-white' : 'text-ink-900'}`}>{h.heading}</h2>
                         {h.subheading && <p className={`mt-5 text-lg max-w-2xl mx-auto ${dark ? 'text-white/85' : 'text-ink-700/75'}`}>{h.subheading}</p>}
                         <div className="mt-9 flex flex-wrap gap-3 justify-center">
                             {h.cta_text && <a href={h.cta_link} className="inline-flex items-center rounded-full bg-gold-600 text-white px-9 py-4 text-sm font-medium tracking-wide hover:bg-gold-700 transition shadow-lg hover:shadow-xl hover:-translate-y-0.5 duration-300">{h.cta_text}</a>}
                             {h.cta2_text && <a href={h.cta2_link} className={`inline-flex items-center rounded-full px-9 py-4 text-sm tracking-wide transition border ${dark ? 'border-white/70 text-white hover:bg-white/10' : 'border-gold-300 text-gold-800 hover:bg-gold-100'}`}>{h.cta2_text}</a>}
                         </div>
-                        {h.note && <p className={`mt-5 text-xs ${dark ? 'text-white/70' : 'text-ink-700/55'}`}>{h.note}</p>}
+                        {h.note && <p className={`mt-5 text-xs ${dark ? 'text-white/70' : 'text-ink-700/70'}`}>{h.note}</p>}
                     </div>
                 </section>
             );
@@ -179,7 +186,7 @@ function Block({ block }) {
         case 'benefits':
             return (
                 <section className="mx-auto max-w-6xl px-4 py-14">
-                    {block.title && <h2 className="font-display text-3xl text-center mb-10">{block.title}</h2>}
+                    <h2 className={block.title ? 'font-display text-3xl text-center mb-10' : 'sr-only'}>{block.title || 'Why shop with us'}</h2>
                     <div className={`grid gap-6 sm:grid-cols-2 ${{ 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' }[Math.min(4, Math.max(2, block.items.length))]}`}>
                         {block.items.map((b, i) => (
                             <div key={i} className="text-center px-4">
@@ -207,7 +214,7 @@ function Block({ block }) {
                             <details key={i} className="group py-4">
                                 <summary className="flex items-center justify-between cursor-pointer font-medium list-none">
                                     <span>{f.q}</span>
-                                    <svg className="w-5 h-5 shrink-0 text-ink-700/40 transition-transform duration-300 group-open:rotate-45" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M12 4v16m8-8H4" /></svg>
+                                    <svg aria-hidden="true" className="w-5 h-5 shrink-0 text-ink-700/40 transition-transform duration-300 group-open:rotate-45" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M12 4v16m8-8H4" /></svg>
                                 </summary>
                                 {f.a && <p className="text-sm text-ink-700/75 mt-3 leading-relaxed">{f.a}</p>}
                             </details>
@@ -253,7 +260,7 @@ function BuyBoxBlock({ block }) {
     const { add } = useCart();
     return (
         <section id="buy" className="mx-auto max-w-6xl px-4 py-14">
-            {block.title && <h2 className="font-display text-3xl text-center mb-10">{block.title}</h2>}
+            <h2 className={block.title ? 'font-display text-3xl text-center mb-10' : 'sr-only'}>{block.title || 'Shop the edit'}</h2>
             <div className={`grid gap-6 ${block.items.length === 1 ? 'max-w-md mx-auto' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
                 {block.items.map((p, i) => (
                     <div key={i} className="card p-4 text-center">
@@ -263,10 +270,10 @@ function BuyBoxBlock({ block }) {
                         <h3 className="font-medium mt-4">{p.name}</h3>
                         <p className="text-gold-700 text-lg font-semibold mt-1">
                             {p.price_text}
-                            {p.compare_text && <span className="text-ink-400 line-through text-sm ml-1">{p.compare_text}</span>}
+                            {p.compare_text && <span className="text-ink-500 line-through text-sm ml-1">{p.compare_text}</span>}
                         </p>
                         <button type="button" onClick={() => add(p.add_url, { qty: 1 })} className="btn-primary w-full mt-4">{block.cta_label}</button>
-                        <p className="text-xs text-ink-700/50 mt-2">Cash on delivery · pay when it arrives</p>
+                        <p className="text-xs text-ink-700/70 mt-2">Cash on delivery · pay when it arrives</p>
                     </div>
                 ))}
             </div>

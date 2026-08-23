@@ -3,6 +3,7 @@ import { usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import Icon, { Facebook, Instagram } from '../Icons';
 import SmartLink from '../SmartLink';
+import { trapTab } from '../focusTrap';
 
 // Off-canvas mobile nav. Open state lives in a module-level store shared with
 // the Header via context — the React equivalent of Alpine's $store.mobileNav.
@@ -48,9 +49,24 @@ export default function MobileDrawer() {
     const { open, close } = useMobileNav();
     const panelRef = useRef(null);
     const touchX = useRef(null);
+    const restoreRef = useRef(null);
 
     useEffect(() => {
-        if (open) panelRef.current?.focus();
+        if (open) {
+            // Remember what opened us, so Escape puts the keyboard back where
+            // it was rather than at the top of the document.
+            restoreRef.current = document.activeElement;
+            panelRef.current?.focus();
+        } else if (restoreRef.current) {
+            restoreRef.current.focus?.();
+            restoreRef.current = null;
+        }
+    }, [open]);
+
+    useEffect(() => {
+        // Only listen while we are actually open — otherwise this drawer
+        // swallowed Escape from the mini-cart and the product lightbox.
+        if (!open) return;
         const esc = (e) => e.key === 'Escape' && close();
         window.addEventListener('keydown', esc);
         return () => window.removeEventListener('keydown', esc);
@@ -65,11 +81,16 @@ export default function MobileDrawer() {
     ];
 
     return (
+        // `inert` takes the whole closed drawer out of the tab order, the
+        // pointer and the accessibility tree in one attribute — previously a
+        // keyboard user tabbed straight into an off-screen menu. aria-hidden is
+        // the fallback for engines without inert. role="dialog" moved onto the
+        // panel below: on this element it claimed a modal was open on every
+        // page of the site.
         <div
             className={`md:hidden fixed inset-0 z-[100] ${open ? '' : 'pointer-events-none'}`}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu"
+            inert={!open}
+            aria-hidden={!open}
         >
             {/* Dim overlay */}
             <div
@@ -82,6 +103,10 @@ export default function MobileDrawer() {
             <aside
                 ref={panelRef}
                 tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Menu"
+                onKeyDown={(e) => trapTab(e, panelRef.current)}
                 className={`absolute top-0 left-0 h-[100dvh] w-[85%] max-w-[360px] bg-white flex flex-col shadow-2xl outline-none will-change-transform ${open ? 'translate-x-0' : '-translate-x-full'}`}
                 style={{ transition: 'transform .3s cubic-bezier(.22,.61,.36,1)' }}
                 onTouchStart={(e) => { touchX.current = e.changedTouches[0].clientX; }}
@@ -109,9 +134,10 @@ export default function MobileDrawer() {
 
                 {/* Search */}
                 <div className="px-4 py-3 border-b border-gold-50 shrink-0">
-                    <form action={urls.shop || '/shop'} method="GET" className="relative">
+                    <form action={urls.shop || '/shop'} method="GET" role="search" className="relative">
                         <input
                             name="q"
+                            aria-label="Search jewelry"
                             placeholder="Search jewelry…"
                             autoComplete="off"
                             className="w-full rounded-full border border-ink-100 bg-ink-50/60 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/50"
@@ -121,7 +147,7 @@ export default function MobileDrawer() {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+                <nav aria-label="Main" className="flex-1 overflow-y-auto overscroll-contain px-2 py-2">
                     <SmartLink href={urls.home || '/'} onClick={close} className="block px-2 py-3 rounded-lg hover:bg-gold-50 border-b border-gold-50">Home</SmartLink>
                     {(menu.items || []).map((item, i) => (
                         <MobileItem key={i} item={item} onNavigate={close} />
@@ -131,7 +157,7 @@ export default function MobileDrawer() {
                     )}
 
                     <div className="mt-3 pt-3 border-t border-ink-100">
-                        <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-700/40">Your account</p>
+                        <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-700/70">Your account</p>
                         {acctLinks.map(([href, label, icon]) => (
                             <a key={label} href={href} onClick={close} className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-gold-50 text-sm">
                                 <Icon name={icon} className="w-5 h-5 text-ink-700/60" strokeWidth={1.6} />
@@ -143,7 +169,7 @@ export default function MobileDrawer() {
 
                 {/* Footer with social icons */}
                 <div className="shrink-0 border-t border-ink-100 px-4 py-3 flex items-center justify-between" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-                    <span className="text-xs text-ink-700/50">{storeName}</span>
+                    <span className="text-xs text-ink-700/70">{storeName}</span>
                     <div className="flex items-center gap-2">
                         {footer.facebook && (
                             <a href={footer.facebook} target="_blank" rel="noopener" aria-label="Facebook" className="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">

@@ -21,7 +21,7 @@ export default function Addresses({ addresses, storeUrl, defaults }) {
             </div>
 
             <div className="space-y-3 mb-6">
-                {addresses.length === 0 && <p className="text-sm text-ink-700/60">No saved addresses yet.</p>}
+                {addresses.length === 0 && <p className="text-sm text-ink-700/70">No saved addresses yet.</p>}
                 {addresses.map((a) => (
                     <div key={a.id} className="card p-4">
                         {editing === a.id ? (
@@ -64,7 +64,7 @@ export default function Addresses({ addresses, storeUrl, defaults }) {
 
             {/* Add new */}
             <div className="card p-5">
-                <button onClick={() => setAddOpen(!addOpen)} type="button" className="flex w-full items-center justify-between font-semibold">
+                <button onClick={() => setAddOpen(!addOpen)} type="button" aria-expanded={addOpen} className="flex w-full items-center justify-between font-semibold">
                     + Add a new address
                     <Icon name="chevronDown" className={`w-5 h-5 transition-transform ${addOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
                 </button>
@@ -103,15 +103,15 @@ function AddressForm({ initial, onSubmit, onCancel = null, submitLabel }) {
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(data); }} className="space-y-3">
             {firstError && <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-700 px-3 py-2 text-sm">{firstError}</div>}
             <div className="grid sm:grid-cols-2 gap-3">
-                <div><label className="label text-xs">Label (optional)</label><input value={data.label} onChange={set('label')} className="input" placeholder="Home / Office" /></div>
-                <div><label className="label text-xs">Full name</label><input value={data.name} onChange={set('name')} className="input" required /></div>
+                <div><label className="label text-xs">Label (optional)<input value={data.label} onChange={set('label')} className="input" placeholder="Home / Office" /></label></div>
+                <div><label className="label text-xs">Full name<input value={data.name} onChange={set('name')} className="input" required /></label></div>
             </div>
-            <div><label className="label text-xs">Phone</label><input value={data.phone} onChange={set('phone')} className="input" required /></div>
-            <div><label className="label text-xs">Full address</label><textarea value={data.address} onChange={set('address')} rows={2} className="input" required placeholder="House, road, block…" /></div>
+            <div><label className="label text-xs">Phone<input value={data.phone} onChange={set('phone')} className="input" required /></label></div>
+            <div><label className="label text-xs">Full address<textarea value={data.address} onChange={set('address')} rows={2} className="input" required placeholder="House, road, block…" /></label></div>
             <div className="grid sm:grid-cols-3 gap-3">
-                <div><label className="label text-xs">Area</label><input value={data.area} onChange={set('area')} className="input" /></div>
-                <div><label className="label text-xs">City</label><input value={data.city} onChange={set('city')} className="input" /></div>
-                <div><label className="label text-xs">District</label><input value={data.district} onChange={set('district')} className="input" /></div>
+                <div><label className="label text-xs">Area<input value={data.area} onChange={set('area')} className="input" /></label></div>
+                <div><label className="label text-xs">City<input value={data.city} onChange={set('city')} className="input" /></label></div>
+                <div><label className="label text-xs">District<input value={data.district} onChange={set('district')} className="input" /></label></div>
             </div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={data.is_inside_dhaka} onChange={set('is_inside_dhaka')} /> Inside Dhaka</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={data.is_default} onChange={set('is_default')} /> Set as default address</label>

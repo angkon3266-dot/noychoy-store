@@ -233,7 +233,7 @@ class AccountController extends Controller
     {
         $order = $this->customer()->orders()
             ->where('order_number', $orderNumber)
-            ->with(['items', 'shipment', 'history'])
+            ->with(['items', 'shipment'])   // no history: this page renders neither notes nor the status trail
             ->firstOrFail();
 
         $tracking = $this->trackingFor($order, $steadfast);

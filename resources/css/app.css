@@ -27,6 +27,12 @@
     --color-ink-200: #d3d3d8;
     --color-ink-300: #b4b4bb;
     --color-ink-400: #8f8f98;
+    /* ink-400 measures 3.21:1 on white — below AA for text. ink-500 gives
+       4.83:1 on white and 4.56:1 on the gold-50 page ground, so it is a
+       drop-in for struck-through prices and other real (non-decorative)
+       secondary text. ink-400 stays for borders, glyphs and disabled
+       controls, which are exempt. */
+    --color-ink-500: #71717a;
     --color-ink-700: #36363b;
     --color-ink-800: #232327;
     --color-ink-900: #161618;
@@ -92,7 +98,12 @@
         @apply border border-gold-300 text-gold-800 hover:bg-gold-100;
     }
     .input {
-        @apply w-full rounded-md border border-ink-100 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 focus:outline-none;
+        /* font-normal / text-ink-900 are load-bearing: several forms now nest
+           the control inside its <label> for implicit association, and the
+           label sets font-medium + text-ink-700, which a bare input would
+           inherit. Stating the control's own typography keeps the association
+           purely semantic. */
+        @apply w-full rounded-md border border-ink-100 bg-white px-3 py-2.5 text-sm font-normal text-ink-900 shadow-sm focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 focus:outline-none;
     }
     .label {
         @apply mb-1 block text-sm font-medium text-ink-700;

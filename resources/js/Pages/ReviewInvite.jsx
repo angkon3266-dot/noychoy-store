@@ -39,7 +39,7 @@ export default function ReviewInvite({ order, items, perk }) {
             )}
 
             {items.length === 0 && (
-                <p className="mt-8 text-ink-700/60">There is nothing left to review on this order.</p>
+                <p className="mt-8 text-ink-700/70">There is nothing left to review on this order.</p>
             )}
 
             {items.length > 0 && remaining.length === 0 && (
@@ -134,7 +134,7 @@ function ReviewCard({ item, order, done, onDone }) {
                             <button className="btn-primary" disabled={!rating || busy}>
                                 {busy ? 'Sending…' : 'Submit review'}
                             </button>
-                            <p className="text-xs text-ink-700/50">Reviews appear after approval.</p>
+                            <p className="text-xs text-ink-700/70">Reviews appear after approval.</p>
                         </form>
                     )}
                 </div>
