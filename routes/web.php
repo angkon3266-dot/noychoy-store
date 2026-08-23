@@ -109,6 +109,10 @@ Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'con
 // /product/{slug} catch-all, and gated by a signature rather than a login —
 // this store is COD and most buyers never register.
 Route::get('/order/{orderNumber}/review', [ReviewController::class, 'invite'])->name('order.review');
+// Turns the guest customer row a checkout created into a real login. Gated by
+// proof the order is yours, never by the phone number alone.
+Route::post('/order/{orderNumber}/claim', [CheckoutController::class, 'claimAccount'])
+    ->name('order.claim')->middleware('throttle:10,10');
 
 // ── Customer accounts (optional) ─────────────────────────────────────────────
 Route::middleware('guest:customer')->group(function () {

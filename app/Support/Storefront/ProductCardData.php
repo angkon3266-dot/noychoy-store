@@ -22,6 +22,7 @@ class ProductCardData
             'url' => route('product.show', $p),
             'thumb' => $p->thumbnail,
             'thumb450' => image_variant($p->thumbnail),
+            'srcset' => image_srcset($p->thumbnail),
             'price' => (float) $p->price,   // raw, for the AddToCart pixel value
             'price_text' => money($p->price),
             'compare_text' => $p->is_on_sale ? money($p->compare_at_price) : null,

@@ -20,7 +20,9 @@ export default function ProductCard({ product: p }) {
                             loading="lazy"
                             width="450"
                             height="450"
-                            {...(p.thumb450 ? { srcSet: `${p.thumb450} 450w, ${p.thumb} 1200w`, sizes: '(min-width: 768px) 25vw, 50vw' } : {})}
+                            {...(p.srcset
+                                ? { srcSet: p.srcset, sizes: '(min-width: 768px) 25vw, 50vw' }
+                                : (p.thumb450 ? { srcSet: `${p.thumb450} 450w, ${p.thumb} 1200w`, sizes: '(min-width: 768px) 25vw, 50vw' } : {}))}
                             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                         />
                     ) : (

@@ -370,7 +370,14 @@ function CategoryLookbook({ section }) {
                 {section.items.map((cat, i) => (
                     <SmartLink key={cat.url} href={cat.url}
                         className={`group relative block overflow-hidden rounded-2xl bg-gold-100 ${i === 0 ? 'md:col-span-2 md:row-span-2 aspect-[4/3] md:aspect-auto' : 'aspect-square'}`}>
-                        {cat.image && <img src={cat.image} alt={cat.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105" />}
+                        {cat.image && (
+                            <img
+                                src={cat.image}
+                                {...(cat.srcset ? { srcSet: cat.srcset, sizes: '(min-width: 768px) 50vw, 100vw' } : {})}
+                                alt={cat.name} loading="lazy" decoding="async"
+                                className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105"
+                            />
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
                         <div className="absolute bottom-0 left-0 p-5">
                             <h3 className="font-display text-xl lg:text-2xl text-white">{cat.name}</h3>
@@ -476,7 +483,13 @@ function Promise({ promise }) {
         <section className="mx-auto max-w-7xl px-4 py-16 lg:py-20">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                 <div className="relative aspect-[5/4] rounded-2xl overflow-hidden bg-gold-100">
-                    {promise.image && <img src={promise.image} alt="" className="w-full h-full object-cover" loading="lazy" />}
+                    {promise.image && (
+                        <img
+                            src={promise.image}
+                            {...(promise.imageSrcset ? { srcSet: promise.imageSrcset, sizes: '(min-width: 1024px) 50vw, 100vw' } : {})}
+                            alt="" className="w-full h-full object-cover" loading="lazy" decoding="async"
+                        />
+                    )}
                 </div>
                 <div className="max-w-md">
                     <p className="uppercase tracking-[0.3em] text-[11px] text-gold-700 mb-3">{promise.eyebrow}</p>

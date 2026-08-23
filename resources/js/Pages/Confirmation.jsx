@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
+import { Link, useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import SmartLink from '../Shared/SmartLink';
 import Icon from '../Shared/Icons';
 
-export default function Confirmation({ order, purchase, trackUrl, estimate, storePhone }) {
+export default function Confirmation({ order, purchase, trackUrl, estimate, storePhone, claimAccount = null }) {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
 
@@ -87,6 +87,8 @@ export default function Confirmation({ order, purchase, trackUrl, estimate, stor
                     </ol>
                 </div>
 
+                {claimAccount && <ClaimAccount offer={claimAccount} />}
+
                 <div className="mt-8 flex justify-center gap-3">
                     <Link href={urls.shop || '/shop'} className="btn-primary">Continue shopping</Link>
                     <SmartLink href={trackUrl} className="btn-outline">Track order</SmartLink>
@@ -97,3 +99,63 @@ export default function Confirmation({ order, purchase, trackUrl, estimate, stor
 }
 
 Confirmation.layout = (page) => <Layout>{page}</Layout>;
+
+/**
+ * Set a password on the customer row this order already created.
+ *
+ * Right after buying is the best moment this shop gets to ask for an account,
+ * and it was the one moment it never did — normal registration would reject
+ * them anyway, because checkout has already taken their phone number.
+ */
+function ClaimAccount({ offer }) {
+    const { data, setData, post, processing, errors } = useForm({ password: '', password_confirmation: '' });
+    const [open, setOpen] = useState(false);
+
+    const submit = (e) => {
+        e.preventDefault();
+        post(offer.url);
+    };
+
+    return (
+        <div className="mt-6 rounded-xl border border-gold-300 bg-gold-50/60 p-5 text-left">
+            <h2 className="font-semibold text-sm">Save your details for next time</h2>
+            <p className="mt-1 text-sm text-ink-700/70">
+                Track this order, reorder in a tap
+                {offer.pct && <> and get <strong>{offer.pct}% off</strong> as a member</>}.
+                We already have your name and number — just pick a password.
+            </p>
+
+            {!open ? (
+                <button type="button" onClick={() => setOpen(true)} className="btn-outline mt-3 text-sm">
+                    Create my account
+                </button>
+            ) : (
+                <form onSubmit={submit} className="mt-3 space-y-2 max-w-sm">
+                    <p className="text-xs text-ink-700/70">Signing in as <strong>{offer.phone}</strong></p>
+                    <div>
+                        <label className="label text-xs" htmlFor="claim-password">Choose a password</label>
+                        <input
+                            id="claim-password" type="password" className="input" required minLength={6}
+                            autoComplete="new-password"
+                            aria-invalid={errors.password ? 'true' : undefined}
+                            value={data.password} onChange={(e) => setData('password', e.target.value)}
+                        />
+                        {errors.password && <p className="text-xs text-danger-600 mt-1">{errors.password}</p>}
+                    </div>
+                    <div>
+                        <label className="label text-xs" htmlFor="claim-password-confirm">Repeat it</label>
+                        <input
+                            id="claim-password-confirm" type="password" className="input" required minLength={6}
+                            autoComplete="new-password"
+                            value={data.password_confirmation}
+                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                        />
+                    </div>
+                    <button className="btn-primary" disabled={processing}>
+                        {processing ? 'Saving…' : 'Save and sign in'}
+                    </button>
+                </form>
+            )}
+        </div>
+    );
+}

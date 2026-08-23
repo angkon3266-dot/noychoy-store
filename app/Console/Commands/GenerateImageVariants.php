@@ -18,6 +18,7 @@ class GenerateImageVariants extends Command
 {
     protected $signature = 'images:variants
         {--card-width=450 : Width for product-card variants}
+        {--mid-width=900 : Middle width, for high-DPR phones and wide cards}
         {--hero-width=900 : Width for hero/branding variants}';
 
     protected $description = 'Generate downscaled srcset variants for product images and the homepage hero';
@@ -35,6 +36,22 @@ class GenerateImageVariants extends Command
                 continue;
             }
             $optimizer->variant($path, (int) $this->option('card-width')) ? $made++ : $skipped++;
+
+            // A middle rung. With only 450 and the 1600px original to choose
+            // from, a high-DPR phone or a wide card jumped straight to the
+            // full-size image — which is what the srcset exists to avoid.
+            $optimizer->variant($path, (int) $this->option('mid-width')) ? $made++ : $skipped++;
+        }
+
+        // Category tiles — these were handing out the full original.
+        foreach (\App\Models\Category::whereNotNull('image')->pluck('image') as $path) {
+            if (str_starts_with((string) $path, 'http')) {
+                $skipped++;
+
+                continue;
+            }
+            $optimizer->variant($path, (int) $this->option('card-width')) ? $made++ : $skipped++;
+            $optimizer->variant($path, (int) $this->option('mid-width')) ? $made++ : $skipped++;
         }
 
         // Homepage hero assets → a mid-size variant for the hero panel.

@@ -241,7 +241,82 @@ class CheckoutController extends Controller
                 ] : null,
             // A human rings before the parcel moves — say so, and on what number.
             'storePhone' => \App\Models\Setting::get('store_phone', config('store.phone')),
+            // Right after buying is the best moment this shop ever gets to ask
+            // for an account — and it was the one moment it did not. PlaceOrder
+            // already made a customer row for them; this offers to turn it into
+            // a real login. Null for anyone already signed in or registered.
+            'claimAccount' => $this->claimOffer($order),
         ])->withViewData(['pageTitle' => 'Order Confirmed']);
+    }
+
+    /**
+     * The "set a password" offer, or null when it does not apply.
+     */
+    protected function claimOffer(Order $order): ?array
+    {
+        if (auth('customer')->check()) {
+            return null;
+        }
+
+        $customer = $order->customer;
+
+        // Only a guest row — one PlaceOrder created by phone, with no password.
+        if (! $customer || filled($customer->password)) {
+            return null;
+        }
+
+        $pct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
+
+        return [
+            'url' => route('order.claim', $order->order_number),
+            'name' => $customer->name,
+            'phone' => $customer->phone,
+            'pct' => $pct > 0 ? rtrim(rtrim(number_format($pct, 2), '0'), '.') : null,
+        ];
+    }
+
+    /**
+     * Turn the guest customer row PlaceOrder created into a real member.
+     *
+     * Registration proper rejects a phone that already exists — and after a
+     * guest checkout it always does, because PlaceOrder matches or creates the
+     * customer by phone. Rather than relaxing that unique rule, which would let
+     * anyone claim any guest account from a phone number alone, this is gated
+     * by proof that the order is yours: the session that placed it, or a signed
+     * link. Same test the confirmation page itself uses.
+     */
+    public function claimAccount(Request $request, string $orderNumber)
+    {
+        $order = Order::where('order_number', $orderNumber)->with('customer')->firstOrFail();
+
+        $allowed = in_array($orderNumber, (array) session('placed_orders', []), true)
+            || $request->hasValidSignature();
+
+        abort_unless($allowed, 403);
+
+        $customer = $order->customer;
+
+        if (! $customer || filled($customer->password)) {
+            return redirect()->route('customer.login')
+                ->with('error', 'That account already has a password — please sign in.');
+        }
+
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        $customer->update(['password' => $data['password']]);
+
+        $loyalty = app(\App\Services\LoyaltyService::class);
+        if ($loyalty->enabled() && $loyalty->signupPoints() > 0) {
+            $loyalty->award($customer, $loyalty->signupPoints(), 'signup', 'Welcome bonus');
+        }
+
+        auth('customer')->login($customer, remember: true);
+        $request->session()->regenerate();
+
+        return redirect()->route('account')
+            ->with('success', 'Your account is ready — welcome to '.store_name().'.');
     }
 
     public function track(Request $request, \App\Services\SteadfastService $steadfast)

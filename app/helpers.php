@@ -12,6 +12,44 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+if (! function_exists('image_srcset')) {
+    /**
+     * A srcset for an uploaded image, from whatever variants exist on disk.
+     *
+     * Originals are stored at up to 1600px and most of the storefront was
+     * handing that straight to the browser — a phone on a Bangladeshi mobile
+     * connection downloading a desktop-sized picture for a tile 180px wide.
+     * The 450 and 900 variants were already being generated; nothing ever
+     * offered them.
+     *
+     * Returns null when no variant exists, so callers can fall back to `src`
+     * alone rather than emitting a broken srcset.
+     */
+    function image_srcset(?string $urlOrPath, array $widths = [450, 900]): ?string
+    {
+        if (blank($urlOrPath)) {
+            return null;
+        }
+
+        $parts = [];
+
+        foreach ($widths as $w) {
+            if ($url = image_variant($urlOrPath, $w)) {
+                $parts[] = $url.' '.$w.'w';
+            }
+        }
+
+        if (empty($parts)) {
+            return null;
+        }
+
+        // The original is the largest option, for a big screen at 2x.
+        $parts[] = $urlOrPath.' 1600w';
+
+        return implode(', ', $parts);
+    }
+}
+
 if (! function_exists('brand_font_css_url')) {
     /**
      * URL of the built self-hosted brand font stylesheet, or null.

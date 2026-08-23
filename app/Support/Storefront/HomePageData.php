@@ -38,13 +38,20 @@ class HomePageData
             'categoriesSection' => [
                 'show' => (bool) home_content('show_categories'),
                 'title' => home_content('categories_title') ?: 'Shop by category',
-                'items' => $categories->map(fn ($c) => [
-                    'name' => $c->name,
-                    'url' => route('category.show', $c),
-                    'image' => $c->image
+                'items' => $categories->map(function ($c) {
+                    // These used to hand the browser the full 1600px original
+                    // for a tile a few hundred pixels wide.
+                    $full = $c->image
                         ? (Str::startsWith($c->image, 'http') ? $c->image : Storage::disk('public')->url($c->image))
-                        : null,
-                ])->values(),
+                        : null;
+
+                    return [
+                        'name' => $c->name,
+                        'url' => route('category.show', $c),
+                        'image' => image_variant($full, 900) ?: $full,
+                        'srcset' => image_srcset($full),
+                    ];
+                })->values(),
             ],
             'featured' => [
                 'title' => home_content('featured_title') ?: 'The Signature Edit',
@@ -55,7 +62,8 @@ class HomePageData
                 'eyebrow' => home_content('promise_eyebrow') ?: 'Our promise',
                 'title' => home_content('promise_title') ?: 'Crafted to be treasured',
                 'text' => home_content('promise_text'),
-                'image' => theme_asset(home_content('promise_image')) ?: $newArrivals->first()?->thumbnail,
+                'image' => ($promiseImg = theme_asset(home_content('promise_image')) ?: $newArrivals->first()?->thumbnail),
+                'imageSrcset' => image_srcset($promiseImg),
                 'badges' => collect(range(1, 3))->map(fn ($b) => [
                     'title' => home_content('badge'.$b.'_title') ?: ['COD', 'Fast', 'Quality'][$b - 1],
                     'text' => home_content('badge'.$b.'_text') ?: ['Pay on delivery', 'Nationwide', 'Hand-finished'][$b - 1],
