@@ -325,16 +325,22 @@ class Product extends Model
             return $query;
         }
 
-        return $query->where(function ($q) use ($term) {
-            $q->where('name', 'like', "%{$term}%")
-                ->orWhere('sku', 'like', "%{$term}%")
-                ->orWhere('short_description', 'like', "%{$term}%")
-                // Searching "gift" used to return nothing, because the word
-                // lives in the tags and the long description, not the name.
-                ->orWhere('tags', 'like', "%{$term}%")
-                ->orWhere('description', 'like', "%{$term}%")
-                ->orWhereHas('category', fn ($c) => $c->where('name', 'like', "%{$term}%"));
-        });
+        // Word by word, not one big substring. The whole phrase as a single
+        // LIKE meant "gold ring" matched nothing unless a product was literally
+        // named that — "Aurora Ring — Gold Plated" was invisible. Nobody types
+        // one word.
+        return \App\Support\ProductSearch::apply($query, $term);
+    }
+
+    /**
+     * The broad version: ANY word matches, not all of them.
+     *
+     * Used as the second pass when the precise search comes back empty, so a
+     * shopper who added one word too many still sees something relevant.
+     */
+    public function scopeSearchLoosely(Builder $query, ?string $term): Builder
+    {
+        return \App\Support\ProductSearch::apply($query, $term, all: false);
     }
 
     public function getThumbnailAttribute(): ?string

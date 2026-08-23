@@ -64,6 +64,9 @@ class CatalogController extends Controller
             'filters' => $this->filters->groups($request, clone $base, $filterKey),
             'sort' => $request->query('sort') ?: theme('default_sort', 'new'),
             'searchQuery' => $request->query('q') ?: null,
+            // A search that found nothing used to be the end of the visit: one
+            // generic line and a "browse all" button. Give it somewhere to go.
+            'noResults' => $this->searchRecovery($request, $products->total()),
         ])->withViewData([
             'pageTitle' => $title,
             'metaDescription' => $description,
@@ -96,6 +99,16 @@ class CatalogController extends Controller
         // Visitor's choice wins; otherwise the admin default (Appearance → Catalog).
         $sort = $request->query('sort') ?: theme('default_sort', 'new');
 
+        // While searching, "best match" is the only sensible default — results
+        // used to fall through to "newest", so someone searching "ring" got
+        // whatever was added last rather than the rings.
+        if (filled($request->query('q')) && ! $request->query('sort')) {
+            \App\Support\ProductSearch::orderByRelevance($query, $request->query('q'));
+            view()->share('shopSort', 'relevance');
+
+            return;
+        }
+
         match ($sort) {
             'price_asc' => $query->orderBy('price'),
             'price_desc' => $query->orderByDesc('price'),
@@ -116,6 +129,60 @@ class CatalogController extends Controller
 
         // Let the catalog view reflect the effective sort in its dropdown.
         view()->share('shopSort', $sort);
+    }
+
+    /**
+     * What to show when a search matched nothing.
+     *
+     * Three ladders down, in order of how close they are to what was asked
+     * for: the same words spelled the way the catalogue spells them, then any
+     * ONE of the words instead of all of them, then simply what sells. Null
+     * when there is nothing to recover from.
+     */
+    protected function searchRecovery(Request $request, int $total): ?array
+    {
+        $term = $request->query('q');
+
+        if ($total > 0 || blank($term)) {
+            return null;
+        }
+
+        $suggestion = \App\Support\ProductSearch::didYouMean($term);
+
+        // "Any word" rather than "every word" — someone who typed one word too
+        // many still gets the pieces that match the rest.
+        $nearest = Product::published()
+            ->searchLoosely($term)
+            ->with('images', 'approvedReviews', 'category')
+            ->take(4)->get();
+
+        $nearest = \App\Support\ProductSearch::orderByRelevance(
+            Product::published()->whereIn('id', $nearest->pluck('id')), $term
+        )->with('images', 'approvedReviews', 'category')->get();
+
+        $popular = collect();
+
+        if ($nearest->isEmpty()) {
+            $popular = Product::published()->bestsellers()
+                ->with('images', 'approvedReviews', 'category')->take(4)->get();
+
+            // A shop that has not flagged any bestsellers yet would otherwise
+            // show a bare page — which is the dead end this whole block exists
+            // to remove. Anything real beats nothing.
+            if ($popular->isEmpty()) {
+                $popular = Product::published()
+                    ->with('images', 'approvedReviews', 'category')
+                    ->latest()->take(4)->get();
+            }
+        }
+
+        return [
+            'term' => $term,
+            'didYouMean' => $suggestion,
+            'didYouMeanUrl' => $suggestion ? route('shop', ['q' => $suggestion]) : null,
+            'nearest' => \App\Support\Storefront\ProductCardData::collection($nearest),
+            'popular' => \App\Support\Storefront\ProductCardData::collection($popular),
+        ];
     }
 
     /** JSON type-ahead suggestions for the header search box. */

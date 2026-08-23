@@ -17,7 +17,7 @@ const PARTIAL = {
     preserveScroll: true,
     only: ['products', 'filters', 'sort', 'title', 'pageTitle'],
 };
-export default function Catalog({ title, description = null, products, filters, sort, searchQuery }) {
+export default function Catalog({ title, description = null, products, filters, sort, searchQuery, noResults = null }) {
     const { props, url } = usePage();
     const urls = props.chrome?.urls || {};
     const [showFilters, setShowFilters] = useState(false);
@@ -128,9 +128,56 @@ export default function Catalog({ title, description = null, products, filters, 
                     </div>
 
                     {products.data.length === 0 ? (
-                        <div className="card p-12 text-center text-ink-700/70">
-                            <p>No products match these filters.</p>
-                            <Link href={urls.shop || '/shop'} className="btn-outline mt-4">Browse all jewelry</Link>
+                        /* A search that found nothing used to end the visit:
+                           one generic line and a button back to the top. Now it
+                           climbs down three rungs — the same words spelled the
+                           way we spell them, then any one of the words, then
+                           simply what sells. */
+                        <div className="card p-8 sm:p-12">
+                            {noResults ? (
+                                <>
+                                    <div className="text-center">
+                                        <p className="text-lg">
+                                            Nothing matched <strong>&ldquo;{noResults.term}&rdquo;</strong>.
+                                        </p>
+                                        {noResults.didYouMean && (
+                                            <p className="mt-2 text-ink-700/70">
+                                                Did you mean{' '}
+                                                <Link href={noResults.didYouMeanUrl} className="text-gold-700 font-medium hover:underline">
+                                                    {noResults.didYouMean}
+                                                </Link>?
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {noResults.nearest.length > 0 && (
+                                        <div className="mt-8">
+                                            <h2 className="font-display text-lg mb-4">Closest we have</h2>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+                                                {noResults.nearest.map((p) => <ProductCard key={p.id} product={p} />)}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {noResults.popular.length > 0 && (
+                                        <div className="mt-8">
+                                            <h2 className="font-display text-lg mb-4">People are buying</h2>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
+                                                {noResults.popular.map((p) => <ProductCard key={p.id} product={p} />)}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="mt-8 text-center">
+                                        <Link href={urls.shop || '/shop'} className="btn-outline">Browse all jewelry</Link>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center text-ink-700/70">
+                                    <p>No products match these filters.</p>
+                                    <Link href={urls.shop || '/shop'} className="btn-outline mt-4">Browse all jewelry</Link>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <>

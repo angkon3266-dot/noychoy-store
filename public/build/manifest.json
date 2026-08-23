@@ -196,7 +196,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BqaW_h1P.css",
+    "file": "assets/app-G2LKMeTj.css",
     "name": "app",
     "names": [
       "app.css"
@@ -365,7 +365,7 @@
     ]
   },
   "resources/js/Pages/Catalog.jsx": {
-    "file": "assets/Catalog-Cv5EtkFo.js",
+    "file": "assets/Catalog-DerCSSMF.js",
     "name": "Catalog",
     "src": "resources/js/Pages/Catalog.jsx",
     "isDynamicEntry": true,
@@ -482,7 +482,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-BOSKusIq.js",
+    "file": "assets/inertia-OqWFI-2m.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,
