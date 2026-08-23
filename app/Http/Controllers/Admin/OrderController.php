@@ -223,6 +223,61 @@ class OrderController extends Controller
     }
 
     /**
+     * The form for an order taken over the phone or on Messenger.
+     */
+    public function create()
+    {
+        return view('admin.orders.create', [
+            'products' => \App\Models\Product::where('status', 'published')
+                ->orderBy('name')
+                ->get(['id', 'name', 'sku', 'price', 'has_variants', 'manage_stock', 'stock_quantity']),
+            'shipInside' => (float) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
+            'shipOutside' => (float) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
+        ]);
+    }
+
+    /**
+     * Record an order the owner took by hand.
+     *
+     * A large share of this shop's sales arrive as a DM. Doing it through the
+     * public storefront meant the owner's own browser fired the Pixel and the
+     * sale was attributed to her session — so every manual order quietly
+     * corrupted the ad data she pays for.
+     */
+    public function storeManual(Request $request, \App\Actions\CreateManualOrder $creator)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'phone' => ['required', 'string', new \App\Rules\BdPhone],
+            'email' => ['nullable', 'email', 'max:160'],
+            'address' => ['required', 'string', 'max:500'],
+            'area' => ['nullable', 'string', 'max:120'],
+            'district' => ['nullable', 'string', 'max:120'],
+            'is_inside_dhaka' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'shipping_cost' => ['nullable', 'numeric', 'min:0'],
+            'discount' => ['nullable', 'numeric', 'min:0'],
+            'status' => ['nullable', 'in:'.implode(',', array_keys(Order::STATUSES))],
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'lines.*.variant_id' => ['nullable', 'integer'],
+            'lines.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
+            'lines.*.price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
+
+        try {
+            $order = $creator->handle($data, $data['lines']);
+        } catch (\App\Exceptions\CheckoutException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('admin.orders.show', $order)
+            ->with('success', 'Order '.$order->order_number.' created.');
+    }
+
+    /**
      * Correct the customer and delivery details on an order.
      *
      * The most common call a cash-on-delivery shop gets is "wrong flat number"

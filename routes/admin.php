@@ -136,6 +136,9 @@ Route::middleware('admin')->group(function () {
     Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
     Route::post('orders/{order}/restore', [OrderController::class, 'restore'])->name('orders.restore')->withTrashed();
     Route::delete('orders/{order}/force', [OrderController::class, 'forceDelete'])->name('orders.force-delete')->withTrashed();
+    // Declared above orders/{order} so "create" is not read as an order id.
+    Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
+    Route::post('orders/create', [OrderController::class, 'storeManual'])->name('orders.store-manual');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
     Route::post('orders/{order}/amend', [OrderController::class, 'amend'])->name('orders.amend');

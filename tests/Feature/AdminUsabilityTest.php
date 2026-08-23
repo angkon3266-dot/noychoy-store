@@ -169,4 +169,89 @@ class AdminUsabilityTest extends TestCase
         $this->assertStringNotContainsString('SMS is not sending', $titles);
         $this->assertStringNotContainsString('no courier consignment', $titles);
     }
+
+    // ── Taking an order by hand ────────────────────────────────────────────
+
+    public function test_the_owner_can_record_a_messenger_sale(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $product = Product::create([
+            'name' => 'DM Ring', 'slug' => 'dm-ring', 'status' => 'published',
+            'price' => 5000, 'manage_stock' => true, 'stock_quantity' => 4,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.orders.store-manual'), [
+                'name' => 'DM Buyer',
+                'phone' => '01860988859',
+                'address' => 'Banani, Dhaka',
+                'is_inside_dhaka' => '1',
+                'shipping_cost' => 70,
+                'discount' => 0,
+                'status' => 'confirmed',
+                'lines' => [
+                    ['product_id' => $product->id, 'qty' => 2, 'price' => null],
+                ],
+            ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+
+        $this->assertSame('DM Buyer', $order->customer_name);
+        $this->assertSame(10070.0, (float) $order->total);
+        $this->assertSame('admin', $order->source_channel, 'a DM sale must be distinguishable from a storefront one');
+        $this->assertSame(2, (int) $order->items->sum('quantity'));
+
+        // Stock comes off, exactly as it would from the storefront.
+        $this->assertSame(2, (int) $product->fresh()->stock_quantity);
+
+        // And the customer still gets their confirmation.
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SendOrderPlacedEffects::class);
+    }
+
+    public function test_a_hand_typed_price_is_honoured(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $product = Product::create([
+            'name' => 'Negotiated Ring', 'slug' => 'negotiated-ring', 'status' => 'published',
+            'price' => 5000, 'manage_stock' => false,
+        ]);
+
+        // She agreed a figure on the phone.
+        $this->actingAs($this->admin())
+            ->post(route('admin.orders.store-manual'), [
+                'name' => 'Buyer', 'phone' => '01860988859', 'address' => 'Dhaka',
+                'lines' => [['product_id' => $product->id, 'qty' => 1, 'price' => 4200]],
+            ])->assertRedirect();
+
+        $this->assertSame(4200.0, (float) Order::latest('id')->first()->items->first()->price);
+    }
+
+    public function test_a_manual_order_cannot_oversell(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $product = Product::create([
+            'name' => 'Last One', 'slug' => 'last-one', 'status' => 'published',
+            'price' => 5000, 'manage_stock' => true, 'stock_quantity' => 1,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.orders.store-manual'), [
+                'name' => 'Buyer', 'phone' => '01860988859', 'address' => 'Dhaka',
+                'lines' => [['product_id' => $product->id, 'qty' => 5, 'price' => null]],
+            ])->assertRedirect();
+
+        $this->assertSame(0, Order::count(), 'an order was written for stock that does not exist');
+        $this->assertSame(1, (int) $product->fresh()->stock_quantity);
+    }
+
+    public function test_the_new_order_screen_opens(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('admin.orders.create'))
+            ->assertOk()
+            ->assertSee('New order');
+    }
 }

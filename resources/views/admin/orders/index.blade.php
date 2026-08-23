@@ -34,6 +34,13 @@
         </div>
     @endif
 
+    {{-- A large share of this shop's orders arrive by phone or DM. Taking one
+         through the public storefront fired the Pixel from the owner's own
+         browser and attributed the sale to her session. --}}
+    <div class="mb-4">
+        <a href="{{ route('admin.orders.create') }}" class="btn-primary py-2 text-sm inline-block">+ New order (phone / Messenger)</a>
+    </div>
+
     <form method="GET" class="flex flex-wrap gap-2 mb-4">
         <input name="q" value="{{ request('q') }}" placeholder="Order #, name or phone…" class="input py-2 w-64">
         <select name="status" onchange="this.form.submit()" class="input py-2">
