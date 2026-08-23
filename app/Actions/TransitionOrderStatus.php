@@ -63,6 +63,14 @@ class TransitionOrderStatus
             app(LoyaltyService::class)->reverseForOrder($order->fresh('customer'));
         }
 
+        // Points the customer SPENT are a different ledger from points they
+        // earned, and they come back whenever the order unwinds — not only
+        // from 'delivered'. A cancellation at any stage otherwise leaves them
+        // having paid with points for goods that never shipped.
+        if (in_array($status, ['returned', 'cancelled'], true)) {
+            app(LoyaltyService::class)->refundRedemptionForOrder($order->fresh('customer'));
+        }
+
         $this->push($order->fresh(), $status);
 
         return true;

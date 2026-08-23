@@ -94,6 +94,11 @@ Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
 Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:10,1');
 Route::post('/checkout/lead', [LeadController::class, 'capture'])->name('checkout.lead')->middleware('throttle:15,1');
 
+// Rebuilds a saved cart from the abandoned-cart reminder SMS. Signed, because
+// a cart's contents are the shopper's business and the id is guessable.
+Route::get('/cart/restore/{cart}', [CartController::class, 'restore'])
+    ->name('cart.restore')->middleware('throttle:20,10');
+
 // Product reviews (photo uploads — keep tight)
 Route::post('/product/{product:slug}/review', [ReviewController::class, 'store'])->name('review.store')->middleware('throttle:5,10');
 

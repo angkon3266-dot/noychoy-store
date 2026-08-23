@@ -156,6 +156,35 @@
             </form>
         </div>
 
+        {{-- Abandoned-cart SMS. The push reminder above only ever reached
+             registered members, which on a cash-on-delivery store is almost
+             nobody — this is the one that reaches guests. --}}
+        <div class="card p-6" x-data="{ on: {{ $settings['abandoned_sms_enabled'] ? 'true' : 'false' }} }">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="font-semibold">Abandoned-cart SMS</h2>
+                <span class="badge {{ $settings['abandoned_sms_enabled'] ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} text-[10px]">{{ $settings['abandoned_sms_enabled'] ? 'Active' : 'Off' }}</span>
+            </div>
+            <p class="text-sm text-ink-700/70 mb-3">Texts anyone who typed their phone at checkout and left without ordering — member or guest. The link puts their cart back exactly as they left it. Runs every 30 minutes.
+                <strong>{{ number_format($abandonedSmsDue) }}</strong> cart(s) are waiting right now.</p>
+            <form action="{{ route('admin.notifications.abandoned-sms') }}" method="POST" class="space-y-3">
+                @csrf
+                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="abandoned_sms_enabled" value="1" x-model="on"> Enable abandoned-cart SMS</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="label text-xs">Wait this long after they leave (minutes)</label><input type="number" name="abandoned_sms_delay_minutes" value="{{ $settings['abandoned_sms_delay_minutes'] }}" min="15" max="1440" class="input py-1.5 text-sm" required></div>
+                    <div><label class="label text-xs">Give up after (hours)</label><input type="number" name="abandoned_sms_max_hours" value="{{ $settings['abandoned_sms_max_hours'] }}" min="2" max="720" class="input py-1.5 text-sm" required></div>
+                    <div class="col-span-2"><label class="label text-xs">Max texts per run</label><input type="number" name="abandoned_sms_per_run" value="{{ $settings['abandoned_sms_per_run'] }}" min="1" max="300" class="input py-1.5 text-sm" required></div>
+                </div>
+                <p class="text-xs text-ink-700/50">The wording lives on the <a href="{{ route('admin.system-config.integrations') }}" class="text-gold-700 hover:underline">Integrations</a> page, under SMS templates.</p>
+                <div class="flex gap-2">
+                    <button class="btn-outline text-sm">Save abandoned-cart settings</button>
+                </div>
+            </form>
+            <form action="{{ route('admin.notifications.run-abandoned-sms') }}" method="POST" class="mt-2" onsubmit="return confirm('Text every waiting cart now?')">
+                @csrf
+                <button class="text-xs text-gold-700 hover:underline">▸ Send reminders now</button>
+            </form>
+        </div>
+
         {{-- Automation + web push --}}
         <div class="card p-6">
             <h2 class="font-semibold mb-3">Product announcements</h2>

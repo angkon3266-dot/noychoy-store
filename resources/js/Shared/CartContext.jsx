@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
-import { fetchJson } from './format';
+import { fetchJson, newEventId } from './format';
 
 // React port of the Alpine `cart` store: badge count, mini-cart drawer,
 // optimistic add with toast. Talks to the same JSON endpoints
@@ -51,12 +51,38 @@ export function CartProvider({ children }) {
     }, [apply, props]);
 
     /** POST an add-to-cart endpoint with fields; mirrors Alpine $store.cart.add. */
-    const add = useCallback(async (action, fields = {}) => {
+    // Every add goes through here, so this is where AddToCart belongs.
+    // It used to live only on the product page, which meant adds from the shop
+    // grid, the home carousels, the related strip and the cart suggestions —
+    // on a mobile browsing site, most of them — were invisible to both the
+    // Pixel and CAPI, and Meta was optimising delivery on a partial signal.
+    //
+    // `track` carries what the browser event needs; the server fills in the
+    // rest from the product. A caller that already made its own event id (the
+    // product page, which knows the chosen variant) keeps it — generating a
+    // second one here would break the dedup pair.
+    const add = useCallback(async (action, fields = {}, track = null) => {
         if (busyRef.current) return false;      // rapid double-taps add once
         busyRef.current = true;
         try {
+            const sent = { ...fields };
+
+            if (!sent.event_id) {
+                sent.event_id = newEventId('AddToCart');
+
+                if (window.track && track) {
+                    window.track('AddToCart', {
+                        content_ids: [track.contentId],
+                        content_name: track.name,
+                        content_type: 'product',
+                        value: track.value,
+                        currency: 'BDT',
+                    }, { eventID: sent.event_id });
+                }
+            }
+
             const body = new FormData();
-            Object.entries(fields).forEach(([k, v]) => body.append(k, v ?? ''));
+            Object.entries(sent).forEach(([k, v]) => body.append(k, v ?? ''));
             const data = await fetchJson(action, { method: 'POST', body });
             apply(data);
             showToast((data.added || 'Item') + ' added to cart ✓');

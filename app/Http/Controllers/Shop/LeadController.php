@@ -27,7 +27,12 @@ class LeadController extends Controller
             return response()->json(['ok' => false], 200);
         }
 
+        // product_id / variant_id are what make the snapshot actionable: the
+        // recovery SMS links to a route that rebuilds this cart, and a list of
+        // names and prices cannot be turned back into a cart.
         $items = $this->cart->items()->map(fn ($i) => [
+            'product_id' => $i['product_id'] ?? null,
+            'variant_id' => $i['variant_id'] ?? null,
             'name' => $i['name'], 'qty' => $i['qty'], 'price' => $i['price'],
         ])->values()->all();
 

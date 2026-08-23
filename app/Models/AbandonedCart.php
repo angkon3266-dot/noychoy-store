@@ -9,6 +9,7 @@ class AbandonedCart extends Model
     protected $fillable = [
         'session_id', 'phone', 'name', 'email', 'items',
         'subtotal', 'item_count', 'last_step', 'recovered', 'contacted', 'push_reminded_at',
+        'sms_reminded_at',
     ];
 
     protected $casts = [
@@ -18,5 +19,6 @@ class AbandonedCart extends Model
         'recovered' => 'boolean',
         'contacted' => 'boolean',
         'push_reminded_at' => 'datetime',
+        'sms_reminded_at' => 'datetime',
     ];
 }

@@ -94,7 +94,7 @@ class AccountController extends Controller
                 'number' => $o->order_number,
                 'url' => route('account.order', $o->order_number),
                 'reorderUrl' => route('account.reorder', $o->order_number),
-                'date' => $o->created_at->format('d M Y'),
+                'date' => store_time($o->created_at)->format('d M Y'),
                 'totalText' => money($o->total),
                 'status' => $o->status,
             ])->values(),
@@ -120,7 +120,7 @@ class AccountController extends Controller
         return [
             'number' => $o->order_number,
             'url' => route('account.order', $o->order_number),
-            'date' => $o->created_at->format('d M Y'),
+            'date' => store_time($o->created_at)->format('d M Y'),
             'totalText' => money($o->total),
             'status' => $o->status,
         ];
@@ -243,7 +243,7 @@ class AccountController extends Controller
             'order' => [
                 'number' => $order->order_number,
                 'status' => $order->status,
-                'date' => $order->created_at->format('d M Y, g:i a'),
+                'date' => store_time($order->created_at)->format('d M Y, g:i a'),
                 'items' => $order->items->map(fn ($i) => [
                     'name' => $i->name,
                     'qty' => $i->quantity,
@@ -462,7 +462,7 @@ class AccountController extends Controller
                     'rating' => (int) $r->rating,
                     'title' => $r->title,
                     'body' => $r->body,
-                    'date' => $r->created_at->format('d M Y'),
+                    'date' => store_time($r->created_at)->format('d M Y'),
                 ])->values(),
                 'links' => $reviews->linkCollection(),
             ],

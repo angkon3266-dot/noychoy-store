@@ -1,6 +1,7 @@
 import { Link, router } from '@inertiajs/react';
 import Icon, { Star } from './Icons';
 import { useCart } from './CartContext';
+import { newEventId } from './format';
 
 // Storefront product card — data shape comes from ProductCardData::make().
 export default function ProductCard({ product: p }) {
@@ -72,7 +73,9 @@ export default function ProductCard({ product: p }) {
                     <div className="flex gap-1.5">
                         <button
                             type="button"
-                            onClick={() => add(p.add_url, { variant_id: '', qty: 1 })}
+                            onClick={() => add(p.add_url, { variant_id: '', qty: 1 }, {
+                                contentId: `prod-${p.id}`, name: p.name, value: p.price,
+                            })}
                             className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-ink-200 px-3 py-2 text-xs font-medium text-ink-800 hover:border-gold-400 hover:text-gold-700 transition"
                             title="Add to cart"
                             aria-label="Add to cart"
@@ -84,7 +87,22 @@ export default function ProductCard({ product: p }) {
                             cart and redirects to /checkout, which renders in place. */}
                         <button
                             type="button"
-                            onClick={() => router.post(p.buynow_url, { variant_id: '', qty: 1 })}
+                            onClick={() => {
+                                // Buy now skips the cart, so without this the
+                                // strongest intent signal on the page reached
+                                // Meta as nothing at all.
+                                const eventId = newEventId('AddToCart');
+                                if (window.track) {
+                                    window.track('AddToCart', {
+                                        content_ids: [`prod-${p.id}`],
+                                        content_name: p.name,
+                                        content_type: 'product',
+                                        value: p.price,
+                                        currency: 'BDT',
+                                    }, { eventID: eventId });
+                                }
+                                router.post(p.buynow_url, { variant_id: '', qty: 1, event_id: eventId });
+                            }}
                             className="flex-1 rounded-full bg-gold-700 px-3 py-2 text-xs font-medium text-white hover:bg-gold-800 transition"
                         >
                             {p.preorder ? 'Book now' : 'Buy now'}

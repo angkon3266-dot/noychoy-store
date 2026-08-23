@@ -276,7 +276,7 @@ class CheckoutController extends Controller
                 // page is reachable with an order number and a phone number.
                 'history' => $order->history->map(fn ($h) => [
                     'status' => $h->status,
-                    'date' => $h->created_at->format('d M Y, g:i a'),
+                    'date' => store_time($h->created_at)->format('d M Y, g:i a'),
                 ])->values(),
             ] : null,
             'tracking' => $tracking ? [

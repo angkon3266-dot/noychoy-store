@@ -67,6 +67,10 @@ Schedule::command('push:abandoned-cart')->everyThirtyMinutes()->name('push-aband
 // Scheduled drip campaigns — send any due steps (hourly).
 Schedule::command('push:drip')->hourly()->name('push-drip')->withoutOverlapping();
 
+// Abandoned-cart SMS — every 30 minutes, so the reminder lands while the
+// shopper still remembers the pieces. A no-op when off or nobody is due.
+Schedule::command('sms:abandoned-cart')->everyThirtyMinutes()->name('sms-abandoned-cart')->withoutOverlapping();
+
 // Post-delivery review requests — one daily pass. A no-op when the automation
 // is off or nothing is past its delay window. 11:30 sits after crm:winback at
 // 11:00 so the two paid-SMS automations do not contend.

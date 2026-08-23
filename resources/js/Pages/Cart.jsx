@@ -137,7 +137,14 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
                         {summary.free_shipping_offer && (
                             <div className="flex justify-between text-success-700"><dt>Free delivery offer</dt><dd>unlocked</dd></div>
                         )}
-                        <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd className="text-ink-700/70">calculated at checkout</dd></div>
+                        <div className="flex justify-between">
+                            <dt className="text-ink-700/70">Delivery</dt>
+                            <dd className="text-ink-700/70 text-right">
+                                {summary.free_shipping
+                                    ? <span className="text-success-700 font-medium">Free</span>
+                                    : <>{summary.ship_inside_text} inside Dhaka<br /><span className="text-xs">{summary.ship_outside_text} outside</span></>}
+                            </dd>
+                        </div>
                         <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3">
                             <dt>Estimated total</dt><dd>{summary.total_text}</dd>
                         </div>

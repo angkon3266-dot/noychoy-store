@@ -212,6 +212,40 @@ class LoyaltyService
         return $tx;
     }
 
+    /**
+     * Give back the points a customer SPENT on an order that unwound.
+     *
+     * Earned points and redeemed points are two different ledgers. reverseForOrder
+     * claws back what the delivery earned; this returns what the customer paid
+     * with. Without it a cancelled parcel leaves them out of pocket in points for
+     * a sale that never happened — they paid, and got neither the goods nor the
+     * points back.
+     *
+     * A distinct transaction type is required, not optional: award() dedupes on
+     * type + reference, so reusing 'redeem' would be silently swallowed by the
+     * original deduction.
+     */
+    public function refundRedemptionForOrder(\App\Models\Order $order): ?PointTransaction
+    {
+        $spent = (int) $order->points_redeemed;
+
+        if (! $order->customer || $spent <= 0) {
+            return null;
+        }
+
+        $tx = $this->award(
+            $order->customer, $spent, 'refund_redeem',
+            'Order '.$order->order_number.' cancelled — points returned', $order,
+        );
+
+        if ($tx) {
+            // Zeroed so a status flip-flop cannot refund the same points twice.
+            $order->update(['points_redeemed' => 0]);
+        }
+
+        return $tx;
+    }
+
     // ── Weekly milestones ─────────────────────────────────────────────────────
 
     /**

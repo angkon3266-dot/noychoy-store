@@ -40,9 +40,23 @@ class PlaceOrder
             // CheckoutException (rolling back) if anything no longer holds.
             [$products, $variants] = $this->validateLines();
 
-            // Enforce per-customer coupon limit now that we know the phone.
+            // Enforce the per-customer coupon limit now that we know the phone.
+            //
+            // This has to bounce the customer, not quietly drop the discount.
+            // Almost everyone checks out as a guest, so the cap cannot be
+            // evaluated while they are still on the page — they see the coupon
+            // line on the summary, press Place order, and the order would be
+            // written higher than the figure they agreed to. On cash on
+            // delivery that surfaces at the door: the rider asks for a number
+            // the customer never accepted, the parcel comes back, and the shop
+            // pays freight both ways. Same treatment as a repriced line below.
             if (($coupon = $this->cart->coupon()) && $coupon->customerLimitReached($data['phone'])) {
                 $this->cart->removeCoupon();
+
+                throw new CheckoutException(
+                    'The coupon '.$coupon->code.' cannot be used on this order — it has already been '
+                    .'used on this number. Please review your cart before ordering.'
+                );
             }
 
             // Totals are read AFTER validation, not before: validateLines() can

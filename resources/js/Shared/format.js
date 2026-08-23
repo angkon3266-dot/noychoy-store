@@ -22,3 +22,13 @@ export async function fetchJson(url, options = {}) {
     if (!res.ok) throw new Error(String(res.status));
     return res.json();
 }
+
+// One id shared by the browser Pixel and the server CAPI call, so Meta collapses
+// the pair into a single event instead of counting it twice.
+export function newEventId(name) {
+    const rand = (self.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : (Date.now() + '-' + Math.random().toString(16).slice(2));
+
+    return name + '.' + rand;
+}

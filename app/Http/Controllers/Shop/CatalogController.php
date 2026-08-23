@@ -359,16 +359,10 @@ class CatalogController extends Controller
      */
     protected function frequentlyBoughtTogether(Product $product, int $limit = 3): \Illuminate\Support\Collection
     {
-        $orderIds = OrderItem::where('product_id', $product->id)->pluck('order_id');
-
-        $ids = $orderIds->isEmpty() ? collect() : OrderItem::whereIn('order_id', $orderIds)
-            ->where('product_id', '!=', $product->id)
-            ->whereNotNull('product_id')
-            ->select('product_id', DB::raw('COUNT(*) as c'))
-            ->groupBy('product_id')
-            ->orderByDesc('c')
-            ->limit($limit)
-            ->pluck('product_id');
+        // Shared with the cart, and capped: scanning every order line a
+        // product ever appeared in made the best-selling piece the slowest
+        // page, degrading as it sold more.
+        $ids = \App\Support\CoPurchase::idsFor([$product->id], [], $limit);
 
         // The admin's manual cross-sells lead (they're a deliberate choice),
         // then real co-purchase pairs, then relevance fill — always $limit items.

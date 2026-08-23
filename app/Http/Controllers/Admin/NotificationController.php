@@ -44,6 +44,11 @@ class NotificationController extends Controller
                 'review_request_per_run' => (int) Setting::get('review_request_per_run', 100),
                 'review_request_email_subject' => Setting::get('review_request_email_subject', ''),
                 'review_request_email_body' => Setting::get('review_request_email_body', ''),
+                // Abandoned-cart SMS. Off by default — it spends SMS credit.
+                'abandoned_sms_enabled' => (bool) Setting::get('abandoned_sms_enabled', false),
+                'abandoned_sms_delay_minutes' => (int) Setting::get('abandoned_sms_delay_minutes', 60),
+                'abandoned_sms_max_hours' => (int) Setting::get('abandoned_sms_max_hours', 48),
+                'abandoned_sms_per_run' => (int) Setting::get('abandoned_sms_per_run', 50),
             ],
             'winbackDue' => \App\Models\Customer::whereNotNull('password')->where('blacklisted', false)
                 ->where('total_orders', '>', 0)
@@ -55,6 +60,10 @@ class NotificationController extends Controller
             'reviewRequestDue' => \App\Console\Commands\RunReviewRequests::dueQuery(
                 max(1, (int) Setting::get('review_request_delay_days', 3)),
                 max(2, (int) Setting::get('review_request_max_days', 30)),
+            )->count(),
+            'abandonedSmsDue' => \App\Console\Commands\RunAbandonedCartSms::dueQuery(
+                max(15, (int) Setting::get('abandoned_sms_delay_minutes', 60)),
+                max(2, (int) Setting::get('abandoned_sms_max_hours', 48)),
             )->count(),
             'analytics' => app(\App\Services\CampaignAnalyticsService::class),
             'webpushDiag' => app(\App\Services\WebPushService::class)->diagnostics(),
@@ -321,6 +330,31 @@ class NotificationController extends Controller
         Setting::put('review_request_email_body', $data['review_request_email_body'] ?? '');
 
         return back()->with('success', 'Review-request settings saved.');
+    }
+
+    /** Save the abandoned-cart SMS settings. */
+    public function abandonedSmsSettings(Request $request)
+    {
+        $data = $request->validate([
+            'abandoned_sms_delay_minutes' => ['required', 'integer', 'min:15', 'max:1440'],
+            'abandoned_sms_max_hours' => ['required', 'integer', 'min:2', 'max:720'],
+            'abandoned_sms_per_run' => ['required', 'integer', 'min:1', 'max:300'],
+        ]);
+
+        Setting::put('abandoned_sms_enabled', $request->boolean('abandoned_sms_enabled'));
+        Setting::put('abandoned_sms_delay_minutes', $data['abandoned_sms_delay_minutes']);
+        Setting::put('abandoned_sms_max_hours', $data['abandoned_sms_max_hours']);
+        Setting::put('abandoned_sms_per_run', $data['abandoned_sms_per_run']);
+
+        return back()->with('success', 'Abandoned-cart SMS settings saved.');
+    }
+
+    /** Send the abandoned-cart reminders right now. */
+    public function runAbandonedSms()
+    {
+        \Illuminate\Support\Facades\Artisan::call('sms:abandoned-cart');
+
+        return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
     }
 
     /** Run the post-delivery review requests right now. */

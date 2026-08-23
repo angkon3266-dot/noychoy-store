@@ -34,11 +34,28 @@ class CartController extends Controller
         $customer = auth('customer')->user();
         $memberUsage = ($customer && member_pricing()->enabled()) ? member_pricing()->usageStatus($customer) : null;
 
+        // What people actually bought alongside what is in this cart. This
+        // used to be inRandomOrder(), while the co-purchase data sat unused.
         $suggestions = collect();
         if (! $cart->isEmpty()) {
-            $inCart = $cart->items()->pluck('product_id')->all();
-            $suggestions = \App\Models\Product::published()->whereNotIn('id', $inCart)
-                ->with('images', 'approvedReviews', 'category')->inRandomOrder()->take(4)->get();
+            $inCart = $cart->items()->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->all();
+            $ids = \App\Support\CoPurchase::idsFor($inCart, [], 4);
+
+            if ($ids->isNotEmpty()) {
+                $suggestions = \App\Models\Product::published()->whereIn('id', $ids)
+                    ->with('images', 'approvedReviews', 'category')->get()
+                    ->sortBy(fn ($p) => $ids->search($p->id))->values();
+            }
+
+            // A new catalogue has no purchase history yet — fall back rather
+            // than showing an empty shelf.
+            if ($suggestions->count() < 4) {
+                $fill = \App\Models\Product::published()
+                    ->whereNotIn('id', array_merge($inCart, $suggestions->pluck('id')->all()))
+                    ->with('images', 'approvedReviews', 'category')
+                    ->inRandomOrder()->take(4 - $suggestions->count())->get();
+                $suggestions = $suggestions->concat($fill);
+            }
         }
 
         return \Inertia\Inertia::render('Cart', [
@@ -64,6 +81,12 @@ class CartController extends Controller
             })->values(),
             'summary' => [
                 'subtotal_text' => money($cart->subtotal()),
+                // Shown on the cart, not held back until checkout: an
+                // unexplained delivery charge appearing on the final screen is
+                // a classic cash-on-delivery abandonment trigger.
+                'ship_inside_text' => money((int) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka'))),
+                'ship_outside_text' => money((int) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka'))),
+                'free_shipping' => $cart->hasFreeShipping(),
                 'discount_lines' => collect($cart->discountLines())
                     ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
                 'free_shipping_offer' => $cart->hasFreeShippingOffer(),
@@ -177,11 +200,67 @@ class CartController extends Controller
         ], $extra);
     }
 
-    public function buyNow(Request $request, Product $product)
+    /**
+     * Put a saved cart back, from the recovery SMS link.
+     *
+     * The snapshot is replayed against live products rather than trusted: a
+     * price, a stock level or a whole product can have changed since they left,
+     * and the cart must reflect today's catalogue, not last night's.
+     */
+    public function restore(Request $request, \App\Models\AbandonedCart $cart)
+    {
+        abort_unless($request->hasValidSignature(), 403);
+
+        $restored = 0;
+        $missing = 0;
+
+        foreach ((array) $cart->items as $line) {
+            $product = Product::published()->find($line['product_id'] ?? null);
+
+            if (! $product) {
+                $missing++;
+
+                continue;
+            }
+
+            $variant = null;
+            if (! empty($line['variant_id'])) {
+                $variant = ProductVariant::where('product_id', $product->id)
+                    ->where('id', $line['variant_id'])->where('is_active', true)->first();
+
+                // A variant product with no usable variant cannot be re-added
+                // without the shopper choosing again.
+                if (! $variant) {
+                    $missing++;
+
+                    continue;
+                }
+            } elseif ($product->has_variants) {
+                $missing++;
+
+                continue;
+            }
+
+            $this->cart->add($product, $variant, max(1, (int) ($line['qty'] ?? 1)));
+            $restored++;
+        }
+
+        if (! $restored) {
+            return redirect()->route('shop')
+                ->with('error', 'Those pieces are no longer available — here is what we have now.');
+        }
+
+        return redirect()->route('cart')->with('success', $missing
+            ? 'Your cart is back. '.$missing.' item(s) are no longer available.'
+            : 'Your cart is back where you left it.');
+    }
+
+    public function buyNow(Request $request, Product $product, MetaTrackingService $tracking)
     {
         $data = $request->validate([
             'variant_id' => ['nullable', 'integer'],
             'qty' => ['nullable', 'integer', 'min:1', 'max:99'],
+            'event_id' => ['nullable', 'string', 'max:80'],
         ]);
 
         // Route-model binding resolves by slug without the published scope, so an
@@ -199,6 +278,16 @@ class CartController extends Controller
         }
 
         $this->cart->add($product, $variant, $data['qty'] ?? 1);
+
+        // Buy now is the strongest intent on the page and used to reach Meta as
+        // nothing. Deferred past the response like the other storefront events.
+        if (filled($data['event_id'] ?? null)) {
+            $atcQty = (int) ($data['qty'] ?? 1);
+            $atcEventId = $data['event_id'];
+            $atcUser = $tracking->customerMatchData(auth('customer')->user());
+            $atcContext = MetaTrackingService::captureClientContext();
+            app()->terminating(fn () => $tracking->addToCart($product, $atcQty, $atcEventId, $atcUser, $variant, $atcContext));
+        }
 
         return redirect()->route('checkout');
     }

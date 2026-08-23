@@ -20,6 +20,7 @@ class IntegrationController extends Controller
         'order_delivered' => 'Order delivered / completed',
         'order_cancelled' => 'Order cancelled',
         'review_request' => 'Review request (post-delivery) — extra placeholder: {link}',
+        'abandoned_cart' => 'Abandoned cart reminder — extra placeholder: {link}',
         'password_reset' => 'Password reset code — placeholders: {store}, {code}, {minutes}',
     ];
 

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
@@ -42,8 +43,13 @@ class SendReviewRequest implements ShouldQueue
         // reach almost nobody.
         $link = URL::signedRoute('order.review', ['orderNumber' => $order->order_number]);
 
+        $smsOk = false;
+        $mailOk = false;
+
         try {
-            $sms->sendTemplate('review_request', $order, ['{link}' => $link]);
+            // sendTemplate returns false — it does not throw — when the gateway
+            // is off, the balance is spent, or the provider rejects the message.
+            $smsOk = (bool) $sms->sendTemplate('review_request', $order, ['{link}' => $link]);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -52,9 +58,24 @@ class SendReviewRequest implements ShouldQueue
         if (filled($order->customer_email)) {
             try {
                 Mail::to($order->customer_email)->send(new ReviewRequestMail($order, $link));
+                $mailOk = true;
             } catch (\Throwable $e) {
                 report($e);
             }
+        }
+
+        // The order was stamped as asked BEFORE this job ran, so that a crash
+        // costs one silent miss rather than a duplicate paid SMS. But if nothing
+        // actually went out, that stamp is a lie that never expires: the order
+        // is excluded from every future run for good. One pass with the SMS
+        // balance at zero would otherwise burn the entire backlog permanently.
+        if (! $smsOk && ! $mailOk) {
+            $order->forceFill(['review_request_sent_at' => null])->saveQuietly();
+
+            Log::warning('Review request reached nobody; un-stamped so it can be retried.', [
+                'order' => $order->order_number,
+                'had_email' => filled($order->customer_email),
+            ]);
         }
     }
 }

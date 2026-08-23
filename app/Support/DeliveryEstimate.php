@@ -43,7 +43,13 @@ class DeliveryEstimate
         $min = max(0, $min);
         $max = max($min, $max);
 
-        $start = ($placedAt ? $placedAt->copy() : now());
+        // Anchored on the shop's local day, not the server's. Between
+        // midnight and 6am Dhaka time UTC is still on yesterday's date, so a
+        // window counted from it lands a full day early — and on cash on
+        // delivery that means the customer arranged to be home, with the
+        // money, on a day the courier was never coming.
+        $tz = config('store.timezone', 'Asia/Dhaka');
+        $start = ($placedAt ? $placedAt->copy() : now())->setTimezone($tz);
         $off = static::offDays();
 
         $from = static::advance($start, $min, $off);

@@ -5,7 +5,7 @@ import ProductCard from '../Shared/ProductCard';
 import ShareButton from '../Shared/ShareButton';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import { useCart } from '../Shared/CartContext';
-import { csrf, fetchJson, money } from '../Shared/format';
+import { csrf, fetchJson, money, newEventId } from '../Shared/format';
 
 // The React product page — a superset of the Blade "showcase" template:
 // gallery + zoom + videos, conversion buy box (variants, qty tiers, offers),
@@ -110,9 +110,7 @@ function usePurchase(pp) {
         const cid = (pp.hasVariants && matched)
             ? `prod-${pp.id}-var-${matched.id}`
             : `prod-${pp.id}`;
-        const eventId = 'AddToCart.' + ((self.crypto && crypto.randomUUID)
-            ? crypto.randomUUID()
-            : (Date.now() + '-' + Math.random().toString(16).slice(2)));
+        const eventId = newEventId('AddToCart');
         if (window.track) {
             window.track('AddToCart', {
                 content_ids: [cid],
@@ -631,7 +629,10 @@ function StorySections({ sections }) {
 }
 
 function Description({ text }) {
-    const [open, setOpen] = useState(false);
+    // Open by default: a jewelry shopper wants the material, the stone and the
+    // measurements before they will hand cash to a courier. Hiding that behind
+    // a tap costs more than the vertical space it saves.
+    const [open, setOpen] = useState(true);
     if (!text) return null;
     return (
         <section className="mt-12 max-w-3xl border-t border-ink-100 pt-8">
@@ -663,7 +664,11 @@ function Specs({ specs }) {
 }
 
 function Reviews({ product, reviews, ui, flash }) {
-    const [open, setOpen] = useState(false);
+    // Open when there is something to read. The star rating in the buy box
+    // links to #reviews, so leaving this collapsed sent shoppers to a heading
+    // with nothing under it — and hid the photos, the verified-buyer badges
+    // and the review form along with it.
+    const [open, setOpen] = useState(reviews.count > 0);
     const [rating, setRating] = useState(0);
     const [hover, setHover] = useState(0);
     const { props } = usePage();

@@ -18,6 +18,7 @@ return [
         'order_delivered' => 'Dear {name}, your {store} order {order} has been delivered. Thank you for shopping with us!',
         'order_cancelled' => 'Dear {name}, your {store} order {order} has been cancelled. Contact us for any questions.',
         'review_request' => 'Dear {name}, thank you for shopping at {store}! Rate order {order} in 30 seconds: {link}',
+        'abandoned_cart' => 'Hi {name}, your {store} selection is still saved. Finish your order here: {link}',
         'password_reset' => 'Your {store} password reset code is {code}. Valid for {minutes} minutes.',
     ],
 ];

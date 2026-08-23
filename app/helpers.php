@@ -12,6 +12,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+if (! function_exists('store_time')) {
+    /**
+     * A stored timestamp, moved into the shop's local wall clock for display.
+     *
+     * Timestamps are stored in UTC. Dhaka is UTC+6, so an order placed at 2am
+     * local was stored under yesterday's date — and printing it raw tells the
+     * customer their order was placed on the wrong day.
+     */
+    function store_time(?\Illuminate\Support\Carbon $at): ?\Illuminate\Support\Carbon
+    {
+        return $at?->copy()->setTimezone(config('store.timezone', 'Asia/Dhaka'));
+    }
+}
+
 if (! function_exists('money')) {
     /** Format a value as store currency, e.g. ৳1,250. */
     function money($amount): string
