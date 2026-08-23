@@ -200,6 +200,10 @@ defaults, the emoji icon system and the palette are code.
 | 2026-08-23 | `61c9435` | Checkout badge + field errors, Meta CAPI off the render path, sessions ready for Redis. 556 tests |
 | 2026-08-23 | `7d7fa1f` | Step 03 post-delivery review requests; step 04 bulk product tagging. 580 tests |
 | 2026-08-23 | `5d60183` | Step 06 keyboard access + contrast; confirmation page delivery estimate and COD-ready line. 592 tests |
+| 2026-08-23 | `51a470a` | **New audit, 91 verified findings.** Money leaks: coupon overcharge, points destroyed on cancel, Meta AddToCart blind outside the PDP, UTC vs Dhaka delivery dates, review-request backlog burn, guest cart-recovery SMS, cart delivery cost, real co-purchase suggestions. 604 tests |
+| 2026-08-23 | `3497553` | Admin: correct a delivery address, take an order by hand, partial deliveries, integration health alerts, Reviews 500 on a deleted product, Steadfast off the page-load path. 615 tests |
+| 2026-08-23 | `9a7aad3` | Landing-page icon names printed as text; Meta token + 1,200 phone numbers purged from production logs; admin role gate and the first negative authz tests. 631 tests |
+| 2026-08-23 | `f833695` | Speed: brand fonts actually served (146 KB, not 268 KB force-preloaded), filter sidebar cached with versioned busting, Deals of the Day cached, related products hydrate only the winners. 638 tests |
 
 ---
 
