@@ -139,6 +139,7 @@ Route::middleware('admin')->group(function () {
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
     Route::post('orders/{order}/amend', [OrderController::class, 'amend'])->name('orders.amend');
+    Route::post('orders/{order}/details', [OrderController::class, 'updateDetails'])->name('orders.details');
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
     // On-demand BDCourier lookups — throttled because every call spends plan quota.

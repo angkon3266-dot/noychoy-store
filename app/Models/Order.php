@@ -19,6 +19,7 @@ class Order extends Model
         'booked' => 'Booked with courier',
         'shipped' => 'Shipped',
         'delivered' => 'Delivered',
+        'partially_delivered' => 'Partially delivered',
         'cancelled' => 'Cancelled',
         'returned' => 'Returned',
     ];
@@ -89,7 +90,11 @@ class Order extends Model
 
         return match (true) {
             str_contains($s, 'cancel') => 'cancelled',
-            str_contains($s, 'partial') => 'cancelled',
+            // A partial delivery is NOT a cancellation. Treating it as one put
+            // the whole order's stock back on the shelf and erased the money
+            // the courier actually collected from every report. It gets its own
+            // status so the owner can settle the difference deliberately.
+            str_contains($s, 'partial') => 'partially_delivered',
             str_contains($s, 'delivered') => 'delivered',
             default => null,
         };

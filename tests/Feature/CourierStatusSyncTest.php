@@ -17,7 +17,7 @@ use Tests\TestCase;
  *
  *   delivered          → Delivered, and LOCKED (goods gone, COD collected)
  *   cancelled          → Cancelled, still editable
- *   partial_delivered  → Cancelled, still editable (someone must deal with it)
+ *   partial_delivered  → Partially delivered, still editable (someone must settle it)
  *   in-flight states   → no forced change
  */
 class CourierStatusSyncTest extends TestCase
@@ -81,7 +81,7 @@ class CourierStatusSyncTest extends TestCase
         return [
             'delivered' => ['delivered', 'delivered'],
             'cancelled' => ['cancelled', 'cancelled'],
-            'partial delivery is a partial cancellation' => ['partial_delivered', 'cancelled'],
+            'partial delivery is its own outcome' => ['partial_delivered', 'partially_delivered'],
             'in review' => ['in_review', null],
             'pending' => ['pending', null],
             'hold' => ['hold', null],
@@ -146,14 +146,19 @@ class CourierStatusSyncTest extends TestCase
         $this->assertSame('processing', $order->fresh()->status);
     }
 
-    public function test_partial_delivery_cancels_the_order_and_leaves_it_editable(): void
+    public function test_a_partial_delivery_is_not_treated_as_a_cancellation(): void
     {
+        // The courier handed over some of the parcel and collected money for
+        // it. Booking that as a cancellation put the whole order's stock back
+        // on the shelf and erased the collected revenue from every report, so
+        // it now gets its own status for the owner to settle deliberately.
         $order = $this->orderWithShipment();
         $this->webhook($order, 'partial_delivered');
 
         $order = $order->fresh()->load('shipment');
-        $this->assertSame('cancelled', $order->status);
+        $this->assertSame('partially_delivered', $order->status);
         $this->assertFalse($order->isStatusLocked());
+        $this->assertFalse((bool) $order->stock_restored, 'stock was released for a parcel that was partly delivered');
     }
 
     public function test_a_courier_cancellation_still_returns_stock(): void

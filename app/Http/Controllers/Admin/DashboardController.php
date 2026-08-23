@@ -59,7 +59,7 @@ class DashboardController extends Controller
         $aov = $periodOrders->count() ? round($periodOrders->avg('total'), 0) : 0;
 
         // COD delivery success across resolved shipments.
-        $resolved = Order::whereIn('status', ['delivered', 'cancelled', 'returned'])->count();
+        $resolved = Order::whereIn('status', ['delivered', 'partially_delivered', 'cancelled', 'returned'])->count();
         $deliveredAll = Order::where('status', 'delivered')->count();
         $codSuccess = $resolved ? round($deliveredAll / $resolved * 100) : null;
 

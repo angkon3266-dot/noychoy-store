@@ -99,6 +99,7 @@ class AdminAlerts
             ...$this->viewedNotSold(),
             ...$this->returningCustomers(),
             ...$this->couponIssues(),
+            ...$this->integrationsDown(),
         ]);
 
         // An entry written before this contract was enforced would come back
@@ -277,6 +278,76 @@ class AdminAlerts
      * than the rest — the balance moves slowly, and an admin page load must
      * never wait on a third-party API.
      */
+    /**
+     * The integrations, when they are NOT working.
+     *
+     * Every existing alert assumes the plumbing is fine — the SMS one even
+     * returns early unless the gateway is enabled, so wrong credentials produce
+     * silence rather than a warning. Meanwhile SmsService logs every message as
+     * "disabled", Steadfast booking failures are log-only, and the owner has no
+     * way to read a log. This is the source that notices the pipes are broken.
+     */
+    protected function integrationsDown(): array
+    {
+        return $this->guard(function () {
+            $out = [];
+
+            // (a) SMS silently swallowing messages.
+            $sms = app(SmsService::class);
+            if (! $sms->isEnabled()) {
+                $recent = \App\Models\SmsLog::where('created_at', '>=', now()->subDays(2))->count();
+
+                if ($recent > 0) {
+                    $out[] = $this->alert(
+                        'integration.sms.off', 'money', 'urgent',
+                        'SMS is not sending — '.$recent.' message(s) were dropped',
+                        'Order confirmations, review requests and cart reminders are all going nowhere. Check the gateway credentials.',
+                        route('admin.system-config.integrations'), now(),
+                    );
+                }
+            } else {
+                // Success is the provider's own code ("0"/"00"), not the status
+                // string — that column holds whatever text the gateway sent
+                // back ("ACCEPTD", "REJECTD", or a message of its own), so
+                // matching on it would be guesswork.
+                $recentSms = \App\Models\SmsLog::where('created_at', '>=', now()->subDay());
+                $total = (clone $recentSms)->count();
+                $failed = (clone $recentSms)->where(fn ($q) => $q
+                    ->whereNull('provider_status')
+                    ->orWhereNotIn('provider_status', ['0', '00'])
+                )->count();
+
+                // A few rejections are normal (dead numbers). Most of them
+                // failing is the gateway, not the customers.
+                if ($total >= 5 && $failed / max(1, $total) > 0.5) {
+                    $out[] = $this->alert(
+                        'integration.sms.failing', 'money', 'urgent',
+                        $failed.' of '.$total.' SMS failed in the last day',
+                        'That is a gateway problem, not bad numbers — customers are not hearing from you.',
+                        route('admin.sms.index'), now(),
+                    );
+                }
+            }
+
+            // (b) Parcels that were never actually booked with the courier.
+            $unbooked = \App\Models\Order::whereIn('status', ['processing', 'booked'])
+                ->whereDoesntHave('shipment')
+                ->where('created_at', '<=', now()->subHours(24))
+                ->count();
+
+            if ($unbooked > 0) {
+                $out[] = $this->alert(
+                    'integration.courier.unbooked', 'orders', 'urgent',
+                    $unbooked.' order(s) still have no courier consignment',
+                    'They have been waiting over a day. Either the booking failed or nobody pressed send.',
+                    route('admin.orders.index').'?status=processing', now(),
+                );
+            }
+
+            return $out;
+        });
+    }
+
     protected function smsCredit(): array
     {
         return $this->guard(function () {

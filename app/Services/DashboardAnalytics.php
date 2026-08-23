@@ -23,6 +23,8 @@ class DashboardAnalytics
     /** Orders that count as real sales. */
     protected function sold()
     {
+        // partially_delivered stays IN: the courier collected money on those
+        // parcels, and excluding them would understate real revenue.
         return Order::whereNotIn('status', ['cancelled', 'returned']);
     }
 

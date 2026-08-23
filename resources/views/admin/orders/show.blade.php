@@ -206,12 +206,47 @@
                     <span class="badge bg-ink-100 text-ink-700">New customer</span>
                 @endif
             </div>
-            <p class="font-medium">{{ $order->customer_name }}</p>
-            <p class="text-ink-700/70">{{ $order->customer_phone }}</p>
-            @if($order->customer_email)<p class="text-ink-700/70">{{ $order->customer_email }}</p>@endif
-            <p class="mt-2 text-ink-700/70">{{ $order->shipping_address }}{{ $order->area ? ', '.$order->area : '' }}{{ $order->district ? ', '.$order->district : '' }}</p>
-            <p class="mt-1 text-xs text-ink-700/50">{{ $order->is_inside_dhaka ? 'Inside Dhaka' : 'Outside Dhaka' }}</p>
-            @if($order->notes)<p class="mt-2 rounded bg-gold-100/60 p-2 text-xs">Note: {{ $order->notes }}</p>@endif
+            <div x-data="{ edit: false }">
+                <div x-show="!edit">
+                    <p class="font-medium">{{ $order->customer_name }}</p>
+                    <p class="text-ink-700/70">{{ $order->customer_phone }}</p>
+                    @if($order->customer_email)<p class="text-ink-700/70">{{ $order->customer_email }}</p>@endif
+                    <p class="mt-2 text-ink-700/70">{{ $order->shipping_address }}{{ $order->area ? ', '.$order->area : '' }}{{ $order->district ? ', '.$order->district : '' }}</p>
+                    <p class="mt-1 text-xs text-ink-700/50">{{ $order->is_inside_dhaka ? 'Inside Dhaka' : 'Outside Dhaka' }}</p>
+                    @if($order->notes)<p class="mt-2 rounded bg-gold-100/60 p-2 text-xs">Note: {{ $order->notes }}</p>@endif
+
+                    @if($order->shipment?->consignment_id)
+                        <p class="mt-3 text-xs text-ink-700/50">
+                            Booked with the courier — cancel the consignment before changing the address,
+                            or the parcel and the order would disagree.
+                        </p>
+                    @else
+                        <button type="button" @click="edit = true" class="mt-3 text-xs text-gold-700 hover:underline">✎ Correct these details</button>
+                    @endif
+                </div>
+
+                {{-- "Wrong flat number" / "use my office address" is the most
+                     common call a cash-on-delivery shop gets. Without this the
+                     only options were to book a parcel you knew would fail, or
+                     delete the order. --}}
+                <form x-show="edit" x-cloak method="POST" action="{{ route('admin.orders.details', $order) }}" class="space-y-2">
+                    @csrf
+                    <div><label class="label text-xs">Name</label><input name="customer_name" value="{{ old('customer_name', $order->customer_name) }}" class="input py-1.5 text-sm" required maxlength="120"></div>
+                    <div><label class="label text-xs">Phone</label><input name="customer_phone" value="{{ old('customer_phone', $order->customer_phone) }}" class="input py-1.5 text-sm" required></div>
+                    <div><label class="label text-xs">Email (optional)</label><input type="email" name="customer_email" value="{{ old('customer_email', $order->customer_email) }}" class="input py-1.5 text-sm" maxlength="160"></div>
+                    <div><label class="label text-xs">Address</label><textarea name="shipping_address" rows="2" class="input py-1.5 text-sm" required maxlength="500">{{ old('shipping_address', $order->shipping_address) }}</textarea></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="label text-xs">Area / Thana</label><input name="area" value="{{ old('area', $order->area) }}" class="input py-1.5 text-sm" maxlength="120"></div>
+                        <div><label class="label text-xs">District</label><input name="district" value="{{ old('district', $order->district) }}" class="input py-1.5 text-sm" maxlength="120"></div>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_inside_dhaka" value="1" @checked($order->is_inside_dhaka)> Inside Dhaka</label>
+                    <div><label class="label text-xs">Customer note</label><textarea name="notes" rows="2" class="input py-1.5 text-sm" maxlength="500">{{ old('notes', $order->notes) }}</textarea></div>
+                    <div class="flex gap-2">
+                        <button class="btn-primary text-sm py-1.5">Save details</button>
+                        <button type="button" @click="edit = false" class="text-xs text-ink-700/60 hover:underline">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- Delivery reliability (from this store's own order history) -->

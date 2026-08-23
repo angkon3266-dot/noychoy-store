@@ -27,7 +27,7 @@
                         <span class="badge {{ ['pending'=>'bg-amber-100 text-amber-700','approved'=>'bg-green-100 text-green-700','hidden'=>'bg-ink-100 text-ink-600'][$review->status] }} text-[10px] capitalize">{{ $review->status }}</span>
                     </div>
                     <p class="text-xs text-ink-700/50 mt-0.5">
-                        on <a href="{{ route('admin.products.edit', $review->product) }}" class="text-gold-700 hover:underline">{{ $review->product->name ?? 'deleted product' }}</a>
+                        on @if($review->product)<a href="{{ route('admin.products.edit', $review->product) }}" class="text-gold-700 hover:underline">{{ $review->product->name }}</a>@else<span class="italic">deleted product</span>@endif
                         · {{ $review->created_at->format('d M Y, g:i a') }}{{ $review->phone ? ' · '.$review->phone : '' }}
                     </p>
                     @if($review->title)<p class="font-medium mt-2">{{ $review->title }}</p>@endif

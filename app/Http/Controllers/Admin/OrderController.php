@@ -92,9 +92,16 @@ class OrderController extends Controller
         $order->load('items', 'history', 'shipment', 'customer');
 
         // Best-effort live Steadfast status refresh for this order's consignment.
+        //
+        // Through the CACHED reader, not the raw call: this page is the one the
+        // owner lives on, every action on it redirects straight back here, and
+        // the raw call carries a 30-second timeout with no cache — so a slow
+        // courier API made the whole admin feel broken. The "Refresh status"
+        // button still forces an uncached read when she actually wants one.
         if ($order->shipment?->consignment_id && $steadfast->isConfigured()) {
             try {
-                $status = $steadfast->statusByConsignmentId($order->shipment->consignment_id);
+                $live = $steadfast->deliveryStatus($order->shipment->consignment_id);
+                $status = $live ? ['delivery_status' => $live] : [];
                 if (! empty($status['delivery_status'])) {
                     $order->shipment->update(['status' => $status['delivery_status'], 'response' => $status]);
                     $order->setRelation('shipment', $order->shipment->fresh());
@@ -216,6 +223,55 @@ class OrderController extends Controller
     }
 
     /**
+     * Correct the customer and delivery details on an order.
+     *
+     * The most common call a cash-on-delivery shop gets is "wrong flat number"
+     * or "use my office address" — and until this existed the only options were
+     * to book a parcel you knew would fail, or delete the order. Both cost the
+     * courier fee twice and put the customer's number in the failed-delivery
+     * history through no fault of theirs.
+     *
+     * Blocked once the consignment exists: at that point the courier holds its
+     * own copy, and editing here would silently put the two out of step. Cancel
+     * the consignment first, then edit, then re-book.
+     */
+    public function updateDetails(Request $request, Order $order)
+    {
+        if ($order->shipment?->consignment_id) {
+            return back()->with('error',
+                'This order is already booked with the courier. Cancel the consignment first, '
+                .'otherwise the address here and the address on the parcel would disagree.');
+        }
+
+        $data = $request->validate([
+            'customer_name' => ['required', 'string', 'max:120'],
+            'customer_phone' => ['required', 'string', new \App\Rules\BdPhone],
+            'customer_email' => ['nullable', 'email', 'max:160'],
+            'shipping_address' => ['required', 'string', 'max:500'],
+            'area' => ['nullable', 'string', 'max:120'],
+            'district' => ['nullable', 'string', 'max:120'],
+            'is_inside_dhaka' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $before = trim($order->shipping_address.' '.$order->area);
+        $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
+
+        $order->update($data);
+
+        // Written to the trail like amend() does — who changed a delivery
+        // address, and when, is exactly what you want on a disputed parcel.
+        $order->history()->create([
+            'status' => $order->status,
+            'note' => 'Delivery details corrected'
+                .($before !== trim($order->shipping_address.' '.$order->area) ? ' (address changed)' : ''),
+            'created_by' => auth()->user()?->name ?? 'Admin',
+        ]);
+
+        return back()->with('success', 'Delivery details updated.');
+    }
+
+    /**
      * Print-ready shipping labels (A4, 2 per row) for orders booked with the
      * courier.
      *
@@ -307,7 +363,7 @@ class OrderController extends Controller
         if ($orders->pluck('customer_phone')->unique()->count() > 1) {
             return back()->with('error', 'Only orders from the same customer (phone) can be merged.');
         }
-        if ($orders->contains(fn ($o) => in_array($o->status, ['shipped', 'delivered', 'returned', 'cancelled'], true))) {
+        if ($orders->contains(fn ($o) => in_array($o->status, ['shipped', 'delivered', 'partially_delivered', 'returned', 'cancelled'], true))) {
             return back()->with('error', 'Orders already shipped, delivered, returned or cancelled cannot be merged.');
         }
 
