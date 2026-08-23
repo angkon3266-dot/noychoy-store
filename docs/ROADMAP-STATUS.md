@@ -102,8 +102,8 @@ defaults, the emoji icon system and the palette are code.
 | Points awarded for an approved review | **Done** | code | The reward the dossier said "already exists" — confirmed |
 | Rating aggregation + star display | **Done** | code | The all-five-gold-stars bug was the missing theme shades; fixed in `0fb357a` |
 | Admin moderation | **Done** | code | pending / approved / hidden |
-| Verified-buyer flag | **Partial** | code | Column exists; confirm it is set from the order |
-| **Post-delivery review request** | **Todo** | code | *The whole gap.* Nothing fires on `delivered`. `DripService` / `NotificationService` / `SmsService` all exist to carry it — this is wiring a trigger, not building a system |
+| Verified-buyer flag | **Done** | code | It *is* set from the order — `ReviewController::store()` matches the typed phone against the orders table. The new invite page prefills that phone, so a review arriving from our own request lands verified. Confirmed end to end against the database (`7d7fa1f`) |
+| **Post-delivery review request** | **Done (code) / Todo (setting)** | code + setting | `reviews:request` runs daily, finds orders the courier confirmed delivered, waits out a delay and queues `SendReviewRequest` — SMS plus email where there is an address — carrying a signed `order.review` link that works for a guest. Delivery time is read from `order_status_history`, so pre-existing orders need no backfill. **Off until you switch it on** in Admin → Notifications: it spends SMS credit. Three brakes: a delay window, a max-age window so the first run does not text every historical order, and a per-run cap. `php artisan reviews:request --dry` lists who would be asked (`7d7fa1f`) |
 
 ---
 
@@ -123,7 +123,7 @@ defaults, the emoji icon system and the palette are code.
 | **`q` is silently dropped on category pages** | **Done** | code | `category()` now calls `->search()` like the other two catalog routes. Regression test pins both the count and `searchQuery` |
 | Occasion concept on products | **Done** | code | **Collections.** A saved rule set (tag / price / category / stock / on-sale / colour / flags, matched all-or-any) with its own page, image, SEO and menu slot. Smart collections keep themselves up to date; manual ones are a picked list; a smart one can also pin products on top |
 | Occasion tiles link to unfiltered `/shop` | **Done (code) / Todo (content)** | code + content | Appearance → occasion tiles now has a “Point this tile at a collection” picker. **Building the collections and tagging products is yours** — the tiles still land on `/shop` until you do |
-| Bulk "tag selected products" | **Todo** | code | Still the real barrier: collections are only as good as the tags they match. Products already carry tags (admin form, quick-edit, CSV import, MCP/API) — what is missing is a “tag these 20 at once” action |
+| Bulk "tag selected products" | **Done** | code | Add / Remove / Replace in the product list's existing bulk bar, sharing its checkboxes and select-all. Replace refuses an empty box, so there is no way to wipe every tag off 200 products by accident. The writer joins with `", "` — one of the two separators the collection matcher recognises — and a test pins that a tag written here is matched by a live `tag is` rule while still never dragging `gift-card` in behind `gift` (`7d7fa1f`) |
 
 ---
 
@@ -134,8 +134,8 @@ defaults, the emoji icon system and the palette are code.
 | Pageview logging off the request path | **Done** | code | Moved to `terminating()` |
 | Homepage query caching, N+1 sweep, setting memo | **Done** | code | `ce4c9c7` |
 | Cache off the database | **Done** | infra | `DEPLOY.md` and the 2026-08-01 SSH check both record **Redis** in production *(dossier stale — the local `.env` says `database`, but that is the dev environment)* |
-| Sessions off the database | **Todo** | infra + code | Genuinely still DB: a SELECT + UPDATE per request, plus a 2% sweep DELETE. There is no `SESSION_DRIVER` field in the dashboard, so this is a server `.env` edit or a new config-schema field |
-| **Synchronous Meta CAPI POST on PDP + checkout** | **Todo** | code | **The biggest remaining TTFB item.** A product-page or checkout render blocks on `graph.facebook.com` with a **10-second timeout** before a byte of HTML is written. Costs nothing while CAPI is off; dominates TTFB when on. `Purchase` is already queued — the other two events should follow |
+| Sessions off the database | **Done** | code + infra | `session:to-redis` copies live sessions across without logging anyone out — the two handlers do not store the same bytes (database base64-encodes, cache stores raw), so a column copy would have corrupted every session silently. Sessions get their own Redis database, because `cache:clear` is a whole-database FLUSHDB and `deploy.sh` runs it every deploy. `SESSION_CONNECTION` is only read under the redis driver, so a rollback cannot 500 the site (`61c9435`) |
+| **Synchronous Meta CAPI POST on PDP + checkout** | **Done** | code | ViewContent, InitiateCheckout and AddToCart moved to `terminating()` — the same mechanism the pageview insert already uses — with the browser signals snapshotted eagerly so the payload cannot depend on how much of the request is still standing. Deliberately *not* queued: a live check found ~390 ViewContents in three days, which would swamp the same queue that carries order SMS. Deferred sends cap at 5s because they still hold an lsphp worker; Purchase keeps its full 10s and stays queued, since `send()` never throws and a timeout there is silent permanent loss (`61c9435`) |
 | Fonts converted to WOFF2 | **Todo** | code | Long-cache headers shipped in `ce4c9c7`, but **no transcode exists at all** — uploads are stored byte-for-byte. TTF is still accepted with no warning |
 | Edge/page cache for guest HTML | **Todo** | infra | Cloudflare page rules or LiteSpeed |
 
@@ -145,13 +145,13 @@ defaults, the emoji icon system and the palette are code.
 
 | Item | Status | Owner | What remains |
 |---|---|---|---|
-| Per-page Open Graph cards | **Partial** | code | `og:*` is emitted **only** inside the product-route branch of `inertia.blade.php`. Home, category, discover and the legal pages share one description |
+| Per-page Open Graph cards | **Done** | code | Every page type emits a card; image resolves category image → page LCP image → shop logo. Verified live on `/` and `/shop` (`77123bd`) |
 | Canonical + structured data | **Partial** | code | Canonical present; JSON-LD coverage incomplete |
-| Off-screen menus stay tabbable | **Partial** | code | The complete `aria-hidden` + `tabIndex` pattern already ships on the homepage hero, and `MiniCart` has half of it — so this is copying a house pattern, not inventing one. `inert` appears nowhere; the focus trap is a regression against the old Alpine drawer |
-| Focus reset after Inertia navigation | **Todo** | code | Focus is dropped on every navigation |
-| Icon-only buttons without a name | **Partial** | code | Several missing `aria-label` |
-| Contrast against WCAG AA | **Todo** | code | Some brand text colours fail on white |
-| Skip link, landmarks, heading order | **Partial** | code | |
+| Off-screen menus stay tabbable | **Done** | code | Both overlays are `inert` when closed — measured in a browser, the sixteen drawer links can no longer take focus. Open, they behave like the dialogs they claimed to be: focus in, Tab trapped, Escape out, focus back to the trigger. `role="dialog"` moved off the full-screen wrapper, which had been announcing an open modal on every page (`5d60183`) |
+| Focus reset after Inertia navigation | **Done** | code | Skip link, focus to `<main>` and an aria-live route announcer (`77123bd`) — *(row was stale)* |
+| Icon-only buttons without a name | **Done** | code | Swept the storefront. The cart button announced as a bare number (element content outranks `title`); the product-card Add button had no name at all on phones, where its visible label is `display:none` (`5d60183`) |
+| Contrast against WCAG AA | **Done** | code | New `ink-500` token (4.83:1 on white) for struck-through prices and other real text; ~150 low-alpha text classes raised to `/70`, the break-even step for 4.5:1 — `/65` still fails. `ink-400` stays on borders, glyphs and disabled controls, which are exempt (`5d60183`) |
+| Skip link, landmarks, heading order | **Done** | code | Footer headings were h3s on h1-only pages, a site-wide skip. Homepage builder blocks with a blank title now emit an `sr-only` h2 rather than inventing visible copy. Every nav landmark named; form labels associated across auth, profile, addresses, tracking and checkout (`5d60183`) |
 
 ---
 
@@ -174,15 +174,15 @@ defaults, the emoji icon system and the palette are code.
 
 | Item | Status | Owner | Note |
 |---|---|---|---|
-| Push prompt fires 1.5s after landing | **Todo** | code | Asking before giving anything earns a permanent Block |
-| Post-registration push prompt is dead | **Todo** | code | **Found during this audit.** Guests set `localStorage.wp_asked` on their *first* page view, so the intended post-signup prompt can never fire. Any fix must use per-trigger keys |
-| Checkout captures phone on blur, undisclosed | **Todo** | code + content | The privacy page actively contradicts it, describing capture at order time |
-| Corrected phone numbers never re-captured | **Todo** | code | **Found during this audit.** The lead guard latches after the first POST, so a typo'd number is the one kept — the exact case the feature exists for |
-| Public tracker shows staff notes verbatim | **Todo** | code | Includes system notes like "Order amount amended". Needs a visibility flag; there is no column for it today |
-| Exact per-variant stock in page props | **Todo** | code | The UI only ever uses it as a boolean — a one-line change plus three call sites |
-| Checkout errors only as a top banner | **Todo** | code | The server *does* send per-field messages; `Checkout.jsx` flattens the keys away. The house pattern already exists in `Account/Profile.jsx` |
-| Confirmation page ends the conversation | **Partial** | code | COD total and track link exist; no delivery estimate and no "keep ৳X ready" line. The estimate settings and a ready-made builder already exist |
-| Account order detail eager-loads unused history | **Todo** | code | One wasted query per view |
+| Push prompt fires 1.5s after landing | **Done** | code | Waits for register or order (`77123bd`) — *(row was stale)* |
+| Post-registration push prompt is dead | **Done** | code | **The stated cause was wrong.** The script lives in the root Blade view, which an Inertia visit never re-renders — so the trigger could never be *observed*, whatever the localStorage key did. It arrives as a shared prop now, with one key per trigger so register and order each fire once instead of whichever came first silencing the other (`5d60183`) |
+| Checkout captures phone on blur, undisclosed | **Done (code) / Todo (content)** | code + content | Checkout now says so under the field (`77123bd`). **The privacy page still describes capture at order time** — that wording is yours to correct |
+| Corrected phone numbers never re-captured | **Done** | code | Keys on the canonical number instead of a boolean latch, so a corrected number re-sends; the lead row also stores the canonical form, so it can match the order that eventually arrives (`61c9435`) |
+| Public tracker shows staff notes verbatim | **Done** | code | Notes no longer leave the server for the public tracker (`77123bd`) |
+| Exact per-variant stock in page props | **Done** | code | Now a boolean. `PlaceOrder` still re-validates the real quantity, so a client that no longer knows it cannot over-order — pinned by a test (`5d60183`) |
+| Checkout errors only as a top banner | **Done** | code | Every field renders its own message with `aria-invalid` / `aria-describedby`, and focus jumps to the first invalid field. The banner summarises instead of duplicating, and still lists anything with no input on the page (`61c9435`) |
+| Confirmation page ends the conversation | **Done** | code | Says what happens next: we call, the courier delivers on a named window, keep exactly this much ready. **The "ready-made builder" did not exist** — the same three lines of Carbon were pasted in two places and neither knew that inside Dhaka is faster or that nobody delivers on Friday. `App\Support\DeliveryEstimate` is now the one builder, skips non-delivery days, and the four windows are editable in Appearance (they were config-only, so effectively hardcoded). A stale window is dropped rather than quoting a past date (`5d60183`) |
+| Account order detail eager-loads unused history | **Done** | code | Load removed; the page renders neither notes nor the status trail (`5d60183`) |
 | Zero social proof on 105 products | **Todo** | content | Closes itself once step 03's request fires |
 
 ---
@@ -196,6 +196,10 @@ defaults, the emoji icon system and the palette are code.
 | 2026-08-22 | `7daefff` | Gift-card settings, free-delivery checkout, member nudge, live admin bell |
 | 2026-08-22 | `9de7081` | Steps 01 and 02 closed on the code side; roadmap re-audited. 508 tests (was 485) |
 | 2026-08-22 | *this change* | Step 04: Collections — Shopify-style smart product groups, in the menu, the sitemap and the occasion tiles. 538 tests |
+| 2026-08-23 | `77123bd` | Sharing cards on every page, keyboard/screen-reader pass, two privacy fixes. 541 tests |
+| 2026-08-23 | `61c9435` | Checkout badge + field errors, Meta CAPI off the render path, sessions ready for Redis. 556 tests |
+| 2026-08-23 | `7d7fa1f` | Step 03 post-delivery review requests; step 04 bulk product tagging. 580 tests |
+| 2026-08-23 | `5d60183` | Step 06 keyboard access + contrast; confirmation page delivery estimate and COD-ready line. 592 tests |
 
 ---
 
