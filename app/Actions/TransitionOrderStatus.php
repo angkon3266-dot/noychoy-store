@@ -54,6 +54,23 @@ class TransitionOrderStatus
 
         if ($status === 'delivered') {
             app(LoyaltyService::class)->awardForOrder($order->fresh('customer'));
+
+            // On cash on delivery, "delivered" IS the payment — the courier
+            // took the money at the door. Nothing in the codebase ever moved
+            // payment_status off 'unpaid', so the column existed and every
+            // order sat in it forever, and the shop had no money trail at all.
+            // Anything except an explicit refund becomes paid — including a
+            // null, which is what older rows written before this column was
+            // used actually hold. Matching only the literal 'unpaid' would
+            // have quietly skipped every one of them.
+            if ($order->payment_status !== 'refunded' && $order->payment_status !== 'paid') {
+                $order->update(['payment_status' => 'paid']);
+            }
+        }
+
+        // A parcel that came back was never paid for.
+        if (in_array($status, ['returned', 'cancelled'], true) && $order->payment_status === 'paid') {
+            $order->update(['payment_status' => 'unpaid']);
         }
 
         // Points are earned by a delivery that sticks. If a delivered order is

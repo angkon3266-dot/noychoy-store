@@ -194,14 +194,34 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('orderAmend', (init) => ({
         editing: false,
         items: init.items || [],
+        // Products being added to an order that already exists — "she rang back
+        // and wanted the matching earrings too".
+        newLines: init.newLines || [],
+        catalogue: init.catalogue || [],
         adjustments: init.adjustments || [],
         shipping: init.shipping || 0,
         discount: init.discount || 0,
+        catalogPrice(line) {
+            const p = this.catalogue.find((c) => c.id === line.product_id);
+            return p ? String(p.price) : '';
+        },
         money(n) {
             return '৳' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         },
         subtotal() {
-            return this.items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
+            const kept = this.items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
+
+            // Added lines count toward the running total too, otherwise the
+            // figure on screen disagrees with the one that gets saved.
+            const added = this.newLines.reduce((s, l) => {
+                const c = this.catalogue.find((x) => x.id === l.product_id);
+                const unit = (l.price === '' || l.price === null || l.price === undefined)
+                    ? (c ? Number(c.price) : 0)
+                    : Number(l.price);
+                return s + unit * (Number(l.qty) || 0);
+            }, 0);
+
+            return kept + added;
         },
         adjTotal() {
             return this.adjustments.reduce((s, a) => s + (Number(a.amount) || 0), 0);

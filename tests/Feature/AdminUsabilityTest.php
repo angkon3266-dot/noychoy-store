@@ -254,4 +254,156 @@ class AdminUsabilityTest extends TestCase
             ->assertOk()
             ->assertSee('New order');
     }
+
+    // ── Amending an order's items ──────────────────────────────────────────
+
+    protected function orderWithItem(int $stock = 10, int $qty = 2): array
+    {
+        $product = Product::create([
+            'name' => 'Amend Ring '.uniqid(), 'slug' => 'amend-'.uniqid(), 'status' => 'published',
+            'price' => 1000, 'manage_stock' => true, 'stock_quantity' => $stock,
+        ]);
+
+        $order = $this->order(['subtotal' => 1000 * $qty, 'total' => 1000 * $qty]);
+
+        $item = $order->items()->create([
+            'product_id' => $product->id, 'name' => $product->name,
+            'price' => 1000, 'quantity' => $qty, 'subtotal' => 1000 * $qty,
+        ]);
+
+        return [$order, $product, $item];
+    }
+
+    public function test_raising_a_quantity_takes_the_extra_units_off_the_shelf(): void
+    {
+        [$order, $product, $item] = $this->orderWithItem(stock: 10, qty: 2);
+
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [['id' => $item->id, 'price' => 1000, 'quantity' => 5]],
+            'shipping_cost' => 0, 'discount' => 0,
+        ])->assertRedirect();
+
+        // Three more units are now committed to this order. Before, amending a
+        // quantity left stock untouched entirely.
+        $this->assertSame(7, (int) $product->fresh()->stock_quantity);
+        $this->assertSame(5000.0, (float) $order->fresh()->total);
+    }
+
+    public function test_removing_an_item_puts_its_units_back(): void
+    {
+        [$order, $product, $item] = $this->orderWithItem(stock: 10, qty: 2);
+
+        $second = Product::create([
+            'name' => 'Keeper', 'slug' => 'keeper-'.uniqid(), 'status' => 'published',
+            'price' => 500, 'manage_stock' => false,
+        ]);
+        $keep = $order->items()->create([
+            'product_id' => $second->id, 'name' => 'Keeper',
+            'price' => 500, 'quantity' => 1, 'subtotal' => 500,
+        ]);
+
+        // The removed line is simply absent from the payload.
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [['id' => $keep->id, 'price' => 500, 'quantity' => 1]],
+            'shipping_cost' => 0, 'discount' => 0,
+        ])->assertRedirect();
+
+        $this->assertSame(12, (int) $product->fresh()->stock_quantity, 'the removed units never went back');
+        $this->assertSame(1, $order->fresh()->items()->count());
+        unset($item);
+    }
+
+    public function test_a_product_can_be_added_to_an_existing_order(): void
+    {
+        [$order, , $item] = $this->orderWithItem(stock: 10, qty: 1);
+
+        $extra = Product::create([
+            'name' => 'Matching Earrings', 'slug' => 'earrings-'.uniqid(), 'status' => 'published',
+            'price' => 800, 'manage_stock' => true, 'stock_quantity' => 4,
+        ]);
+
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [['id' => $item->id, 'price' => 1000, 'quantity' => 1]],
+            'new_lines' => [['product_id' => $extra->id, 'qty' => 2, 'price' => null]],
+            'shipping_cost' => 0, 'discount' => 0,
+        ])->assertRedirect();
+
+        $order->refresh();
+        $this->assertSame(2, $order->items()->count());
+        $this->assertSame(2600.0, (float) $order->total);
+        $this->assertSame(2, (int) $extra->fresh()->stock_quantity, 'the added units were not taken');
+    }
+
+    public function test_an_order_cannot_be_emptied_of_every_item(): void
+    {
+        [$order, , ] = $this->orderWithItem();
+
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [], 'shipping_cost' => 0, 'discount' => 0,
+        ])->assertSessionHas('error');
+
+        $this->assertSame(1, $order->fresh()->items()->count());
+    }
+
+    public function test_amending_a_cancelled_order_does_not_invent_stock(): void
+    {
+        [$order, $product, $item] = $this->orderWithItem(stock: 10, qty: 2);
+
+        // Cancelling already put the units back.
+        $order->update(['status' => 'cancelled', 'stock_restored' => true]);
+
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [['id' => $item->id, 'price' => 1000, 'quantity' => 5]],
+            'shipping_cost' => 0, 'discount' => 0,
+        ])->assertRedirect();
+
+        $this->assertSame(10, (int) $product->fresh()->stock_quantity, 'stock moved on an order that no longer holds any');
+    }
+
+    // ── The COD money trail ────────────────────────────────────────────────
+
+    public function test_delivering_an_order_records_the_money_as_collected(): void
+    {
+        [$order, , ] = $this->orderWithItem();
+
+        $this->assertSame('unpaid', $order->fresh()->payment_status);
+
+        app(\App\Actions\TransitionOrderStatus::class)->handle($order, 'delivered');
+
+        // On cash on delivery, delivered IS paid — the courier took the money.
+        $this->assertSame('paid', $order->fresh()->payment_status);
+    }
+
+    public function test_a_returned_parcel_is_not_left_marked_paid(): void
+    {
+        [$order, , ] = $this->orderWithItem();
+        $transition = app(\App\Actions\TransitionOrderStatus::class);
+
+        $transition->handle($order, 'delivered');
+        $transition->handle($order->fresh(), 'returned');
+
+        $this->assertSame('unpaid', $order->fresh()->payment_status);
+    }
+
+    public function test_the_owner_can_set_the_payment_status_by_hand(): void
+    {
+        [$order, , ] = $this->orderWithItem();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.orders.payment', $order), ['payment_status' => 'refunded'])
+            ->assertRedirect();
+
+        $this->assertSame('refunded', $order->fresh()->payment_status);
+        $this->assertStringContainsString('Payment marked refunded', $order->history()->latest('id')->first()->note);
+    }
+
+    public function test_a_refund_is_not_overwritten_by_a_later_delivery(): void
+    {
+        [$order, , ] = $this->orderWithItem();
+        $order->update(['payment_status' => 'refunded']);
+
+        app(\App\Actions\TransitionOrderStatus::class)->handle($order, 'delivered');
+
+        $this->assertSame('refunded', $order->fresh()->payment_status);
+    }
 }

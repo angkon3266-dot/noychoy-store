@@ -88,6 +88,8 @@
         <div class="card overflow-hidden"
              x-data="orderAmend({
                 items: {{ Illuminate\Support\Js::from($order->items->map(fn($i) => ['id'=>$i->id,'name'=>$i->name,'price'=>(float)$i->price,'quantity'=>(int)$i->quantity])) }},
+                catalogue: {{ Illuminate\Support\Js::from($catalogue) }},
+                newLines: [],
                 shipping: {{ (float) $order->shipping_cost }},
                 discount: {{ (float) $order->discount }},
                 adjustments: {{ Illuminate\Support\Js::from(collect($order->adjustments ?? [])->map(fn($a) => ['label'=>$a['label'],'amount'=>(float)$a['amount']])->values()) }},
@@ -96,6 +98,20 @@
                 <h2 class="font-semibold">Items &amp; amounts</h2>
                 <div class="flex items-center gap-2">
                     <span class="badge bg-gold-100 text-gold-800 capitalize">{{ $order->status }}</span>
+                    {{-- Nothing ever moved this off 'unpaid' before, so the shop
+                         had no record of which cash-on-delivery money had
+                         actually come in. Delivery now sets it automatically;
+                         this is for the cases delivery cannot express. --}}
+                    <form action="{{ route('admin.orders.payment', $order) }}" method="POST" class="inline">
+                        @csrf
+                        <select name="payment_status" onchange="this.form.submit()"
+                                class="badge border-0 capitalize {{ ['unpaid'=>'bg-amber-100 text-amber-800','paid'=>'bg-green-100 text-green-700','refunded'=>'bg-ink-100 text-ink-700'][$order->payment_status] ?? 'bg-ink-100' }}"
+                                title="Payment status">
+                            @foreach(['unpaid' => 'Unpaid', 'paid' => 'Paid', 'refunded' => 'Refunded'] as $k => $label)
+                                <option value="{{ $k }}" @selected($order->payment_status === $k)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </form>
                     <button type="button" @click="editing = !editing" class="btn-outline text-xs py-1" x-text="editing ? 'Cancel' : '✎ Amend amounts'"></button>
                 </div>
             </div>
@@ -143,12 +159,47 @@
                             <label class="label text-[10px]">Unit price ৳</label>
                             <input type="number" step="0.01" min="0" :name="`items[${i}][price]`" x-model.number="it.price" class="input py-1 text-sm">
                         </div>
-                        <div class="col-span-3">
+                        <div class="col-span-2">
                             <label class="label text-[10px]">Qty</label>
                             <input type="number" min="1" :name="`items[${i}][quantity]`" x-model.number="it.quantity" class="input py-1 text-sm">
                         </div>
+                        <div class="col-span-1 text-right">
+                            {{-- Removing a line puts its units back on the shelf. --}}
+                            <button type="button" @click="items.splice(i, 1)" x-show="items.length + newLines.length > 1"
+                                    class="text-red-600 text-xs hover:underline" aria-label="Remove this item">✕</button>
+                        </div>
                     </div>
                 </template>
+
+                {{-- Products being added. "She rang back and wanted the matching
+                     earrings too" had no answer here before. --}}
+                <template x-for="(line, i) in newLines" :key="'n' + i">
+                    <div class="grid grid-cols-12 gap-2 items-center">
+                        <div class="col-span-6">
+                            <select :name="`new_lines[${i}][product_id]`" x-model.number="line.product_id" class="input py-1 text-sm" required>
+                                <option value="">Choose a product…</option>
+                                <template x-for="p in catalogue" :key="p.id">
+                                    <option :value="p.id" x-text="p.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="col-span-3">
+                            <label class="label text-[10px]">Unit price ৳</label>
+                            <input type="number" step="0.01" min="0" :name="`new_lines[${i}][price]`" x-model.number="line.price"
+                                   :placeholder="catalogPrice(line)" class="input py-1 text-sm">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="label text-[10px]">Qty</label>
+                            <input type="number" min="1" :name="`new_lines[${i}][qty]`" x-model.number="line.qty" class="input py-1 text-sm">
+                        </div>
+                        <div class="col-span-1 text-right">
+                            <button type="button" @click="newLines.splice(i, 1)" class="text-red-600 text-xs hover:underline" aria-label="Remove">✕</button>
+                        </div>
+                    </div>
+                </template>
+
+                <button type="button" @click="newLines.push({ product_id: '', qty: 1, price: '' })"
+                        class="text-xs text-gold-700 hover:underline">+ Add a product</button>
 
                 <div class="border-t border-ink-100 pt-3 space-y-2">
                     <p class="font-medium text-xs text-ink-700/60">Custom adjustments (positive = extra charge, negative = discount)</p>

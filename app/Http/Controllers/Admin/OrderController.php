@@ -152,6 +152,10 @@ class OrderController extends Controller
             'balance' => $steadfast->balance(),
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
+            // For the "add a product" picker on the amend form.
+            'catalogue' => \App\Models\Product::where('status', 'published')
+                ->where('has_variants', false)
+                ->orderBy('name')->get(['id', 'name', 'price']),
         ]);
     }
 
@@ -174,24 +178,106 @@ class OrderController extends Controller
             'adjustments.*.label' => ['nullable', 'string', 'max:60'],
             'adjustments.*.amount' => ['nullable', 'numeric', 'between:-1000000,1000000'],
             'reason' => ['nullable', 'string', 'max:200'],
+            // Products being added to an existing order.
+            'new_lines' => ['nullable', 'array', 'max:20'],
+            'new_lines.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'new_lines.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
+            'new_lines.*.price' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        // A payload with neither kept lines nor new ones would empty the order.
+        // The form always posts what it is showing, so this only fires on a
+        // malformed request — but an order with no items is not an order.
+        if (empty($data['items'] ?? []) && empty($data['new_lines'] ?? [])) {
+            return back()->with('error', 'An order must keep at least one item.');
+        }
 
         DB::transaction(function () use ($order, $data) {
             $itemsById = $order->items->keyBy('id');
             $subtotal = 0.0;
+            $changes = [];
+
+            // Stock is only this order's to move while it is actually holding
+            // it. Once an order is cancelled or returned its units are already
+            // back on the shelf (stock_restored), and adjusting again here
+            // would invent inventory that does not exist.
+            $holdsStock = ! $order->stock_restored
+                && ! in_array($order->status, ['cancelled', 'returned'], true);
+
+            $kept = [];
 
             foreach ($data['items'] ?? [] as $row) {
                 $item = $itemsById->get((int) $row['id']);
                 if (! $item) {
                     continue;
                 }
-                $lineSubtotal = round((float) $row['price'] * (int) $row['quantity'], 2);
+
+                $kept[] = $item->id;
+                $newQty = (int) $row['quantity'];
+                $delta = $newQty - (int) $item->quantity;
+
+                // Changing a quantity used to leave stock untouched, so an
+                // order amended from 1 to 5 reserved four units it never took.
+                if ($holdsStock && $delta !== 0) {
+                    $this->moveStock($item, -$delta);
+                    $changes[] = $item->name.' '.$item->quantity.' → '.$newQty;
+                }
+
+                $lineSubtotal = round((float) $row['price'] * $newQty, 2);
                 $item->update([
                     'price' => $row['price'],
-                    'quantity' => $row['quantity'],
+                    'quantity' => $newQty,
                     'subtotal' => $lineSubtotal,
                 ]);
                 $subtotal += $lineSubtotal;
+            }
+
+            // Anything the form no longer shows has been removed. Its units go
+            // back on the shelf.
+            foreach ($itemsById as $item) {
+                if (in_array($item->id, $kept, true)) {
+                    continue;
+                }
+
+                if ($holdsStock) {
+                    $this->moveStock($item, (int) $item->quantity);
+                }
+
+                $changes[] = 'removed '.$item->name;
+                $item->delete();
+            }
+
+            // And anything newly added takes its units now.
+            foreach ($data['new_lines'] ?? [] as $line) {
+                $product = \App\Models\Product::whereKey($line['product_id'])->lockForUpdate()->first();
+
+                if (! $product) {
+                    continue;
+                }
+
+                $qty = (int) $line['qty'];
+                $price = ($line['price'] ?? null) !== null && $line['price'] !== ''
+                    ? round((float) $line['price'], 2)
+                    : (float) $product->price;
+
+                $new = $order->items()->create([
+                    'product_id' => $product->id,
+                    'variant_id' => null,
+                    'name' => $product->name,
+                    'sku' => $product->sku,
+                    'price' => $price,
+                    'cost_price' => $product->cost_price,
+                    'transport_cost' => $product->transport_cost,
+                    'quantity' => $qty,
+                    'subtotal' => round($price * $qty, 2),
+                ]);
+
+                if ($holdsStock) {
+                    $this->moveStock($new, -$qty);
+                }
+
+                $changes[] = 'added '.$product->name.' ×'.$qty;
+                $subtotal += $new->subtotal;
             }
 
             // Keep only fully-filled adjustment lines.
@@ -213,13 +299,14 @@ class OrderController extends Controller
 
             $order->history()->create([
                 'status' => $order->status,
-                'note' => 'Order amount amended — new total '.money($total)
+                'note' => 'Order amended — new total '.money($total)
+                    .($changes ? '. '.implode(', ', array_slice($changes, 0, 6)) : '')
                     .($data['reason'] ?? null ? '. '.$data['reason'] : ''),
                 'created_by' => auth()->user()?->name ?? 'Admin',
             ]);
         });
 
-        return back()->with('success', 'Order amounts updated.');
+        return back()->with('success', 'Order updated.');
     }
 
     /**
@@ -275,6 +362,35 @@ class OrderController extends Controller
 
         return redirect()->route('admin.orders.show', $order)
             ->with('success', 'Order '.$order->order_number.' created.');
+    }
+
+    /**
+     * Set an order's payment status by hand.
+     *
+     * Delivery sets this automatically, but not every case is a delivery: a
+     * refund, a bank transfer taken up front, or a parcel the courier says was
+     * delivered and the shop knows was not.
+     */
+    public function updatePayment(Request $request, Order $order)
+    {
+        $data = $request->validate([
+            'payment_status' => ['required', 'in:unpaid,paid,refunded'],
+        ]);
+
+        if ($order->payment_status === $data['payment_status']) {
+            return back();
+        }
+
+        $was = $order->payment_status;
+        $order->update(['payment_status' => $data['payment_status']]);
+
+        $order->history()->create([
+            'status' => $order->status,
+            'note' => 'Payment marked '.$data['payment_status'].' (was '.$was.')',
+            'created_by' => auth()->user()?->name ?? 'Admin',
+        ]);
+
+        return back()->with('success', 'Payment status updated.');
     }
 
     /**
@@ -514,6 +630,28 @@ class OrderController extends Controller
         }
 
         return back()->with('success', 'Order status updated.');
+    }
+
+    /**
+     * Move stock for a single order line. Positive puts units back on the
+     * shelf, negative takes them off.
+     */
+    protected function moveStock(\App\Models\OrderItem $item, int $by): void
+    {
+        if ($by === 0) {
+            return;
+        }
+
+        if ($item->variant_id && ($variant = \App\Models\ProductVariant::find($item->variant_id))) {
+            $variant->increment('stock_quantity', $by);
+        }
+
+        $product = $item->product_id ? \App\Models\Product::find($item->product_id) : null;
+
+        if ($product && $product->manage_stock) {
+            $product->increment('stock_quantity', $by);
+            $product->update(['in_stock' => $product->fresh()->stock_quantity > 0]);
+        }
     }
 
     /** Add ($sign=+1) or remove ($sign=-1) this order's line quantities from stock. */
