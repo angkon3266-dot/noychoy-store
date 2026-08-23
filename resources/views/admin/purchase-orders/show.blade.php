@@ -9,7 +9,7 @@
     <span class="badge capitalize {{ $order->status === 'received' ? 'bg-green-100 text-green-700' : ($order->status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700') }}">{{ $order->statusLabel() }}</span>
     <form action="{{ route('admin.purchase-orders.status', $order) }}" method="POST" class="flex items-center gap-2">
         @csrf
-        <select name="status" onchange="this.form.submit()" class="input py-1.5 text-sm">
+        <select name="status" onchange="submitForm(this.form)" class="input py-1.5 text-sm">
             @foreach($statuses as $key => $label)
                 <option value="{{ $key }}" @selected($order->status==$key)>{{ $label }}</option>
             @endforeach

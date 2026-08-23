@@ -6,30 +6,30 @@
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     <form method="GET" class="flex flex-wrap gap-2">
         <input name="q" value="{{ request('q') }}" placeholder="Search products…" class="input py-2 w-48">
-        <select name="status" onchange="this.form.submit()" class="input py-2">
+        <select name="status" onchange="submitForm(this.form)" class="input py-2">
             <option value="">All status</option>
             <option value="published" @selected(request('status')=='published')>Published</option>
             <option value="draft" @selected(request('status')=='draft')>Draft</option>
         </select>
-        <select name="type" onchange="this.form.submit()" class="input py-2">
+        <select name="type" onchange="submitForm(this.form)" class="input py-2">
             <option value="">All types</option>
             <option value="simple" @selected(request('type')=='simple')>Simple</option>
             <option value="variable" @selected(request('type')=='variable')>Variable</option>
         </select>
-        <select name="tag" onchange="this.form.submit()" class="input py-2">
+        <select name="tag" onchange="submitForm(this.form)" class="input py-2">
             <option value="">All tags</option>
             @foreach($allTags as $tag)
                 <option value="{{ $tag }}" @selected(request('tag')==$tag)>{{ $tag }}</option>
             @endforeach
         </select>
-        <select name="category" onchange="this.form.submit()" class="input py-2" title="Filter by category">
+        <select name="category" onchange="submitForm(this.form)" class="input py-2" title="Filter by category">
             <option value="">All categories</option>
             @foreach($bulkCategories as $cat)
                 <option value="{{ $cat->id }}" @selected((string) request('category') === (string) $cat->id)>{{ $cat->name }}</option>
             @endforeach
         </select>
         <input name="custom" value="{{ request('custom') }}" placeholder="Custom field value…" class="input py-2 w-40">
-        <select name="sort" onchange="this.form.submit()" class="input py-2" title="Sort products">
+        <select name="sort" onchange="submitForm(this.form)" class="input py-2" title="Sort products">
             <option value="">Newest first</option>
             <option value="serial" @selected(request('sort')=='serial')>Product ID (1 → N)</option>
             <option value="name" @selected(request('sort')=='name')>Name A–Z</option>
@@ -37,7 +37,7 @@
             <option value="price_desc" @selected(request('sort')=='price_desc')>Price: high to low</option>
             <option value="stock" @selected(request('sort')=='stock')>Stock: low first</option>
         </select>
-        <select name="per_page" onchange="this.form.submit()" class="input py-2" title="Products per page">
+        <select name="per_page" onchange="submitForm(this.form)" class="input py-2" title="Products per page">
             @foreach(['20','50','100','200','all'] as $pp)
                 <option value="{{ $pp }}" @selected((string) request('per_page', '20') === $pp)>{{ $pp === 'all' ? 'Show all' : $pp.' / page' }}</option>
             @endforeach

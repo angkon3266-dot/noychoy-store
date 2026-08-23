@@ -104,7 +104,7 @@
                          this is for the cases delivery cannot express. --}}
                     <form action="{{ route('admin.orders.payment', $order) }}" method="POST" class="inline">
                         @csrf
-                        <select name="payment_status" onchange="this.form.submit()"
+                        <select name="payment_status" onchange="submitForm(this.form)"
                                 class="badge border-0 capitalize {{ ['unpaid'=>'bg-amber-100 text-amber-800','paid'=>'bg-green-100 text-green-700','refunded'=>'bg-ink-100 text-ink-700'][$order->payment_status] ?? 'bg-ink-100' }}"
                                 title="Payment status">
                             @foreach(['unpaid' => 'Unpaid', 'paid' => 'Paid', 'refunded' => 'Refunded'] as $k => $label)

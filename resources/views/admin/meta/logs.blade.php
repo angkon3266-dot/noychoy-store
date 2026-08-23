@@ -10,13 +10,13 @@
         <form method="GET" class="flex flex-wrap gap-2 items-end">
             <div><label class="label text-xs">Search</label><input name="q" value="{{ request('q') }}" placeholder="Product, retailer id, error…" class="input py-2 w-56"></div>
             <div><label class="label text-xs">Status</label>
-                <select name="status" onchange="this.form.submit()" class="input py-2">
+                <select name="status" onchange="submitForm(this.form)" class="input py-2">
                     <option value="">All</option>
                     @foreach($statuses as $s)<option value="{{ $s }}" @selected(request('status')===$s)>{{ ucfirst($s) }}</option>@endforeach
                 </select>
             </div>
             <div><label class="label text-xs">Action</label>
-                <select name="action" onchange="this.form.submit()" class="input py-2">
+                <select name="action" onchange="submitForm(this.form)" class="input py-2">
                     <option value="">All</option>
                     @foreach($actions as $a)<option value="{{ $a }}" @selected(request('action')===$a)>{{ ucfirst(str_replace('_',' ',$a)) }}</option>@endforeach
                 </select>

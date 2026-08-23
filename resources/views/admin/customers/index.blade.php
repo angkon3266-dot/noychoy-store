@@ -22,7 +22,7 @@
 
 <form method="GET" class="flex flex-wrap items-end gap-2 mb-4">
     <input name="q" value="{{ request('q') }}" placeholder="Name, phone or email…" class="input py-2 w-56">
-    <select name="sort" onchange="this.form.submit()" class="input py-2">
+    <select name="sort" onchange="submitForm(this.form)" class="input py-2">
         <option value="spend" @selected($sort=='spend')>Top spenders</option>
         <option value="orders" @selected($sort=='orders')>Most orders</option>
         <option value="recent" @selected($sort=='recent')>Recently ordered</option>
@@ -31,11 +31,11 @@
     </select>
     <input name="min_spend" value="{{ request('min_spend') }}" type="number" min="0" placeholder="Min spend ৳" class="input py-2 w-32">
     <input name="min_orders" value="{{ request('min_orders') }}" type="number" min="0" placeholder="Min orders" class="input py-2 w-28">
-    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="repeat" value="1" onchange="this.form.submit()" @checked(request('repeat'))> Repeat</label>
-    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="members" value="1" onchange="this.form.submit()" @checked(request('members'))> Members</label>
-    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="has_email" value="1" onchange="this.form.submit()" @checked(request('has_email'))> Has email</label>
-    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="has_points" value="1" onchange="this.form.submit()" @checked(request('has_points'))> Has points</label>
-    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="lapsed" value="1" onchange="this.form.submit()" @checked(request('lapsed'))> Lapsed 30d+</label>
+    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="repeat" value="1" onchange="submitForm(this.form)" @checked(request('repeat'))> Repeat</label>
+    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="members" value="1" onchange="submitForm(this.form)" @checked(request('members'))> Members</label>
+    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="has_email" value="1" onchange="submitForm(this.form)" @checked(request('has_email'))> Has email</label>
+    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="has_points" value="1" onchange="submitForm(this.form)" @checked(request('has_points'))> Has points</label>
+    <label class="flex items-center gap-1.5 text-sm px-1"><input type="checkbox" name="lapsed" value="1" onchange="submitForm(this.form)" @checked(request('lapsed'))> Lapsed 30d+</label>
     <button class="btn-outline">Filter</button>
     <a href="{{ route('admin.customers.export', request()->query()) }}" class="btn-outline ml-auto">⬇ Export Excel</a>
     <a href="{{ route('admin.customers.import') }}" class="btn-outline">⬆ Import CSV</a>

@@ -11,13 +11,13 @@
 </div>
 
 <form method="GET" class="flex flex-wrap gap-2 mb-4">
-    <select name="status" onchange="this.form.submit()" class="input py-2">
+    <select name="status" onchange="submitForm(this.form)" class="input py-2">
         <option value="">All statuses</option>
         @foreach($statuses as $key => $label)
             <option value="{{ $key }}" @selected(request('status')==$key)>{{ $label }}</option>
         @endforeach
     </select>
-    <select name="supplier" onchange="this.form.submit()" class="input py-2">
+    <select name="supplier" onchange="submitForm(this.form)" class="input py-2">
         <option value="">All suppliers</option>
         @foreach($suppliers as $s)
             <option value="{{ $s->id }}" @selected(request('supplier')==$s->id)>{{ $s->name }}</option>

@@ -162,20 +162,20 @@ document.addEventListener('alpine:init', () => {
 <form method="GET" class="flex flex-wrap items-center gap-2 mb-4">
     <input name="q" value="{{ $q }}" placeholder="Search by product name or filename…" class="input py-2 w-64">
     <input type="hidden" name="view" value="{{ $view }}">
-    <select name="type" onchange="this.form.submit()" class="input py-2">
+    <select name="type" onchange="submitForm(this.form)" class="input py-2">
         <option value="all" @selected($type=='all')>All types</option>
         <option value="image" @selected($type=='image')>Images</option>
         <option value="video" @selected($type=='video')>Videos</option>
     </select>
-    <select name="folder" onchange="this.form.submit()" class="input py-2">
+    <select name="folder" onchange="submitForm(this.form)" class="input py-2">
         <option value="">All folders</option>
         @foreach($folders as $f)<option value="{{ $f }}" @selected($folder==$f)>{{ $f }}</option>@endforeach
     </select>
-    <select name="ext" onchange="this.form.submit()" class="input py-2" title="File type">
+    <select name="ext" onchange="submitForm(this.form)" class="input py-2" title="File type">
         <option value="">All formats</option>
         @foreach($extensions as $e)<option value="{{ $e }}" @selected($ext==$e)>{{ strtoupper($e) }}</option>@endforeach
     </select>
-    <select name="size" onchange="this.form.submit()" class="input py-2" title="File size">
+    <select name="size" onchange="submitForm(this.form)" class="input py-2" title="File size">
         <option value="">Any size</option>
         <option value="gt1m" @selected($size=='gt1m')>≥ 1 MB</option>
         <option value="500to1m" @selected($size=='500to1m')>500 KB – 1 MB</option>

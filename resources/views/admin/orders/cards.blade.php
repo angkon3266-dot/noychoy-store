@@ -59,7 +59,7 @@
     <form method="GET" style="display:flex;gap:8px;align-items:center;">
         <input type="hidden" name="ids" value="{{ request('ids') }}">
         <label style="font-size:13px;color:#555;">Message:</label>
-        <select name="template" onchange="this.form.submit()">
+        <select name="template" onchange="submitForm(this.form)">
             <option value="">Automatic (per-order / new vs repeat)</option>
             @foreach($templates as $t)
                 <option value="{{ $t['name'] }}" @selected($forced === $t['name'])>{{ $t['name'] }}</option>

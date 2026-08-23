@@ -43,7 +43,7 @@
 
     <form method="GET" class="flex flex-wrap gap-2 mb-4">
         <input name="q" value="{{ request('q') }}" placeholder="Order #, name or phone…" class="input py-2 w-64">
-        <select name="status" onchange="this.form.submit()" class="input py-2">
+        <select name="status" onchange="submitForm(this.form)" class="input py-2">
             {{-- "all" is spelled out because an empty value means "use the
                  default", which is Processing — the day's packing queue. --}}
             <option value="all" @selected($status==='all')>All statuses</option>
@@ -246,7 +246,7 @@
                                 @else
                                     <form action="{{ route('admin.orders.status', $order) }}" method="POST">
                                         @csrf
-                                        <select name="status" onchange="this.form.submit()"
+                                        <select name="status" onchange="submitForm(this.form)"
                                                 class="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs capitalize">
                                             @foreach($statuses as $key => $label)
                                                 <option value="{{ $key }}" @selected($order->status==$key)>{{ $label }}</option>

@@ -198,6 +198,9 @@
             <div class="text-sm text-ink-700/60">{{ auth()->user()->name ?? '' }}</div>
         </header>
 
+        {{-- Wrapped so admin-ajax.js can swap it after a background submit
+             without reloading the page. --}}
+        <div id="admin-flash">
         @if(session('success'))<div class="m-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm">{{ session('success') }}</div>@endif
         @if(session('warning'))<div class="m-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm">{{ session('warning') }}</div>@endif
         @if(session('error'))<div class="m-4 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">{{ session('error') }}</div>@endif
@@ -209,6 +212,7 @@
                 </ul>
             </div>
         @endif
+        </div>
 
         <main class="p-4 sm:p-6">@yield('content')</main>
     </div>

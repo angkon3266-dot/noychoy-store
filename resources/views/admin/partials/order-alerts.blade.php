@@ -45,7 +45,7 @@
             <form action="{{ route('admin.push.toggle') }}" method="POST" class="inline ml-auto">
                 @csrf
                 <label class="flex items-center gap-2 text-xs text-ink-700/70">
-                    <input type="checkbox" name="on" value="1" onchange="this.form.submit()"
+                    <input type="checkbox" name="on" value="1" onchange="submitForm(this.form)"
                            @checked(\App\Models\Setting::get('admin_order_alerts', true)) class="rounded">
                     Alerts enabled store-wide
                 </label>

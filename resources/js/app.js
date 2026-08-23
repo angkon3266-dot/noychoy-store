@@ -1,3 +1,4 @@
+import './admin-ajax';
 // Alpine.js is bundled through Vite (no CDN) for fewer external requests and
 // reliability. Plugins + components register on the alpine:init listeners below,
 // then Alpine.start() at the very end of this file boots everything.
