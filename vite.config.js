@@ -11,11 +11,17 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/inertia.jsx'],
             refresh: true,
             fonts: [
+                // latin only. Without this the build also ships Cyrillic,
+                // Vietnamese and latin-ext cuts of every weight — 18 preloaded
+                // files for a shop that sells in English and Bengali, all
+                // competing with the hero image on a phone connection.
                 bunny('Instrument Sans', {
                     weights: [400, 500, 600],
+                    subsets: ['latin'],
                 }),
                 bunny('Playfair Display', {
                     weights: [500, 600, 700],
+                    subsets: ['latin'],
                 }),
             ],
         }),

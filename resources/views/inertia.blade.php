@@ -130,6 +130,14 @@
                   @isset($preloadSrcset)@if($preloadSrcset) imagesrcset="{{ $preloadSrcset }}" imagesizes="{{ $preloadSizes ?? '100vw' }}"@endif @endisset>
         @endif
     @endisset
+    {{-- The brand fonts. Without this the storefront rendered in whatever
+         system font the phone happened to have: Instrument Sans and Playfair
+         Display were being built, committed and deployed on every release, and
+         no page ever emitted a @font-face for them. Self-hosted, so no
+         third-party request and no Google Fonts privacy question. --}}
+    @if($fontCss = brand_font_css_url())
+        <link rel="stylesheet" href="{{ $fontCss }}">
+    @endif
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/inertia.jsx'])
 

@@ -67,6 +67,31 @@ class DailyDeals
             return collect();
         }
 
+        // Cached because this sits OUTSIDE the homepage's cached plan and costs
+        // two to three queries per offer — target() resolves a product, then
+        // reads ->thumbnail, which fetches the image row on a model with no
+        // eager loads. Up to eight offers, on every single homepage render.
+        //
+        // Two variants, because a members-only deal is hidden from guests.
+        // Arrays, not models: this cache store refuses to serialize objects.
+        $key = 'home.deals.'.(auth('customer')->check() ? 'member' : 'guest');
+
+        return collect(\Illuminate\Support\Facades\Cache::remember(
+            $key, 600, fn () => static::buildCards()->all()
+        ));
+    }
+
+    /** Drop both cached variants — called whenever an offer changes. */
+    public static function flushCache(): void
+    {
+        foreach (['guest', 'member'] as $who) {
+            \Illuminate\Support\Facades\Cache::forget('home.deals.'.$who);
+        }
+    }
+
+    /** @return Collection<int,array<string,mixed>> */
+    protected static function buildCards(): Collection
+    {
         $offers = Offer::active()
             // A members-only deal is not a deal for someone who is not signed
             // in — dangling it in front of a guest is just a dead end.

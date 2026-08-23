@@ -338,11 +338,21 @@ class CatalogController extends Controller
                 continue;
             }
 
-            $pool = $query->whereNotIn('id', $exclude)
-                ->with('images', 'approvedReviews', 'category')
-                ->take(24)->get()
-                ->sortBy(fn ($p) => crc32($seed.'|'.$p->id))
-                ->take($limit - $picked->count())
+            // Ids first, then hydrate only the winners. This used to pull 24
+            // full products with their images and approved reviews per tier —
+            // and run twice per page view — to keep three to five of them. The
+            // crc32 shuffle only ever needed the id.
+            $need = max(0, $limit - $picked->count());
+
+            $ids = $query->whereNotIn('id', $exclude)
+                ->take(24)->pluck('id')
+                ->sortBy(fn ($id) => crc32($seed.'|'.$id))
+                ->take($need)
+                ->values();
+
+            $pool = $ids->isEmpty() ? collect() : Product::whereIn('id', $ids)
+                ->with('images', 'approvedReviews', 'category')->get()
+                ->sortBy(fn ($p) => $ids->search($p->id))
                 ->values();
 
             $picked = $picked->concat($pool);

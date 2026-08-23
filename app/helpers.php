@@ -12,6 +12,39 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+if (! function_exists('brand_font_css_url')) {
+    /**
+     * URL of the built self-hosted brand font stylesheet, or null.
+     *
+     * Laravel's @fonts directive would also emit a <link rel=preload> for every
+     * font file in the manifest — 18 of them here, about 268 KB, forced down
+     * the wire before the hero image. That defeats the whole point of the
+     * unicode-range splits: left alone, a browser fetches only the two or three
+     * subsets the page actually uses. So we link the stylesheet and let it.
+     *
+     * The filename is content-hashed, so it caches forever and the manifest is
+     * only read once per boot.
+     */
+    function brand_font_css_url(): ?string
+    {
+        static $url = false;
+
+        if ($url !== false) {
+            return $url;
+        }
+
+        $manifest = public_path('build/fonts-manifest.json');
+
+        if (! is_file($manifest)) {
+            return $url = null;
+        }
+
+        $file = json_decode((string) file_get_contents($manifest), true)['style']['file'] ?? null;
+
+        return $url = $file ? asset('build/'.$file) : null;
+    }
+}
+
 if (! function_exists('store_time')) {
     /**
      * A stored timestamp, moved into the shop's local wall clock for display.

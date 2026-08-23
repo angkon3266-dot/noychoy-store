@@ -138,4 +138,28 @@ class LinkPreviewMetaTest extends TestCase
     {
         return Str::before(Str::after($html, '<head>'), '</head>');
     }
+
+    public function test_the_brand_fonts_are_actually_served(): void
+    {
+        // Instrument Sans and Playfair Display were built, committed and
+        // deployed on every release while no page emitted a @font-face for
+        // them — the storefront rendered in whatever system font the phone had.
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $this->assertStringContainsString('fonts-', $html, 'the brand font stylesheet is not linked');
+    }
+
+    public function test_the_fonts_are_not_all_force_preloaded(): void
+    {
+        // The unicode-range splits let a browser fetch only the subsets a page
+        // needs. Preloading every file (18 of them, ~268 KB) throws that away
+        // and puts them in front of the hero image.
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $this->assertLessThanOrEqual(
+            2,
+            substr_count($html, 'as="font"'),
+            'fonts are being mass-preloaded again'
+        );
+    }
 }

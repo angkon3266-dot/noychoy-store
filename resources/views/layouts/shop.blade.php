@@ -103,6 +103,11 @@
     <meta name="apple-mobile-web-app-title" content="{{ store_name() }}">
     <meta name="theme-color" content="#9a6c2e">
     <link rel="apple-touch-icon" href="{{ $fav ?: asset('favicon.ico') }}">
+    {{-- Same brand fonts as the React root — the landing pages an ad points
+         at should not render in a different typeface from the storefront. --}}
+    @if($fontCss = brand_font_css_url())
+        <link rel="stylesheet" href="{{ $fontCss }}">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>window.__cartCount = {{ $cartCount ?? 0 }};</script>
     {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}

@@ -19,6 +19,17 @@ class Offer extends Model
         'products' => 'Specific products',
     ];
 
+    protected static function booted(): void
+    {
+        // Deals of the Day is cached (it costs 2-3 queries per offer), so an
+        // edit has to clear it — otherwise the owner changes a deal and waits
+        // ten minutes wondering why the homepage disagrees with her.
+        $bust = fn () => \App\Support\DailyDeals::flushCache();
+
+        static::saved($bust);
+        static::deleted($bust);
+    }
+
     protected $fillable = [
         'title', 'description', 'type', 'applies_to', 'category_ids', 'product_ids',
         'percent', 'min_subtotal', 'min_qty',

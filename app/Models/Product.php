@@ -119,7 +119,13 @@ class Product extends Model
             if (! app()->environment('testing')) {
                 SyncProductKnowledge::dispatch($product->id);
             }
+
+            // The catalogue filter sidebar is derived from every published
+            // product, so it is cached — this is what keeps it honest.
+            \App\Services\StorefrontFilters::bumpVersion();
         });
+
+        static::deleted(fn () => \App\Services\StorefrontFilters::bumpVersion());
     }
 
     /**

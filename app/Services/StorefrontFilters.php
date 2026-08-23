@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
 
 /**
@@ -197,8 +198,47 @@ class StorefrontFilters
      */
     public function groups(Request $request, ?Builder $scope = null, ?string $pageKey = null): array
     {
-        $cfg = $this->config($pageKey);
         $scope ??= Product::published();
+
+        // The sidebar is derived from the WHOLE unfiltered, unpaginated
+        // catalogue — every published product hydrated with its JSON casts, then
+        // re-scanned once per attribute, once for colours, once for tags and
+        // once for custom fields. That ran on every /shop, category and
+        // collection page view.
+        //
+        // The facet values only change when a product is saved, so the result is
+        // cached. The key carries the scope (a category page offers different
+        // values from /shop) and the query string, because the `checked` flags
+        // are per-request. Everything returned is plain scalars, which this
+        // cache store requires.
+        // Versioned rather than enumerated: the keys are hashes, so there is
+        // nothing to walk and forget. Bumping the version orphans the old
+        // entries and they expire on their own.
+        $key = 'storefront.filters.'.static::version().'.'.md5(implode('|', [
+            (string) $pageKey,
+            $scope->toSql(),
+            serialize($scope->getBindings()),
+            serialize($request->query()),
+        ]));
+
+        return Cache::remember($key, 600, fn () => $this->buildGroups($request, $scope, $pageKey));
+    }
+
+    /** Bumped whenever a product changes, so the facets cannot go stale. */
+    public static function version(): int
+    {
+        return (int) Cache::get('storefront.filters.version', 1);
+    }
+
+    public static function bumpVersion(): void
+    {
+        Cache::forever('storefront.filters.version', static::version() + 1);
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    protected function buildGroups(Request $request, Builder $scope, ?string $pageKey): array
+    {
+        $cfg = $this->config($pageKey);
         $products = (clone $scope)->get(['id', 'options', 'tags', 'colors', 'custom_label', 'custom_value', 'custom_fields', 'price', 'compare_at_price']);
 
         $groups = [];
