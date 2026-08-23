@@ -126,8 +126,25 @@ class LandingTemplateTest extends TestCase
             'show_footer' => true,
         ]);
 
+        // Turn the footer trust strip on with the shipped defaults — otherwise
+        // the block this asserts about does not render and the assertion below
+        // would pass while proving nothing.
+        \App\Models\Setting::put('theme', [
+            'footer_show_trust' => true,
+            'trust_badges' => config('theme.defaults.trust_badges'),
+        ]);
+
         // The real storefront route, hydration and all.
-        $this->get('/lp/'.$page->slug)->assertOk();
+        $response = $this->get('/lp/'.$page->slug)->assertOk();
+        $response->assertSee('Cash on delivery', false);
+
+        // The footer trust badges store an icon NAME. The Blade half had no
+        // icon renderer, so every landing page an ad pointed at advertised
+        // "truck Fast nationwide" and "cash Cash on delivery" under its call
+        // to action. These are the default names.
+        foreach (['shieldCheck', 'truck', 'cash'] as $iconName) {
+            $response->assertDontSee('>'.$iconName.'<', false);
+        }
     }
 
     public function test_the_sales_page_countdown_is_set_in_the_future(): void

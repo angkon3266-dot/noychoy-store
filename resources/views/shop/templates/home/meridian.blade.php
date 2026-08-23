@@ -147,7 +147,7 @@
     <div class="mx-auto max-w-7xl px-4 grid grid-cols-2 lg:grid-cols-4 divide-x divide-ink-100">
         @foreach($features as $f)
             <div class="flex flex-col items-center text-center gap-1.5 py-7 px-3">
-                <span class="text-xl">{{ $f['icon'] ?? '✓' }}</span>
+                <span class="mx-auto flex w-fit">{!! \App\Support\StorefrontIcons::svg($f['icon'] ?? null, 'w-6 h-6') !!}</span>
                 <span class="text-[11px] sm:text-xs tracking-wide uppercase text-ink-800 font-medium">{{ $f['title'] }}</span>
                 @if(filled($f['text'] ?? null))<span class="text-[11px] text-ink-700/50">{{ $f['text'] }}</span>@endif
             </div>

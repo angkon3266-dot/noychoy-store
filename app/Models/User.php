@@ -32,8 +32,12 @@ class User extends Authenticatable
     public static function sectionsFor(string $role): array
     {
         return match ($role) {
-            'manager' => ['dashboard', 'products', 'categories', 'collections', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'customers', 'suppliers', 'purchase-orders', 'media', 'menu', 'profile'],
-            'staff' => ['dashboard', 'orders', 'profile'],
+            // `alerts` is the notification bell that every admin page polls —
+            // it is chrome, not a section. Leaving it out gave managers and
+            // staff a bell that 403'd every 25 seconds and silently swallowed
+            // the failure, so they never saw a new order.
+            'manager' => ['dashboard', 'alerts', 'products', 'categories', 'collections', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'customers', 'suppliers', 'purchase-orders', 'media', 'menu', 'profile'],
+            'staff' => ['dashboard', 'alerts', 'orders', 'profile'],
             default => ['*'], // admin
         };
     }

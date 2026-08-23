@@ -706,7 +706,10 @@
                 <div class="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                     @foreach($footerTrust->take(3) as $b)
                         <div class="flex items-center justify-center gap-2">
-                            @if(!empty($b['icon']))<span class="text-xl">{{ $b['icon'] }}</span>@endif
+                            {{-- A NAME is stored here, not a glyph, since the emoji picker was
+                                 retired — printing it raw is why every ad landing page read
+                                 "truck Fast nationwide" under its call to action. --}}
+                            @if(!empty($b['icon']))<span class="text-gold-300 shrink-0">{!! \App\Support\StorefrontIcons::svg($b['icon'], 'w-6 h-6') !!}</span>@endif
                             <div class="text-left">
                                 <div class="text-sm font-medium text-gold-100">{{ $b['title'] }}</div>
                                 @if(!empty($b['text']))<div class="text-xs text-gold-100/60">{{ $b['text'] }}</div>@endif

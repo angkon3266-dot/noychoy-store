@@ -332,7 +332,10 @@ class MetaDebug
 
     private function redact(array $params): array
     {
-        foreach (['access_token', 'appsecret_proof', 'client_secret', 'fb_exchange_token'] as $k) {
+        // input_token is how debug_token receives the token being inspected —
+        // a real, live credential, and it was the one name missing from this
+        // list, so it went to disk in the clear.
+        foreach (['access_token', 'appsecret_proof', 'client_secret', 'fb_exchange_token', 'input_token'] as $k) {
             if (isset($params[$k])) {
                 $params[$k] = '***redacted***';
             }

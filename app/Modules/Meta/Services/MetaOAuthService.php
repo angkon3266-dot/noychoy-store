@@ -75,11 +75,13 @@ class MetaOAuthService
             return null;
         }
 
+        // Deliberately no raw body or decoded json: on the token-exchange
+        // calls these ARE the access token, and this writes to a file the
+        // support flow copy-pastes out of.
         $verbose and Log::info("[meta-oauth] AFTER {$label}", [
             'http_status' => $resp->status(),
-            'response_headers' => $resp->headers(),
-            'raw_body' => $resp->body(),
-            'decoded_json' => $resp->json(),
+            'ok' => $resp->successful(),
+            'error' => $resp->json('error.message'),
         ]);
 
         // Also feed the debug-page buffer (no-op unless enabled).
@@ -236,11 +238,10 @@ class MetaOAuthService
         Log::info('[meta-oauth] AFTER token exchange (short-lived)', [
             'http_status' => $short->status(),
             'has_access_token' => (bool) $short->json('access_token'),
-            'raw_body' => $short->body(),
         ]);
 
         if ($short->failed() || ! $short->json('access_token')) {
-            Log::error('[meta-oauth] EARLY RETURN — token exchange failed', ['http_status' => $short->status(), 'raw_body' => $short->body()]);
+            Log::error('[meta-oauth] EARLY RETURN — token exchange failed', ['http_status' => $short->status(), 'error' => $short->json('error.message')]);
             return ['ok' => false, 'module' => $moduleKey, 'message' => 'Failed to obtain access token: '.$short->json('error.message', 'unknown error')];
         }
 

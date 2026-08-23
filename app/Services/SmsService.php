@@ -101,12 +101,18 @@ class SmsService
             );
 
             if (! $accepted) {
-                Log::warning('SMS rejected', ['to' => $to, 'response' => $data]);
+                Log::warning('SMS rejected', ['to' => static::maskRecipients($to), 'response' => $data]);
             }
 
             return $accepted;
         } catch (\Throwable $e) {
-            Log::error('SMS send failed', ['to' => $to, 'error' => $e->getMessage()]);
+            // Neither the numbers nor the exception message: a QueryException's
+            // message is the full SQL with its bindings substituted in, which is
+            // how a broadcast to 100 people put 100 phone numbers in the log.
+            Log::error('SMS send failed', [
+                'to' => static::maskRecipients($to),
+                'error' => $e::class.' ('.$e->getCode().')',
+            ]);
             $this->log($to, $message, $orderId, status: 'error', accepted: false, response: ['error' => $e->getMessage()]);
             return false;
         }
@@ -212,6 +218,27 @@ class SmsService
             })
             ->filter()
             ->implode(',');
+    }
+
+    /**
+     * "01712345678,0186…" becomes "3 recipient(s), last 4: 8859".
+     *
+     * Enough to identify a send in support without putting the customer list on
+     * disk — the numbers are the most valuable thing this shop holds, and the
+     * log file travels differently from the database: support pastes, cPanel
+     * File Manager, downloaded backups.
+     */
+    public static function maskRecipients(string $to): string
+    {
+        $numbers = array_values(array_filter(array_map('trim', explode(',', $to))));
+
+        if (empty($numbers)) {
+            return '(none)';
+        }
+
+        $last = substr((string) end($numbers), -4);
+
+        return count($numbers).' recipient(s), last 4: '.$last;
     }
 
     protected function log(string $phone, string $message, ?int $orderId, string $status, bool $accepted, ?array $response, ?string $messageId = null, ?string $providerStatus = null): void

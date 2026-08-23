@@ -8,7 +8,7 @@
      style="grid-template-columns: repeat({{ $cols }}, minmax(0, 1fr));">
     @foreach($badges as $b)
         <div class="rounded-lg bg-gold-100/60 p-3">
-            <span class="text-base">{{ $b['icon'] ?? '✓' }}</span><br>
+            <span class="mx-auto mb-1 flex w-fit">{!! \App\Support\StorefrontIcons::svg($b['icon'] ?? null, 'w-5 h-5') !!}</span>
             <span class="font-medium">{{ $b['title'] }}</span>
             @if(!empty($b['text']))<br><span class="text-[10px] text-ink-700/50">{{ $b['text'] }}</span>@endif
         </div>

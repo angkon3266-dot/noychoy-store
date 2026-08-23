@@ -50,7 +50,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         @foreach($features as $f)
             <div class="flex flex-col items-center text-center gap-2 rounded-xl border border-ink-100 py-6 px-3">
-                <span class="text-2xl">{{ $f['icon'] ?? '✓' }}</span>
+                <span class="mx-auto flex w-fit">{!! \App\Support\StorefrontIcons::svg($f['icon'] ?? null, 'w-7 h-7') !!}</span>
                 <span class="text-xs sm:text-sm tracking-wide uppercase text-ink-700/70">{{ $f['title'] }}</span>
             </div>
         @endforeach
