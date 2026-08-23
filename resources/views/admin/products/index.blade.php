@@ -54,6 +54,7 @@
 <div x-data="{
         sel: [],
         catIds: [],
+        tagText: '',
         allIds: {{ Js::from($pageIds) }},
         toggleAll(e) { this.sel = e.target.checked ? [...this.allIds] : []; },
         run(action) {
@@ -62,6 +63,9 @@
             if (action === 'category' && !this.catIds.length) { alert('Pick at least one category first.'); return; }
             if (action === 'category' && !confirm('This will REPLACE the categories of ' + this.sel.length + ' product(s) with the ' + this.catIds.length + ' selected. Continue?')) return;
             if (action === 'generate_serials' && !confirm('Renumber the ' + this.sel.length + ' selected product(s) as ID 1–' + this.sel.length + ', oldest first? Their current IDs will be replaced.')) return;
+            if (action.startsWith('tag_') && !this.tagText.trim()) { alert('Type a tag first, e.g. gift'); return; }
+            if (action === 'tag_replace' && !confirm('This will REPLACE every tag on ' + this.sel.length + ' product(s) with \u201C' + this.tagText.trim() + '\u201D. Continue?')) return;
+            if (action === 'tag_remove' && !confirm('Remove \u201C' + this.tagText.trim() + '\u201D from ' + this.sel.length + ' product(s)?')) return;
             this.$refs.act.value = action;
             this.$refs.bulk.submit();
         }
@@ -84,6 +88,14 @@
         </select>
         <button type="button" @click="run('category')" class="text-gold-700 hover:underline">Set categories (<span x-text="catIds.length"></span>)</button>
         <span class="text-[11px] text-ink-700/40">replaces existing · Ctrl/Cmd-click for several</span>
+        <span class="text-ink-300">|</span>
+        <input x-model="tagText" list="bulkTags" class="input py-1 text-xs w-40"
+               placeholder="gift, eid"
+               title="Comma-separated. Whole tags only — &quot;gift&quot; never matches &quot;gift-card&quot;.">
+        <button type="button" @click="run('tag_add')" class="text-gold-700 hover:underline">Add tags</button>
+        <button type="button" @click="run('tag_remove')" class="text-gold-700 hover:underline">Remove tags</button>
+        <button type="button" @click="run('tag_replace')" class="text-gold-700 hover:underline" title="Replaces every existing tag">Replace tags</button>
+        <datalist id="bulkTags">@foreach($allTags as $tag)<option value="{{ $tag }}"></option>@endforeach</datalist>
         <button type="button" @click="run('delete')" class="text-red-600 hover:underline ml-auto">Delete</button>
     </div>
 
@@ -91,6 +103,7 @@
     <form x-ref="bulk" action="{{ route('admin.products.bulk') }}" method="POST" class="hidden">
         @csrf
         <input type="hidden" name="action" x-ref="act">
+        <input type="hidden" name="tags" :value="tagText">
         <template x-for="cid in catIds" :key="cid"><input type="hidden" name="category_ids[]" :value="cid"></template>
         <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
     </form>

@@ -121,6 +121,41 @@
             </form>
         </div>
 
+        {{-- Post-delivery review requests. Off by default: it spends SMS
+             credit, so switching it on is the owner's call, not a default. --}}
+        <div class="card p-6" x-data="{ on: {{ $settings['review_request_enabled'] ? 'true' : 'false' }} }">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="font-semibold">Post-delivery review requests</h2>
+                <span class="badge {{ $settings['review_request_enabled'] ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} text-[10px]">{{ $settings['review_request_enabled'] ? 'Active' : 'Off' }}</span>
+            </div>
+            <p class="text-sm text-ink-700/60 mb-3">Asks the buyer to rate what they bought, a few days after the courier confirms delivery. Sends by SMS, plus email when we have one. Runs daily via the scheduler.
+                <strong>{{ number_format($reviewRequestDue) }}</strong> order(s) are due right now.</p>
+            <p class="text-xs text-warning-800 bg-warning-50 border border-warning-200 rounded p-2 mb-3">
+                The link makes each SMS about two segments, so it costs roughly double a normal one.
+                Switch on with a small <em>max orders per run</em> first, and use
+                <code>php artisan reviews:request --dry</code> to see exactly who would be asked.
+            </p>
+            <form action="{{ route('admin.notifications.review-requests') }}" method="POST" class="space-y-3">
+                @csrf
+                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="review_request_enabled" value="1" x-model="on"> Enable post-delivery review requests</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="label text-xs">Ask this many days after delivery</label><input type="number" name="review_request_delay_days" value="{{ $settings['review_request_delay_days'] }}" min="1" max="60" class="input py-1.5 text-sm" required></div>
+                    <div><label class="label text-xs">Skip orders delivered longer ago than (days)</label><input type="number" name="review_request_max_days" value="{{ $settings['review_request_max_days'] }}" min="2" max="365" class="input py-1.5 text-sm" required></div>
+                    <div class="col-span-2"><label class="label text-xs">Max orders per run</label><input type="number" name="review_request_per_run" value="{{ $settings['review_request_per_run'] }}" min="1" max="500" class="input py-1.5 text-sm" required></div>
+                </div>
+                <div><label class="label text-xs">Email subject <span class="text-ink-700/40">(blank = default)</span></label><input name="review_request_email_subject" value="{{ $settings['review_request_email_subject'] }}" maxlength="150" class="input py-1.5 text-sm"></div>
+                <div><label class="label text-xs">Email message <span class="text-ink-700/40">(blank = default)</span></label><textarea name="review_request_email_body" rows="2" maxlength="400" class="input py-1.5 text-sm">{{ $settings['review_request_email_body'] }}</textarea></div>
+                <p class="text-xs text-ink-700/50">The SMS wording lives on the <a href="{{ route('admin.system-config.integrations') }}" class="text-gold-700 hover:underline">Integrations</a> page, under SMS templates.</p>
+                <div class="flex gap-2">
+                    <button class="btn-outline text-sm">Save review-request settings</button>
+                </div>
+            </form>
+            <form action="{{ route('admin.notifications.run-review-requests') }}" method="POST" class="mt-2" onsubmit="return confirm('Send review requests now for all due orders?')">
+                @csrf
+                <button class="text-xs text-gold-700 hover:underline">▸ Run review requests now</button>
+            </form>
+        </div>
+
         {{-- Automation + web push --}}
         <div class="card p-6">
             <h2 class="font-semibold mb-3">Product announcements</h2>

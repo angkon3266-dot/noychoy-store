@@ -36,12 +36,26 @@ class NotificationController extends Controller
                 'winback_title' => Setting::get('winback_title', 'We miss you 💛'),
                 'winback_body' => Setting::get('winback_body', 'It’s been a while — here’s a little something to welcome you back.'),
                 'winback_sms' => (bool) Setting::get('winback_sms', false),
+                // Post-delivery review requests. Off by default — this spends
+                // the owner's SMS credit, so it is theirs to switch on.
+                'review_request_enabled' => (bool) Setting::get('review_request_enabled', false),
+                'review_request_delay_days' => (int) Setting::get('review_request_delay_days', 3),
+                'review_request_max_days' => (int) Setting::get('review_request_max_days', 30),
+                'review_request_per_run' => (int) Setting::get('review_request_per_run', 100),
+                'review_request_email_subject' => Setting::get('review_request_email_subject', ''),
+                'review_request_email_body' => Setting::get('review_request_email_body', ''),
             ],
             'winbackDue' => \App\Models\Customer::whereNotNull('password')->where('blacklisted', false)
                 ->where('total_orders', '>', 0)
                 ->where('last_order_at', '<', now()->subDays((int) Setting::get('winback_days', 60)))
                 ->where(fn ($w) => $w->whereNull('winback_sent_at')->orWhere('winback_sent_at', '<', now()->subDays((int) Setting::get('winback_cooldown_days', 30))))
                 ->count(),
+            // Same query the command runs, so the number on the card is the
+            // number that would actually be asked.
+            'reviewRequestDue' => \App\Console\Commands\RunReviewRequests::dueQuery(
+                max(1, (int) Setting::get('review_request_delay_days', 3)),
+                max(2, (int) Setting::get('review_request_max_days', 30)),
+            )->count(),
             'analytics' => app(\App\Services\CampaignAnalyticsService::class),
             'webpushDiag' => app(\App\Services\WebPushService::class)->diagnostics(),
             'pushTemplates' => collect(\App\Services\PushTemplateService::defaults())->map(fn ($d, $key) => [
@@ -284,6 +298,35 @@ class NotificationController extends Controller
     public function runWinback()
     {
         \Illuminate\Support\Facades\Artisan::call('crm:winback');
+
+        return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
+    }
+
+    /** Save the post-delivery review-request settings. */
+    public function reviewRequestSettings(Request $request)
+    {
+        $data = $request->validate([
+            'review_request_delay_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'review_request_max_days' => ['required', 'integer', 'min:2', 'max:365'],
+            'review_request_per_run' => ['required', 'integer', 'min:1', 'max:500'],
+            'review_request_email_subject' => ['nullable', 'string', 'max:150'],
+            'review_request_email_body' => ['nullable', 'string', 'max:400'],
+        ]);
+
+        Setting::put('review_request_enabled', $request->boolean('review_request_enabled'));
+        Setting::put('review_request_delay_days', $data['review_request_delay_days']);
+        Setting::put('review_request_max_days', $data['review_request_max_days']);
+        Setting::put('review_request_per_run', $data['review_request_per_run']);
+        Setting::put('review_request_email_subject', $data['review_request_email_subject'] ?? '');
+        Setting::put('review_request_email_body', $data['review_request_email_body'] ?? '');
+
+        return back()->with('success', 'Review-request settings saved.');
+    }
+
+    /** Run the post-delivery review requests right now. */
+    public function runReviewRequests()
+    {
+        \Illuminate\Support\Facades\Artisan::call('reviews:request');
 
         return back()->with('success', trim(\Illuminate\Support\Facades\Artisan::output()));
     }

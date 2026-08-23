@@ -676,15 +676,22 @@ class ProductController extends Controller
     public function bulk(Request $request)
     {
         $data = $request->validate([
-            'action' => ['required', 'in:publish,draft,feature,unfeature,bestseller,unbestseller,delete,category,generate_serials'],
+            'action' => ['required', 'in:publish,draft,feature,unfeature,bestseller,unbestseller,delete,category,generate_serials,tag_add,tag_remove,tag_replace'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
             'category_ids' => ['nullable', 'array', 'required_if:action,category'],
             'category_ids.*' => ['integer', 'exists:categories,id'],
+            // Required even for tag_replace: there must be no way to wipe every
+            // tag off 200 products by submitting an empty box.
+            'tags' => ['nullable', 'string', 'max:255', 'required_if:action,tag_add,tag_remove,tag_replace'],
         ]);
 
         if ($data['action'] === 'generate_serials') {
             return $this->generateSerials($data['ids']);
+        }
+
+        if (str_starts_with($data['action'], 'tag_')) {
+            return $this->applyTags($data['ids'], $data['action'], (string) ($data['tags'] ?? ''));
         }
 
         $catIds = array_values(array_unique(array_map('intval', $data['category_ids'] ?? [])));
@@ -712,6 +719,137 @@ class ProductController extends Controller
             : "$count product(s) updated.";
 
         return back()->with('success', $msg);
+    }
+
+    /** Longest a single tag may be. The column holds 255 characters in all, so
+     *  anything longer than this is a pasted sentence, not a tag. */
+    protected const MAX_TAG_LENGTH = 40;
+
+    /** Most tags one bulk submit may carry. */
+    protected const MAX_TAGS_PER_BULK = 10;
+
+    /**
+     * Split a typed tag box into clean tags.
+     *
+     * Commas, tabs and newlines all separate, so a column pasted out of a
+     * spreadsheet works. Inner whitespace is collapsed and the tag trimmed,
+     * because CollectionService matches whole tags with LIKE patterns built
+     * around "," and ", " only — a stray space silently drops the product out
+     * of the collection it was tagged for.
+     *
+     * Case is preserved but deduped case-insensitively: the live catalogue
+     * holds both "Gift" and "gift", the match is case-insensitive by
+     * collation, so adding one on top of the other only makes the string
+     * longer without changing what it matches.
+     *
+     * @return array<int, string>
+     */
+    protected function parseTagInput(string $raw): array
+    {
+        $seen = [];
+        $tags = [];
+
+        foreach (preg_split('/[,\r\n\t]+/', $raw) as $piece) {
+            $tag = trim(preg_replace('/\s+/', ' ', (string) $piece));
+            if ($tag === '') {
+                continue;
+            }
+            $key = mb_strtolower($tag);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $tags[] = $tag;
+        }
+
+        return $tags;
+    }
+
+    /**
+     * Add, remove or replace tags across the selected products.
+     *
+     * Writes through the model rather than a mass update, so each product's
+     * saved hook still runs. Products whose tag list would not change are
+     * skipped, so re-running "add gift" over the same 200 products queues no
+     * work at all.
+     */
+    protected function applyTags(array $ids, string $mode, string $raw)
+    {
+        $tags = $this->parseTagInput($raw);
+
+        if (empty($tags)) {
+            return back()->with('error', 'Type at least one tag first, e.g. gift.');
+        }
+
+        if (count($tags) > self::MAX_TAGS_PER_BULK) {
+            return back()->with('error', 'Too many tags at once — '.self::MAX_TAGS_PER_BULK.' is the limit.');
+        }
+
+        foreach ($tags as $tag) {
+            if (mb_strlen($tag) > self::MAX_TAG_LENGTH) {
+                return back()->with('error', 'Tag "'.Str::limit($tag, 30).'" is too long (max '.self::MAX_TAG_LENGTH.' characters).');
+            }
+        }
+
+        $lower = array_map('mb_strtolower', $tags);
+        $changed = 0;
+        $unchanged = 0;
+        $tooLong = [];
+
+        foreach (Product::whereIn('id', $ids)->get() as $product) {
+            $existing = $product->tag_list;
+            $existingLower = array_map('mb_strtolower', $existing);
+
+            $next = match ($mode) {
+                'tag_replace' => $tags,
+                'tag_remove' => array_values(array_filter(
+                    $existing,
+                    fn ($t) => ! in_array(mb_strtolower($t), $lower, true)
+                )),
+                default => array_merge($existing, array_values(array_filter(
+                    $tags,
+                    fn ($t) => ! in_array(mb_strtolower($t), $existingLower, true)
+                ))),
+            };
+
+            // ", " is one of the two separators CollectionService recognises,
+            // so everything written here is matched by a `tag is X` rule.
+            $value = implode(', ', $next) ?: null;
+
+            if ($value === ($product->tags ?: null)) {
+                $unchanged++;
+
+                continue;
+            }
+
+            // MySQL runs strict, so an over-long string throws rather than
+            // truncating. Skipping and naming the product beats a 500 that
+            // leaves half the selection tagged and half not.
+            if ($value !== null && mb_strlen($value) > 255) {
+                $tooLong[] = $product->name;
+
+                continue;
+            }
+
+            $product->update(['tags' => $value]);
+            $changed++;
+        }
+
+        $verb = match ($mode) {
+            'tag_replace' => 'replaced on',
+            'tag_remove' => 'removed from',
+            default => 'added to',
+        };
+
+        $redirect = back()->with('success', count($tags).' tag(s) '.$verb.' '.$changed.' product(s)'
+            .($unchanged ? ', '.$unchanged.' already correct.' : '.'));
+
+        if ($tooLong) {
+            $redirect->with('warning', count($tooLong).' product(s) skipped — their tag list would pass 255 characters: '
+                .Str::limit(implode(', ', $tooLong), 160));
+        }
+
+        return $redirect;
     }
 
     /** Delete several selected images of a product at once. */

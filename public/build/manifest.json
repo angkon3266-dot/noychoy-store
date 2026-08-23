@@ -196,7 +196,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-CpU6GNzd.css",
+    "file": "assets/app-CVBUWcK4.css",
     "name": "app",
     "names": [
       "app.css"
@@ -453,6 +453,17 @@
       "_ProductCard-CFoIu_al.js"
     ]
   },
+  "resources/js/Pages/ReviewInvite.jsx": {
+    "file": "assets/ReviewInvite-B5GlpgXm.js",
+    "name": "ReviewInvite",
+    "src": "resources/js/Pages/ReviewInvite.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-Bh1tDfsg.js",
+      "_vendor-DZU0qg6Y.js",
+      "_Layout-C_4kztVg.js"
+    ]
+  },
   "resources/js/Pages/Track.jsx": {
     "file": "assets/Track-esgHCb8g.js",
     "name": "Track",
@@ -471,7 +482,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-DZCRnHkh.js",
+    "file": "assets/inertia-EZVzfkm8.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,
@@ -501,6 +512,7 @@
       "resources/js/Pages/Home.jsx",
       "resources/js/Pages/Legal.jsx",
       "resources/js/Pages/Product.jsx",
+      "resources/js/Pages/ReviewInvite.jsx",
       "resources/js/Pages/Track.jsx"
     ]
   }

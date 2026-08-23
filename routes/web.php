@@ -100,6 +100,10 @@ Route::post('/product/{product:slug}/review', [ReviewController::class, 'store']
 // Love / heart reaction (anonymous, per-browser cookie)
 Route::post('/product/{product:slug}/love', [LoveController::class, 'toggle'])->name('product.love')->middleware('throttle:60,1');
 Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'confirmation'])->name('order.confirmation');
+// Where the post-delivery review request lands. Declared here, above the
+// /product/{slug} catch-all, and gated by a signature rather than a login —
+// this store is COD and most buyers never register.
+Route::get('/order/{orderNumber}/review', [ReviewController::class, 'invite'])->name('order.review');
 
 // ── Customer accounts (optional) ─────────────────────────────────────────────
 Route::middleware('guest:customer')->group(function () {

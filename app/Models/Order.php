@@ -52,6 +52,7 @@ class Order extends Model
         'points_discount' => 'decimal:2',
         'member_discount' => 'decimal:2',
         'points_earned' => 'integer',
+        'review_request_sent_at' => 'datetime',
     ];
 
     /** Same canonical 01XXXXXXXXX form as Customer::phone, so the two always join. */

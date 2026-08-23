@@ -67,6 +67,11 @@ Schedule::command('push:abandoned-cart')->everyThirtyMinutes()->name('push-aband
 // Scheduled drip campaigns — send any due steps (hourly).
 Schedule::command('push:drip')->hourly()->name('push-drip')->withoutOverlapping();
 
+// Post-delivery review requests — one daily pass. A no-op when the automation
+// is off or nothing is past its delay window. 11:30 sits after crm:winback at
+// 11:00 so the two paid-SMS automations do not contend.
+Schedule::command('reviews:request')->dailyAt('11:30')->name('reviews-request')->withoutOverlapping();
+
 // Nightly: age out diagnostic logs (visits, SMS receipts, Meta sync attempts).
 // Runs at a quiet hour because the first pass over a long-neglected table is
 // the expensive one. Retention windows live in config/retention.php.

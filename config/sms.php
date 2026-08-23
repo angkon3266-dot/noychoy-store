@@ -17,6 +17,7 @@ return [
         'order_shipped' => 'Dear {name}, your {store} order {order} has been shipped via Steadfast. Tracking: {tracking}.',
         'order_delivered' => 'Dear {name}, your {store} order {order} has been delivered. Thank you for shopping with us!',
         'order_cancelled' => 'Dear {name}, your {store} order {order} has been cancelled. Contact us for any questions.',
+        'review_request' => 'Dear {name}, thank you for shopping at {store}! Rate order {order} in 30 seconds: {link}',
         'password_reset' => 'Your {store} password reset code is {code}. Valid for {minutes} minutes.',
     ],
 ];

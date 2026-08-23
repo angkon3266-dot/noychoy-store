@@ -167,6 +167,8 @@ Route::middleware('admin')->group(function () {
     Route::post('notifications/winback-settings', [NotificationController::class, 'winbackSettings'])->name('notifications.winback-settings');
     Route::post('notifications/run-new-arrivals', [NotificationController::class, 'runNewArrivals'])->name('notifications.run-new-arrivals');
     Route::post('notifications/run-winback', [NotificationController::class, 'runWinback'])->name('notifications.run-winback');
+    Route::post('notifications/review-requests', [NotificationController::class, 'reviewRequestSettings'])->name('notifications.review-requests');
+    Route::post('notifications/run-review-requests', [NotificationController::class, 'runReviewRequests'])->name('notifications.run-review-requests');
     Route::post('notifications/vapid-keys', [NotificationController::class, 'generateVapidKeys'])->name('notifications.vapid-keys');
     Route::post('notifications/test-push', [NotificationController::class, 'testPush'])->name('notifications.test-push');
     Route::post('notifications/push-templates', [NotificationController::class, 'savePushTemplates'])->name('notifications.push-templates');
