@@ -213,10 +213,21 @@ class CatalogController extends Controller
         session(['recently_viewed' => $recent]);
 
         // ViewContent — fire server-side (CAPI) and hand the SAME event id to the
-        // Blade so the browser Pixel dedups against it. content_ids match the
-        // catalog retailer_id via meta_content_id().
+        // React page so the browser Pixel dedups against it. content_ids match
+        // the catalog retailer_id via meta_content_id().
+        //
+        // Sent after the response is flushed, not before the controller returns:
+        // this is a POST to graph.facebook.com and it used to sit ahead of the
+        // HTML on every single product view. Same move, and the same reason, as
+        // TrackVisit's pageview insert. The browser signals are snapshotted here
+        // so the payload cannot depend on how much of the request is still
+        // standing by the time the callback runs. The event id itself stays
+        // synchronous — the page below needs it for Pixel dedup.
         $vcEventId = MetaTrackingService::newEventId('ViewContent');
-        $this->tracking->viewContent($product, $vcEventId, $this->trackingUser($request));
+        $vcUser = $this->trackingUser($request);
+        $vcContext = MetaTrackingService::captureClientContext();
+        $tracking = $this->tracking;
+        app()->terminating(fn () => $tracking->viewContent($product, $vcEventId, $vcUser, $vcContext));
 
         // Shared Alpine config for the product page (built once, used by every template).
         $pp = [

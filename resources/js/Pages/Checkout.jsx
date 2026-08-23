@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
-import { csrf, fetchJson, money } from '../Shared/format';
+import { fetchJson, money } from '../Shared/format';
 import Icon, { IconOrGlyph } from '../Shared/Icons';
+
+// Mirrors app/helpers.php bd_phone() so the client and the server agree on
+// what "the same number" is — and so "017 1234 5678" is not silently dropped.
+const bdPhone = (v) => {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.startsWith('880')) d = d.slice(3);
+    if (d.length === 10 && d.startsWith('1')) d = '0' + d;
+    return d;
+};
 
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
@@ -11,8 +20,28 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     const { props } = usePage();
     const chromeUrls = props.chrome?.urls || {};
     const errors = props.errors || {};
-    const errorList = Object.values(errors).flat();
-    const leadSent = useRef(false);
+    // Per-field messages, the way Account/Profile.jsx:22 already does it — the
+    // middleware shares MessageBag::getMessages(), so each value is an array.
+    // The old code flattened these into one banner, throwing away which field
+    // each message belonged to.
+    const err = (k) => errors[k]?.[0];
+    // DOM order of the form's fields — decides which one gets focus on failure.
+    const FIELD_ORDER = ['name', 'phone', 'address', 'area', 'is_inside_dhaka', 'is_gift', 'card_message', 'notes'];
+    // `email` and `district` are validated server-side but have no input here;
+    // without this they would fail silently.
+    const unmapped = Object.keys(errors).filter((k) => !FIELD_ORDER.includes(k));
+    const [errorNonce, setErrorNonce] = useState(0);
+    // id + invalid flag + describedby, keeping any pre-existing helper id.
+    const a11y = (k, help) => ({
+        id: `co-${k}`,
+        'aria-invalid': err(k) ? 'true' : undefined,
+        'aria-describedby': [help, err(k) ? `co-${k}-error` : null].filter(Boolean).join(' ') || undefined,
+    });
+    // The value last stored, not a boolean: a customer who typos their number
+    // and corrects it is the exact case abandoned-cart capture exists for, so a
+    // materially different number must re-send. Identical ones do not.
+    const leadSent = useRef('');
+    const leadBusy = useRef(false);
     const [code, setCode] = useState('');
     const [couponBusy, setCouponBusy] = useState(false);
 
@@ -76,28 +105,67 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     // Capture the lead the moment a valid phone is typed — a COD order the
     // customer abandons is still a phone number the team can follow up.
     const captureLead = () => {
-        if (leadSent.current) return;
-        if (!/^(\+?880|0)1[3-9]\d{8}$/.test((form.data.phone || '').trim())) return;
-        leadSent.current = true;
-        fetch(urls.lead, {
+        const phone = bdPhone(form.data.phone);
+        // App\Rules\BdPhone's pattern, applied after canonicalisation.
+        if (!/^01[3-9]\d{8}$/.test(phone)) return;
+        const name = (form.data.name || '').trim();
+        const key = `${phone}|${name}`;
+        if (key === leadSent.current || leadBusy.current) return;
+        leadBusy.current = true;
+        // fetchJson throws on any non-2xx, so a 429 from the endpoint's own
+        // throttle leaves leadSent untouched and the next blur retries. The old
+        // bare fetch() set the latch before the request and never cleared it on
+        // an HTTP-level failure.
+        fetchJson(urls.lead, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
-            body: JSON.stringify({ phone: form.data.phone, name: form.data.name, email: null }),
-        }).catch(() => { leadSent.current = false; });
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, name: name || null, email: null }),
+        })
+            .then(() => { leadSent.current = key; })
+            .catch(() => {})
+            .finally(() => { leadBusy.current = false; });
     };
+
+    // Send the customer straight to the first thing that needs fixing, rather
+    // than making them hunt for it under a list at the top of the page.
+    useEffect(() => {
+        if (!errorNonce) return;
+        const first = FIELD_ORDER.find((k) => errors[k]);
+        const row = first ? document.querySelector(`[data-field="${first}"]`) : null;
+        const input = first ? document.getElementById(`co-${first}`) : null;
+        // No `behavior` key: app.css owns smooth scroll and already disables it
+        // under prefers-reduced-motion.
+        (row || input || document.getElementById('checkout-errors'))?.scrollIntoView({ block: 'center' });
+        input?.focus({ preventScroll: true });
+    }, [errorNonce]);
 
     const submit = (e) => {
         e.preventDefault();
-        form.post(urls.store);
+        form.post(urls.store, {
+            // Hold scroll only when we stay on this page; a placed order
+            // redirects to the confirmation, which must open at the top.
+            preserveScroll: (page) => Object.keys(page.props.errors || {}).length > 0,
+            onError: () => {
+                // By now the number may have been corrected — re-capture it.
+                captureLead();
+                setErrorNonce((n) => n + 1);
+            },
+        });
     };
 
     return (
         <div className="mx-auto max-w-6xl px-4 py-8">
             <h1 className="font-display text-3xl font-semibold mb-6">Checkout</h1>
 
-            {errorList.length > 0 && (
-                <div className="rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-4 py-3 text-sm mb-6">
-                    <ul className="list-disc list-inside">{errorList.map((e, i) => <li key={i}>{e}</li>)}</ul>
+            {Object.keys(errors).length > 0 && (
+                <div id="checkout-errors" role="alert" tabIndex={-1} className="rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-4 py-3 text-sm mb-6">
+                    <p className="font-medium">Please check the highlighted {Object.keys(errors).length === 1 ? 'field' : 'fields'} below.</p>
+                    {/* Anything with no input on this page still has to be shown. */}
+                    {unmapped.length > 0 && (
+                        <ul className="list-disc list-inside mt-1">
+                            {unmapped.map((k) => <li key={k}>{err(k)}</li>)}
+                        </ul>
+                    )}
                 </div>
             )}
 
@@ -109,16 +177,18 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     )}
 
                     <div className="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="label">Full name *</label>
-                            <input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} className="input" required autoComplete="name" />
+                        <div data-field="name">
+                            <label className="label" htmlFor="co-name">Full name *</label>
+                            <input {...a11y('name')} value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} onBlur={captureLead} className="input" required autoComplete="name" />
+                            {err('name') && <p id="co-name-error" className="text-xs text-danger-600 mt-1">{err('name')}</p>}
                         </div>
-                        <div>
+                        <div data-field="phone">
                             {/* The phone gets the numeric keypad — this form is filled
                                 one-thumbed on a phone, and a COD order lives or dies
                                 on this field. */}
-                            <label className="label">Mobile number *</label>
+                            <label className="label" htmlFor="co-phone">Mobile number *</label>
                             <input
+                                {...a11y('phone', 'phone-help')}
                                 type="tel"
                                 value={form.data.phone}
                                 onChange={(e) => form.setData('phone', e.target.value)}
@@ -128,21 +198,23 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 required
                                 autoComplete="tel"
                                 inputMode="numeric"
-                                aria-describedby="phone-help"
                             />
                             <p id="phone-help" className="mt-1 text-[11px] text-ink-700/50">
                                 We save this so we can call you about the order — including if you
                                 do not finish checking out.
                             </p>
+                            {err('phone') && <p id="co-phone-error" className="text-xs text-danger-600 mt-1">{err('phone')}</p>}
                         </div>
                     </div>
-                    <div>
-                        <label className="label">Full address *</label>
-                        <textarea value={form.data.address} onChange={(e) => form.setData('address', e.target.value)} rows={2} className="input" required autoComplete="street-address" />
+                    <div data-field="address">
+                        <label className="label" htmlFor="co-address">Full address *</label>
+                        <textarea {...a11y('address')} value={form.data.address} onChange={(e) => form.setData('address', e.target.value)} rows={2} className="input" required autoComplete="street-address" />
+                        {err('address') && <p id="co-address-error" className="text-xs text-danger-600 mt-1">{err('address')}</p>}
                     </div>
-                    <div>
-                        <label className="label">Area / Thana</label>
-                        <input value={form.data.area} onChange={(e) => form.setData('area', e.target.value)} className="input" autoComplete="address-level2" />
+                    <div data-field="area">
+                        <label className="label" htmlFor="co-area">Area / Thana</label>
+                        <input {...a11y('area')} value={form.data.area} onChange={(e) => form.setData('area', e.target.value)} className="input" autoComplete="address-level2" />
+                        {err('area') && <p id="co-area-error" className="text-xs text-danger-600 mt-1">{err('area')}</p>}
                     </div>
 
                     {freeShipping ? (
@@ -159,11 +231,11 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                             </div>
                         </div>
                     ) : (
-                    <div>
+                    <div data-field="is_inside_dhaka">
                         <span className="label">Delivery zone</span>
                         <div className="flex gap-3">
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
-                                <input type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '1'); }} className="sr-only" />
+                                <input id="co-is_inside_dhaka" aria-invalid={err('is_inside_dhaka') ? 'true' : undefined} type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '1'); }} className="sr-only" />
                                 Inside Dhaka — ৳{summary.shipInside}
                             </label>
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${!inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
@@ -171,6 +243,9 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 Outside Dhaka — ৳{summary.shipOutside}
                             </label>
                         </div>
+                        {/* The radios are sr-only, so the effect scrolls to the
+                            [data-field] wrapper and focuses the input separately. */}
+                        {err('is_inside_dhaka') && <p id="co-is_inside_dhaka-error" className="text-xs text-danger-600 mt-1">{err('is_inside_dhaka')}</p>}
                     </div>
                     )}
 
@@ -193,10 +268,10 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 </span>
                             </label>
                             {form.data.is_gift && (
-                                <div className="mt-3">
-                                    <label className="label text-xs" htmlFor="card_message">{gift.messageLabel}</label>
+                                <div className="mt-3" data-field="card_message">
+                                    <label className="label text-xs" htmlFor="co-card_message">{gift.messageLabel}</label>
                                     <textarea
-                                        id="card_message"
+                                        {...a11y('card_message')}
                                         value={form.data.card_message}
                                         onChange={(e) => form.setData('card_message', e.target.value.slice(0, gift.max))}
                                         rows={3}
@@ -210,14 +285,16 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                             {form.data.card_message.length}/{gift.max}
                                         </span>
                                     </div>
+                                    {err('card_message') && <p id="co-card_message-error" className="text-xs text-danger-600 mt-1">{err('card_message')}</p>}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    <div>
-                        <label className="label">Order note (optional)</label>
-                        <textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} className="input" />
+                    <div data-field="notes">
+                        <label className="label" htmlFor="co-notes">Order note (optional)</label>
+                        <textarea {...a11y('notes')} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} className="input" />
+                        {err('notes') && <p id="co-notes-error" className="text-xs text-danger-600 mt-1">{err('notes')}</p>}
                     </div>
                 </div>
 
@@ -243,7 +320,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     <div className="mt-4 pt-4 border-t border-ink-100">
                         {coupon ? (
                             <div className="flex items-center justify-between text-sm rounded-md bg-success-50 border border-success-200 px-3 py-2">
-                                <span className="text-success-800 inline-flex items-center gap-1.5"><Icon name="tag" className="w-4 h-4 shrink-0" />Coupon <strong className="font-mono">{coupon.code}</strong> applied</span>
+                                <span className="text-success-800 inline-flex items-center gap-1.5"><Icon name="tag" className="w-4 h-4 shrink-0" /><span className="min-w-0">Coupon <strong className="font-mono">{coupon.code}</strong> applied</span></span>
                                 <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-danger-600 hover:underline disabled:opacity-50">Remove</button>
                             </div>
                         ) : (
@@ -288,9 +365,35 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     {loyalty && <Points loyalty={loyalty} />}
 
                     {registerPct && (
-                        <div className="mt-3 rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs flex items-center justify-between gap-2">
-                            <span className="inline-flex items-center gap-1.5"><Icon name="sparkle" className="w-4 h-4 shrink-0" />Get an extra <strong>{registerPct}%</strong> off — plus loyalty points on every order.</span>
-                            <a href={chromeUrls.register} className="shrink-0 underline font-medium">Create account</a>
+                        /* The icon and the CTA are the only flex items besides ONE
+                           span holding the whole sentence. Bare text either side of
+                           an element child becomes its own anonymous flex item, and
+                           with `items-center` each one is then a rigid column that
+                           wraps independently — which is why this row used to read
+                           "Get an" / "2%" / "off — plus…" stacked. `min-w-0` lets
+                           that span shrink below its min-content width so the text
+                           reflows normally. Same shape as Product.jsx:336. */
+                        <div className="mt-3 rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs">
+                            {/* Exactly two flex items — the icon and ONE paragraph
+                                that holds the entire sentence. Nothing here can
+                                fragment. The CTA is a normal block below rather
+                                than a third flex item, because this card is only
+                                ~210px wide on a phone and no arrangement fits the
+                                sentence and a button on one line at that size. */}
+                            <div className="flex items-start gap-2">
+                                <Icon name="sparkle" className="w-4 h-4 shrink-0 mt-px text-gold-300" />
+                                <p className="min-w-0 leading-relaxed">
+                                    {registerPct.saving >= 50 ? (
+                                        <>Save <strong className="font-semibold">{registerPct.savingText}</strong> on this order</>
+                                    ) : (
+                                        <>Get <strong className="font-semibold">{registerPct.pct}%</strong> off this order</>
+                                    )}
+                                    <span className="text-white/65"> — member price, plus loyalty points on every order.</span>
+                                </p>
+                            </div>
+                            <a href={chromeUrls.register} className="mt-2 inline-flex items-center gap-1 rounded bg-white/10 px-2.5 py-1 font-medium hover:bg-white/20">
+                                Create account <span aria-hidden="true">→</span>
+                            </a>
                         </div>
                     )}
 

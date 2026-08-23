@@ -130,15 +130,15 @@ class CartController extends Controller
         Visit::record('cart_add', ['product_id' => $product->id]);
 
         // AddToCart — server-side (CAPI) with the SAME event id the browser Pixel
-        // used, so Meta collapses the two into one deduplicated event.
+        // used, so Meta collapses the two into one deduplicated event. Sent
+        // after the response: the mini-cart slide-over is blocked on the JSON
+        // below, and Graph is not something it should wait behind.
         if (filled($data['event_id'] ?? null)) {
-            $tracking->addToCart(
-                $product,
-                (int) ($data['qty'] ?? 1),
-                $data['event_id'],
-                $tracking->customerMatchData(auth('customer')->user()),
-                $variant,
-            );
+            $atcQty = (int) ($data['qty'] ?? 1);
+            $atcEventId = $data['event_id'];
+            $atcUser = $tracking->customerMatchData(auth('customer')->user());
+            $atcContext = MetaTrackingService::captureClientContext();
+            app()->terminating(fn () => $tracking->addToCart($product, $atcQty, $atcEventId, $atcUser, $variant, $atcContext));
         }
 
         if ($request->wantsJson()) {

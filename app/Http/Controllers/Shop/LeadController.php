@@ -34,7 +34,9 @@ class LeadController extends Controller
         AbandonedCart::updateOrCreate(
             ['session_id' => $request->session()->getId(), 'recovered' => false],
             [
-                'phone' => $data['phone'],
+                // Canonical "01XXXXXXXXX" — the form PlaceOrder stores and
+                // matches on. A raw "+8801…" lead never gets marked recovered.
+                'phone' => bd_phone($data['phone']),
                 'name' => $data['name'] ?? null,
                 'email' => $data['email'] ?? null,
                 'items' => $items,

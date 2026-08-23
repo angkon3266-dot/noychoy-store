@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
@@ -79,10 +80,25 @@ class SendOrderPlacedEffects implements ShouldQueue
             // anyway — the event_id is the order number, so it's stable across
             // retries by construction — but not sending them at all is better
             // than relying on that, and this needs no schema change.
-            $once = Cache::add('meta.purchase.'.$order->order_number, true, now()->addDay());
+            $key = 'meta.purchase.'.$order->order_number;
+            $once = Cache::add($key, true, now()->addDay());
 
             if ($once) {
-                $capi->purchase($order, $order->order_number, $this->clientContext ?: null);
+                $result = $capi->purchase($order, $order->order_number, $this->clientContext ?: null);
+
+                // send() never throws — it returns ok:false. Claiming the guard
+                // before knowing that would mean a single failed POST silently
+                // buried this order's revenue event for a day, with nothing
+                // retrying and nothing logged. Release it so a re-dispatch can
+                // still get through, and say so out loud.
+                if (! ($result['ok'] ?? false)) {
+                    Cache::forget($key);
+                    Log::warning('Meta CAPI Purchase did not land; guard released so it can be resent.', [
+                        'order' => $order->order_number,
+                        'status' => $result['status'] ?? null,
+                        'error' => $result['error'] ?? null,
+                    ]);
+                }
             }
         } catch (\Throwable $e) {
             report($e);

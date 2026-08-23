@@ -271,10 +271,51 @@ APP_URL=https://your-domain
 DB_DATABASE=cpaneluser_dbname
 DB_USERNAME=cpaneluser_dbuser
 DB_PASSWORD=********
-SESSION_DRIVER=database
+SESSION_DRIVER=redis       # or `database` if Redis isn't available
+SESSION_CONNECTION=session # ONLY alongside SESSION_DRIVER=redis — see below
 QUEUE_CONNECTION=database
 CACHE_STORE=redis          # or `database` if Redis isn't available
 ```
+
+#### Sessions on Redis
+
+Sessions sit on **Redis database 2**, on their own `session` connection. That is
+deliberate, not tidiness: `php artisan cache:clear` — which `deploy.sh` runs on
+every single deploy via `optimize:clear` — is a whole-database `FLUSHDB` on the
+cache connection (db 1), and `cache:clear --locks` is a `FLUSHDB` on `default`
+(db 0). A session store sharing either database would be erased by a routine
+deploy, logging out every customer and emptying every cart.
+
+`SESSION_CONNECTION` means two different things depending on the driver: a
+**Redis** connection under `redis`, but a **database** connection under
+`database`. `config/session.php` therefore only reads it when the driver is
+`redis`, so a rollback cannot leave a Redis connection name behind and take the
+site down — but still move the two keys together so the intent stays readable.
+
+**Moving an existing store from the database driver, without logging anyone out:**
+
+```bash
+php artisan session:to-redis --dry-run     # proves the Redis round trip, writes nothing
+php artisan session:to-redis --verify      # copies, then reads every key back
+sed -i 's|^SESSION_DRIVER=.*|SESSION_DRIVER=redis|' .env
+grep -q '^SESSION_CONNECTION=' .env || printf 'SESSION_CONNECTION=session\n' >> .env
+php artisan config:cache
+```
+
+The copy is not a column copy: the database handler base64-encodes the payload
+and the cache handler stores it raw, so moving the rows verbatim would corrupt
+every session — silently, with no log line, presenting exactly as "everyone was
+logged out". `session:to-redis` decodes on the way across and writes through the
+same repository Laravel's own handler would use, so the key format cannot drift.
+
+Rollback is one line, and needs no cleanup:
+
+```bash
+sed -i 's|^SESSION_DRIVER=.*|SESSION_DRIVER=database|' .env && php artisan config:cache
+```
+
+Once you are past the rollback window, `php artisan session:to-redis --prune`
+deletes the rows it copied.
 Then:
 ```bash
 php artisan key:generate

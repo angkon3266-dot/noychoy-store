@@ -71,9 +71,20 @@ return [
     | connection that should be used to manage these sessions. This should
     | correspond to a connection in your database configuration options.
     |
+    | SESSION_CONNECTION means two different things depending on the driver: a
+    | *Redis* connection under `redis`, but a *database* connection under
+    | `database`. Reading it unconditionally is a trap — rolling the driver back
+    | to `database` while a Redis connection name is still in .env makes
+    | SessionManager::getDatabaseConnection() ask for a database connection
+    | called "session", which does not exist, and every single request throws.
+    | That would turn the emergency rollback into a worse outage than the thing
+    | being rolled back. So it only applies to the driver it was written for.
+    |
     */
 
-    'connection' => env('SESSION_CONNECTION'),
+    'connection' => env('SESSION_DRIVER', 'database') === 'redis'
+        ? env('SESSION_CONNECTION')
+        : env('SESSION_DB_CONNECTION'),
 
     /*
     |--------------------------------------------------------------------------

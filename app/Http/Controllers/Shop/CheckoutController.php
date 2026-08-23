@@ -33,13 +33,36 @@ class CheckoutController extends Controller
             : "prod-{$i['product_id']}")->values()->all();
         $icValue = (float) ($this->cart->subtotal() - $this->cart->discount());
         $user = $tracking->customerMatchData($customer);
-        $tracking->initiateCheckout($icContentIds, $icValue, (int) $this->cart->count(), $icEventId, $user);
+        // After the response, never before it — see CatalogController::show().
+        // The cart is read NOW: the closure must not re-read it, because a
+        // terminate-time read would be a different snapshot.
+        $icCount = (int) $this->cart->count();
+        $icContext = MetaTrackingService::captureClientContext();
+        app()->terminating(fn () => $tracking->initiateCheckout($icContentIds, $icValue, $icCount, $icEventId, $user, $icContext));
 
         $loyalty = app(\App\Services\LoyaltyService::class);
         $custPoints = (int) ($customer->points ?? 0);
         $appliedPoints = $this->cart->redeemablePoints();
         $regPct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
         $discount = $this->cart->discount();
+
+        // What signing up is actually worth on THIS cart, in taka. "Get an extra
+        // 2% off" is an abstraction; "Save ৳130 on this order" is the same fact
+        // in the unit the customer is deciding in. Mirrors CartService's
+        // per-line loop so per-product and per-category member overrides apply
+        // — the figure cannot be derived client-side from one percentage.
+        $regSaving = 0.0;
+        if (! $customer) {
+            $pricing = app(\App\Services\MemberPricingService::class);
+            if ($pricing->enabled()) {
+                foreach ($this->cart->items() as $line) {
+                    $pct = $pricing->percentForLine((int) $line['product_id'], $line['category_id'] ?? null);
+                    if ($pct > 0) {
+                        $regSaving += $line['price'] * $line['qty'] * $pct / 100;
+                    }
+                }
+            }
+        }
 
         return \Inertia\Inertia::render('Checkout', [
             'pageTitle' => 'Checkout',
@@ -81,15 +104,18 @@ class CheckoutController extends Controller
                 'defaultRedeem' => (int) (floor($custPoints / max(1, $loyalty->redeemStep())) * $loyalty->redeemStep()),
                 'pointsUrl' => route('cart.points'),
             ] : null,
-            'registerPct' => (! $customer && $regPct > 0)
-                ? rtrim(rtrim(number_format($regPct, 2), '0'), '.') : null,
+            'registerPct' => (! $customer && $regPct > 0) ? [
+                'pct' => rtrim(rtrim(number_format($regPct, 2), '0'), '.'),
+                'saving' => round($regSaving, 2),
+                'savingText' => money(round($regSaving, 2)),
+            ] : null,
             'trustBadges' => collect(theme('trust_badges') ?: config('theme.defaults.trust_badges', []))
                 ->filter(fn ($b) => filled($b['title'] ?? null))->take(4)->values(),
             'ic' => [
                 'eventId' => $icEventId,
                 'contentIds' => $icContentIds,
                 'value' => $icValue,
-                'numItems' => (int) $this->cart->count(),
+                'numItems' => $icCount,
             ],
             'coupon' => ($c = $this->cart->coupon()) ? ['code' => $c->code] : null,
             // Free delivery already won: the zone picker is noise at that

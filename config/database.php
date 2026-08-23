@@ -179,6 +179,26 @@ return [
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
+        // Sessions get their own logical database, and it is not optional.
+        // `php artisan cache:clear` — which deploy.sh runs on every deploy via
+        // optimize:clear — is a FLUSHDB on the `cache` connection, and
+        // `cache:clear --locks` is a FLUSHDB on `default`. A session store
+        // sharing either database would be wiped by a routine deploy, logging
+        // out every customer and emptying every cart. Keeping it on db 2 means
+        // neither command can reach it.
+        'session' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_SESSION_DB', '2'),
+            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
     ],
 
 ];

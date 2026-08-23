@@ -92,9 +92,16 @@ class MetaTrackingService
         return $this->mapper->retailerId($product, $variant);
     }
 
+    /**
+     * Seconds allowed for a storefront event that has already been deferred past
+     * the response. Meta normally answers in 100-200ms; the only thing a longer
+     * window buys is a stuck connection holding an lsphp process for longer.
+     */
+    private const STOREFRONT_TIMEOUT = 5;
+
     // ── Standard commerce events ─────────────────────────────────────────────
 
-    public function viewContent(Product $product, string $eventId, array $user = []): void
+    public function viewContent(Product $product, string $eventId, array $user = [], ?array $context = null): void
     {
         $this->send('ViewContent', $this->hashUser($user), [
             'content_type' => 'product',
@@ -102,10 +109,10 @@ class MetaTrackingService
             'content_name' => $product->name,
             'currency' => $this->currency(),
             'value' => (float) $product->price,
-        ], $eventId);
+        ], $eventId, context: $context, timeout: self::STOREFRONT_TIMEOUT);
     }
 
-    public function addToCart(Product $product, int $quantity, string $eventId, array $user = [], ?ProductVariant $variant = null): void
+    public function addToCart(Product $product, int $quantity, string $eventId, array $user = [], ?ProductVariant $variant = null, ?array $context = null): void
     {
         $unit = $variant?->price !== null ? (float) $variant->price : (float) $product->price;
 
@@ -115,13 +122,13 @@ class MetaTrackingService
             'content_name' => $product->name,
             'currency' => $this->currency(),
             'value' => $unit * max(1, $quantity),
-        ], $eventId);
+        ], $eventId, context: $context, timeout: self::STOREFRONT_TIMEOUT);
     }
 
     /**
      * @param  array<int,string>  $contentIds  retailer_ids ("prod-{id}") in the cart
      */
-    public function initiateCheckout(array $contentIds, float $value, int $numItems, string $eventId, array $user = []): void
+    public function initiateCheckout(array $contentIds, float $value, int $numItems, string $eventId, array $user = [], ?array $context = null): void
     {
         $this->send('InitiateCheckout', $this->hashUser($user), [
             'content_type' => 'product',
@@ -129,7 +136,7 @@ class MetaTrackingService
             'currency' => $this->currency(),
             'value' => $value,
             'num_items' => $numItems,
-        ], $eventId);
+        ], $eventId, context: $context, timeout: self::STOREFRONT_TIMEOUT);
     }
 
     /**
@@ -154,7 +161,10 @@ class MetaTrackingService
         ];
     }
 
-    public function purchase(Order $order, string $eventId, ?array $context = null): void
+    /**
+     * @return array{ok:bool,status:int,body:mixed,error:?string,ms:int}
+     */
+    public function purchase(Order $order, string $eventId, ?array $context = null): array
     {
         $order->loadMissing('items');
 
@@ -162,7 +172,7 @@ class MetaTrackingService
         // and a full name in `fn` matches neither.
         [$first, $last] = $this->splitName($order->customer_name);
 
-        $this->send('Purchase', $this->hashUser([
+        return $this->send('Purchase', $this->hashUser([
             'em' => $order->customer_email,
             'ph' => $order->customer_phone,
             'fn' => $first,
@@ -232,9 +242,16 @@ class MetaTrackingService
      * and a token to be configured. Returns a structured result for the Test
      * panel / Event debugger.
      *
+     * $timeout is opt-in and deliberately NOT the default. The storefront
+     * events are fire-and-forget after the response, so they should fail fast
+     * rather than pin a PHP worker on a shared host. Purchase keeps the full
+     * ten seconds: it is one POST per order, it carries the revenue, and
+     * send() never throws — so a timeout there is silent, permanent data loss,
+     * not a retry.
+     *
      * @return array{ok:bool,status:int,body:mixed,error:?string,ms:int}
      */
-    protected function send(string $eventName, array $userData, array $customData, string $eventId, bool $test = false, ?array $context = null): array
+    protected function send(string $eventName, array $userData, array $customData, string $eventId, bool $test = false, ?array $context = null, ?int $timeout = null): array
     {
         $skip = ['ok' => false, 'status' => 0, 'body' => null, 'error' => null, 'ms' => 0];
 
@@ -285,7 +302,9 @@ class MetaTrackingService
                 $pixelId,
             );
 
-            $res = Http::timeout(10)->post($url.'?access_token='.urlencode($token), $payload);
+            $res = Http::connectTimeout($timeout ? 3 : 10)
+                ->timeout($timeout ?? 10)
+                ->post($url.'?access_token='.urlencode($token), $payload);
             $ms = (int) round((microtime(true) - $started) * 1000);
 
             if ($res->failed()) {

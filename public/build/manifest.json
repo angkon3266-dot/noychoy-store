@@ -196,7 +196,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BqwXtmBB.css",
+    "file": "assets/app-CpU6GNzd.css",
     "name": "app",
     "names": [
       "app.css"
@@ -378,7 +378,7 @@
     ]
   },
   "resources/js/Pages/Checkout.jsx": {
-    "file": "assets/Checkout-Dzqqk8kX.js",
+    "file": "assets/Checkout-B0_d1Iga.js",
     "name": "Checkout",
     "src": "resources/js/Pages/Checkout.jsx",
     "isDynamicEntry": true,
@@ -471,7 +471,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-BiLgZR1y.js",
+    "file": "assets/inertia-DZCRnHkh.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,
