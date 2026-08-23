@@ -204,6 +204,11 @@ defaults, the emoji icon system and the palette are code.
 | 2026-08-23 | `3497553` | Admin: correct a delivery address, take an order by hand, partial deliveries, integration health alerts, Reviews 500 on a deleted product, Steadfast off the page-load path. 615 tests |
 | 2026-08-23 | `9a7aad3` | Landing-page icon names printed as text; Meta token + 1,200 phone numbers purged from production logs; admin role gate and the first negative authz tests. 631 tests |
 | 2026-08-23 | `f833695` | Speed: brand fonts actually served (146 KB, not 268 KB force-preloaded), filter sidebar cached with versioned busting, Deals of the Day cached, related products hydrate only the winners. 638 tests |
+| 2026-08-23 | `15671a9` | Search rebuilt: multi-word, relevance-ordered, typo correction (transposition-aware), and a zero-result page that recovers instead of dead-ending. 652 tests |
+| 2026-08-23 | `8b73b45` | Order items can be added and removed (with the stock deltas that were never applied); COD payment recorded on delivery. 661 tests |
+| 2026-08-23 | `f01d7c7` | Responsive images via srcset + a mid-size variant; guests offered an account on the confirmation page, gated by proof the order is theirs. 668 tests |
+| 2026-08-23 | `9e66ef9` | 2,724 lines of dead Blade deleted, after single-sourcing the homepage React/Blade fork that would have silently reverted the live homepage. Product-template picker removed |
+| 2026-08-23 | `6d25c4d` | Admin forms submit in the background and swap the changed region — no full-page reload. 672 tests |
 
 ---
 
