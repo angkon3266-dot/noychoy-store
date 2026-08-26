@@ -49,7 +49,17 @@ class LandingController extends Controller
                 return $b;
             })->values();
 
-        return view('shop.landing', compact('page', 'blocks', 'attached'));
+        return view('shop.landing', compact('page', 'blocks', 'attached'))->with([
+            // Handed to partials.seo-head rather than emitted by the view, so a
+            // landing page gets the same canonical/robots/JSON-LD treatment as
+            // the rest of the site instead of its own half-set of OG tags.
+            'pageTitle' => $page->meta_title ?: $page->title,
+            'metaDescription' => $page->meta_description,
+            'ogImage' => theme_asset($page->og_image),
+            // A draft is only reachable by a logged-in admin, but if one shares
+            // the preview link it must not end up in the index.
+            'metaRobots' => $page->is_published ? null : 'noindex, nofollow',
+        ]);
     }
 
     /** Products for a carousel block: this page's picks, or a catalog source. */

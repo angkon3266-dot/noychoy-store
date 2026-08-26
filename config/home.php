@@ -4,6 +4,18 @@ return [
     // Editable homepage content — overridable from Admin → Appearance → Homepage content
     // (stored in the settings table under the 'home_content' key).
     'defaults' => [
+        // SEO. These were editable in Admin -> Appearance -> Homepage content
+        // and then thrown away on save, because that form only persists keys
+        // that exist here — so the homepage has been running on its hardcoded
+        // fallback title no matter what the owner typed.
+        // The default names the market on purpose. "Fine Jewelry" — which is
+        // what seven homepage templates each hardcoded as their own fallback —
+        // competes with the entire web; "in Bangladesh" competes with the
+        // handful of shops that actually deliver here, which is the only race
+        // this shop can win.
+        'seo_title' => 'Fine Jewelry Online in Bangladesh',
+        'seo_description' => null,              // falls back to hero_subtitle
+
         // Hero
         'hero_eyebrow' => null,                 // small text above heading (defaults to store name)
         'hero_heading' => 'Jewelry that tells your story',

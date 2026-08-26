@@ -110,9 +110,23 @@ class HomeController extends Controller
             $lcp = collect($data['hero']['slides'] ?? [])->first();
             $lcpImage = ($lcp && ($lcp['type'] ?? null) === 'image') ? $lcp['image'] : null;
 
-            return \Inertia\Inertia::render('Home', $data)->withViewData([
-                'pageTitle' => home_content('seo_title') ?: 'Fine Jewelry',
-                'metaDescription' => home_content('hero_subtitle'),
+            return \Inertia\Inertia::render('Home', $data + [
+                'seoTitle' => home_content('seo_title'),
+            ])->withViewData([
+                // Default in config/home.php, overridable in Admin → Appearance
+                // → Homepage content (a field that until now was silently
+                // discarded on save).
+                'pageTitle' => home_content('seo_title'),
+                'metaDescription' => home_content('seo_description') ?: home_content('hero_subtitle'),
+                // Featured products, server-rendered into the pre-hydration
+                // shell: the homepage is where crawl depth is decided, and it
+                // previously linked to nothing without JavaScript.
+                'seoHeading' => home_content('hero_heading') ?: store_name(),
+                'seoItems' => collect($featured)->take(12)->map(fn ($p) => [
+                    'url' => route('product.show', $p),
+                    'name' => $p->name,
+                ])->all(),
+                'seoListName' => 'Featured jewelry',
                 'preloadImage' => $lcpImage,
                 'preloadSrcset' => ($lcpImage && ($lcp['image900'] ?? null))
                     ? $lcp['image900'].' 900w, '.$lcpImage.' 1600w' : null,

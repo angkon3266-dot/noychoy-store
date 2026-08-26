@@ -25,7 +25,14 @@ class PageController extends Controller
             'pageTitle' => $title,
             'title' => $title,
             'body' => page_content($page, 'body'),
-        ])->withViewData(['pageTitle' => $title]);
+        ])->withViewData([
+            'pageTitle' => $title,
+            // The body is React-rendered, so without this the About page — the
+            // one page a shopper reads to decide whether the shop is real —
+            // reached a crawler as an empty div.
+            'seoHeading' => $title,
+            'seoIntro' => page_content($page, 'body'),
+        ]);
     }
 
     public function contact()
@@ -43,7 +50,11 @@ class PageController extends Controller
                 'whatsapp' => theme('whatsapp_number'),
             ],
             'submitUrl' => route('page.contact.submit'),
-        ])->withViewData(['pageTitle' => $title]);
+        ])->withViewData([
+            'pageTitle' => $title,
+            'seoHeading' => $title,
+            'seoIntro' => page_content('contact', 'intro'),
+        ]);
     }
 
     public function submitContact(Request $request)

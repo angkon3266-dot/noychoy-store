@@ -35,11 +35,23 @@ function Chrome({ children }) {
     }, [url]);
 
     // The Blade head renders the title on first load; SPA visits must keep it
-    // in sync themselves (same "X — Store" pattern as the server).
+    // in sync themselves.
+    //
+    // `seoTitle` is what the server put in <title> — the search-facing string,
+    // which for a product is "Hoop Earrings — Price in Bangladesh" rather than
+    // the bare heading. Preferring it here matters twice over: it keeps SPA
+    // titles identical to server ones, and it stops this effect from quietly
+    // overwriting the server's title with the weaker one on first mount, where
+    // a rendering crawler would have read the replacement.
     useEffect(() => {
         const store = props.chrome?.storeName;
-        if (props.pageTitle && store) document.title = `${props.pageTitle} — ${store}`;
-    }, [props.pageTitle, props.chrome?.storeName]);
+        const title = props.seoTitle || props.pageTitle;
+        if (!title || !store) return;
+
+        document.title = title.toLowerCase().includes(store.toLowerCase())
+            ? title
+            : `${title} | ${store}`;
+    }, [props.seoTitle, props.pageTitle, props.chrome?.storeName]);
 
     // A normal page load moves focus to the top of the document and a screen
     // reader announces the new title. An SPA navigation does neither unless we

@@ -60,9 +60,18 @@ class LinkPreviewMetaTest extends TestCase
 
             // The homepage DOES carry a sharing card now — it just has to be
             // the shop's own, never a product's.
+            $head = $this->headOf($html);
+
+            // The homepage does now name its featured products, inside an
+            // ItemList — that is the shop listing what it sells, not the page
+            // claiming to be one of them. So the ban applies to the sharing
+            // card and to Product schema, not to every mention of the name.
+            $sharingCard = preg_replace('#<script type="application/ld\+json">.*?</script>#s', '', $head);
+
             $this->assertStringNotContainsString('og:type" content="product"', $html, "[$template] homepage claims to be a product");
             $this->assertStringNotContainsString('product:price:amount', $html, "[$template] homepage leaks a product price");
-            $this->assertStringNotContainsString('Shared Product', $this->headOf($html), "[$template] homepage leaks a product title into <head>");
+            $this->assertStringNotContainsString('Shared Product', $sharingCard, "[$template] homepage leaks a product title into its sharing card");
+            $this->assertStringNotContainsString('"@type":"Product"', $head, "[$template] homepage emits Product schema");
         }
     }
 

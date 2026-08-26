@@ -1,117 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ config('seo.html_lang', 'en-BD') }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    {{-- $pageTitle / $metaDescription / $canonicalUrl / $product arrive as view
-         data from Inertia::render(...)->withViewData(...) so crawlers and link
-         previews get real server-rendered tags — never client-rendered. --}}
-    <title>{{ ($pageTitle ?? null) ?: store_name() }} — {{ store_name() }}</title>
-    @isset($product)
-        @if($product instanceof \App\Models\Product && request()->routeIs('product.show'))
-            @php $ogImg = $product->thumbnail; @endphp
-            <meta property="og:type" content="product">
-            <meta property="og:title" content="{{ $product->meta_title ?: $product->name }}">
-            <meta property="og:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($product->meta_description ?: $product->short_description ?: $product->description), 200) }}">
-            <meta property="og:url" content="{{ route('product.show', $product) }}">
-            @if($ogImg)<meta property="og:image" content="{{ \Illuminate\Support\Str::startsWith($ogImg, 'http') ? $ogImg : rtrim(config('app.url'),'/').'/'.ltrim($ogImg,'/') }}">@endif
-            <meta property="product:brand" content="{{ store_name() }}">
-            <meta property="product:availability" content="{{ ($product->isAvailable() || $product->isPreorder()) ? 'in stock' : 'out of stock' }}">
-            <meta property="product:condition" content="new">
-            <meta property="product:price:amount" content="{{ number_format((float) $product->price, 2, '.', '') }}">
-            <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
-            @php
-                $ldImages = $product->relationLoaded('images')
-                    ? $product->images->map->url->take(4)->values()->all()
-                    : array_filter([$ogImg]);
-                $ldProduct = [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'Product',
-                    'name' => $product->name,
-                    'description' => \Illuminate\Support\Str::limit(trim(strip_tags($product->short_description ?: $product->description)), 300),
-                    'image' => $ldImages,
-                    'sku' => $product->sku,
-                    'brand' => ['@type' => 'Brand', 'name' => store_name()],
-                    'offers' => [
-                        '@type' => 'Offer',
-                        'url' => route('product.show', $product),
-                        'price' => number_format((float) $product->price, 2, '.', ''),
-                        'priceCurrency' => config('store.currency', 'BDT'),
-                        'availability' => ($product->isAvailable() || $product->isPreorder())
-                            ? 'https://schema.org/InStock'
-                            : 'https://schema.org/OutOfStock',
-                    ],
-                ];
-                if ($product->review_count > 0 && $product->average_rating) {
-                    $ldProduct['aggregateRating'] = [
-                        '@type' => 'AggregateRating',
-                        'ratingValue' => round((float) $product->average_rating, 1),
-                        'reviewCount' => (int) $product->review_count,
-                    ];
-                }
-                $ldCrumbs = [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'BreadcrumbList',
-                    'itemListElement' => array_values(array_filter([
-                        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => route('home')],
-                        $product->category
-                            ? ['@type' => 'ListItem', 'position' => 2, 'name' => $product->category->name, 'item' => route('category.show', $product->category->slug)]
-                            : null,
-                        ['@type' => 'ListItem', 'position' => $product->category ? 3 : 2, 'name' => $product->name, 'item' => route('product.show', $product)],
-                    ])),
-                ];
-            @endphp
-            <script type="application/ld+json">{!! json_encode($ldProduct, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
-            <script type="application/ld+json">{!! json_encode($ldCrumbs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
-        @endif
-    @endisset
-    <link rel="canonical" href="{{ $canonicalUrl ?? url()->current() }}">
-    @php
-        $metaDesc = $metaDescription ?? null;
-        if (blank($metaDesc) && isset($product) && $product instanceof \App\Models\Product && request()->routeIs('product.show')) {
-            $metaDesc = $product->meta_description ?: $product->short_description ?: $product->description;
-        }
-        if (blank($metaDesc)) {
-            $metaDesc = home_content('hero_subtitle') ?: 'Shop '.store_name().' — quality pieces delivered across Bangladesh with cash on delivery.';
-        }
-        $metaDesc = \Illuminate\Support\Str::limit(trim(strip_tags((string) $metaDesc)), 160);
-    @endphp
-    <meta name="description" content="{{ $metaDesc }}">
+    {{-- Every SEO tag on the site — title, description, robots, canonical,
+         hreflang, OG/Twitter and the JSON-LD graph — lives in one partial
+         shared with layouts/shop.blade.php. $pageTitle / $metaDescription /
+         $product and friends arrive as view data from
+         Inertia::render(...)->withViewData(), so crawlers and link previews
+         get real server-rendered tags rather than client-rendered ones. --}}
+    @include('partials.seo-head')
 
-    {{-- Sharing card. Product pages set their own og:* block above (with the
-         richer product:* properties); every other page type gets one here, so
-         a link pasted into WhatsApp or Facebook always renders with a picture
-         instead of as bare text. --}}
-    @php
-        $absolute = function (?string $u) {
-            $u = trim((string) $u);
-            if ($u === '') {
-                return null;
-            }
-
-            return \Illuminate\Support\Str::startsWith($u, 'http')
-                ? $u
-                : rtrim(config('app.url'), '/').'/'.ltrim($u, '/');
-        };
-        // Best available picture, in order: one the controller chose, the
-        // page's own LCP image, the shop logo.
-        $shareImage = $absolute($ogImage ?? ($preloadImage ?? null) ?: theme_asset(theme('logo')));
-        $isProductPage = isset($product) && $product instanceof \App\Models\Product && request()->routeIs('product.show');
-    @endphp
-    @unless($isProductPage)
-        <meta property="og:type" content="website">
-        <meta property="og:title" content="{{ ($pageTitle ?? null) ?: store_name() }}">
-        <meta property="og:description" content="{{ $metaDesc }}">
-        <meta property="og:url" content="{{ $canonicalUrl ?? url()->current() }}">
-        @if($shareImage)<meta property="og:image" content="{{ $shareImage }}">@endif
-    @endunless
-    <meta property="og:site_name" content="{{ store_name() }}">
-    <meta property="og:locale" content="en_GB">
-    <meta name="twitter:card" content="{{ $shareImage ? 'summary_large_image' : 'summary' }}">
-    <meta name="twitter:title" content="{{ ($pageTitle ?? null) ?: store_name() }}">
-    <meta name="twitter:description" content="{{ $metaDesc }}">
-    @if($shareImage)<meta name="twitter:image" content="{{ $shareImage }}">@endif
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any"><link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">@endif
     <link rel="manifest" href="{{ route('manifest') }}">
     <meta name="mobile-web-app-capable" content="yes">
@@ -197,7 +97,14 @@
     @include('partials.meta-pixel')
 </head>
 <body class="min-h-screen" data-shop>
-    @inertia
+    {{-- @inertia expanded by hand so the crawlable shell can sit INSIDE the
+         root element. React's createRoot().render() clears the container on
+         mount, so partials.seo-body is a true pre-hydration fallback: a
+         crawler and a JS-less visitor see it, a normal visitor sees it only
+         for as long as the bundle takes to arrive. Re-introducing Inertia SSR
+         would replace both this and the shell. --}}
+    <script data-page="app" type="application/json">{!! json_encode($page, JSON_HEX_TAG) !!}</script>
+    <div id="app">@include('partials.seo-body')</div>
     @include('partials.web-push')
 </body>
 </html>

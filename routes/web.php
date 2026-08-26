@@ -42,9 +42,22 @@ Route::get('/lp/{slug}', [LandingController::class, 'show'])->name('landing.show
 Route::get('/robots.txt', function () {
     $private = config('seo.robots') === 'noindex';
 
+    // Utility paths only. Filtered and sorted catalog URLs (?sort=, ?colors[]=,
+    // ?q=) are deliberately NOT blocked here: they carry `noindex, follow` from
+    // App\Support\Seo\Meta, and a page Google is forbidden to fetch is a page
+    // whose noindex Google never reads. On a catalogue this size crawl budget is
+    // not the constraint, so letting the crawler in and telling it plainly beats
+    // slamming the door and hoping.
+    $disallow = [
+        '/admin', '/cart', '/checkout', '/account', '/login', '/register',
+        '/logout', '/password/', '/order/', '/track', '/search/suggest',
+    ];
+
     $body = $private
         ? "User-agent: *\nDisallow: /\n"
-        : "User-agent: *\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n";
+        : "User-agent: *\n"
+            .collect($disallow)->map(fn ($p) => "Disallow: {$p}\n")->implode('')
+            ."Allow: /\n";
 
     // A sitemap line pointing at a disabled (404) sitemap is a crawl error, and
     // there is nothing to advertise on a site asking not to be indexed.

@@ -1,5 +1,5 @@
 @extends('layouts.shop')
-@section('title', home_content('seo_title') ?: 'Fine Jewelry')
+@section('title', home_content('seo_title'))
 
 @section('content')
     {{-- Playful (Pandora-inspired) --}}

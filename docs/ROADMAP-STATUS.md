@@ -52,6 +52,10 @@ code.
 | 2 | **Reset lsphp OPcache** | cPanel to MultiPHP Manager, toggle the PHP version away and back | PHP changes are not live for everyone until this runs |
 | 3 | **Decide the free-delivery promise** | Admin to Settings (see step 01) | The banner promises free delivery over ৳3,000; checkout does not honour it. This changes your margins, so it is your call — not a bug to be fixed by guessing |
 | 4 | **Rename the social handles** | Facebook / Instagram / Messenger accounts | The links themselves are admin settings, but the *accounts* are `Noychoylove` / `_noychoy_` and only you can rename them |
+| 5 | **Unblock the AI crawlers** | Cloudflare to the `meridianeclat.shop` zone to AI Crawl Control / Managed robots.txt | Cloudflare injects a managed `robots.txt` ahead of the app's own and blocks `GPTBot`, `ClaudeBot`, `Google-Extended`, `meta-externalagent` and others from the whole site. Nobody here chose that. It also keeps the shop out of AI Overviews. See `docs/SEO.md` §3.1 |
+| 6 | **Create the Search Console + Bing properties** | search.google.com/search-console, bing.com/webmasters | Neither exists, so nothing measures whether any of the SEO work landed, and the sitemap has never been submitted. `docs/SEO.md` §3.2 |
+| 7 | **Merge the duplicate categories, delete `dummy`** | Admin to Categories | `bracelet` vs `bracelet-2`, and `women` vs `women-jewelry` vs `jewellery-for-her`, are three pages competing for one intent — Google splits the signal and ranks none of them. `dummy` is a placeholder currently in the sitemap. `docs/SEO.md` §3.3 |
+| 8 | **Decide the return-fee policy** | `SEO_RETURN_FEES` in `.env`, after deciding | The refund policy only accepts damaged/wrong items, so the schema omits `returnFees` rather than assert a policy the page does not state |
 
 ---
 
@@ -184,6 +188,12 @@ defaults, the emoji icon system and the palette are code.
 | Confirmation page ends the conversation | **Done** | code | Says what happens next: we call, the courier delivers on a named window, keep exactly this much ready. **The "ready-made builder" did not exist** — the same three lines of Carbon were pasted in two places and neither knew that inside Dhaka is faster or that nobody delivers on Friday. `App\Support\DeliveryEstimate` is now the one builder, skips non-delivery days, and the four windows are editable in Appearance (they were config-only, so effectively hardcoded). A stale window is dropped rather than quoting a past date (`5d60183`) |
 | Account order detail eager-loads unused history | **Done** | code | Load removed; the page renders neither notes nor the status trail (`5d60183`) |
 | Zero social proof on 105 products | **Todo** | content | Closes itself once step 03's request fires |
+| Storefront served no crawlable HTML | **Done** | code | The React pages returned a JSON blob and an empty div: **zero `<h1>`, zero `<a href>`** on a live product page. A pre-hydration shell now renders the heading, price, copy and link graph inside `#app`, which React clears on mount. `docs/SEO.md` |
+| Nothing on the site said "Bangladesh" | **Done** | code | `lang="en-BD"`, `og:locale` `en_BD`, geo tags, and an `OnlineStore` graph carrying BDT, cash on delivery, area served and real courier rates. Titles fall back to "— Price in Bangladesh" |
+| Facets and pagination were duplicate content | **Done** | code | Filtered/sorted/searched grids are `noindex, follow` with no canonical; page 2 canonicalises to page 2 instead of page 1 |
+| Homepage SEO title silently discarded on save | **Done** | code | The Appearance field wrote to a key the save loop dropped, so the hardcoded fallback always shipped. Registered in `config/home.php`, with a Google-description field beside it |
+| Occasion and price-band collections | **Todo** | content | Bridal, Eid, gifts under ৳1,500, Pohela Boishakh. Six weeks of lead time each — a page published the week of Eid ranks for nothing. `docs/SEO.md` §3.4 |
+| Empty image alt text across the catalogue | **Todo** | content | Alt text is how Google Images reads a photo, and Images is where jewelry gets found |
 
 ---
 
@@ -209,6 +219,7 @@ defaults, the emoji icon system and the palette are code.
 | 2026-08-23 | `f01d7c7` | Responsive images via srcset + a mid-size variant; guests offered an account on the confirmation page, gated by proof the order is theirs. 668 tests |
 | 2026-08-23 | `9e66ef9` | 2,724 lines of dead Blade deleted, after single-sourcing the homepage React/Blade fork that would have silently reverted the live homepage. Product-template picker removed |
 | 2026-08-23 | `6d25c4d` | Admin forms submit in the background and swap the changed region — no full-page reload. 672 tests |
+| 2026-08-26 | *this change* | **SEO, rebuilt for Bangladesh.** The React storefront was serving crawlers an empty div; it now ships a pre-hydration HTML shell with the heading, price, copy and link graph. Market targeting (`en-BD`, geo, BDT, COD, courier rates) in an `OnlineStore` + `WebSite` + `Product` graph; facets and pagination stop duplicating; one shared SEO head replaces two drifted copies; product images enter the sitemap; the Appearance SEO fields stop being thrown away. Full audit and the owner's half in `docs/SEO.md`. 695 tests |
 
 ---
 

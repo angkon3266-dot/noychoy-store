@@ -1,98 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ config('seo.html_lang', 'en-BD') }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', store_name()) — {{ store_name() }}</title>
+    {{-- Shared with inertia.blade.php: title, description, robots, canonical,
+         hreflang, OG/Twitter and the JSON-LD graph. These Blade pages set the
+         title through @section('title'), so hand it across explicitly. --}}
+    @include('partials.seo-head', [
+        'pageTitle' => trim($__env->yieldContent('title')) ?: ($pageTitle ?? null),
+    ])
     @hasSection('meta')@yield('meta')@endif
-    {{-- request()->routeIs() is deliberate, not just isset($product): Blade's
-         @extends shares the child template's ENTIRE final variable table with
-         this layout, so a stray `foreach ($newArrivals as $product)` on any
-         other page — homepage sections, the shop grid, anywhere — leaves
-         $product still set once the loop ends, and this head would otherwise
-         advertise that leftover product's title/image/price to whoever shares
-         the link. Only the actual product page may set OG/product meta. --}}
-    @isset($product)
-        @if($product instanceof \App\Models\Product && request()->routeIs('product.show'))
-            @php $ogImg = $product->thumbnail; @endphp
-            <meta property="og:type" content="product">
-            <meta property="og:title" content="{{ $product->meta_title ?: $product->name }}">
-            <meta property="og:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($product->meta_description ?: $product->short_description ?: $product->description), 200) }}">
-            <meta property="og:url" content="{{ route('product.show', $product) }}">
-            @if($ogImg)<meta property="og:image" content="{{ \Illuminate\Support\Str::startsWith($ogImg, 'http') ? $ogImg : rtrim(config('app.url'),'/').'/'.ltrim($ogImg,'/') }}">@endif
-            <meta property="product:brand" content="{{ store_name() }}">
-            <meta property="product:availability" content="{{ ($product->isAvailable() || $product->isPreorder()) ? 'in stock' : 'out of stock' }}">
-            <meta property="product:condition" content="new">
-            <meta property="product:price:amount" content="{{ number_format((float) $product->price, 2, '.', '') }}">
-            <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
 
-            {{-- Structured data: this is what earns the price/availability/star
-                 line under the listing in Google. Same guard as the OG tags —
-                 only the real product page may claim to be a Product. --}}
-            @php
-                $ldImages = $product->relationLoaded('images')
-                    ? $product->images->map->url->take(4)->values()->all()
-                    : array_filter([$ogImg]);
-                $ldProduct = [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'Product',
-                    'name' => $product->name,
-                    'description' => \Illuminate\Support\Str::limit(trim(strip_tags($product->short_description ?: $product->description)), 300),
-                    'image' => $ldImages,
-                    'sku' => $product->sku,
-                    'brand' => ['@type' => 'Brand', 'name' => store_name()],
-                    'offers' => [
-                        '@type' => 'Offer',
-                        'url' => route('product.show', $product),
-                        'price' => number_format((float) $product->price, 2, '.', ''),
-                        'priceCurrency' => config('store.currency', 'BDT'),
-                        'availability' => ($product->isAvailable() || $product->isPreorder())
-                            ? 'https://schema.org/InStock'
-                            : 'https://schema.org/OutOfStock',
-                    ],
-                ];
-                // Ratings only when real reviews exist — a zero-count
-                // aggregateRating is a rich-results policy violation.
-                if ($product->review_count > 0 && $product->average_rating) {
-                    $ldProduct['aggregateRating'] = [
-                        '@type' => 'AggregateRating',
-                        'ratingValue' => round((float) $product->average_rating, 1),
-                        'reviewCount' => (int) $product->review_count,
-                    ];
-                }
-                $ldCrumbs = [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'BreadcrumbList',
-                    'itemListElement' => array_values(array_filter([
-                        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => route('home')],
-                        $product->category
-                            ? ['@type' => 'ListItem', 'position' => 2, 'name' => $product->category->name, 'item' => route('category.show', $product->category->slug)]
-                            : null,
-                        ['@type' => 'ListItem', 'position' => $product->category ? 3 : 2, 'name' => $product->name, 'item' => route('product.show', $product)],
-                    ])),
-                ];
-            @endphp
-            <script type="application/ld+json">{!! json_encode($ldProduct, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
-            <script type="application/ld+json">{!! json_encode($ldCrumbs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
-        @endif
-    @endisset
-    {{-- Canonical: strips query strings (?sort=, filters) so crawlers don't index
-         endless duplicates of the same catalog page. Views may override. --}}
-    <link rel="canonical" href="{{ $canonicalUrl ?? url()->current() }}">
-    {{-- Search/link-preview description: controller-provided, else the product's
-         own copy, else the storefront tagline. --}}
-    @php
-        $metaDesc = $metaDescription ?? null;
-        if (blank($metaDesc) && isset($product) && $product instanceof \App\Models\Product && request()->routeIs('product.show')) {
-            $metaDesc = $product->meta_description ?: $product->short_description ?: $product->description;
-        }
-        if (blank($metaDesc)) {
-            $metaDesc = home_content('hero_subtitle') ?: 'Shop '.store_name().' — quality pieces delivered across Bangladesh with cash on delivery.';
-        }
-        $metaDesc = \Illuminate\Support\Str::limit(trim(strip_tags((string) $metaDesc)), 160);
-    @endphp
-    <meta name="description" content="{{ $metaDesc }}">
     @if($fav = theme_asset(theme('favicon')))<link rel="icon" href="{{ $fav }}">@else<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any"><link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">@endif
     {{-- PWA / iOS: web push on iPhone only works from a Home-Screen-installed app,
          which requires this manifest (display: standalone). --}}

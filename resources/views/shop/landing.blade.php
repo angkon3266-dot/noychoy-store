@@ -2,16 +2,10 @@
 
 @section('title', $page->meta_title ?: $page->title)
 
-@section('meta')
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="{{ $page->meta_title ?: $page->title }}">
-    @if(filled($page->meta_description))
-        <meta property="og:description" content="{{ $page->meta_description }}">
-    @endif
-    @if($ogImg = theme_asset($page->og_image))
-        <meta property="og:image" content="{{ $ogImg }}">
-    @endif
-@endsection
+{{-- The OG tags this section used to emit now come from partials.seo-head,
+     fed by LandingController: they were duplicating the layout's own og:*
+     tags, and a page with two og:description values is a page whose preview
+     is decided by whichever the scraper happens to read first. --}}
 
 @section('content')
     @if(! $page->is_published)

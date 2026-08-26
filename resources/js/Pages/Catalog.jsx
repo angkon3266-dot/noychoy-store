@@ -15,7 +15,7 @@ import { Link } from '@inertiajs/react';
 const PARTIAL = {
     preserveState: true,
     preserveScroll: true,
-    only: ['products', 'filters', 'sort', 'title', 'pageTitle'],
+    only: ['products', 'filters', 'sort', 'title', 'pageTitle', 'seoTitle'],
 };
 export default function Catalog({ title, description = null, products, filters, sort, searchQuery, noResults = null }) {
     const { props, url } = usePage();

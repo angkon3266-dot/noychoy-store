@@ -215,8 +215,12 @@
 
         <div class="max-w-xl mb-5">
             <label class="label">Browser tab title (SEO tagline)</label>
-            <input name="home[seo_title]" value="{{ $home['seo_title'] ?? '' }}" class="input" placeholder="Fine Jewelry">
+            <input name="home[seo_title]" value="{{ $home['seo_title'] ?? '' }}" class="input" placeholder="{{ config('home.defaults.seo_title') }}">
             <p class="text-xs text-ink-700/50 mt-1">Homepage title shows as “<span class="font-medium">this — {{ store_name() }}</span>” in the browser tab and Google. Leave empty for the template default.</p>
+
+            <label class="label mt-4">Google description</label>
+            <textarea name="home[seo_description]" rows="2" class="input" maxlength="160" placeholder="{{ home_content('hero_subtitle') }}">{{ $home['seo_description'] ?? '' }}</textarea>
+            <p class="text-xs text-ink-700/50 mt-1">The grey summary under your homepage link in Google. Aim for ~155 characters, and say the two things that decide the click: what you sell, and cash on delivery across Bangladesh. Leave empty to reuse the hero subtitle.</p>
         </div>
 
         <h3 class="text-sm font-semibold text-ink-700 mt-2 mb-3">Hero banner</h3>

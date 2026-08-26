@@ -25,8 +25,11 @@ class CatalogController extends Controller
     {
         $base = Product::published()->search($request->query('q'));
 
-        return $this->renderCatalog($request, $base, 'shop',
-            $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry');
+        return $this->renderCatalog(
+            $request, $base, 'shop',
+            $request->filled('q') ? 'Search: '.$request->query('q') : 'All Jewelry',
+            seoTitle: 'Buy Jewelry Online in Bangladesh',
+        );
     }
 
     /** Curated best-sellers — the products you've flagged as bestsellers. */
@@ -34,7 +37,10 @@ class CatalogController extends Controller
     {
         $base = Product::published()->bestsellers()->search($request->query('q'));
 
-        return $this->renderCatalog($request, $base, 'shop', 'Best Sellers');
+        return $this->renderCatalog(
+            $request, $base, 'shop', 'Best Sellers',
+            seoTitle: 'Best Selling Jewelry in Bangladesh',
+        );
     }
 
     /** Shared Inertia response for the shop / best-sellers / category grids. */
@@ -45,14 +51,20 @@ class CatalogController extends Controller
         string $title,
         ?Category $category = null,
         ?string $description = null,
+        ?string $seoTitle = null,
     ) {
         $description ??= $category?->description;
 
         $products = $this->paginate($base, $request);
         $cards = \App\Support\Storefront\ProductCardData::collection($products->items());
 
+        // The search-facing title, shared with the React layout so an SPA
+        // navigation writes the same <title> the server would have.
+        $resolvedSeoTitle = $seoTitle ?: \App\Support\Seo\Meta::catalogTitle($title);
+
         return \Inertia\Inertia::render('Catalog', [
             'pageTitle' => $title,
+            'seoTitle' => $resolvedSeoTitle,
             'title' => $title,
             'description' => $description,
             'products' => [
@@ -68,13 +80,31 @@ class CatalogController extends Controller
             // generic line and a "browse all" button. Give it somewhere to go.
             'noResults' => $this->searchRecovery($request, $products->total()),
         ])->withViewData([
-            'pageTitle' => $title,
-            'metaDescription' => $description,
+            // The visible <h1> stays the plain name; only the <title> carries
+            // the market qualifier, because "rings price in bangladesh" is the
+            // query and "Rings" is the heading.
+            'pageTitle' => $resolvedSeoTitle,
+            'metaDescription' => \App\Support\Seo\Meta::catalogDescription(
+                $title, $description, $products->total(),
+            ),
             // A category's own picture makes the best sharing card; the shop
             // and best-sellers grids fall back to the shop logo in the layout.
             'ogImage' => $category?->image
                 ? \Illuminate\Support\Facades\Storage::disk('public')->url($category->image)
                 : ($cards[0]['thumb'] ?? null),
+            // Feeds the pre-hydration shell and the ItemList JSON-LD, so the
+            // grid's contents are crawlable without running React.
+            'seoHeading' => $title,
+            'seoIntro' => $description,
+            'seoItems' => $cards,
+            'seoListName' => $title,
+            'seoBreadcrumbs' => array_values(array_filter([
+                ['name' => 'Home', 'url' => route('home')],
+                $category?->parent
+                    ? ['name' => $category->parent->name, 'url' => route('category.show', $category->parent->slug)]
+                    : null,
+                ['name' => $title, 'url' => \App\Support\Seo\Meta::canonical($request)],
+            ])),
         ]);
     }
 
@@ -336,11 +366,22 @@ class CatalogController extends Controller
         // (showcase/classic/minimal/luxe/sticky) — a superset of showcase.
         return \Inertia\Inertia::render('Product', [
             'pageTitle' => $product->meta_title ?: $product->name,
+            'seoTitle' => \App\Support\Seo\Meta::productTitle($product),
         ] + \App\Support\Storefront\ProductPageData::make(
             $product, $related, $crossSells, $pp, $lovesCount, $loved, $vcEventId, $recentlyViewed,
         ))->withViewData([
-            'pageTitle' => $product->meta_title ?: $product->name,
+            // Falls back to "<name> — Price in Bangladesh" when the admin has
+            // not written a meta title, which is most products.
+            'pageTitle' => \App\Support\Seo\Meta::productTitle($product),
             'product' => $product,
+            // "You may also like", server-rendered into the pre-hydration shell
+            // so a crawler following this product has somewhere to go next.
+            'seoItems' => $related instanceof \Illuminate\Support\Collection
+                ? $related->map(fn ($p) => [
+                    'url' => route('product.show', $p),
+                    'name' => $p->name,
+                ])->all()
+                : [],
             // The main product photo is the LCP element here.
             'preloadImage' => $mainImage = $product->images->first()?->url,
             'preloadSrcset' => ($mainImage && ($v = image_variant($mainImage)))
