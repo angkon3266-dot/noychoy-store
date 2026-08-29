@@ -213,6 +213,7 @@ Route::middleware('admin')->group(function () {
     Route::delete('offers/{offer}', [OfferController::class, 'destroy'])->name('offers.destroy');
     Route::post('offers/register-discount', [OfferController::class, 'saveRegisterOffer'])->name('offers.register');
     Route::post('offers/loyalty', [OfferController::class, 'saveLoyalty'])->name('offers.loyalty');
+    Route::post('offers/gift-ladder', [OfferController::class, 'saveGiftLadder'])->name('offers.gift-ladder');
 
     // Media library (browse / optimize / delete uploaded images & videos)
     Route::get('media', [MediaController::class, 'index'])->name('media.index');

@@ -82,6 +82,9 @@ class AppearanceController extends Controller
             'delivery_days_max' => ['nullable', 'integer', 'min:0', 'max:60'],
             'delivery_days_inside_min' => ['nullable', 'integer', 'min:0', 'max:60'],
             'delivery_days_inside_max' => ['nullable', 'integer', 'min:0', 'max:60'],
+            // Product-page Care / Shipping & returns accordions
+            'pdp_care_text' => ['nullable', 'string', 'max:2000'],
+            'pdp_returns_text' => ['nullable', 'string', 'max:2000'],
             'sticky_buy_bar' => ['nullable', 'boolean'],
             'gift_enabled' => ['nullable', 'boolean'],
             'gift_title' => ['nullable', 'string', 'max:80'],
@@ -450,7 +453,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'pdp_care_text', 'pdp_returns_text', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
             'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
             'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
             'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',

@@ -151,10 +151,10 @@ class DailyDeals
         if ($offer->applies_to === 'products') {
             $ids = array_values(array_filter((array) $offer->product_ids));
             if (count($ids) === 1 && ($product = Product::published()->find($ids[0]))) {
-                return [$product->thumbnail, route('product.show', $product)];
+                return [static::cardImage($product->thumbnail), route('product.show', $product)];
             }
             if ($ids && ($product = Product::published()->whereIn('id', $ids)->latest()->first())) {
-                return [$product->thumbnail, route('shop')];
+                return [static::cardImage($product->thumbnail), route('shop')];
             }
         }
 
@@ -164,7 +164,7 @@ class DailyDeals
 
             if ($category) {
                 return [
-                    theme_asset($category->image) ?: static::newestThumbnailIn($ids),
+                    static::cardImage(theme_asset($category->image)) ?: static::newestThumbnailIn($ids),
                     route('category.show', $category),
                 ];
             }
@@ -173,16 +173,26 @@ class DailyDeals
             }
         }
 
-        return [Product::published()->latest()->first()?->thumbnail, route('shop')];
+        return [static::cardImage(Product::published()->latest()->first()?->thumbnail), route('shop')];
+    }
+
+    /**
+     * A deal card tile is 280px wide — the 450 variant, not the 1600px
+     * original that used to ship (the single largest image waste on the
+     * homepage when deals were on).
+     */
+    protected static function cardImage(?string $url): ?string
+    {
+        return $url ? (image_variant($url) ?: $url) : null;
     }
 
     /** Newest published product photo from any of the given categories. */
     protected static function newestThumbnailIn(array $categoryIds): ?string
     {
-        return Product::published()
+        return static::cardImage(Product::published()
             ->where(fn ($q) => $q->whereIn('category_id', $categoryIds)
                 ->orWhereHas('categories', fn ($c) => $c->whereIn('categories.id', $categoryIds)))
             ->latest()
-            ->first()?->thumbnail;
+            ->first()?->thumbnail);
     }
 }

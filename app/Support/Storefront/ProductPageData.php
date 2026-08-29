@@ -62,7 +62,15 @@ class ProductPageData
                     'alt' => $i->alt,
                 ])->values(),
                 'videos' => array_values($product->galleryVideos()),
-                'sections' => $product->content_sections ?? [],
+                'sections' => collect($product->content_sections ?? [])->map(function ($s) {
+                    // Story images are up to 1600px; the 900 variant is plenty
+                    // for a half-width column.
+                    if (! empty($s['image'])) {
+                        $s['image'] = image_variant($s['image'], 900) ?: $s['image'];
+                    }
+
+                    return $s;
+                })->all(),
                 'specs' => collect($product->customFieldList())->where('show', true)->values()
                     ->map(fn ($s) => ['label' => $s['label'], 'value' => $s['value']]),
                 'available' => $product->isAvailable(),
@@ -116,6 +124,16 @@ class ProductPageData
             // slower nationwide window rather than over-promising. The builder
             // also skips the days the courier does not work.
             'delivery' => \App\Support\DeliveryEstimate::for()?->productPageShape(),
+            // The vertical badge list beside the buy button. Uncapped here —
+            // the footer strip keeps its own take(3) in HandleInertiaRequests.
+            'trustBadges' => collect(theme('trust_badges') ?? [])
+                ->filter(fn ($b) => filled($b['title'] ?? null))->take(6)->values(),
+            // Bold "unlock gifts" line + link, when the milestone ladder is on.
+            'giftBadge' => app(\App\Support\GiftLadder::class)->pdpBadge(),
+            // Care / Shipping & returns accordions under the Details table.
+            'care' => theme('pdp_care_text') ?: null,
+            'returns' => theme('pdp_returns_text') ?: null,
+            'refundUrl' => route('page.refund'),
             'reviews' => [
                 'avg' => $product->average_rating,
                 'count' => $count,
@@ -137,7 +155,8 @@ class ProductPageData
                     'id' => $p->id,
                     'name' => $p->name,
                     'url' => route('product.show', $p),
-                    'thumb' => $p->thumbnail,
+                    // A w-32 tile does not need the 1600px original.
+                    'thumb' => image_variant($p->thumbnail) ?: $p->thumbnail,
                     'price' => (float) $p->price,
                     'price_text' => money($p->price),
                     'selectable' => $p->isAvailable() && ! $p->has_variants,

@@ -57,10 +57,10 @@ return [
     ],
 
     // ── Return window, in days, for hasMerchantReturnPolicy ─────────────────
-    // Matches the Refund Policy page as shipped ("contact us within 3 days of
-    // delivery"). Keep the two in step — a schema figure that contradicts the
+    // Matches the Refund Policy page as shipped ("7 days to change your
+    // mind"). Keep the two in step — a schema figure that contradicts the
     // written policy is worse than no schema at all, and Google cross-checks.
-    'return_days' => (int) env('SEO_RETURN_DAYS', 3),
+    'return_days' => (int) env('SEO_RETURN_DAYS', 7),
 
     // Who pays return postage, as a schema.org ReturnFeesEnumeration member:
     // 'FreeReturn' | 'ReturnFeesCustomerResponsibility' | 'ReturnShippingFees'.

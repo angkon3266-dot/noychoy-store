@@ -24,6 +24,16 @@ class OfferController extends Controller
                 'window_days' => (int) \App\Models\Setting::get('register_offer_window_days', 7),
             ],
             'memberOverrides' => $this->memberOverrideRows(),
+            'giftLadder' => [
+                'enabled' => (bool) \App\Models\Setting::get('gift_ladder_enabled', false),
+                'buy' => (int) \App\Models\Setting::get('gift_ladder_buy', 2),
+                'max' => (int) \App\Models\Setting::get('gift_ladder_max', 3),
+                'gifts_collection_id' => (int) \App\Models\Setting::get('gift_ladder_gifts_collection_id', 0),
+                'qualifying_collection_id' => (int) \App\Models\Setting::get('gift_ladder_qualifying_collection_id', 0),
+                'collections' => \App\Models\Collection::active()->orderBy('name')->get(['id', 'name'])
+                    ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'count' => app(\App\Services\CollectionService::class)->count($c)])
+                    ->values(),
+            ],
             'loyalty' => [
                 'enabled' => (bool) \App\Models\Setting::get('loyalty_enabled', config('loyalty.enabled', true)),
                 'per_1000' => round(((float) \App\Models\Setting::get('loyalty_earn_per_taka', config('loyalty.earn_per_taka', 0.1))) * 1000),
@@ -54,6 +64,41 @@ class OfferController extends Controller
         \App\Models\Setting::put('loyalty_review_photo_bonus', (int) $data['photo_bonus']);
 
         return back()->with('success', 'Loyalty settings saved.');
+    }
+
+    /**
+     * Save the milestone gift ladder ("every Nth piece free").
+     *
+     * Enabling requires a gifts collection with at least one product in it —
+     * a ladder pointing at an empty collection would advertise gifts nobody
+     * can claim.
+     */
+    public function saveGiftLadder(Request $request)
+    {
+        $data = $request->validate([
+            'buy' => ['required', 'integer', 'min:1', 'max:20'],
+            'max' => ['required', 'integer', 'min:1', 'max:10'],
+            'gifts_collection_id' => ['nullable', 'integer', 'exists:collections,id'],
+            'qualifying_collection_id' => ['nullable', 'integer', 'exists:collections,id'],
+        ]);
+
+        $enabled = $request->boolean('enabled');
+        $giftsId = (int) ($data['gifts_collection_id'] ?? 0);
+
+        if ($enabled) {
+            $gifts = $giftsId ? \App\Models\Collection::active()->find($giftsId) : null;
+            if (! $gifts || app(\App\Services\CollectionService::class)->count($gifts) < 1) {
+                return back()->with('error', 'Pick a gifts collection with at least one product before switching the ladder on.');
+            }
+        }
+
+        \App\Models\Setting::put('gift_ladder_enabled', $enabled);
+        \App\Models\Setting::put('gift_ladder_buy', (int) $data['buy']);
+        \App\Models\Setting::put('gift_ladder_max', (int) $data['max']);
+        \App\Models\Setting::put('gift_ladder_gifts_collection_id', $giftsId);
+        \App\Models\Setting::put('gift_ladder_qualifying_collection_id', (int) ($data['qualifying_collection_id'] ?? 0));
+
+        return back()->with('success', $enabled ? 'Gift ladder saved and live.' : 'Gift ladder saved (off).');
     }
 
     /** Save the "register for an extra discount" offer (shown to guests, applied to members). */

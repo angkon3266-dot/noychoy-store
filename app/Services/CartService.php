@@ -165,6 +165,32 @@ class CartService
         return (float) $this->items()->sum(fn ($i) => $i['price'] * $i['qty']);
     }
 
+    /**
+     * Cart lines with the unlocked gift units removed — what the customer is
+     * actually paying for. Every percentage stage below the gift in the
+     * cascade prices against THIS, not items(): otherwise a 10% offer on a
+     * ৳2,000-paid + ৳500-gift cart discounts 10% of ৳2,500 and the store
+     * leaks pct × gift value on every stacked percentage.
+     */
+    public function discountableItems(): Collection
+    {
+        return $this->memo('discountable_items', function () {
+            $free = app(\App\Support\GiftLadder::class)->freeUnitsByLine($this);
+            if ($free === []) {
+                return $this->items();
+            }
+
+            return $this->items()
+                ->map(function ($i) use ($free) {
+                    $i['qty'] -= min((int) $i['qty'], $free[$i['key']] ?? 0);
+
+                    return $i;
+                })
+                ->filter(fn ($i) => $i['qty'] > 0)
+                ->values();
+        });
+    }
+
     // ── Quantity / bundle offers ────────────────────────────────────────────
 
     /** Best applicable offer percent for a single line, given its quantity. */
@@ -200,10 +226,10 @@ class CartService
         return round($item['price'] * $item['qty'] * $this->lineOfferPercent($item) / 100, 2);
     }
 
-    /** Total saved across the cart from quantity/bundle offers. */
+    /** Total saved across the cart from quantity/bundle offers (paid units only). */
     public function offerDiscount(): float
     {
-        return (float) $this->items()->sum(fn ($i) => $this->lineOfferSaving($i));
+        return (float) $this->discountableItems()->sum(fn ($i) => $this->lineOfferSaving($i));
     }
 
     // ── Automatic offers (Admin → Offers) ──────────────────────────────────
@@ -215,10 +241,12 @@ class CartService
         return auth('customer')->check();
     }
 
-    /** Base that order-level offers apply to: subtotal after per-product offers. */
+    /** Base that order-level offers apply to: what is paid, after per-product offers. */
     protected function promoBase(): float
     {
-        return max(0, $this->subtotal() - $this->offerDiscount());
+        $paid = (float) $this->discountableItems()->sum(fn ($i) => $i['price'] * $i['qty']);
+
+        return max(0, $paid - $this->offerDiscount());
     }
 
     /** All active offers whose conditions the current cart meets. */
@@ -274,7 +302,7 @@ class CartService
      * `discount` past `subtotal` — storing a negative profit and a total
      * floored at zero, i.e. a free order with free shipping.
      *
-     * @return array{offer:float, promo:float, member:float, customer:float,
+     * @return array{gift:float, offer:float, promo:float, member:float, customer:float,
      *               coupon:float, coupon_model:?Coupon, points:float,
      *               points_redeemed:int, base_before_coupon:float, total:float}
      */
@@ -290,6 +318,10 @@ class CartService
 
                 return $amount;
             };
+
+            // Milestone gifts go first: they zero specific units outright, so
+            // every percentage further down applies to what is actually paid.
+            $gift = $take($this->rawGiftDiscount());
 
             $offer = $take($this->offerDiscount());
             $promo = $take($this->rawPromoDiscount());
@@ -307,6 +339,7 @@ class CartService
             $points = $take(app(LoyaltyService::class)->pointsValue($redeemed));
 
             return [
+                'gift' => $gift,
                 'offer' => $offer,
                 'promo' => $promo,
                 'member' => $member,
@@ -316,9 +349,29 @@ class CartService
                 'points' => $points,
                 'points_redeemed' => $redeemed,
                 'base_before_coupon' => round($baseBeforeCoupon, 2),
-                'total' => round($offer + $promo + $member + $customer + $coupon + $points, 2),
+                'total' => round($gift + $offer + $promo + $member + $customer + $coupon + $points, 2),
             ];
         });
+    }
+
+    // ── Milestone gift ladder (Admin → Offers) ─────────────────────────────
+
+    /** Value of the free gift units the cart has unlocked. */
+    protected function rawGiftDiscount(): float
+    {
+        return $this->memo('gift_raw', fn () => app(\App\Support\GiftLadder::class)->discountFor($this));
+    }
+
+    /** Gift discount actually applied (first in the cascade, so never capped in practice). */
+    public function giftDiscount(): float
+    {
+        return $this->cascade()['gift'];
+    }
+
+    /** Milestone progress payload for the cart page / mini-cart, or null. */
+    public function giftProgress(): ?array
+    {
+        return $this->memo('gift_progress', fn () => app(\App\Support\GiftLadder::class)->progressFor($this));
     }
 
     /**
@@ -349,9 +402,10 @@ class CartService
                 }
             }
 
-            // Per-line member discount so per-category / per-product overrides apply.
+            // Per-line member discount so per-category / per-product overrides
+            // apply. Paid units only — a free gift unit earns no member percent.
             $total = 0.0;
-            foreach ($this->items() as $item) {
+            foreach ($this->discountableItems() as $item) {
                 $pct = $pricing->percentForLine((int) $item['product_id'], $item['category_id'] ?? null);
                 if ($pct > 0) {
                     $total += $item['price'] * $item['qty'] * $pct / 100;
@@ -526,6 +580,15 @@ class CartService
         $lines = [];
         $offers = $this->matchingOffers()->where('type', 'order_percent');
         $cascade = $this->cascade();
+
+        // One line per free gift piece, so the customer sees exactly which
+        // item the ladder zeroed. Gift goes first in the cascade, so these
+        // amounts are never scaled.
+        if ($cascade['gift'] > 0) {
+            foreach (app(\App\Support\GiftLadder::class)->discountLinesFor($this) as $line) {
+                $lines[] = $line;
+            }
+        }
 
         // The auto-offer lines are shown at the amount actually applied: when the
         // cap bites, the raw offer amounts are scaled down so the breakdown still

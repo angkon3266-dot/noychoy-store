@@ -103,7 +103,7 @@ class Meta
             return Str::limit(trim(strip_tags($product->meta_description)), 160);
         }
 
-        $lead = trim(strip_tags((string) ($product->short_description ?: $product->description)));
+        $lead = plain_copy(strip_tags((string) ($product->short_description ?: $product->description)));
         $lead = preg_replace('/\s+/u', ' ', $lead) ?? '';
 
         $price = config('store.currency_symbol', '৳').number_format((float) $product->price);

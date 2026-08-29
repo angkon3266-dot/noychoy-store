@@ -3,6 +3,7 @@ import { usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
 import { useCart } from '../CartContext';
 import SmartLink from '../SmartLink';
+import GiftLadderBar from '../GiftLadderBar';
 import Icon from '../Icons';
 import { trapTab } from '../focusTrap';
 
@@ -10,7 +11,7 @@ import { trapTab } from '../focusTrap';
 export default function MiniCart() {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
-    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, freeShipping, remove, cartTrigger } = useCart();
+    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, freeShipping, remove, cartTrigger } = useCart();
     const panelRef = useRef(null);
 
     useEffect(() => {
@@ -80,6 +81,7 @@ export default function MiniCart() {
                 </div>
                 {items.length > 0 && (
                     <div className="border-t border-ink-100 p-5 space-y-3">
+                        <GiftLadderBar gift={gift} compact />
                         <div className="flex justify-between text-sm"><span className="text-ink-700/70">Subtotal</span><span>{subtotalText}</span></div>
                         {discountLines.map((d) => (
                             <div key={d.label} className="flex justify-between text-sm text-success-700"><span>{d.label}</span><span>−{d.amount_text}</span></div>

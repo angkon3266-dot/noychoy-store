@@ -516,19 +516,48 @@ if (! function_exists('image_variant')) {
             return null;
         }
 
+        // Per-request memo: a homepage render asks for the same variants over
+        // and over (each product card stats its 450 twice — src and srcset),
+        // and every miss or hit is a filesystem stat. ~100+ stats per page
+        // collapse to one per distinct file.
+        static $memo = [];
+        $key = $urlOrPath.'|'.$width;
+        if (array_key_exists($key, $memo)) {
+            return $memo[$key];
+        }
+
         $path = Str::startsWith($urlOrPath, ['http://', 'https://', '/'])
             ? public_url_to_path($urlOrPath)
             : $urlOrPath;
 
         if (blank($path) || Str::startsWith($path, ['http://', 'https://'])) {
-            return null; // remote image — nothing of ours to look up
+            return $memo[$key] = null; // remote image — nothing of ours to look up
         }
 
         $variant = app(ImageOptimizer::class)->variantPath($path, $width);
 
-        return Storage::disk('public')->exists($variant)
+        return $memo[$key] = (Storage::disk('public')->exists($variant)
             ? Storage::disk('public')->url($variant)
-            : null;
+            : null);
+    }
+}
+
+if (! function_exists('plain_copy')) {
+    /**
+     * Strip the light-markdown the storefront renderer understands ("## "
+     * headings, **bold**, *italic*) so the same copy reads clean where only
+     * plain text is wanted — the pre-hydration SEO shell, meta descriptions.
+     * Bullets keep their dash; that reads fine as text.
+     */
+    function plain_copy(?string $text): string
+    {
+        $text = (string) $text;
+        $text = preg_replace('/^##\s+/m', '', $text);
+        $text = preg_replace('/\*\*([^*]+)\*\*/', '$1', $text);
+        $text = preg_replace('/(?<![\w*])\*([^*\n]+)\*(?![\w*])/', '$1', $text);
+        $text = preg_replace('/(?<![\w_])_([^_\n]+)_(?![\w_])/', '$1', $text);
+
+        return trim($text);
     }
 }
 

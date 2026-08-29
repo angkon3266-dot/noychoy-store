@@ -110,6 +110,27 @@ class DeliveryEstimateTest extends TestCase
         $this->assertStringNotContainsString('–', $estimate->label());
     }
 
+    public function test_dispatch_is_the_next_working_day(): void
+    {
+        // Thursday: the next working day is Saturday — Friday is off.
+        Carbon::setTestNow(Carbon::parse('2026-08-27'));
+
+        $estimate = DeliveryEstimate::for(false);
+
+        $this->assertSame('Saturday', $estimate->dispatch->format('l'));
+        $this->assertSame($estimate->dispatch->format('D, d M'), $estimate->productPageShape()['dispatch']);
+    }
+
+    public function test_dispatch_never_lands_after_the_promised_arrival(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-24'));   // a Monday
+        config(['theme.defaults.delivery_days_min' => 0, 'theme.defaults.delivery_days_max' => 0]);
+
+        $estimate = DeliveryEstimate::for(false);
+
+        $this->assertTrue($estimate->dispatch->lte($estimate->from));
+    }
+
     public function test_a_stale_confirmation_page_stops_quoting_a_past_window(): void
     {
         $order = $this->confirmedOrder();

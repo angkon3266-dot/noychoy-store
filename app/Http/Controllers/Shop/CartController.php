@@ -94,6 +94,7 @@ class CartController extends Controller
                 'hints' => $cart->offerHints(),
             ],
             'coupon' => ($c = $cart->coupon()) ? ['code' => $c->code] : null,
+            'giftBar' => $cart->giftProgress(),
             'freeBar' => (theme('free_shipping_bar') && $freeThreshold > 0) ? [
                 'remaining_text' => money(max(0, $freeThreshold - $cart->subtotal())),
                 'unlocked' => $cart->subtotal() >= $freeThreshold,
@@ -188,6 +189,7 @@ class CartController extends Controller
             'discount_lines' => collect($this->cart->discountLines())
                 ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
             'hints' => $this->cart->offerHints(),
+            'gift' => $this->cart->giftProgress(),
             'free_shipping' => $this->cart->hasFreeShipping(),
             'items' => $this->cart->items()->map(fn ($i) => [
                 'key' => $i['key'],

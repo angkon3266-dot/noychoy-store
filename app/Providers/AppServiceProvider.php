@@ -38,6 +38,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(CartService::class);
 
+        // Gift-ladder collections resolve once per request, not once per
+        // cart re-render.
+        $this->app->singleton(\App\Support\GiftLadder::class);
+
         // One instance per request so member-discount usage is queried once even
         // when both the layout and the cart view ask for it.
         $this->app->singleton(MemberPricingService::class);

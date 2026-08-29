@@ -23,6 +23,7 @@ class DeliveryEstimate
     protected function __construct(
         public readonly Carbon $from,
         public readonly ?Carbon $to,
+        public readonly ?Carbon $dispatch = null,
     ) {}
 
     /**
@@ -60,7 +61,14 @@ class DeliveryEstimate
             $to = null;
         }
 
-        return new self($from, $to);
+        // The parcel leaves on the next working day — never later than the
+        // day it is promised to arrive.
+        $dispatch = static::advance($start, 1, $off);
+        if ($dispatch->greaterThan($from)) {
+            $dispatch = $from->copy();
+        }
+
+        return new self($from, $to, $dispatch);
     }
 
     /** Carbon day numbers the courier skips. Never all seven. */
@@ -122,6 +130,7 @@ class DeliveryEstimate
         return [
             'from' => $this->from->format('D, d M'),
             'to' => $this->to?->format('d M'),
+            'dispatch' => $this->dispatch?->format('D, d M'),
         ];
     }
 }

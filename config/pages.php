@@ -61,17 +61,18 @@ return [
     'refund' => [
         'title' => 'Refund & Return Policy',
         'body' => '<p>Your satisfaction matters to us. Please read our return and refund policy below.</p>
-<h3>Returns</h3>
-<p>If you receive a damaged, defective or wrong item, please contact us within 3 days of delivery with photos. We will arrange a replacement or refund.</p>
+<h3>7 days to change your mind</h3>
+<p>If a piece isn\'t right, you have 7 days from delivery to return it for an exchange or a refund — no reason needed. Contact us with your order number and we will arrange the pickup or drop-off.</p>
+<h3>Damaged, defective or wrong item</h3>
+<p>Please contact us within 3 days of delivery with photos. We will arrange a replacement or a full refund, including delivery.</p>
 <h3>Conditions</h3>
 <ul>
 <li>The item must be unused and in its original condition and packaging.</li>
 <li>Proof of purchase (order number) is required.</li>
+<li>For hygiene reasons, earrings can only be returned unworn with the seal intact, or if faulty.</li>
 </ul>
 <h3>Refunds</h3>
-<p>Approved refunds are processed via bKash/Nagad or the original payment method within 7 working days.</p>
-<h3>Non-returnable items</h3>
-<p>For hygiene reasons, earrings and certain personalised items may not be eligible for return unless faulty.</p>',
+<p>Approved refunds are processed via bKash/Nagad or the original payment method within 7 working days.</p>',
     ],
 
     'contact' => [

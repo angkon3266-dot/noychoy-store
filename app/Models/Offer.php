@@ -87,18 +87,22 @@ class Offer extends Model
         };
     }
 
-    /** Subtotal of the cart lines this offer applies to. */
+    /**
+     * Subtotal of the cart lines this offer applies to. Gift-ladder units the
+     * customer is not paying for are excluded — a percentage of a ৳0 piece is
+     * money out of the store's pocket, not a discount.
+     */
     public function eligibleSubtotal(CartService $cart): float
     {
-        return (float) $cart->items()
+        return (float) $cart->discountableItems()
             ->filter(fn ($i) => $this->lineEligible($i))
             ->sum(fn ($i) => $i['price'] * $i['qty']);
     }
 
-    /** Total quantity of eligible cart lines. */
+    /** Total quantity of eligible (paid) cart lines. */
     public function eligibleQty(CartService $cart): int
     {
-        return (int) $cart->items()
+        return (int) $cart->discountableItems()
             ->filter(fn ($i) => $this->lineEligible($i))
             ->sum('qty');
     }

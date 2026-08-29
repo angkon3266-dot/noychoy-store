@@ -124,7 +124,7 @@ class Schema
             '@type' => 'Product',
             '@id' => route('product.show', $product).'#product',
             'name' => $product->name,
-            'description' => Str::limit(trim(strip_tags(
+            'description' => Str::limit(plain_copy(strip_tags(
                 (string) ($product->meta_description ?: $product->short_description ?: $product->description)
             )), 400, ''),
             'image' => $images,

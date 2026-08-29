@@ -1018,6 +1018,25 @@
                 </div>
             </div>
         </div>
+
+        <div class="mt-6 border-t border-ink-100 pt-4">
+            <h3 class="font-medium text-sm">Product page — Care &amp; Shipping/returns accordions</h3>
+            <p class="text-xs text-ink-700/70 mt-0.5">
+                Shown under the Details table on every product page. Plain text: a blank line starts a new
+                paragraph, a line starting with “- ” becomes a bullet, “## ” a heading. Leave one blank to hide
+                that accordion. The returns accordion links to the full refund policy automatically.
+            </p>
+            <div class="grid md:grid-cols-2 gap-4 mt-3">
+                <div>
+                    <label class="label text-xs">Care</label>
+                    <textarea name="pdp_care_text" rows="6" class="input font-mono text-xs">{{ $theme['pdp_care_text'] ?? '' }}</textarea>
+                </div>
+                <div>
+                    <label class="label text-xs">Shipping &amp; returns</label>
+                    <textarea name="pdp_returns_text" rows="6" class="input font-mono text-xs">{{ $theme['pdp_returns_text'] ?? '' }}</textarea>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Gift orders -->

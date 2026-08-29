@@ -127,8 +127,10 @@ class HomePageData
                     ->map(fn ($p) => ['title' => $p['title'], 'text' => $p['text'] ?? null]),
             ],
             'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
-            // Social proof: recent 4–5★ approved reviews, sitewide.
-            'reviews' => \App\Models\Review::approved()->with('product:id,name,slug')
+            // Social proof: recent 4–5★ approved reviews, sitewide. Cached like
+            // the deals block — it ran two uncached queries on every homepage
+            // render for content that changes a few times a week at most.
+            'reviews' => \Illuminate\Support\Facades\Cache::remember('home.reviews.band', 600, fn () => \App\Models\Review::approved()->with('product:id,name,slug')
                 ->where('rating', '>=', 4)->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))
                 ->latest()->take(6)->get()
                 ->map(fn ($r) => [
@@ -136,7 +138,7 @@ class HomePageData
                     'rating' => (int) $r->rating,
                     'quote' => $r->body ?: $r->title,
                     'product' => $r->product ? ['name' => $r->product->name, 'url' => route('product.show', $r->product->slug)] : null,
-                ])->values(),
+                ])->values()),
             'blocks' => $sections->map(fn ($b) => self::block($b))->filter()->values(),
         ];
     }

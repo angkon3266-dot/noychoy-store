@@ -3,11 +3,12 @@ import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import SmartLink from '../Shared/SmartLink';
+import GiftLadderBar from '../Shared/GiftLadderBar';
 import Icon from '../Shared/Icons';
 
 // Full cart page. Mutations go through Inertia (server redirects back to /cart
 // with fresh props + flash), with optimistic qty display while in flight.
-export default function Cart({ items, summary, coupon, freeBar, offersPanel, memberUsage, suggestions, cartUrls }) {
+export default function Cart({ items, summary, coupon, giftBar, freeBar, offersPanel, memberUsage, suggestions, cartUrls }) {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
     const [code, setCode] = useState('');
@@ -51,6 +52,8 @@ export default function Cart({ items, summary, coupon, freeBar, offersPanel, mem
     return (
         <div className="mx-auto max-w-5xl px-4 py-8">
             <h1 className="font-display text-3xl font-semibold mb-6">Your cart</h1>
+
+            <GiftLadderBar gift={giftBar} />
 
             {freeBar && (
                 <div className="card p-4 mb-6">

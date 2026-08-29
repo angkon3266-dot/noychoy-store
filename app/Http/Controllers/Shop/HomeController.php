@@ -60,11 +60,6 @@ class HomeController extends Controller
                 ->sortBy(fn ($c) => $scrollerIds->search($c->id))->values()
             : Category::active()->whereNull('parent_id')->orderBy('position')->take(10)->get();
 
-        // Highlighted categories (large editorial tiles), in the admin-chosen order.
-        $highlightIds = collect(home_content('highlight_category_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
-        $highlightCategories = $highlightIds->isEmpty() ? collect() : Category::whereIn('id', $highlightIds)->get()
-            ->sortBy(fn ($c) => $highlightIds->search($c->id))->values();
-
         // Custom section blocks: hydrate products + video meta from the plan.
         $sections = collect($plan['sections'])->map(function ($b) use ($pick) {
             if (isset($b['product_ids'])) {
@@ -139,6 +134,13 @@ class HomeController extends Controller
         if (! $view || ! view()->exists($view)) {
             $view = 'shop.templates.home.storefront';
         }
+
+        // Highlighted categories (large editorial tiles), in the admin-chosen
+        // order. Only the Blade templates render these — computing them above
+        // cost the React homepage a query it never used.
+        $highlightIds = collect(home_content('highlight_category_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
+        $highlightCategories = $highlightIds->isEmpty() ? collect() : Category::whereIn('id', $highlightIds)->get()
+            ->sortBy(fn ($c) => $highlightIds->search($c->id))->values();
 
         return view($view, compact(
             'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'sections'

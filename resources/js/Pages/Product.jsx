@@ -3,6 +3,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import ShareButton from '../Shared/ShareButton';
+import RichText from '../Shared/RichText';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
@@ -40,7 +41,12 @@ export default function Product(props) {
 
             <StorySections sections={product.sections} />
             <Description text={product.description} />
-            <Specs specs={product.specs} />
+            <Details specs={product.specs} />
+            <PolicyAccordion title="Care" text={props.care} />
+            <PolicyAccordion title="Shipping & returns" text={props.returns} moreUrl={props.refundUrl} moreLabel="Read the full policy" />
+            <div className="max-w-3xl mt-6 border-t border-ink-100 pt-4">
+                <ShareButton url={product.url} title={product.name} label="Share" />
+            </div>
             <Reviews {...props} />
             <FrequentlyBought fbt={props.fbt} />
             <CardStrip title="You may also like" products={props.related} cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-5" />
@@ -252,10 +258,8 @@ function MemberPill() {
     );
 }
 
-function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBanner, delivery, reviews, loved, lovesCount, ui }) {
+function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBanner, delivery, trustBadges, giftBadge, reviews, loved, lovesCount, ui }) {
     const { add } = useCart();
-    const { props } = usePage();
-    const trustBadges = props.chrome?.footer?.trustBadges || [];
     const preorder = product.preorder;
 
     const addToCart = async () => {
@@ -414,13 +418,6 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 </ul>
             )}
 
-            {delivery && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-ink-700/80">
-                    <Icon name="truck" className="w-5 h-5 text-gold-700" />
-                    <span>Order now — estimated delivery <strong>{delivery.from}{delivery.to ? ` – ${delivery.to}` : ''}</strong></span>
-                </div>
-            )}
-
             {product.low_stock != null && (
                 <div className="mt-4 flex items-center gap-2 text-sm text-danger-600 font-medium">
                     <span className="relative flex h-2 w-2">
@@ -440,14 +437,46 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                 </div>
             )}
 
-            {/* Quantity */}
-            <div className="mt-6 flex items-center gap-4">
-                <div className="inline-flex items-center rounded-md border border-ink-100">
-                    <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="px-3 py-2.5">−</button>
-                    <span className="w-10 text-center">{purchase.qty}</span>
-                    <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="px-3 py-2.5">+</button>
+            {/* Trust badges — the vertical promise list beside the buy button */}
+            {(trustBadges?.length > 0 || giftBadge) && (
+                <ul className="mt-6 space-y-2.5">
+                    {(trustBadges || []).map((b, i) => (
+                        <li key={i} className="flex items-center gap-3 text-sm text-ink-800">
+                            <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5 shrink-0 text-gold-700" />
+                            <span>{b.title}{b.text ? <span className="text-ink-700/70"> — {b.text}</span> : null}</span>
+                        </li>
+                    ))}
+                    {giftBadge && (
+                        <li className="flex items-center gap-3 text-sm">
+                            <Icon name="gift" className="w-5 h-5 shrink-0 text-gold-700" strokeWidth={2} />
+                            <a href={giftBadge.url} className="font-semibold text-gold-800 hover:underline">{giftBadge.label}</a>
+                        </li>
+                    )}
+                </ul>
+            )}
+
+            {/* Arrival window — the parcel's two dates in one calm box */}
+            {delivery && (
+                <div className="mt-5 rounded-xl bg-gold-100/70 px-4 py-3 flex items-start gap-3">
+                    <Icon name="calendar" className="w-5 h-5 shrink-0 text-ink-800 mt-0.5" />
+                    <div className="text-sm">
+                        <p className="font-medium text-ink-900">Arrives {delivery.from}{delivery.to ? ` – ${delivery.to}` : ''}</p>
+                        {delivery.dispatch && <p className="text-ink-700/70 mt-0.5">Dispatching {delivery.dispatch}</p>}
+                    </div>
                 </div>
-                <span className="text-sm text-ink-700/70">Cash on delivery available</span>
+            )}
+
+            {/* Quantity */}
+            <div className="mt-5">
+                <span className="label">Quantity</span>
+                <div className="flex items-center gap-4">
+                    <div className="inline-flex items-center rounded-md border border-ink-100">
+                        <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="px-3 py-2.5">−</button>
+                        <span className="w-10 text-center">{purchase.qty}</span>
+                        <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="px-3 py-2.5">+</button>
+                    </div>
+                    <span className="text-sm text-ink-700/70">Cash on delivery available</span>
+                </div>
             </div>
 
             {preorder && (
@@ -485,19 +514,6 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
                     <WhatsApp />
                     Order or ask on WhatsApp
                 </a>
-            )}
-
-            {/* Trust badges */}
-            {trustBadges.length > 0 && (
-                <div className="mt-6 grid grid-cols-3 gap-3">
-                    {trustBadges.map((b, i) => (
-                        <div key={i} className="rounded-lg border border-gold-100 bg-white px-3 py-2.5 text-center">
-                            <div className="flex justify-center text-gold-700"><IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5" /></div>
-                            <div className="text-xs font-medium mt-0.5">{b.title}</div>
-                            {b.text && <div className="text-[11px] text-ink-700/70">{b.text}</div>}
-                        </div>
-                    ))}
-                </div>
             )}
         </div>
     );
@@ -641,23 +657,42 @@ function Description({ text }) {
                 <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
             </button>
             {/* Always in the DOM (collapsed via CSS) so search engines index the copy. */}
-            <div className={`prose prose-sm max-w-none text-ink-700/85 mt-3 whitespace-pre-line ${open ? '' : 'hidden'}`}>{text}</div>
+            <RichText text={text} className={`text-[15px] text-ink-700/85 mt-3 ${open ? '' : 'hidden'}`} />
         </section>
     );
 }
 
-function Specs({ specs }) {
+/** The Metal / Stone / Cut / Finish table — the spec chips, grown up. */
+function Details({ specs }) {
     if (!specs?.length) return null;
     return (
-        <section className="mt-6 max-w-3xl">
-            <h2 className="font-display text-lg font-semibold mb-2">Specifications</h2>
-            <div className="flex flex-wrap gap-2">
+        <section className="mt-10 max-w-3xl">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-700 mb-1">Details</h2>
+            <dl>
                 {specs.map((spec, i) => (
-                    <div key={i} className="inline-flex items-center gap-2 rounded-lg bg-gold-50 border border-gold-100 px-4 py-2 text-sm">
-                        <span className="text-ink-700/70">{spec.label}:</span>
-                        <span className="font-medium">{spec.value}</span>
+                    <div key={i} className="grid grid-cols-[8rem_1fr] sm:grid-cols-[10rem_1fr] gap-4 py-3 border-b border-ink-100 text-sm">
+                        <dt className="text-ink-700/60">{spec.label}</dt>
+                        <dd className="text-ink-900">{spec.value}</dd>
                     </div>
                 ))}
+            </dl>
+        </section>
+    );
+}
+
+/** Care / Shipping & returns — collapsed accordions, content admin-editable. */
+function PolicyAccordion({ title, text, moreUrl = null, moreLabel = null }) {
+    const [open, setOpen] = useState(false);
+    if (!text) return null;
+    return (
+        <section className="max-w-3xl border-b border-ink-100">
+            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 py-4 text-left">
+                <h2 className="font-display text-xl font-medium">{title}</h2>
+                <Icon name="chevronDown" className={`w-5 h-5 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
+            </button>
+            <div className={`pb-5 text-sm text-ink-700/85 ${open ? '' : 'hidden'}`}>
+                <RichText text={text} />
+                {moreUrl && <Link href={moreUrl} className="text-gold-700 underline">{moreLabel || 'Read more'}</Link>}
             </div>
         </section>
     );
@@ -849,7 +884,7 @@ function FrequentlyBought({ fbt }) {
                                     onChange={(e) => setSel({ ...sel, [p.id]: e.target.checked })}
                                 />
                                 <span className="block aspect-square rounded-lg overflow-hidden bg-gold-100 border border-ink-100">
-                                    {p.thumb && <img src={p.thumb} className="h-full w-full object-cover" alt={p.name} />}
+                                    {p.thumb && <img src={p.thumb} className="h-full w-full object-cover" alt={p.name} loading="lazy" decoding="async" />}
                                 </span>
                                 <span className="mt-1 block text-xs truncate">{p.name}</span>
                                 <span className="block text-xs font-semibold text-gold-700">{p.price_text}</span>

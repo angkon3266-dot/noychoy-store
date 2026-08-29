@@ -107,10 +107,10 @@ class CustomerOffer extends Model
         return self::SCOPES[$this->applies_to] ?? 'Whole order';
     }
 
-    /** Cart lines that fall within this offer's scope. */
+    /** Cart lines that fall within this offer's scope (paid units only — gift-ladder freebies excluded). */
     public function eligibleItems($cart)
     {
-        return $cart->items()->filter(fn ($i) => $this->lineEligible($i));
+        return $cart->discountableItems()->filter(fn ($i) => $this->lineEligible($i));
     }
 
     public function lineEligible(array $item): bool

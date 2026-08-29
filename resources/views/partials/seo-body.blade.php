@@ -66,7 +66,7 @@
                 cash on delivery all over Bangladesh
             </span>
         </p>
-        @if($body = trim(strip_tags((string) ($product->description ?: $product->short_description))))
+        @if($body = plain_copy(strip_tags((string) ($product->description ?: $product->short_description))))
             <p style="margin:0 0 1rem;white-space:pre-line">{{ Str::limit($body, 1200) }}</p>
         @endif
     @else

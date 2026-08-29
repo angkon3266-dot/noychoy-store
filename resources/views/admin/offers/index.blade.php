@@ -4,12 +4,63 @@
 
 @section('content')
 @if(session('success'))<div class="mb-4 rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-2.5 text-sm">{{ session('success') }}</div>@endif
+@if(session('error'))<div class="mb-4 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 text-sm">{{ session('error') }}</div>@endif
 
 <p class="text-sm text-ink-700/70 mb-4 max-w-3xl">
     Automatic promotions that apply at checkout <strong>and</strong> show on product pages to boost conversions —
     e.g. “Free delivery over ৳2000”, “Buy any 2, get 5% off”, “Members get an extra 3% off”.
     For single-use codes use <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a>.
 </p>
+
+{{-- Milestone gift ladder — every Nth piece free, from a picked collection --}}
+<div class="card p-5 mb-6 max-w-3xl">
+    <h2 class="font-semibold mb-1">Milestone gift ladder</h2>
+    <p class="text-xs text-ink-700/60 mb-3">
+        “Every 3rd piece free”: for every <strong>{{ $giftLadder['buy'] }}</strong> qualifying pieces a customer buys,
+        they may add <strong>1 piece from the gifts collection</strong> to the cart free — up to the per-order cap.
+        The storefront shows a milestone progress bar in the cart and an “unlock gifts” badge on every product page.
+        Build the two collections under <a href="{{ route('admin.collections.index') }}" class="text-gold-700 underline">Products → Collections</a> first
+        (a manual collection is a hand-picked list), then choose them here.
+    </p>
+    <form action="{{ route('admin.offers.gift-ladder') }}" method="POST" class="flex flex-wrap items-end gap-3">
+        @csrf
+        <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm w-full sm:w-auto">
+            <input type="checkbox" name="enabled" value="1" @checked($giftLadder['enabled'])>
+            Ladder is live
+        </label>
+        <div>
+            <label class="label">Buy (pieces per gift)</label>
+            <input name="buy" type="number" min="1" max="20" value="{{ $giftLadder['buy'] }}" class="input w-28">
+        </div>
+        <div>
+            <label class="label">Max gifts / order</label>
+            <input name="max" type="number" min="1" max="10" value="{{ $giftLadder['max'] }}" class="input w-28">
+        </div>
+        <div class="flex-1 min-w-[190px]">
+            <label class="label">Gifts collection (pieces customers take free) *</label>
+            <select name="gifts_collection_id" class="input">
+                <option value="">— choose —</option>
+                @foreach($giftLadder['collections'] as $c)
+                    <option value="{{ $c['id'] }}" @selected($giftLadder['gifts_collection_id'] === $c['id'])>{{ $c['name'] }} ({{ $c['count'] }})</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="flex-1 min-w-[190px]">
+            <label class="label">Qualifying collection (blank = every product counts)</label>
+            <select name="qualifying_collection_id" class="input">
+                <option value="">All products</option>
+                @foreach($giftLadder['collections'] as $c)
+                    <option value="{{ $c['id'] }}" @selected($giftLadder['qualifying_collection_id'] === $c['id'])>{{ $c['name'] }} ({{ $c['count'] }})</option>
+                @endforeach
+            </select>
+        </div>
+        <button class="btn-primary">Save gift ladder</button>
+        <p class="w-full text-xs text-ink-700/50 mt-1">
+            The cheapest eligible gift pieces go free first, the discount is re-checked server-side at checkout,
+            and gift stock is deducted like any other sale. This gives product away — check your margins before switching it on.
+        </p>
+    </form>
+</div>
 
 {{-- Registration offer (shown to guests, applied automatically to logged-in members) --}}
 <div class="card p-5 mb-6 max-w-3xl">
