@@ -11,10 +11,12 @@
 // in place (the filename hash no longer matches the content, which is
 // harmless — the fonts manifest references it by name).
 
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dir = join(process.cwd(), 'public', 'build', 'assets');
+const manifestPath = join(process.cwd(), 'public', 'build', 'fonts-manifest.json');
 
 const files = readdirSync(dir).filter((f) => /^fonts-.*\.css$/.test(f));
 
@@ -53,10 +55,29 @@ for (const file of files) {
         const sorted = [...new Set(srcs)].sort((a, b) => (a.includes('woff2') ? -1 : 1) - (b.includes('woff2') ? -1 : 1));
 
         return face.replace(/src:\s*[^;]+;/, `src: ${sorted.join(', ')};`);
-    }).join('\n\n');
+    }).join('\n\n') + '\n';
 
-    writeFileSync(path, out + '\n');
-    console.log(`[fonts] ${file}: merged ${faces.length} @font-face rules into ${order.length} (woff2 preferred)`);
+    // Re-fingerprint: the stylesheet is referenced by content-hashed name with
+    // immutable caching, so rewriting it in place would leave every cached
+    // copy (browser, LiteSpeed) serving the unmerged rules forever. A new
+    // name busts those caches; the old name keeps the merged content too, for
+    // HTML that was itself cached pointing at it.
+    const hash = createHash('sha256').update(out).digest('base64url').slice(0, 8);
+    const newFile = file.replace(/^fonts-.*\.css$/, `fonts-${hash}.css`);
+    writeFileSync(path, out);
+    writeFileSync(join(dir, newFile), out);
+
+    try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+        if (manifest.style?.file === file || manifest.style?.file) {
+            manifest.style.file = newFile;
+            writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+        }
+    } catch (e) {
+        console.warn(`[fonts] could not update fonts-manifest.json: ${e.message}`);
+    }
+
+    console.log(`[fonts] ${file} -> ${newFile}: merged ${faces.length} @font-face rules into ${order.length} (woff2 preferred)`);
 }
 
 if (!files.length) console.log('[fonts] no fonts-*.css found, skipped');
