@@ -313,6 +313,108 @@ class ReviewThankYouOfferTest extends TestCase
         $this->assertSame($sent[0], rtrim($sent[0]));
     }
 
+    // ── The 160-character budget ───────────────────────────────────────────
+
+    /** Every character the GSM-7 alphabet can send in a single byte. */
+    private const GSM7 = "@£\$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
+        ."¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+
+    /** Render the review SMS exactly as the job would, and hand it back. */
+    protected function renderedSms(Order $order): string
+    {
+        $sent = [];
+        $this->mock(\App\Services\SmsService::class, function ($mock) use (&$sent) {
+            $mock->shouldReceive('template')->andReturn(config('sms.templates.review_request'));
+            $mock->shouldReceive('sendTemplate')->andReturnUsing(function ($key, $o, $extra, $tpl = null) use (&$sent) {
+                $sent[] = strtr($tpl ?? '', array_merge([
+                    '{store}' => store_name(),
+                    '{order}' => $o->order_number,
+                ], $extra));
+
+                return true;
+            });
+        });
+
+        app(SendReviewRequest::class, ['order' => $order])->handle(
+            app(\App\Services\SmsService::class), app(ReviewThankYouOffer::class),
+        );
+
+        return $sent[0];
+    }
+
+    public function test_the_whole_message_fits_one_sms_segment(): void
+    {
+        $this->enableOffer(10, 30);
+        $order = $this->deliveredOrder();
+        $order->update(['customer_name' => 'Kazi Rahat']);
+
+        $sms = $this->renderedSms($order->fresh());
+        $coupon = Coupon::firstOrFail();
+
+        // Everything that was asked for is still in it.
+        $this->assertStringContainsString('/r/'.$order->order_number.'/', $sms, 'review link');
+        $this->assertStringContainsString('10% off', $sms, 'discount');
+        $this->assertStringContainsString($coupon->code, $sms, 'coupon code');
+        $this->assertStringContainsString($coupon->expires_at->format('j M'), $sms, 'expiry');
+        $this->assertStringContainsString(store_name(), $sms, 'store name');
+
+        $this->assertLessThanOrEqual(160, mb_strlen($sms), "One segment. Message was:\n".$sms);
+    }
+
+    public function test_a_long_customer_name_cannot_push_it_over(): void
+    {
+        $this->enableOffer(10, 30);
+        $order = $this->deliveredOrder();
+        $order->update(['customer_name' => 'Mohammad Abdur Rahman Chowdhury']);
+
+        $sms = $this->renderedSms($order->fresh());
+
+        // Only the first name is used, so the four-word version costs the
+        // same as the short one.
+        $this->assertStringContainsString('Mohammad', $sms);
+        $this->assertStringNotContainsString('Chowdhury', $sms);
+        $this->assertLessThanOrEqual(160, mb_strlen($sms), "One segment. Message was:\n".$sms);
+    }
+
+    public function test_every_character_is_gsm7_so_the_gateway_does_not_switch_to_unicode(): void
+    {
+        $this->enableOffer(10, 30);
+        $order = $this->deliveredOrder();
+        $order->update(['customer_name' => 'Kazi Rahat']);
+
+        // One non-GSM-7 character (an em dash, a curly quote) turns the whole
+        // message into UCS-2, where a segment is 70 characters, not 160 — so
+        // the budget above would be quietly blown by a typo in the wording.
+        $stray = collect(mb_str_split($this->renderedSms($order->fresh())))
+            ->reject(fn ($c) => mb_strpos(self::GSM7, $c) !== false)
+            ->unique()->values()->all();
+
+        $this->assertSame([], $stray, 'non-GSM-7 characters: '.implode(' ', $stray));
+    }
+
+    public function test_the_short_link_opens_the_review_page(): void
+    {
+        $order = $this->deliveredOrder();
+
+        $short = \App\Http\Controllers\Shop\ReviewController::shortLink($order->order_number);
+
+        // It hands off to the signed URL the review page already trusts.
+        $this->get($short)->assertRedirectContains('signature=');
+        $this->followingRedirects()->get($short)->assertOk()
+            ->assertInertia(fn ($page) => $page->component('ReviewInvite'));
+    }
+
+    public function test_a_guessed_short_link_is_turned_away(): void
+    {
+        $order = $this->deliveredOrder();
+
+        $this->get('/r/'.$order->order_number.'/'.str_repeat('a', 16))
+            ->assertRedirect(route('track'));
+
+        // And it cannot be reached by simply dropping the token.
+        $this->get('/r/'.$order->order_number.'/')->assertNotFound();
+    }
+
     // ── Defects found in review ────────────────────────────────────────────
 
     public function test_a_coupon_earns_nothing_on_a_free_gift_unit(): void

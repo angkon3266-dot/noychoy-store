@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Http\Controllers\Shop\ReviewController;
 use App\Mail\ReviewRequestMail;
 use App\Models\Order;
 use App\Services\ReviewThankYouOffer;
@@ -44,6 +45,12 @@ class SendReviewRequest implements ShouldQueue
         // reach almost nobody.
         $link = URL::signedRoute('order.review', ['orderNumber' => $order->order_number]);
 
+        // The SMS gets the short form of the same link. A full signature is
+        // 119 characters with the path — most of a segment — and the message
+        // has to carry a coupon code as well. Email has no such budget and
+        // keeps the signed URL.
+        $smsLink = ReviewController::shortLink($order->order_number);
+
         // Minted before the send, because the code has to be inside the
         // message. Deriving it from the order number keeps a retry from
         // issuing her a second one.
@@ -80,7 +87,12 @@ class SendReviewRequest implements ShouldQueue
             // sendTemplate returns false — it does not throw — when the gateway
             // is off, the balance is spent, or the provider rejects the message.
             $smsOk = (bool) $sms->sendTemplate('review_request', $order, [
-                '{link}' => $link,
+                // First name only. Extras win the array_merge in
+                // sendTemplate(), so this narrows {name} for this message
+                // alone — a four-word name would otherwise be the difference
+                // between one paid segment and two.
+                '{name}' => str($order->customer_name)->trim()->explode(' ')->first(),
+                '{link}' => $smsLink,
                 // Carries its own leading space so the template reads
                 // "{link}{offer}" and loses nothing when there is no offer.
                 '{offer}' => $offerLine === '' ? '' : ' '.$offerLine,

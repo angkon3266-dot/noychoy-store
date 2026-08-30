@@ -129,8 +129,13 @@ class ReviewThankYouOffer
     }
 
     /**
-     * The sentence appended to her SMS. Kept to one short line: the review
-     * link already pushes the message into a second paid segment.
+     * The offer half of her SMS, in as few characters as it can be said.
+     *
+     * Every word here is paid for: with the review link this has to fit
+     * inside one 160-character segment, so the sentence carries only the four
+     * things she needs — how much, on what, the code, and until when. Plain
+     * GSM-7 characters only (no em dash, no curly quotes), or the gateway
+     * silently switches the whole message to unicode and 160 becomes 70.
      */
     public function smsLine(Coupon $coupon): string
     {
@@ -140,9 +145,8 @@ class ReviewThankYouOffer
         // it be cleared, so this cannot assume a date exists — dereferencing
         // null here would throw inside a queued job that has already been
         // stamped as sent, silencing the request for good.
-        $until = $coupon->expires_at ? ', valid till '.$coupon->expires_at->format('j M') : '';
+        $until = $coupon->expires_at ? ' till '.$coupon->expires_at->format('j M') : '';
 
-        return 'Thank-you gift: '.$percent.'% off your next order with code '
-            .$coupon->code.$until.'.';
+        return $percent.'% off next order: '.$coupon->code.$until;
     }
 }

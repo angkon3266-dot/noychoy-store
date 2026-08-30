@@ -9,6 +9,7 @@ use App\Models\Review;
 use App\Services\ImageOptimizer;
 use App\Services\LoyaltyService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 
 class ReviewController extends Controller
 {
@@ -20,6 +21,49 @@ class ReviewController extends Controller
      * as unverified. This page lists just the pieces in the order and posts to
      * the same endpoint, untouched.
      */
+    /**
+     * The short door onto the review page, for SMS.
+     *
+     * A Laravel signed URL carries a 64-character signature, which with the
+     * path costs about 119 characters — most of a 160-character message, and
+     * the reason the review SMS ran to two paid segments. This is the same
+     * guarantee in a fifth of the space: a 64-bit HMAC of the order number
+     * under the app key, checked in constant time, then handed straight to
+     * the signed URL the review page already expects.
+     *
+     * Deliberately a redirect and not a second entry point: `invite()` keeps
+     * its own three-way allow list, and nothing about who may read or write a
+     * review changes here.
+     */
+    public function shortInvite(string $orderNumber, string $token)
+    {
+        if (! hash_equals(static::shortToken($orderNumber), strtolower($token))) {
+            return redirect()->route('track')
+                ->with('error', 'That review link is not valid. Please look your order up below.');
+        }
+
+        return redirect()->to(URL::signedRoute('order.review', ['orderNumber' => $orderNumber]));
+    }
+
+    /** The opaque half of a short review link. */
+    public static function shortToken(string $orderNumber): string
+    {
+        return substr(
+            hash_hmac('sha256', 'review-link:'.$orderNumber, (string) config('app.key')),
+            0,
+            16,
+        );
+    }
+
+    /** The full short link that goes into a message. */
+    public static function shortLink(string $orderNumber): string
+    {
+        return route('order.review.short', [
+            'orderNumber' => $orderNumber,
+            'token' => static::shortToken($orderNumber),
+        ]);
+    }
+
     public function invite(Request $request, string $orderNumber)
     {
         $order = Order::where('order_number', $orderNumber)

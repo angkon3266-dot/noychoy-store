@@ -122,6 +122,11 @@ Route::get('/order/{orderNumber}/confirmation', [CheckoutController::class, 'con
 // /product/{slug} catch-all, and gated by a signature rather than a login —
 // this store is COD and most buyers never register.
 Route::get('/order/{orderNumber}/review', [ReviewController::class, 'invite'])->name('order.review');
+// The short form of the same link, for SMS — a signed URL's 64-character
+// signature is most of a 160-character message. Throttled because its token is
+// shorter than a full signature, so guessing must stay expensive.
+Route::get('/r/{orderNumber}/{token}', [ReviewController::class, 'shortInvite'])
+    ->name('order.review.short')->middleware('throttle:20,1');
 // Turns the guest customer row a checkout created into a real login. Gated by
 // proof the order is yours, never by the phone number alone.
 Route::post('/order/{orderNumber}/claim', [CheckoutController::class, 'claimAccount'])
