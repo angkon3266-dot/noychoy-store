@@ -39,7 +39,8 @@ class BackfillGiftSeo extends Command
     protected $signature = 'catalog:gift-seo
         {--dry-run : Print every change and write nothing}
         {--tags-only : Skip the meta descriptions}
-        {--descriptions-only : Skip the tags and the collection rule}';
+        {--descriptions-only : Skip the tags and the collection rule}
+        {--samples=0 : Print this many products in full, exactly as Google would see them}';
 
     protected $description = 'Tag products into the gift collections and rewrite meta descriptions for Bangladesh';
 
@@ -202,6 +203,10 @@ class BackfillGiftSeo extends Command
         }
 
         $this->table(['ID', 'Product', 'Occasions', 'Meta description (stored — price is appended at render)'], $rows);
+
+        if ($samples = (int) $this->option('samples')) {
+            $this->sample($products, $samples);
+        }
 
         $this->newLine();
         $this->info("Tag changes: {$tagChanges}   Description changes: {$descChanges}");
@@ -429,6 +434,38 @@ class BackfillGiftSeo extends Command
         $options = self::OCCASION_COPY[$key];
 
         return $options[$product->id % count($options)];
+    }
+
+    /**
+     * A handful of products printed whole — the stored description, then the
+     * snippet Google actually receives once the live price and the delivery
+     * promise are appended. Reading the finished sentence is the only way to
+     * catch copy that is grammatical in the template and wrong on the page.
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>  $products
+     */
+    private function sample(\Illuminate\Support\Collection $products, int $count): void
+    {
+        $this->newLine();
+        $this->info('Sample — what Google receives:');
+
+        $step = max(1, intdiv($products->count(), $count));
+
+        foreach ($products->values()->filter(fn ($p, $i) => $i % $step === 0)->take($count) as $product) {
+            $occasions = array_values(array_intersect(
+                ['anniversary', 'birthday', 'datenight', 'giftforher'],
+                array_map('strtolower', $this->occasionTags($product, $this->tagList($product))),
+            ));
+
+            // Render through the same path the page uses, so what is printed
+            // here is what ships — not an approximation of it.
+            $product->meta_description = $this->description($product, $occasions);
+            $rendered = Meta::productDescription($product);
+
+            $this->newLine();
+            $this->line("  <fg=yellow>{$product->name}</> — ".implode(', ', $occasions));
+            $this->line('  '.$rendered.' <fg=gray>('.mb_strlen($rendered).' chars)</>');
+        }
     }
 
     /**
