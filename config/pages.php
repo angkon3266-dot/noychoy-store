@@ -16,16 +16,38 @@
 
 return [
 
-    // The brand story. A "brand_story" landing template already shipped, but it
-    // lived at /lp/{slug} and nothing linked to it, so the site had no answer to
-    // "who are you?" at the moment a shopper checks whether you are real.
+    /*
+     * The brand story.
+     *
+     * This shipped as scaffolding — "Write the story behind the brand here" —
+     * and was never replaced, so the one page a shopper opens to decide whether
+     * the shop is real told them to write it themselves. The copy below is a
+     * real default in the brand's own voice, drawn from what the rest of the
+     * site already promises (the trust badges, the refund window, the pricing
+     * claim) so the page cannot contradict them. It is still the owner's to
+     * rewrite in Admin → Pages.
+     *
+     * `eyebrow`, `headline`, `lede` and `hero_image` drive the page header;
+     * `body` is the long-form copy underneath it.
+     */
     'about' => [
         'title' => 'Our story',
-        'body' => '<p>Write the story behind the brand here — who makes the pieces, why you started, and what a customer is really buying. Two or three short paragraphs beat one long one.</p>
-<h3>What we make</h3>
-<p>Say what the jewelry is and who it is for, in plain words. Not "premium quality product" — the piece, the material, the person.</p>
-<h3>How we work</h3>
-<p>Hand-checked before it ships, delivered nationwide, paid for on your doorstep. Say it once, here, and let the rest of the site talk about the jewelry.</p>',
+        // Null, not the brand name: this file is the shared default for every
+        // store on this codebase, so the eyebrow falls back to store_name().
+        'eyebrow' => null,
+        'headline' => 'Jewelry that tells your story',
+        'lede' => 'Hand-picked pieces, checked before they ship, and priced to be worn — not saved for a day that never comes.',
+        'hero_image' => null,
+        'body' => '<h2>Why we started</h2>
+<p>Fine jewelry in Bangladesh tends to arrive one of two ways: a glass counter where the price is whatever the shopkeeper decides that afternoon, or an online photo that looks nothing like the parcel. We wanted a third way — a fixed, fair price on the page, a real photograph of the actual piece, and a box you would be happy to hand to someone.</p>
+<h2>What we make</h2>
+<p>Brilliant-cut cubic zirconia set in gold-plated and rhodium-plated settings, with sterling silver on selected pieces. Earrings, necklaces, rings, bracelets and anklets — everyday pieces and occasion pieces, made to be worn to work on Tuesday and to a wedding on Friday.</p>
+<h2>We tell you exactly what it is</h2>
+<p>Our stones are cubic zirconia: lab-made, cut the same way a diamond is, and brilliant in the light. They are not diamonds, and we will never imply otherwise. Plenty of shops in this category leave that comfortably vague. We would rather put the material on every product page and let the piece earn its place.</p>
+<p>That is also why the prices look the way they do. You are paying for the stone, the setting and the finishing — not for a ten-times markup and a velvet room.</p>
+<h2>How we work</h2>
+<p>Every order is checked by hand before it leaves us. It reaches you through our courier partner anywhere in Bangladesh, and you pay when it arrives — nothing up front, nothing online. If a piece is not what you expected, you have seven days to tell us and we will make it right.</p>
+<p>If you would rather talk to a person first, call or message us. Someone here will answer.</p>',
     ],
 
     'privacy' => [

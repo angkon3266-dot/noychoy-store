@@ -196,7 +196,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-C7qC8tEp.css",
+    "file": "assets/app-CUoYHh4t.css",
     "name": "app",
     "names": [
       "app.css"
@@ -420,7 +420,7 @@
     ]
   },
   "resources/js/Pages/Home.jsx": {
-    "file": "assets/Home-8_ypIdHO.js",
+    "file": "assets/Home-C8Xc7w6H.js",
     "name": "Home",
     "src": "resources/js/Pages/Home.jsx",
     "isDynamicEntry": true,
@@ -432,7 +432,7 @@
     ]
   },
   "resources/js/Pages/Legal.jsx": {
-    "file": "assets/Legal-h8avBX5v.js",
+    "file": "assets/Legal-HiYJXYK6.js",
     "name": "Legal",
     "src": "resources/js/Pages/Legal.jsx",
     "isDynamicEntry": true,
@@ -464,6 +464,16 @@
       "_Layout-TBUS-9M6.js"
     ]
   },
+  "resources/js/Pages/Story.jsx": {
+    "file": "assets/Story-8zyLzDFl.js",
+    "name": "Story",
+    "src": "resources/js/Pages/Story.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-DZU0qg6Y.js",
+      "_Layout-TBUS-9M6.js"
+    ]
+  },
   "resources/js/Pages/Track.jsx": {
     "file": "assets/Track-CW__YfwR.js",
     "name": "Track",
@@ -482,7 +492,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-heeoWven.js",
+    "file": "assets/inertia-Cys6T-Jz.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,
@@ -513,6 +523,7 @@
       "resources/js/Pages/Legal.jsx",
       "resources/js/Pages/Product.jsx",
       "resources/js/Pages/ReviewInvite.jsx",
+      "resources/js/Pages/Story.jsx",
       "resources/js/Pages/Track.jsx"
     ]
   }

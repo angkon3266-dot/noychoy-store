@@ -6,10 +6,10 @@ export default function Legal({ title, body }) {
     return (
         <div className="mx-auto max-w-3xl px-4 py-12">
             <h1 className="font-display text-3xl font-semibold mb-6">{title}</h1>
-            <div
-                className="prose prose-sm sm:prose max-w-none text-ink-700/85 prose-headings:font-display prose-headings:text-ink-900 prose-a:text-gold-700"
-                dangerouslySetInnerHTML={{ __html: body }}
-            />
+            {/* `.rich-text`, not `prose`: @tailwindcss/typography is not
+                installed, so the prose classes that used to be here emitted no
+                CSS at all and these pages rendered as one wall of text. */}
+            <div className="rich-text" dangerouslySetInnerHTML={{ __html: body }} />
         </div>
     );
 }

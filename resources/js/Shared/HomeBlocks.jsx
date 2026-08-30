@@ -228,7 +228,8 @@ function Block({ block }) {
 
         case 'richtext':
             // Admin-authored HTML — the same trust boundary as Blade's {!! !!}.
-            return <section className="mx-auto max-w-4xl px-4 py-8 prose prose-sm sm:prose" dangerouslySetInnerHTML={{ __html: block.html }} />;
+            // `.rich-text`, not `prose` — @tailwindcss/typography is not installed.
+            return <section className="mx-auto max-w-4xl px-4 py-8 rich-text" dangerouslySetInnerHTML={{ __html: block.html }} />;
 
         default:
             return null;

@@ -23,9 +23,38 @@
                     <label class="label">Title</label>
                     <input name="pages[{{ $key }}][title]" value="{{ $pages[$key]['title'] ?? '' }}" class="input">
                 </div>
+                {{-- The story page has a designed header above the body copy;
+                     the legal pages are a title and a column of text. --}}
+                @if($key === 'about')
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="label">Eyebrow <span class="text-ink-700/40">(small text above the headline)</span></label>
+                            <input name="pages[about][eyebrow]" value="{{ $pages['about']['eyebrow'] ?? '' }}" class="input" placeholder="{{ store_name() }}">
+                        </div>
+                        <div>
+                            <label class="label">Headline</label>
+                            <input name="pages[about][headline]" value="{{ $pages['about']['headline'] ?? '' }}" class="input" placeholder="Jewelry that tells your story">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label">Opening line <span class="text-ink-700/40">(one or two sentences under the headline)</span></label>
+                        <textarea name="pages[about][lede]" rows="2" class="input">{{ $pages['about']['lede'] ?? '' }}</textarea>
+                    </div>
+                    <x-media-field name="about_hero_image" :value="theme_asset($pages['about']['hero_image'] ?? null) ?: ''" folder="branding"
+                                   label="Header photo (optional)"
+                                   help="A wide lifestyle shot. Left empty, the header is a clean cream band." />
+                @endif
                 <div>
                     <label class="label">Content (HTML)</label>
                     <textarea name="pages[{{ $key }}][body]" rows="8" class="input font-mono text-xs">{{ $pages[$key]['body'] ?? '' }}</textarea>
+                    @if($key === 'about')
+                        <p class="text-xs text-ink-700/50 mt-1">
+                            Use <code>&lt;h2&gt;</code> for the section headings and <code>&lt;p&gt;</code> for paragraphs.
+                            The promise strip below the story is your
+                            <a href="{{ route('admin.appearance') }}#trust" class="text-gold-700 hover:underline">trust badges</a> —
+                            edit them there and this page follows.
+                        </p>
+                    @endif
                 </div>
             </div>
         @endforeach

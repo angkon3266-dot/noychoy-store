@@ -62,8 +62,11 @@ class BrandChromeTest extends TestCase
 
     public function test_about_page_routes_and_is_editable(): void
     {
+        // The story has its own designed component now; the legal pages keep
+        // 'Legal'. What this test guards — that /about routes and stays
+        // owner-editable — is unchanged.
         $this->get('/about')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p
-            ->component('Legal')
+            ->component('Story')
             ->where('title', 'Our story'));
 
         Setting::put('pages', ['about' => ['title' => 'The house of Meridian', 'body' => '<p>Founded in Dhaka.</p>']]);

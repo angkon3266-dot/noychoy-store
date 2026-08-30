@@ -302,6 +302,7 @@
 
 @elseif($type === 'richtext')
     @if(filled($block['html'] ?? null))
-        <section class="mx-auto max-w-4xl px-4 py-8 prose prose-sm sm:prose">{!! $block['html'] !!}</section>
+        {{-- `.rich-text`, not `prose` — @tailwindcss/typography is not installed. --}}
+        <section class="mx-auto max-w-4xl px-4 py-8 rich-text">{!! $block['html'] !!}</section>
     @endif
 @endif
