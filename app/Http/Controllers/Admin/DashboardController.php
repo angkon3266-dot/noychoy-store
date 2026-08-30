@@ -40,6 +40,25 @@ class DashboardController extends Controller
         return back()->with('success', 'Dashboard layout saved.');
     }
 
+    /**
+     * Who is on the storefront right now — polled by the dashboard's live card.
+     *
+     * Kept out of index() on purpose: this is the one figure that is worthless
+     * the moment it is a minute old, and re-rendering the whole dashboard to
+     * refresh it would be absurd.
+     */
+    public function live(DashboardAnalytics $analytics)
+    {
+        try {
+            return response()->json($analytics->liveVisitors());
+        } catch (\Throwable $e) {
+            report($e);
+
+            // A polling endpoint that 500s every ten seconds would bury the log.
+            return response()->json(['count' => 0, 'window' => 5, 'rows' => [], 'error' => true]);
+        }
+    }
+
     public function index(DashboardAnalytics $analytics, Request $request)
     {
         $today = now()->startOfDay();
@@ -171,9 +190,9 @@ class DashboardController extends Controller
             'profit' => $on('profit') ? $safe(fn () => $analytics->periodComparison($range)) : null,
             'funnel' => $on('funnel') ? $safe(fn () => $analytics->funnel($range)) : null,
             // collect(), not null: the funnel panel @foreaches this directly.
-            'visitorsByDay' => $on('funnel') ? $safe(fn () => $analytics->visitorsByDay($range), collect()) : null,
+            'series' => $on('funnel') ? $safe(fn () => $analytics->funnelByDay($range), collect()) : null,
             'sources' => $on('funnel') ? $safe(fn () => $analytics->trafficSources($range), collect()) : null,
-            'campaigns' => $on('funnel') ? $safe(fn () => $analytics->topCampaigns($range), collect()) : collect(),
+            'ads' => $on('funnel') ? $safe(fn () => $analytics->adPerformance($range), collect()) : collect(),
             'viewedNotSold' => $on('funnel') ? $safe(fn () => $analytics->viewedNotSold($range), collect()) : null,
             'retention' => $on('retention') ? $safe(fn () => $analytics->retention($range)) : null,
             'operations' => $on('operations') ? $safe(fn () => $analytics->operations($range)) : null,

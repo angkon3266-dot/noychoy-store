@@ -75,6 +75,8 @@ Route::middleware('admin')->group(function () {
     Route::patch('products/{product}/serial', [ProductController::class, 'updateSerial'])->name('products.serial');
 
     Route::post('dashboard/panels', [DashboardController::class, 'savePanels'])->name('dashboard.panels');
+    // Polled by the "on the site right now" card — see DashboardController::live.
+    Route::get('dashboard/live', [DashboardController::class, 'live'])->name('dashboard.live');
 
     // Marketing landing pages
     Route::get('landing', [LandingPageController::class, 'index'])->name('landing.index');

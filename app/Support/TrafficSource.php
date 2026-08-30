@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 
 /**
  * Works out where a visitor came from: a channel ("Facebook", "Google search",
- * "Direct"), the campaign behind it, and the referring host.
+ * "Direct"), the campaign and ad behind it, and the referring host.
  *
  * Signals, strongest first:
  *   1. utm_source / utm_medium — set deliberately, so trusted above all
@@ -23,6 +23,8 @@ class TrafficSource
         'facebook' => ['label' => 'Facebook', 'color' => 'blue'],
         'facebook_ads' => ['label' => 'Facebook Ads', 'color' => 'blue'],
         'instagram' => ['label' => 'Instagram', 'color' => 'pink'],
+        'instagram_ads' => ['label' => 'Instagram Ads', 'color' => 'pink'],
+        'audience_network' => ['label' => 'Meta Audience Network', 'color' => 'violet'],
         'google' => ['label' => 'Google search', 'color' => 'green'],
         'google_ads' => ['label' => 'Google Ads', 'color' => 'green'],
         'tiktok' => ['label' => 'TikTok', 'color' => 'ink'],
@@ -55,6 +57,40 @@ class TrafficSource
         'outlook' => 'email',
     ];
 
+    /**
+     * Exact utm_source values that are a platform under a short name.
+     *
+     * Matched whole, not as substrings: "fb" appearing inside some other word
+     * means nothing, and a two-letter substring test would misfile half the web
+     * as Facebook. These are the values Meta's own `{{site_source_name}}` macro
+     * emits — the reason a tagged ad click used to land in "Other website".
+     */
+    protected const SOURCE_ALIASES = [
+        'fb' => 'facebook',
+        'facebook' => 'facebook',
+        'meta' => 'facebook',
+        'ig' => 'instagram',
+        'insta' => 'instagram',
+        'instagram' => 'instagram',
+        'an' => 'audience_network',
+        'audience_network' => 'audience_network',
+        'msg' => 'messenger',
+        'messenger' => 'messenger',
+        'wa' => 'whatsapp',
+        'whatsapp' => 'whatsapp',
+        'tt' => 'tiktok',
+        'tiktok' => 'tiktok',
+        'yt' => 'youtube',
+        'youtube' => 'youtube',
+        'google' => 'google',
+        'adwords' => 'google_ads',
+        'bing' => 'bing',
+        'newsletter' => 'email',
+        'email' => 'email',
+        'sms' => 'sms',
+        'push' => 'push',
+    ];
+
     /** Ad/click id → channel, for when the referrer is missing. */
     protected const CLICK_IDS = [
         'fbclid' => 'facebook',
@@ -65,10 +101,23 @@ class TrafficSource
         'msclkid' => 'bing',
     ];
 
+    /** utm_medium values that mean somebody paid for the click. */
+    protected const PAID_MEDIUMS = ['cpc', 'ppc', 'paid', 'paid_social', 'paidsocial', 'ads', 'ad', 'display', 'cpm'];
+
+    /** Query parameters carrying a platform's own ad id, best first. */
+    protected const AD_ID_PARAMS = ['ad_id', 'adid', 'utm_ad_id', 'adset_id', 'campaign_id', 'utm_id'];
+
+    /** Organic → paid counterpart, applied once we know money changed hands. */
+    protected const PAID_VARIANT = [
+        'facebook' => 'facebook_ads',
+        'instagram' => 'instagram_ads',
+        'google' => 'google_ads',
+    ];
+
     /**
-     * Resolve a request into ['channel', 'campaign', 'referrer'].
+     * Resolve a request into the full attribution set.
      *
-     * @return array{channel:string, campaign:?string, referrer:?string}
+     * @return array{channel:string, campaign:?string, referrer:?string, medium:?string, content:?string, ad_id:?string}
      */
     public static function fromRequest(Request $request): array
     {
@@ -92,6 +141,14 @@ class TrafficSource
             'channel' => self::resolve($request, $referrerHost),
             'campaign' => $campaign,
             'referrer' => $referrerHost ? substr($referrerHost, 0, 120) : null,
+            'medium' => self::str($request->query('utm_medium'), 40),
+            // Only a *separate* utm_content is the ad name. When utm_campaign is
+            // missing, utm_content is standing in as the campaign above, and
+            // repeating it here would invent an ad that doesn't exist.
+            'content' => filled($request->query('utm_campaign'))
+                ? self::str($request->query('utm_content'))
+                : null,
+            'ad_id' => self::adId($request),
         ];
     }
 
@@ -99,18 +156,19 @@ class TrafficSource
     {
         $source = strtolower((string) self::str($request->query('utm_source')));
         $medium = strtolower((string) self::str($request->query('utm_medium')));
+        $paid = self::looksPaid($request, $medium);
 
         // 1. An explicit utm_source wins — the store set it themselves.
         if ($source !== '') {
-            $paid = in_array($medium, ['cpc', 'ppc', 'paid', 'paid_social', 'ads'], true);
+            // Whole-value aliases first ("fb", "ig", "an"), then the substring
+            // pass that catches "Facebook_Mobile_Feed" and friends.
+            if ($channel = self::SOURCE_ALIASES[$source] ?? null) {
+                return $paid ? (self::PAID_VARIANT[$channel] ?? $channel) : $channel;
+            }
 
             foreach (self::HOSTS as $needle => $channel) {
                 if (str_contains($source, rtrim($needle, '.'))) {
-                    return match (true) {
-                        $paid && $channel === 'facebook' => 'facebook_ads',
-                        $paid && $channel === 'google' => 'google_ads',
-                        default => $channel,
-                    };
+                    return $paid ? (self::PAID_VARIANT[$channel] ?? $channel) : $channel;
                 }
             }
 
@@ -126,8 +184,8 @@ class TrafficSource
         foreach (self::CLICK_IDS as $param => $channel) {
             if (filled($request->query($param))) {
                 // fbclid on a paid click means an ad; organic posts carry it too,
-                // so only call it Ads when the medium says so.
-                return $channel === 'facebook' && $medium !== '' ? 'facebook_ads' : $channel;
+                // so only call it Ads when something else says it was paid.
+                return $paid ? (self::PAID_VARIANT[$channel] ?? $channel) : $channel;
             }
         }
 
@@ -135,7 +193,7 @@ class TrafficSource
         if ($referrerHost) {
             foreach (self::HOSTS as $needle => $channel) {
                 if (str_contains($referrerHost, $needle)) {
-                    return $channel;
+                    return $paid ? (self::PAID_VARIANT[$channel] ?? $channel) : $channel;
                 }
             }
 
@@ -143,6 +201,45 @@ class TrafficSource
         }
 
         return 'direct';
+    }
+
+    /**
+     * Did somebody pay for this click?
+     *
+     * utm_medium is the honest answer when it's set. It very often isn't — a
+     * link built with Meta's macros can carry only `utm_source={{site_source_name}}`
+     * and `utm_campaign={{campaign.id}}` — so an ad id in the URL counts too:
+     * organic posts and shares never carry one.
+     */
+    protected static function looksPaid(Request $request, string $medium): bool
+    {
+        if (in_array($medium, self::PAID_MEDIUMS, true)) {
+            return true;
+        }
+
+        foreach (self::AD_ID_PARAMS as $param) {
+            if (filled($request->query($param))) {
+                return true;
+            }
+        }
+
+        // Meta's {{campaign.id}} macro resolves to a long numeric id. A human
+        // naming a campaign does not write seventeen digits and nothing else.
+        $campaign = (string) self::str($request->query('utm_campaign'));
+
+        return $campaign !== '' && ctype_digit($campaign) && strlen($campaign) >= 12;
+    }
+
+    /** The platform's own ad id, if the link carries one under any known name. */
+    protected static function adId(Request $request): ?string
+    {
+        foreach (self::AD_ID_PARAMS as $param) {
+            if ($value = self::str($request->query($param), 40)) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     public static function label(?string $channel): string
@@ -169,10 +266,32 @@ class TrafficSource
         };
     }
 
-    protected static function str($value): ?string
+    /**
+     * The channel a bare referrer host belongs to, with no query string to go
+     * on. Used to re-file rows recorded before a mis-tagged link was understood
+     * (see `visits:reclassify`), never on the request path.
+     */
+    public static function fromReferrerHost(?string $host): ?string
+    {
+        $host = strtolower(trim((string) $host));
+
+        if ($host === '') {
+            return null;
+        }
+
+        foreach (self::HOSTS as $needle => $channel) {
+            if (str_contains($host, $needle)) {
+                return $channel;
+            }
+        }
+
+        return null;
+    }
+
+    protected static function str($value, int $limit = 80): ?string
     {
         $value = trim((string) $value);
 
-        return $value === '' ? null : substr($value, 0, 80);
+        return $value === '' ? null : substr($value, 0, $limit);
     }
 }

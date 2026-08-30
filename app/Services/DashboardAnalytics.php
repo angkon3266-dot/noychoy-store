@@ -32,7 +32,7 @@ class DashboardAnalytics
      * Cache key prefix. Bumping the version makes every entry written by an
      * older build unreachable, so a bad payload can't outlive the fix.
      */
-    protected const CACHE_PREFIX = 'dash.v2.';
+    protected const CACHE_PREFIX = 'dash.v3.';
 
     /**
      * Cache a computed figure.
@@ -203,50 +203,89 @@ class DashboardAnalytics
     protected const CHART_BUCKETS = 60;
 
     /**
-     * Visitors over the window, as a small bar chart.
+     * The whole funnel over time: visitors, product views, add-to-carts,
+     * checkouts started and orders, one point per day.
      *
-     * Days are grouped once the window is longer than the chart can show —
+     * A visitor count on its own only says whether traffic moved. Plotted
+     * against the steps beneath it, the same chart says *where* it stopped —
+     * a spike in visitors with a flat product-view line is a bad audience, a
+     * flat line at add-to-cart is a price or a photo problem.
+     *
+     * Days are grouped once the window is longer than the chart can draw —
      * "Maximum" on a store with two years of data would otherwise be 700
-     * one-pixel bars. Grouping sums each day's distinct visitors, so a bucket
+     * one-pixel points. Grouping sums each day's distinct visitors, so a bucket
      * counts someone twice if they returned on two different days within it;
      * that is fine for a shape-of-traffic chart and wrong for a headline
      * figure, which is why the unique total is counted separately.
+     *
+     * @return \Illuminate\Support\Collection<int, array{label:string, visitors:int, viewed:int, carted:int, checkout:int, orders:int}>
      */
-    public function visitorsByDay(DateRange $range): \Illuminate\Support\Collection
+    public function funnelByDay(DateRange $range): \Illuminate\Support\Collection
     {
         // Cached as a plain array, hydrated on the way out (see remember()).
-        return collect($this->remember('visitors.'.$range->cacheKey(), function () use ($range) {
-            $rows = $range->constrain(Visit::query())
+        return collect($this->remember('series.'.$range->cacheKey(), function () use ($range) {
+            $perDay = fn (?string $event) => $range->constrain(Visit::query())
+                ->when($event, fn ($q) => $q->where('event', $event))
                 ->selectRaw('DATE(created_at) as d, COUNT(DISTINCT visitor_token) as c')
                 ->groupBy('d')->pluck('c', 'd');
 
-            $start = $range->start
-                ?? Carbon::parse(Visit::min('created_at') ?: now())->startOfDay();
+            $series = [
+                'visitors' => $perDay(null),
+                'viewed' => $perDay('product'),
+                'carted' => $perDay('cart_add'),
+                'checkout' => $perDay('checkout_start'),
+                'orders' => $range->constrain($this->sold())
+                    ->selectRaw('DATE(created_at) as d, COUNT(*) as c')
+                    ->groupBy('d')->pluck('c', 'd'),
+            ];
+
+            // An unbounded window has to find its own start. Orders can predate
+            // the visits table (tracking was added later), so take the earlier
+            // of the two or the chart would begin after the store's first sale.
+            $earliest = collect([Visit::min('created_at'), Order::min('created_at')])
+                ->filter()->map(fn ($t) => Carbon::parse($t))->min();
+
+            $start = $range->start ?? ($earliest ?: now())->copy()->startOfDay();
             $end = $range->end ?? now()->endOfDay();
 
-            $days = max(1, (int) $start->diffInDays($end) + 1);
-            $perBucket = (int) max(1, ceil($days / self::CHART_BUCKETS));
+            return $this->bucketDays($start, $end, $series);
+        }, $range->cacheSeconds()));
+    }
 
-            $out = [];
-            for ($i = 0; $i < $days; $i += $perBucket) {
-                $bucketStart = $start->copy()->addDays($i);
-                $bucketEnd = min($days - 1, $i + $perBucket - 1);
+    /**
+     * Roll a set of date-keyed counts up into at most CHART_BUCKETS points.
+     *
+     * @param  array<string, \Illuminate\Support\Collection<string,int>>  $series
+     * @return array<int, array<string, string|int>>
+     */
+    protected function bucketDays(Carbon $start, Carbon $end, array $series): array
+    {
+        $days = max(1, (int) $start->diffInDays($end) + 1);
+        $perBucket = (int) max(1, ceil($days / self::CHART_BUCKETS));
 
+        $out = [];
+        for ($i = 0; $i < $days; $i += $perBucket) {
+            $bucketStart = $start->copy()->addDays($i);
+            $bucketEnd = min($days - 1, $i + $perBucket - 1);
+
+            $row = [
+                'label' => $perBucket === 1
+                    ? $bucketStart->format('d M')
+                    : $bucketStart->format('d M').'–'.$start->copy()->addDays($bucketEnd)->format('d M'),
+            ];
+
+            foreach ($series as $name => $counts) {
                 $value = 0;
                 for ($d = $i; $d <= $bucketEnd; $d++) {
-                    $value += (int) ($rows[$start->copy()->addDays($d)->toDateString()] ?? 0);
+                    $value += (int) ($counts[$start->copy()->addDays($d)->toDateString()] ?? 0);
                 }
-
-                $out[] = [
-                    'label' => $perBucket === 1
-                        ? $bucketStart->format('d M')
-                        : $bucketStart->format('d M').'–'.$start->copy()->addDays($bucketEnd)->format('d M'),
-                    'value' => $value,
-                ];
+                $row[$name] = $value;
             }
 
-            return $out;
-        }, $range->cacheSeconds()));
+            $out[] = $row;
+        }
+
+        return $out;
     }
 
     /**
@@ -254,7 +293,12 @@ class DashboardAnalytics
      * actually earned — so "Facebook sent 800 people" sits next to "and they
      * spent ৳40,000", which is the number that decides the ad budget.
      *
-     * @return \Illuminate\Support\Collection<int, array{channel:string,label:string,visitors:int,orders:int,revenue:float,rate:?float}>
+     * Each channel carries the sites and campaigns underneath it. Without that,
+     * a row reading "Other website — 83 visitors" is a dead end: it is the one
+     * channel whose whole meaning is "we could not name this", and naming it is
+     * exactly what the store needs in order to act on it.
+     *
+     * @return \Illuminate\Support\Collection<int, array{channel:string,label:string,visitors:int,orders:int,revenue:float,rate:?float,sites:array,campaigns:array}>
      */
     public function trafficSources(DateRange $range, int $limit = 8): \Illuminate\Support\Collection
     {
@@ -267,8 +311,28 @@ class DashboardAnalytics
                 ->selectRaw("COALESCE(NULLIF(source_channel, ''), 'direct') as channel, COUNT(*) as orders, SUM(total) as revenue")
                 ->groupBy('channel')->get()->keyBy('channel');
 
+            // The referring sites behind each channel, biggest first.
+            $sites = $range->constrain(Visit::query())
+                ->whereNotNull('referrer_host')->where('referrer_host', '!=', '')
+                ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, referrer_host, COUNT(DISTINCT visitor_token) as c")
+                ->groupBy('channel', 'referrer_host')->orderByDesc('c')->get()
+                ->groupBy('channel');
+
+            // …and the campaigns, which is what names an untagged-looking
+            // channel when the referrer was stripped (most mobile ad clicks).
+            $campaigns = $range->constrain(Visit::query())
+                ->whereNotNull('campaign')->where('campaign', '!=', '')
+                ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, campaign, COUNT(DISTINCT visitor_token) as c")
+                ->groupBy('channel', 'campaign')->orderByDesc('c')->get()
+                ->groupBy('channel');
+
+            $top = fn ($grouped, string $channel, string $field) => collect($grouped[$channel] ?? [])
+                ->take(4)
+                ->map(fn ($r) => ['name' => (string) $r->{$field}, 'visitors' => (int) $r->c])
+                ->values()->all();
+
             return $visitors->keys()->merge($sales->keys())->unique()
-                ->map(function ($channel) use ($visitors, $sales) {
+                ->map(function ($channel) use ($visitors, $sales, $sites, $campaigns, $top) {
                     $v = (int) ($visitors[$channel] ?? 0);
                     $row = $sales[$channel] ?? null;
                     $orders = (int) ($row->orders ?? 0);
@@ -281,6 +345,8 @@ class DashboardAnalytics
                         'revenue' => round((float) ($row->revenue ?? 0), 2),
                         // Conversion is only meaningful when we saw the visits.
                         'rate' => $v > 0 ? round($orders / $v * 100, 1) : null,
+                        'sites' => $top($sites, $channel, 'referrer_host'),
+                        'campaigns' => $top($campaigns, $channel, 'campaign'),
                     ];
                 })
                 ->sortByDesc(fn ($r) => [$r['revenue'], $r['visitors']])
@@ -289,26 +355,200 @@ class DashboardAnalytics
     }
 
     /**
-     * Campaigns (utm_campaign) that produced orders — tells you which specific
-     * ad or post is working, not just which platform.
+     * Which ad sent the traffic, and what it earned.
      *
-     * @return \Illuminate\Support\Collection<int, object>
+     * `topCampaigns()` above starts from orders, so an ad that spent all week
+     * sending people who bought nothing never appears — precisely the ad you
+     * most want to see. This starts from visits instead and joins the orders
+     * on, so a campaign with 400 visitors and zero sales shows up as the
+     * expensive mistake it is.
+     *
+     * @return \Illuminate\Support\Collection<int, array{campaign:string,ad:?string,channel:string,visitors:int,orders:int,revenue:float,rate:?float}>
      */
-    public function topCampaigns(DateRange $range, int $limit = 6): \Illuminate\Support\Collection
+    public function adPerformance(DateRange $range, int $limit = 12): \Illuminate\Support\Collection
     {
-        // ->get() yields stdClass rows, which the cache cannot restore — map to
-        // plain arrays before storing.
-        return collect($this->remember('camp.'.$range->cacheKey(), fn () => $range->constrain($this->sold())
-            ->whereNotNull('source_campaign')->where('source_campaign', '!=', '')
-            ->selectRaw('source_campaign, source_channel, COUNT(*) as orders, SUM(total) as revenue')
-            ->groupBy('source_campaign', 'source_channel')
-            ->orderByDesc('revenue')->take($limit)->get()
-            ->map(fn ($r) => [
-                'source_campaign' => (string) $r->source_campaign,
-                'source_channel' => (string) $r->source_channel,
-                'orders' => (int) $r->orders,
-                'revenue' => (float) $r->revenue,
-            ])->all(), $range->cacheSeconds()));
+        return collect($this->remember('ads.'.$range->cacheKey().'.'.$limit, function () use ($range, $limit) {
+            $hasContent = $this->visitsHaveAdColumns();
+
+            $visits = $range->constrain(Visit::query())
+                ->whereNotNull('campaign')->where('campaign', '!=', '')
+                ->selectRaw(
+                    'campaign, '
+                    .($hasContent ? 'content' : 'NULL as content').', '
+                    ."COALESCE(NULLIF(source, ''), 'direct') as channel, "
+                    .'COUNT(DISTINCT visitor_token) as visitors'
+                )
+                // Only group by a column that exists — on a server that hasn't
+                // run the migration, naming it here is a SQL error, not a null.
+                ->groupBy(...array_filter(['campaign', $hasContent ? 'content' : null, 'channel']))
+                ->orderByDesc('visitors')->take(60)->get();
+
+            $orderContent = $this->ordersHaveAdColumn();
+
+            $sales = $range->constrain($this->sold())
+                ->whereNotNull('source_campaign')->where('source_campaign', '!=', '')
+                ->selectRaw(
+                    'source_campaign, '
+                    .($orderContent ? 'source_content' : 'NULL as source_content').', '
+                    .'source_channel, COUNT(*) as orders, SUM(total) as revenue'
+                )
+                ->groupBy(...array_filter(['source_campaign', $orderContent ? 'source_content' : null, 'source_channel']))
+                ->get();
+
+            if ($visits->isEmpty() && $sales->isEmpty()) {
+                return [];
+            }
+
+            // Keyed on campaign+ad so an order lands on the exact creative when
+            // both sides carry one, and on the campaign when they don't.
+            $key = fn ($campaign, $content) => $campaign.'|'.($content ?: '');
+            $byKey = $sales->groupBy(fn ($r) => $key($r->source_campaign, $r->source_content));
+            $byCampaign = $sales->groupBy('source_campaign');
+
+            $rows = $visits->map(function ($v) use ($byKey, $byCampaign, $key) {
+                $exact = collect($byKey[$key($v->campaign, $v->content)] ?? []);
+                $orders = (int) $exact->sum('orders');
+                $revenue = (float) $exact->sum('revenue');
+
+                // No ad-level match: fall back to the campaign total, but only
+                // for a row that has no ad of its own — otherwise every ad in
+                // the campaign would claim the same sales.
+                if ($exact->isEmpty() && blank($v->content)) {
+                    $all = collect($byCampaign[$v->campaign] ?? []);
+                    $orders = (int) $all->sum('orders');
+                    $revenue = (float) $all->sum('revenue');
+                }
+
+                $visitors = (int) $v->visitors;
+
+                return [
+                    'campaign' => (string) $v->campaign,
+                    'ad' => filled($v->content) ? (string) $v->content : null,
+                    'channel' => (string) $v->channel,
+                    'visitors' => $visitors,
+                    'orders' => $orders,
+                    'revenue' => round($revenue, 2),
+                    'rate' => $visitors > 0 ? round($orders / $visitors * 100, 1) : null,
+                ];
+            });
+
+            // Campaigns that only appear on orders. Attribution predates these
+            // ad columns, and an order can be stamped with a campaign whose
+            // visits have since been pruned — dropping those would quietly
+            // under-report revenue.
+            $seen = $rows->pluck('campaign')->unique()->flip();
+
+            $orphans = $sales->reject(fn ($s) => $seen->has($s->source_campaign))
+                ->groupBy('source_campaign')
+                ->map(fn ($group, $campaign) => [
+                    'campaign' => (string) $campaign,
+                    'ad' => null,
+                    'channel' => (string) ($group->first()->source_channel ?: 'direct'),
+                    'visitors' => 0,
+                    'orders' => (int) $group->sum('orders'),
+                    'revenue' => round((float) $group->sum('revenue'), 2),
+                    'rate' => null,
+                ])->values();
+
+            return $rows->concat($orphans)
+                ->sortByDesc(fn ($r) => [$r['revenue'], $r['visitors']])
+                ->take($limit)->values()->all();
+        }, $range->cacheSeconds()));
+    }
+
+    /** Whether the ad-detail columns exist yet (see the visits migration). */
+    protected function visitsHaveAdColumns(): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasColumn('visits', 'content');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    protected function ordersHaveAdColumn(): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasColumn('orders', 'source_content');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Who is on the storefront right now, and what they are looking at.
+     *
+     * Deliberately not cached: a five-minute-stale "live" panel is worse than
+     * no live panel. The query is a single indexed range scan over a table that
+     * only holds pageviews, so it stays cheap even when polled.
+     *
+     * @return array{count:int, window:int, rows:array<int, array<string,mixed>>}
+     */
+    public function liveVisitors(int $minutes = 5, int $limit = 25): array
+    {
+        $since = now()->subMinutes($minutes);
+
+        // The latest row per visitor, via their highest id in the window —
+        // MAX(id) rather than MAX(created_at) so two hits in the same second
+        // still resolve to one, definite row.
+        $latestIds = Visit::query()->where('created_at', '>=', $since)
+            ->selectRaw('MAX(id) as id')->groupBy('visitor_token')
+            ->pluck('id');
+
+        if ($latestIds->isEmpty()) {
+            return ['count' => 0, 'window' => $minutes, 'rows' => []];
+        }
+
+        $rows = Visit::whereIn('id', $latestIds)->latest('id')->take($limit)->get();
+
+        // When each of them first showed up in the window, for "on site 4 min".
+        $firstSeen = Visit::whereIn('visitor_token', $rows->pluck('visitor_token'))
+            ->where('created_at', '>=', $since)
+            ->selectRaw('visitor_token, MIN(created_at) as t')
+            ->groupBy('visitor_token')->pluck('t', 'visitor_token');
+
+        $products = Product::whereIn('id', $rows->pluck('product_id')->filter()->unique())
+            ->get(['id', 'name', 'slug'])->keyBy('id');
+
+        return [
+            'count' => $latestIds->count(),
+            'window' => $minutes,
+            'rows' => $rows->map(function ($v) use ($products, $firstSeen) {
+                $product = $v->product_id ? $products->get($v->product_id) : null;
+                $firstAt = $firstSeen[$v->visitor_token] ?? null;
+
+                return [
+                    'product' => $product?->name,
+                    'product_slug' => $product?->slug,
+                    'path' => $v->path === '' || $v->path === null ? '/' : '/'.ltrim($v->path, '/'),
+                    'where' => $product?->name ?? self::describePath($v->path),
+                    'channel' => $v->source ?: 'direct',
+                    'channel_label' => \App\Support\TrafficSource::label($v->source),
+                    'campaign' => $v->campaign,
+                    'seconds_ago' => max(0, (int) $v->created_at->diffInSeconds(now())),
+                    'minutes_on_site' => $firstAt
+                        ? max(0, (int) Carbon::parse($firstAt)->diffInMinutes(now()))
+                        : 0,
+                ];
+            })->values()->all(),
+        ];
+    }
+
+    /** A storefront path as something a shopkeeper would say out loud. */
+    protected static function describePath(?string $path): string
+    {
+        $path = trim((string) $path, '/');
+
+        return match (true) {
+            $path === '' => 'Home page',
+            $path === 'cart' => 'Cart',
+            str_starts_with($path, 'checkout') => 'Checkout',
+            str_starts_with($path, 'category/') => 'Category · '.str_replace('-', ' ', substr($path, 9)),
+            str_starts_with($path, 'collection/') => 'Collection · '.str_replace('-', ' ', substr($path, 11)),
+            str_starts_with($path, 'search') => 'Search',
+            str_starts_with($path, 'account') => 'Their account',
+            default => '/'.$path,
+        };
     }
 
     /**
@@ -344,8 +584,11 @@ class DashboardAnalytics
             $products = Product::whereIn('id', $views->keys())->get(['id', 'name', 'slug', 'price'])->keyBy('id');
 
             // Scalars only: an Eloquent model cannot survive this cache.
+            // The slug travels with the id because Product::getRouteKeyName()
+            // is 'slug' — an admin link built from the id 404s.
             return $views->map(fn ($v, $id) => [
                 'id' => (int) $id,
+                'slug' => (string) ($products->get($id)->slug ?? ''),
                 'name' => (string) ($products->get($id)->name ?? ''),
                 'views' => (int) $v,
                 'sold' => (int) ($sold[$id] ?? 0),
@@ -469,9 +712,11 @@ class DashboardAnalytics
                 $sold = (float) ($velocity[$p->id] ?? 0);
                 $perDay = $sold / max(1, $spanDays);
 
-                // Scalars only — Product models cannot survive this cache.
+                // Scalars only — Product models cannot survive this cache. The
+                // slug comes along because admin product links are keyed on it.
                 return [
                     'id' => (int) $p->id,
+                    'slug' => (string) $p->slug,
                     'name' => (string) $p->name,
                     'stock_quantity' => (int) $p->stock_quantity,
                     'per_day' => round($perDay, 2),
@@ -484,6 +729,7 @@ class DashboardAnalytics
                 ->sortByDesc('stock_quantity')->take(6)
                 ->map(fn ($p) => [
                     'id' => (int) $p->id,
+                    'slug' => (string) $p->slug,
                     'name' => (string) $p->name,
                     'stock_quantity' => (int) $p->stock_quantity,
                 ])->values()->all();

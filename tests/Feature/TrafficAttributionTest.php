@@ -59,6 +59,86 @@ class TrafficAttributionTest extends TestCase
         $this->assertSame('facebook', $organic['channel']);
     }
 
+    /**
+     * The bug this store actually hit. Meta's `{{site_source_name}}` macro
+     * resolves to `fb` / `ig` / `an` / `msg`, and the classifier only matched
+     * full platform names — so every tagged ad click fell through to "Other
+     * website" and the store's Facebook traffic looked like it came from
+     * nowhere.
+     */
+    public function test_metas_short_source_names_are_not_other_website(): void
+    {
+        $campaign = '120250686619310682';   // what {{campaign.id}} resolves to
+
+        $this->assertSame('facebook_ads', $this->classify("/?utm_source=fb&utm_campaign={$campaign}")['channel']);
+        $this->assertSame('instagram_ads', $this->classify("/?utm_source=ig&utm_campaign={$campaign}")['channel']);
+        $this->assertSame('audience_network', $this->classify("/?utm_source=an&utm_campaign={$campaign}")['channel']);
+        $this->assertSame('messenger', $this->classify("/?utm_source=msg&utm_campaign={$campaign}")['channel']);
+    }
+
+    public function test_a_short_source_without_ad_signals_stays_organic(): void
+    {
+        // A hand-written link to a normal post is not ad spend.
+        $this->assertSame('facebook', $this->classify('/?utm_source=fb&utm_campaign=eid-post')['channel']);
+        $this->assertSame('instagram', $this->classify('/?utm_source=ig')['channel']);
+    }
+
+    public function test_an_ad_id_in_the_url_marks_the_click_as_paid(): void
+    {
+        // Meta links often carry only the source and an ad id — no utm_medium.
+        $click = $this->classify('/?utm_source=fb&ad_id=120250686619310682');
+
+        $this->assertSame('facebook_ads', $click['channel']);
+        $this->assertSame('120250686619310682', $click['ad_id']);
+    }
+
+    public function test_the_ad_and_medium_are_kept_alongside_the_campaign(): void
+    {
+        $click = $this->classify('/?utm_source=fb&utm_medium=paid_social&utm_campaign=Eid+Bridal&utm_content=carousel-v2');
+
+        $this->assertSame('Eid Bridal', $click['campaign']);
+        $this->assertSame('carousel-v2', $click['content']);
+        $this->assertSame('paid_social', $click['medium']);
+    }
+
+    public function test_utm_content_standing_in_for_a_missing_campaign_is_not_also_an_ad(): void
+    {
+        // utm_content is used as the campaign when there is no utm_campaign;
+        // repeating it as the ad would invent a creative that doesn't exist.
+        $click = $this->classify('/?utm_source=fb&utm_content=carousel-v2');
+
+        $this->assertSame('carousel-v2', $click['campaign']);
+        $this->assertNull($click['content']);
+    }
+
+    public function test_a_tagged_visit_stores_the_whole_tag(): void
+    {
+        $this->get('/?utm_source=fb&utm_medium=paid_social&utm_campaign=eid&utm_content=carousel-v2&ad_id=9911');
+
+        $visit = Visit::latest('id')->first();
+
+        $this->assertNotNull($visit);
+        $this->assertSame('facebook_ads', $visit->source);
+        $this->assertSame('eid', $visit->campaign);
+        $this->assertSame('carousel-v2', $visit->content);
+        $this->assertSame('paid_social', $visit->medium);
+        $this->assertSame('9911', $visit->ad_id);
+    }
+
+    public function test_visits_are_still_recorded_before_the_ad_columns_exist(): void
+    {
+        // A server that hasn't run the migration must keep counting traffic
+        // rather than losing every pageview to a missing column.
+        app()->instance(Visit::AD_READY_KEY, false);
+
+        $this->get('/?utm_source=fb&utm_campaign=eid');
+
+        $visit = Visit::latest('id')->first();
+
+        $this->assertNotNull($visit);
+        $this->assertSame('eid', $visit->campaign);
+    }
+
     public function test_our_own_pages_are_not_a_source(): void
     {
         $host = parse_url(config('app.url'), PHP_URL_HOST);

@@ -191,6 +191,182 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // ── Admin: traffic & conversion line chart ──────────────────────────────
+    // Hand-drawn SVG rather than a charting library: the admin bundle is served
+    // from shared hosting in Bangladesh and a chart library would be the single
+    // biggest thing in it, for five polylines.
+    //
+    // The markup is built as a string and handed to x-html. Building it with
+    // <template x-for> instead would mean putting <template> inside <svg>,
+    // which the HTML parser does not reliably allow.
+    window.Alpine.data('funnelChart', (config) => ({
+        rows: config.rows || [],
+        series: [
+            { key: 'visitors', label: 'Visitors', color: '#2563eb' },
+            { key: 'viewed', label: 'Viewed a product', color: '#7c3aed' },
+            { key: 'carted', label: 'Added to cart', color: '#d97706' },
+            { key: 'checkout', label: 'Started checkout', color: '#db2777' },
+            { key: 'orders', label: 'Ordered', color: '#16a34a' },
+        ],
+        off: {},
+        hover: null,
+
+        // Drawing box, in viewBox units. The SVG scales to its container.
+        W: 1000, H: 300, padL: 46, padR: 16, padT: 14, padB: 30,
+
+        toggle(key) {
+            // Never let the last line be switched off — an empty chart looks broken.
+            const on = this.series.filter((s) => !this.off[s.key]);
+            if (on.length === 1 && on[0].key === key) return;
+            this.off = { ...this.off, [key]: !this.off[key] };
+        },
+
+        active() {
+            return this.series.filter((s) => !this.off[s.key]);
+        },
+
+        total(key) {
+            return this.rows.reduce((sum, r) => sum + (Number(r[key]) || 0), 0).toLocaleString();
+        },
+
+        /** Round the top of the scale up to something a person would choose. */
+        niceMax() {
+            let peak = 0;
+            for (const s of this.active()) {
+                for (const r of this.rows) peak = Math.max(peak, Number(r[s.key]) || 0);
+            }
+            if (peak <= 0) return 4;
+            const pow = Math.pow(10, Math.floor(Math.log10(peak)));
+            for (const step of [1, 2, 2.5, 5, 10]) {
+                if (peak <= step * pow) return step * pow;
+            }
+            return 10 * pow;
+        },
+
+        x(i) {
+            const span = this.W - this.padL - this.padR;
+            return this.rows.length < 2 ? this.padL + span / 2 : this.padL + (i * span) / (this.rows.length - 1);
+        },
+
+        y(v) {
+            const span = this.H - this.padT - this.padB;
+            return this.H - this.padB - (Math.max(0, Number(v) || 0) / this.niceMax()) * span;
+        },
+
+        svg() {
+            if (!this.rows.length) {
+                return '<p class="text-sm text-ink-700/50 py-10 text-center">No traffic recorded in this period yet.</p>';
+            }
+
+            const max = this.niceMax();
+            const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+            let out = '';
+
+            // Horizontal grid + value axis.
+            for (let g = 0; g <= 4; g++) {
+                const v = (max / 4) * g;
+                const yy = this.y(v);
+                out += `<line x1="${this.padL}" y1="${yy}" x2="${this.W - this.padR}" y2="${yy}" stroke="#e8e6e1" stroke-width="1"/>`;
+                out += `<text x="${this.padL - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="#9c9890">${v >= 1000 ? (v / 1000) + 'k' : v}</text>`;
+            }
+
+            // Date axis — thinned so the labels never collide.
+            const every = Math.max(1, Math.ceil(this.rows.length / 8));
+            this.rows.forEach((r, i) => {
+                if (i % every && i !== this.rows.length - 1) return;
+                out += `<text x="${this.x(i)}" y="${this.H - 8}" text-anchor="middle" font-size="11" fill="#9c9890">${esc(r.label.split('–')[0])}</text>`;
+            });
+
+            // The guide under the cursor, drawn before the lines so it sits behind.
+            if (this.hover !== null) {
+                const hx = this.x(this.hover);
+                out += `<line x1="${hx}" y1="${this.padT}" x2="${hx}" y2="${this.H - this.padB}" stroke="#c9a227" stroke-width="1" stroke-dasharray="3 3"/>`;
+            }
+
+            for (const s of this.active()) {
+                const pts = this.rows.map((r, i) => `${this.x(i)},${this.y(r[s.key])}`).join(' ');
+                out += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+                // Dots only when they can be told apart, plus always on hover.
+                if (this.rows.length <= 32) {
+                    this.rows.forEach((r, i) => {
+                        out += `<circle cx="${this.x(i)}" cy="${this.y(r[s.key])}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;
+                    });
+                } else if (this.hover !== null) {
+                    out += `<circle cx="${this.x(this.hover)}" cy="${this.y(this.rows[this.hover][s.key])}" r="3.5" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;
+                }
+            }
+
+            return `<svg viewBox="0 0 ${this.W} ${this.H}" class="w-full h-56 sm:h-64" role="img" aria-label="Traffic and conversion over time">${out}</svg>`;
+        },
+
+        /** Snap the cursor to the nearest point. */
+        track(event) {
+            if (!this.rows.length) return;
+            const box = event.currentTarget.getBoundingClientRect();
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const ratio = (clientX - box.left) / box.width;          // 0…1 across the card
+            const px = ratio * this.W;                                // back into viewBox units
+
+            let best = 0;
+            let bestGap = Infinity;
+            this.rows.forEach((r, i) => {
+                const gap = Math.abs(this.x(i) - px);
+                if (gap < bestGap) { bestGap = gap; best = i; }
+            });
+            this.hover = best;
+            this._ratio = Math.min(0.98, Math.max(0.02, this.x(best) / this.W));
+        },
+
+        /** Keep the tooltip inside the card, flipping it before it runs off. */
+        tooltipStyle() {
+            const pct = (this._ratio || 0.5) * 100;
+            const flip = pct > 60;
+            return `top:8px; ${flip ? 'right' : 'left'}:${flip ? 100 - pct : pct}%; margin-${flip ? 'right' : 'left'}:10px;`;
+        },
+    }));
+
+    // ── Admin: who is on the storefront right now ────────────────────────────
+    // Polls, for the same reason the notification bell does: shared hosting
+    // gives us no websocket. Stops while the tab is hidden.
+    window.Alpine.data('liveVisitors', (config) => ({
+        count: 0,
+        window: 5,
+        rows: [],
+        loaded: false,
+        _timer: null,
+
+        start() {
+            this.poll();
+            this._timer = setInterval(() => {
+                if (!document.hidden) this.poll();
+            }, 12000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) this.poll();
+            });
+        },
+
+        async poll() {
+            try {
+                const res = await fetch(config.url, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                this.count = data.count || 0;
+                this.window = data.window || 5;
+                this.rows = data.rows || [];
+            } catch (e) { /* offline or a blip — the next tick tries again */ } finally {
+                this.loaded = true;
+            }
+        },
+
+        ago(seconds) {
+            const s = Number(seconds) || 0;
+            return s < 60 ? `${s}s ago` : `${Math.round(s / 60)}m ago`;
+        },
+    }));
+
     // ── Admin: amend order amounts (items, adjustments, shipping, discount) ──
     window.Alpine.data('orderAmend', (init) => ({
         editing: false,

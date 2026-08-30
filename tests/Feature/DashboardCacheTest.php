@@ -14,7 +14,7 @@ use Tests\TestCase;
  * restore any object — a cached Collection or Eloquent model comes back as
  * __PHP_Incomplete_Class. Production hit exactly that:
  *
- *   DashboardAnalytics::visitorsByDay(): Return value must be of type
+ *   DashboardAnalytics::funnelByDay(): Return value must be of type
  *   Illuminate\Support\Collection, __PHP_Incomplete_Class returned
  *
  * These pin that every cached payload stays plain, and that a poisoned entry
@@ -32,7 +32,7 @@ class DashboardCacheTest extends TestCase
     /** What the app writes to the cache for a given method. */
     protected function cachedPayload(string $key): mixed
     {
-        return Cache::get('dash.v2.'.$key, 'ABSENT');
+        return Cache::get('dash.v3.'.$key, 'ABSENT');
     }
 
     public function test_no_analytics_method_caches_an_object(): void
@@ -44,19 +44,19 @@ class DashboardCacheTest extends TestCase
         // Touch every cached method.
         $a->periodComparison($range);
         $a->funnel($range);
-        $a->visitorsByDay($range);
+        $a->funnelByDay($range);
         $a->trafficSources($range);
-        $a->topCampaigns($range);
+        $a->adPerformance($range);
         $a->viewedNotSold($range);
         $a->retention($range);
         $a->operations($range);
 
-        foreach (['cmp.30d', 'funnel.30d', 'visitors.30d', 'src.30d.8', 'camp.30d', 'vns.30d', 'ret.30d', 'ops.30d'] as $key) {
+        foreach (['cmp.30d', 'funnel.30d', 'series.30d', 'src.30d.8', 'ads.30d.12', 'vns.30d', 'ret.30d', 'ops.30d'] as $key) {
             $payload = $this->cachedPayload($key);
             $this->assertNotSame('ABSENT', $payload, "nothing cached for {$key}");
             $this->assertTrue(
                 $this->isPlain($payload),
-                "dash.v2.{$key} contains an object — it will come back as __PHP_Incomplete_Class",
+                "dash.v3.{$key} contains an object — it will come back as __PHP_Incomplete_Class",
             );
         }
     }
@@ -68,33 +68,33 @@ class DashboardCacheTest extends TestCase
         $range = DateRange::preset('30d');
 
         // Prime the cache, then read again so the second call comes from cache.
-        $a->visitorsByDay($range);
+        $a->funnelByDay($range);
         $a->trafficSources($range);
-        $a->topCampaigns($range);
+        $a->adPerformance($range);
         $a->viewedNotSold($range);
 
-        $this->assertInstanceOf(\Illuminate\Support\Collection::class, $a->visitorsByDay($range));
+        $this->assertInstanceOf(\Illuminate\Support\Collection::class, $a->funnelByDay($range));
         $this->assertInstanceOf(\Illuminate\Support\Collection::class, $a->trafficSources($range));
-        $this->assertInstanceOf(\Illuminate\Support\Collection::class, $a->topCampaigns($range));
+        $this->assertInstanceOf(\Illuminate\Support\Collection::class, $a->adPerformance($range));
         $this->assertInstanceOf(\Illuminate\Support\Collection::class, $a->viewedNotSold($range));
     }
 
     public function test_a_poisoned_cache_entry_is_discarded_not_served(): void
     {
         // Exactly what a pre-fix entry looks like once it comes back out.
-        Cache::put('dash.v2.visitors.30d', new \stdClass, 300);
+        Cache::put('dash.v3.series.30d', new \stdClass, 300);
 
-        $result = $this->analytics()->visitorsByDay(DateRange::preset('30d'));
+        $result = $this->analytics()->funnelByDay(DateRange::preset('30d'));
 
         $this->assertInstanceOf(\Illuminate\Support\Collection::class, $result);
         $this->assertCount(30, $result);              // recomputed, not the junk
-        $this->assertTrue($this->isPlain($this->cachedPayload('visitors.30d')));
+        $this->assertTrue($this->isPlain($this->cachedPayload('series.30d')));
     }
 
     public function test_the_dashboard_renders_with_a_poisoned_cache(): void
     {
-        foreach (['visitors.30d', 'src.30d.8', 'camp.30d', 'vns.30d', 'ops.30d'] as $key) {
-            Cache::put('dash.v2.'.$key, new \stdClass, 300);
+        foreach (['series.30d', 'src.30d.8', 'ads.30d.12', 'vns.30d', 'ops.30d'] as $key) {
+            Cache::put('dash.v3.'.$key, new \stdClass, 300);
         }
 
         $admin = User::create([

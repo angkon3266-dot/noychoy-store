@@ -39,12 +39,17 @@
     <div class="px-5 py-4 border-b border-ink-100"><h2 class="font-semibold">Recent SMS log</h2></div>
     <table class="w-full text-sm">
         <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
-            <tr><th class="px-4 py-3">Phone</th><th class="px-4 py-3">Message</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">When</th></tr>
+            <tr><th class="px-4 py-3">Sent to</th><th class="px-4 py-3">Message</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">When</th></tr>
         </thead>
         <tbody class="divide-y divide-ink-100">
             @forelse($logs as $log)
                 <tr>
-                    <td class="px-4 py-3 whitespace-nowrap">{{ \Illuminate\Support\Str::limit($log->phone, 30) }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        {{ \Illuminate\Support\Str::limit($log->phone, 30) }}
+                        @if(($log->recipients ?? 1) > 1)
+                            <span class="badge bg-ink-100 text-ink-600 ml-1">bulk</span>
+                        @endif
+                    </td>
                     <td class="px-4 py-3 text-ink-700/70">{{ \Illuminate\Support\Str::limit($log->message, 60) }}</td>
                     <td class="px-4 py-3"><span class="badge {{ $log->status=='ACCEPTD' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">{{ $log->status }}</span></td>
                     <td class="px-4 py-3 text-ink-700/60 whitespace-nowrap">{{ $log->created_at->diffForHumans() }}</td>

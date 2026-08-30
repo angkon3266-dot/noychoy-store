@@ -209,21 +209,34 @@ class SmsService
     {
         // KhudeBarta expects 880XXXXXXXXXX. Supports comma-separated bulk.
         return collect(explode(',', $phone))
-            ->map(function ($p) {
-                $d = preg_replace('/\D/', '', $p);
-                if (str_starts_with($d, '880')) {
-                    return $d;
-                }
-                if (str_starts_with($d, '0')) {
-                    return '88'.$d;
-                }
-                if (strlen($d) === 10 && $d[0] === '1') {
-                    return '880'.$d;
-                }
-                return $d;
-            })
+            ->map(fn ($p) => self::normalizeNumber($p))
             ->filter()
             ->implode(',');
+    }
+
+    /**
+     * One number in the form the gateway wants.
+     *
+     * Public because the broadcast needs it before sending: the same customer's
+     * number can be stored as `01712345678` on one row and `8801712345678` on
+     * another, and a list de-duplicated before normalising still messages them
+     * twice — two SMS, two charges, one annoyed customer.
+     */
+    public static function normalizeNumber(string $phone): string
+    {
+        $d = preg_replace('/\D/', '', $phone);
+
+        if (str_starts_with($d, '880')) {
+            return $d;
+        }
+        if (str_starts_with($d, '0')) {
+            return '88'.$d;
+        }
+        if (strlen($d) === 10 && $d[0] === '1') {
+            return '880'.$d;
+        }
+
+        return $d;
     }
 
     /**
@@ -247,17 +260,72 @@ class SmsService
         return count($numbers).' recipient(s), last 4: '.$last;
     }
 
+    /**
+     * Longest value `sms_logs.phone` can hold. A bulk send is one gateway call
+     * with the numbers comma-separated, so the raw string is unbounded — 100
+     * recipients is ~1,400 characters into a varchar(255).
+     */
+    protected const PHONE_COLUMN_LIMIT = 255;
+
+    /**
+     * Write the audit row. Never throws.
+     *
+     * A send that already reached the gateway must not be reported as failed
+     * because the *record* of it wouldn't fit, and the admin must not get a 500
+     * for a broadcast that went out. This used to happen both ways at once: the
+     * INSERT overflowed `phone`, the catch block called this again with the same
+     * oversized value, and the second failure escaped as a 500 — after the first
+     * hundred customers had already been messaged.
+     */
     protected function log(string $phone, string $message, ?int $orderId, string $status, bool $accepted, ?array $response, ?string $messageId = null, ?string $providerStatus = null): void
     {
-        SmsLog::create([
-            'phone' => $phone,
-            'message' => $message,
-            'direction' => 'out',
-            'status' => $status,
-            'provider_status' => $providerStatus,
-            'message_id' => $messageId,
-            'order_id' => $orderId,
-            'response' => $response,
-        ]);
+        $count = self::countRecipients($phone);
+
+        try {
+            SmsLog::create([
+                'phone' => self::phoneForLog($phone, $count),
+                'recipients' => $count,
+                'message' => $message,
+                'direction' => 'out',
+                'status' => $status,
+                'provider_status' => $providerStatus,
+                'message_id' => $messageId,
+                'order_id' => $orderId,
+                'response' => $response,
+            ]);
+        } catch (\Throwable $e) {
+            // Log the failure without the numbers: a QueryException's message is
+            // the full SQL with its bindings substituted in, which is how a
+            // broadcast to 100 people once put 100 phone numbers on disk.
+            Log::error('SMS log write failed', [
+                'to' => self::maskRecipients($phone),
+                'error' => $e::class.' ('.$e->getCode().')',
+            ]);
+        }
+    }
+
+    /** How many numbers one send covers. */
+    public static function countRecipients(string $phone): int
+    {
+        return count(array_filter(array_map('trim', explode(',', $phone))));
+    }
+
+    /**
+     * What goes in the `phone` column.
+     *
+     * One recipient is stored as itself — that is the whole point of the column
+     * and of its index. A bulk send stores a summary instead: the full list
+     * neither fits nor belongs on disk, and `recipients` carries the count.
+     */
+    protected static function phoneForLog(string $phone, int $count): string
+    {
+        if ($count <= 1) {
+            return substr(trim($phone), 0, self::PHONE_COLUMN_LIMIT);
+        }
+
+        $numbers = array_values(array_filter(array_map('trim', explode(',', $phone))));
+        $last = substr((string) end($numbers), -4);
+
+        return $count.' recipients · ends '.$last;
     }
 }

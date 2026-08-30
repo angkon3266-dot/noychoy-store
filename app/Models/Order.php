@@ -37,7 +37,7 @@ class Order extends Model
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'card_message', 'is_gift', 'source', 'stock_restored',
-        'source_channel', 'source_campaign', 'source_referrer', 'first_touch_channel', 'landing_path',
+        'source_channel', 'source_campaign', 'source_content', 'source_referrer', 'first_touch_channel', 'landing_path',
     ];
 
     protected $casts = [

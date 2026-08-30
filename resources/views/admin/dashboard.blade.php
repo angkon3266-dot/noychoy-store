@@ -330,19 +330,54 @@
                 <strong>{{ $f['conversion'] === null ? '—' : $f['conversion'].'%' }}</strong></p>
         </div>
 
+        {{-- Where visitors come from. Each row opens to name the sites and
+             campaigns underneath it — "Other website" is the channel that means
+             "we could not name this", so leaving it closed answers nothing. --}}
         <div class="card p-5">
             <h2 class="font-semibold mb-1">Where visitors come from</h2>
-            <p class="text-xs text-ink-700/55 mb-3">Visitors and what each channel earned — {{ $per }}.</p>
+            <p class="text-xs text-ink-700/55 mb-3">Visitors and what each channel earned — {{ $per }}. Tap a row for the detail.</p>
             @forelse($deep['sources'] as $s)
-                <div class="py-2 border-b border-ink-100 last:border-0">
-                    <div class="flex justify-between items-center text-sm gap-2">
-                        <span class="badge {{ \App\Support\TrafficSource::badgeClass($s['channel']) }} shrink-0">{{ $s['label'] }}</span>
+                @php $hasDetail = ! empty($s['sites']) || ! empty($s['campaigns']); @endphp
+                <div class="py-2 border-b border-ink-100 last:border-0" x-data="{ open: false }">
+                    <div class="flex justify-between items-center text-sm gap-2 {{ $hasDetail ? 'cursor-pointer' : '' }}"
+                         @if($hasDetail) @click="open = !open" @endif>
+                        <span class="flex items-center gap-1.5 min-w-0">
+                            <span class="badge {{ \App\Support\TrafficSource::badgeClass($s['channel']) }} shrink-0">{{ $s['label'] }}</span>
+                            @if($hasDetail)
+                                <svg class="w-3 h-3 text-ink-700/40 shrink-0 transition" :class="open && 'rotate-90'"
+                                     fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            @endif
+                        </span>
                         <span class="font-medium whitespace-nowrap">{{ number_format($s['visitors']) }} visitor{{ $s['visitors'] === 1 ? '' : 's' }}</span>
                     </div>
                     <div class="flex justify-between text-xs text-ink-700/60 mt-1">
                         <span>{{ $s['orders'] }} order{{ $s['orders'] === 1 ? '' : 's' }}{{ $s['rate'] !== null ? ' · '.$s['rate'].'% convert' : '' }}</span>
                         <span class="font-medium text-ink-700/80">{{ money($s['revenue']) }}</span>
                     </div>
+                    @if($hasDetail)
+                        <div x-show="open" x-cloak x-collapse class="mt-2 pl-1 border-l-2 border-ink-100 space-y-1">
+                            @foreach($s['sites'] as $site)
+                                <div class="flex justify-between text-xs text-ink-700/70 pl-2">
+                                    <span class="truncate">{{ $site['name'] }}</span>
+                                    <span class="whitespace-nowrap ml-2">{{ number_format($site['visitors']) }}</span>
+                                </div>
+                            @endforeach
+                            @foreach($s['campaigns'] as $camp)
+                                <div class="flex justify-between text-xs text-ink-700/70 pl-2">
+                                    <span class="truncate">🏷 {{ $camp['name'] }}</span>
+                                    <span class="whitespace-nowrap ml-2">{{ number_format($camp['visitors']) }}</span>
+                                </div>
+                            @endforeach
+                            @if($s['channel'] === 'referral')
+                                <p class="text-[11px] text-ink-700/45 pl-2 pt-1">
+                                    Grouped here because the link carried a <code>utm_source</code> this store doesn't
+                                    recognise. Rows with no site listed came from an app that strips the referrer.
+                                </p>
+                            @endif
+                        </div>
+                    @endif
                 </div>
             @empty
                 <p class="text-sm text-ink-700/50">No traffic data yet.</p>
@@ -350,42 +385,86 @@
         </div>
     </div>
 
-    @if($deep['campaigns']->isNotEmpty())
-        <div class="card p-5 mt-6">
-            <h2 class="font-semibold mb-1">Campaigns that sold</h2>
-            <p class="text-xs text-ink-700/55 mb-3">
-                From <code>utm_campaign</code> on your ad and post links — tag every link and this tells you which
-                specific ad paid for itself.
-            </p>
-            <table class="w-full text-sm">
-                <thead class="text-left text-xs uppercase tracking-wide text-ink-700/50">
-                    <tr><th class="py-1">Campaign</th><th class="py-1">Channel</th><th class="py-1 text-right">Orders</th><th class="py-1 text-right">Revenue</th></tr>
-                </thead>
-                <tbody>
-                    @foreach($deep['campaigns'] as $c)
-                        <tr class="border-t border-ink-100">
-                            <td class="py-1.5 truncate max-w-[220px]">{{ $c['source_campaign'] }}</td>
-                            <td class="py-1.5"><span class="badge {{ \App\Support\TrafficSource::badgeClass($c['source_channel']) }}">{{ \App\Support\TrafficSource::label($c['source_channel']) }}</span></td>
-                            <td class="py-1.5 text-right">{{ number_format($c['orders']) }}</td>
-                            <td class="py-1.5 text-right font-medium">{{ money($c['revenue']) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+    {{-- The funnel over time. Visitors alone only say whether traffic moved;
+         plotted against the steps under it, the same chart says where it
+         stopped. --}}
+    <div class="card p-5 mt-6"
+         x-data="funnelChart({ rows: @js(collect($deep['series'])->values()) })">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <h2 class="font-semibold">Traffic &amp; conversion over time</h2>
+            <div class="flex flex-wrap gap-1.5">
+                <template x-for="s in series" :key="s.key">
+                    <button type="button" @click="toggle(s.key)"
+                            class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition"
+                            :class="off[s.key] ? 'border-ink-100 text-ink-700/40' : 'border-ink-200 text-ink-700'">
+                        <span class="h-2 w-2 rounded-full" :style="`background:${off[s.key] ? '#cbd5e1' : s.color}`"></span>
+                        <span x-text="s.label"></span>
+                        <span class="text-ink-700/40" x-text="total(s.key)"></span>
+                    </button>
+                </template>
+            </div>
         </div>
-    @endif
+        <p class="text-xs text-ink-700/55 mb-3">{{ $range->label }} · switch a line off to rescale the rest.</p>
+
+        <div class="relative" @mousemove="track($event)" @mouseleave="hover = null"
+             @touchstart.passive="track($event)" @touchmove.passive="track($event)">
+            <div x-html="svg()"></div>
+            <div x-show="hover !== null" x-cloak
+                 class="pointer-events-none absolute z-10 rounded-lg border border-ink-100 bg-white/95 px-3 py-2 text-xs shadow-lg backdrop-blur"
+                 :style="tooltipStyle()">
+                <div class="font-semibold mb-1" x-text="hover !== null ? rows[hover].label : ''"></div>
+                <template x-for="s in series" :key="s.key">
+                    <div class="flex items-center gap-2" x-show="!off[s.key]">
+                        <span class="h-2 w-2 rounded-full shrink-0" :style="`background:${s.color}`"></span>
+                        <span class="text-ink-700/60" x-text="s.label"></span>
+                        <span class="ml-auto font-medium" x-text="hover !== null ? rows[hover][s.key] : ''"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
 
     <div class="grid lg:grid-cols-2 gap-6 mt-6">
-        <div class="card p-5">
-            <h2 class="font-semibold mb-3">Visitors — {{ $per }}</h2>
-            @php $vMax = max(1, collect($deep['visitorsByDay'])->max('value')); @endphp
-            <div class="flex items-end gap-1.5 h-32">
-                @foreach($deep['visitorsByDay'] as $d)
-                    <div class="flex-1 flex flex-col items-center gap-1" title="{{ $d['label'] }}: {{ $d['value'] }}">
-                        <div class="w-full rounded-t bg-gold-400" style="height: {{ max(2, round($d['value'] / $vMax * 100)) }}%"></div>
-                        <span class="text-[9px] text-ink-700/40 whitespace-nowrap">{{ explode(' ', $d['label'])[0] }}</span>
+        {{-- On the site right now. Polled, because shared hosting has no
+             websocket — see DashboardController::live. --}}
+        <div class="card p-5" x-data="liveVisitors({ url: '{{ route('admin.dashboard.live') }}' })" x-init="start()">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="font-semibold flex items-center gap-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-60"
+                              :class="count > 0 && 'animate-ping'"></span>
+                        <span class="relative inline-flex h-2.5 w-2.5 rounded-full"
+                              :class="count > 0 ? 'bg-green-500' : 'bg-ink-300'"></span>
+                    </span>
+                    On the site right now
+                </h2>
+                <span class="text-2xl font-semibold" x-text="count"></span>
+            </div>
+            <p class="text-xs text-ink-700/55 mb-3">
+                Shoppers active in the last <span x-text="window"></span> minutes. Refreshes on its own.
+            </p>
+
+            <template x-if="!loaded">
+                <p class="text-sm text-ink-700/40">Checking…</p>
+            </template>
+            <template x-if="loaded && rows.length === 0">
+                <p class="text-sm text-ink-700/50">Nobody browsing at the moment.</p>
+            </template>
+
+            <div class="divide-y divide-ink-100 max-h-72 overflow-y-auto -mx-1 px-1">
+                <template x-for="(r, i) in rows" :key="i">
+                    <div class="py-2 flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-sm truncate" x-text="r.where"></div>
+                            <div class="text-[11px] text-ink-700/50 truncate">
+                                <span x-text="r.channel_label"></span>
+                                <template x-if="r.campaign"><span> · <span x-text="r.campaign"></span></span></template>
+                                <span> · on site <span x-text="r.minutes_on_site"></span>m</span>
+                            </div>
+                        </div>
+                        <span class="text-[11px] text-ink-700/40 whitespace-nowrap" x-text="ago(r.seconds_ago)"></span>
                     </div>
-                @endforeach
+                </template>
             </div>
         </div>
 
@@ -394,13 +473,77 @@
             <p class="text-xs text-ink-700/55 mb-3">Interest is there — the photos, price or copy are the blocker.</p>
             @forelse($deep['viewedNotSold'] as $r)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $r['id']) }}" class="truncate hover:text-gold-700">{{ $r['name'] }}</a>
+                    {{-- Linked by slug: Product::getRouteKeyName() is 'slug', so
+                         an admin link built from the id 404s. --}}
+                    <a href="{{ route('admin.products.edit', $r['slug'] ?: $r['id']) }}" class="truncate hover:text-gold-700">{{ $r['name'] }}</a>
                     <span class="text-ink-700/60 text-xs whitespace-nowrap ml-2">{{ $r['views'] }} views · 0 sold</span>
                 </div>
             @empty
                 <p class="text-sm text-ink-700/50">Nothing flagged — every viewed product has sold.</p>
             @endforelse
         </div>
+    </div>
+
+    {{-- Which ad sent the traffic. Starts from visits, not orders, so a
+         campaign that spent all week sending people who bought nothing is
+         visible — that is the one worth switching off. --}}
+    <div class="card p-5 mt-6">
+        <h2 class="font-semibold mb-1">Ads &amp; campaigns</h2>
+        <p class="text-xs text-ink-700/55 mb-3">
+            Read from <code>utm_campaign</code> and <code>utm_content</code> on your ad links — {{ $per }}.
+        </p>
+
+        {{-- The table can only ever be as good as the links. Meta fills these
+             macros in for you, so the campaign shows as its name rather than a
+             seventeen-digit id. --}}
+        <details class="mb-3 text-xs">
+            <summary class="cursor-pointer text-gold-700 hover:underline select-none">How to tag your ad links</summary>
+            <div class="mt-2 rounded-lg bg-ink-50 border border-ink-100 p-3 space-y-2">
+                <p class="text-ink-700/70">
+                    In Meta Ads Manager, put this in <strong>URL parameters</strong> at the ad level. Meta replaces each
+                    <code>&#123;&#123;…&#125;&#125;</code> with the real name when someone clicks:
+                </p>
+                <pre class="overflow-x-auto text-[11px] leading-relaxed text-ink-800">utm_source=&#123;&#123;site_source_name&#125;&#125;&amp;utm_medium=paid_social&amp;utm_campaign=&#123;&#123;campaign.name&#125;&#125;&amp;utm_content=&#123;&#123;ad.name&#125;&#125;&amp;ad_id=&#123;&#123;ad.id&#125;&#125;</pre>
+                <p class="text-ink-700/70">
+                    For a boosted post or a plain link, add <code>?utm_source=facebook&amp;utm_campaign=eid-sale</code>
+                    to the end of the URL — any name you'll recognise later.
+                </p>
+            </div>
+        </details>
+        @if($deep['ads']->isNotEmpty())
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm min-w-[560px]">
+                    <thead class="text-left text-xs uppercase tracking-wide text-ink-700/50">
+                        <tr>
+                            <th class="py-1">Campaign</th><th class="py-1">Ad</th><th class="py-1">Channel</th>
+                            <th class="py-1 text-right">Visitors</th><th class="py-1 text-right">Orders</th>
+                            <th class="py-1 text-right">Convert</th><th class="py-1 text-right">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($deep['ads'] as $a)
+                            <tr class="border-t border-ink-100 {{ $a['orders'] === 0 && $a['visitors'] >= 20 ? 'bg-red-50/60' : '' }}">
+                                <td class="py-1.5 truncate max-w-[200px]" title="{{ $a['campaign'] }}">{{ $a['campaign'] }}</td>
+                                <td class="py-1.5 truncate max-w-[180px] text-ink-700/70" title="{{ $a['ad'] }}">{{ $a['ad'] ?? '—' }}</td>
+                                <td class="py-1.5"><span class="badge {{ \App\Support\TrafficSource::badgeClass($a['channel']) }}">{{ \App\Support\TrafficSource::label($a['channel']) }}</span></td>
+                                <td class="py-1.5 text-right">{{ number_format($a['visitors']) }}</td>
+                                <td class="py-1.5 text-right">{{ number_format($a['orders']) }}</td>
+                                <td class="py-1.5 text-right {{ $a['orders'] === 0 ? 'text-red-600' : '' }}">{{ $a['rate'] === null ? '—' : $a['rate'].'%' }}</td>
+                                <td class="py-1.5 text-right font-medium">{{ money($a['revenue']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-[11px] text-ink-700/45 mt-2">
+                A row shaded red sent real traffic and made no sale. Ads only appear once your links carry
+                <code>utm_content</code> — until then each campaign shows as one row.
+            </p>
+        @else
+            <p class="text-sm text-ink-700/50">
+                No tagged links seen yet. Add <code>utm_campaign</code> to your ad and post links and this fills in.
+            </p>
+        @endif
     </div>
 @endif
 
@@ -475,7 +618,7 @@
             <p class="text-xs text-ink-700/55 mb-3">Days of stock left at the current sales rate.</p>
             @forelse($o['stock_cover'] as $c)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $c['id']) }}" class="truncate hover:text-gold-700">{{ $c['name'] }}</a>
+                    <a href="{{ route('admin.products.edit', $c['slug'] ?? $c['id']) }}" class="truncate hover:text-gold-700">{{ $c['name'] }}</a>
                     <span class="whitespace-nowrap ml-2 {{ $c['days_left'] <= 7 ? 'text-red-600 font-medium' : 'text-ink-700/60' }}">
                         {{ $c['days_left'] }}d · {{ $c['stock_quantity'] }} left
                     </span>
@@ -490,7 +633,7 @@
             <p class="text-xs text-ink-700/55 mb-3">In stock, zero sales in this period — cash sitting still.</p>
             @forelse($o['dead_stock'] as $p)
                 <div class="flex justify-between items-center text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $p['id']) }}" class="truncate hover:text-gold-700">{{ $p['name'] }}</a>
+                    <a href="{{ route('admin.products.edit', $p['slug'] ?? $p['id']) }}" class="truncate hover:text-gold-700">{{ $p['name'] }}</a>
                     <span class="text-ink-700/60 text-xs whitespace-nowrap ml-2">{{ $p['stock_quantity'] }} pcs</span>
                 </div>
             @empty
