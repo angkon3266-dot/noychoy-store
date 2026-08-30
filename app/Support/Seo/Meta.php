@@ -93,18 +93,28 @@ class Meta
     }
 
     /**
-     * Meta description for a product with none written. Leads with the shop's
-     * own words, then states the two things that decide a Bangladeshi purchase
-     * — the price in taka, and that no money changes hands before delivery.
+     * A product's meta description: the shop's own words, then the two things
+     * that decide a Bangladeshi purchase — the price in taka, and that no money
+     * changes hands before delivery.
+     *
+     * The price is appended at render time rather than stored, including on top
+     * of an admin-written description. That is deliberate: a price baked into
+     * 105 saved descriptions is 105 lies waiting for the first repricing, and a
+     * snippet whose price contradicts the Product schema on the same page is
+     * worse than one with no price at all.
+     *
+     * The owner's words are never truncated to make room for ours. If what they
+     * wrote already fills the snippet, or already talks about price or cash on
+     * delivery, it stands alone.
      */
     public static function productDescription(Product $product): string
     {
-        if (filled($product->meta_description)) {
-            return Str::limit(trim(strip_tags($product->meta_description)), 160);
-        }
+        $own = filled($product->meta_description);
 
-        $lead = plain_copy(strip_tags((string) ($product->short_description ?: $product->description)));
-        $lead = preg_replace('/\s+/u', ' ', $lead) ?? '';
+        $lead = plain_copy(strip_tags((string) (
+            $product->meta_description ?: $product->short_description ?: $product->description
+        )));
+        $lead = trim(preg_replace('/\s+/u', ' ', $lead) ?? '');
 
         $price = config('store.currency_symbol', '৳').number_format((float) $product->price);
         // Not "<name> at <price>" — the name is almost always the first words
@@ -112,12 +122,31 @@ class Meta
         // spend twice on the same phrase.
         $tail = 'Price '.$price.'. Cash on delivery all over Bangladesh.';
 
+        if (self::alreadyStatesTerms($lead)) {
+            return Str::limit($lead, 160);
+        }
+
         // Budget the lead so the whole thing survives Google's ~160-char cut
         // with the price and the COD promise intact.
         $room = 158 - mb_strlen($tail);
-        $lead = $room > 40 ? Str::limit($lead, $room, '') : '';
 
-        return trim(trim($lead).' '.$tail);
+        if (mb_strlen($lead) > $room) {
+            // Admin copy wins the whole snippet; generated copy makes room.
+            return $own || $room <= 40
+                ? Str::limit($lead, 160)
+                : trim(Str::limit($lead, $room, '').' '.$tail);
+        }
+
+        return trim($lead.' '.$tail);
+    }
+
+    /** True when the copy already quotes a price or promises cash on delivery. */
+    private static function alreadyStatesTerms(string $copy): bool
+    {
+        return (bool) preg_match(
+            '/৳|\bBDT\b|\btaka\b|\bTk\.?\b|cash on delivery/iu',
+            $copy
+        );
     }
 
     /**
