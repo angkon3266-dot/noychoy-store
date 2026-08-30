@@ -62,6 +62,14 @@ if (! function_exists('brand_font_css_url')) {
      *
      * The filename is content-hashed, so it caches forever and the manifest is
      * only read once per boot.
+     *
+     * The manifest records the path relative to `public/build`, normally
+     * `assets/fonts-XXXX.css`. Builds between `2aca77b` and this fix wrote only
+     * the basename, which resolved to `/build/fonts-XXXX.css` — a 404 on every
+     * storefront page, so the site served no brand fonts at all. Both shapes
+     * are accepted, and the file is confirmed to exist before its URL is
+     * emitted: linking a stylesheet that isn't there buys nothing but a console
+     * error and a wasted request.
      */
     function brand_font_css_url(): ?string
     {
@@ -79,7 +87,19 @@ if (! function_exists('brand_font_css_url')) {
 
         $file = json_decode((string) file_get_contents($manifest), true)['style']['file'] ?? null;
 
-        return $url = $file ? asset('build/'.$file) : null;
+        if (! is_string($file) || trim($file) === '') {
+            return $url = null;
+        }
+
+        $file = ltrim(trim($file), '/');
+
+        foreach ([$file, 'assets/'.$file] as $candidate) {
+            if (is_file(public_path('build/'.$candidate))) {
+                return $url = asset('build/'.$candidate);
+            }
+        }
+
+        return $url = null;
     }
 }
 

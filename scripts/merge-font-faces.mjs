@@ -69,8 +69,15 @@ for (const file of files) {
 
     try {
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-        if (manifest.style?.file === file || manifest.style?.file) {
-            manifest.style.file = newFile;
+        if (manifest.style?.file) {
+            // The manifest records a path relative to public/build, which is how
+            // the plugin writes it ("assets/fonts-Bg0TCPv9.css"). Writing the
+            // bare basename here is what made brand_font_css_url() emit
+            // /build/fonts-X.css — a 404 on every storefront page, so the site
+            // shipped no brand fonts at all for two weeks. The merged file is
+            // always written into public/build/assets (see `dir` above), so the
+            // prefix is correct by construction rather than by guesswork.
+            manifest.style.file = `assets/${newFile}`;
             writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
         }
     } catch (e) {
