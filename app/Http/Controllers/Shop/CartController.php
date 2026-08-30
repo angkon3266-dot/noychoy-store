@@ -355,7 +355,15 @@ class CartController extends Controller
     {
         $request->validate(['code' => ['required', 'string']]);
 
-        $coupon = Coupon::where('code', strtoupper(trim($request->string('code'))))->first();
+        $typed = strtoupper(trim($request->string('code')));
+        $coupon = Coupon::where('code', $typed)->first();
+
+        // Someone reading a code off a text message types it with a space or
+        // a dash in the middle as often as not. Try again without them rather
+        // than telling her a code she holds is invalid.
+        if (! $coupon && ($compact = preg_replace('/[^A-Z0-9]/', '', $typed)) !== '') {
+            $coupon = Coupon::where('code', $compact)->first();
+        }
 
         // Validate against the base the cart will actually apply it to (subtotal
         // after offers and member/personalised discounts), not the raw subtotal —

@@ -20,6 +20,11 @@ use Illuminate\Support\Carbon;
  */
 class ReviewThankYouOffer
 {
+    /** No O/0, no I/L/1 — nothing left in here that can be misread off a screen. */
+    protected const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+    protected const CODE_LENGTH = 6;
+
     public function enabled(): bool
     {
         return (bool) Setting::get('review_offer_enabled', false) && $this->percent() > 0;
@@ -103,7 +108,7 @@ class ReviewThankYouOffer
     protected function distinctCode(Order $order): string
     {
         do {
-            $code = 'THANKS-'.strtoupper(bin2hex(random_bytes(5)));
+            $code = $this->encode(random_bytes(self::CODE_LENGTH));
         } while (Coupon::where('code', $code)->exists());
 
         return $code;
@@ -119,13 +124,30 @@ class ReviewThankYouOffer
      */
     public function codeFor(Order $order): string
     {
-        $digest = hash_hmac('sha256', 'review-thanks:'.$order->order_number, (string) config('app.key'));
+        $digest = hash_hmac('sha256', 'review-thanks:'.$order->order_number, (string) config('app.key'), true);
 
-        // Ten hex characters, not six. Six is a 16.7-million space, and the
-        // birthday bound makes a collision better than even odds by ~5,000
-        // coupons — well inside this shop's lifetime, and a collision means
-        // one buyer's SMS quoting another buyer's private code.
-        return 'THANKS-'.strtoupper(substr($digest, 0, 10));
+        return $this->encode($digest);
+    }
+
+    /**
+     * Six characters from a 31-symbol alphabet — about 887 million codes.
+     *
+     * Short because she has to read it off a text message and type it into a
+     * phone with the other hand. The alphabet is the reason it can be short
+     * and still not be mistyped: no O or 0, no I, L or 1, so there is no pair
+     * left to confuse. Guessing is not the threat model — a code is refused
+     * unless the checkout phone matches — so the length only has to keep
+     * collisions rare, and a collision is caught and re-minted anyway.
+     */
+    protected function encode(string $bytes): string
+    {
+        $code = '';
+
+        for ($i = 0; $i < self::CODE_LENGTH; $i++) {
+            $code .= self::ALPHABET[ord($bytes[$i]) % strlen(self::ALPHABET)];
+        }
+
+        return $code;
     }
 
     /**

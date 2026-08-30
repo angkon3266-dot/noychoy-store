@@ -392,6 +392,30 @@ class ReviewThankYouOfferTest extends TestCase
         $this->assertSame([], $stray, 'non-GSM-7 characters: '.implode(' ', $stray));
     }
 
+    public function test_the_code_is_short_and_free_of_look_alike_characters(): void
+    {
+        $this->enableOffer();
+        $coupon = app(ReviewThankYouOffer::class)->forOrder($this->deliveredOrder());
+
+        // Six characters, typed off a phone screen with one thumb.
+        $this->assertSame(6, strlen($coupon->code));
+        // Nothing left that can be misread: no O/0, no I/L/1.
+        $this->assertMatchesRegularExpression('/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$/', $coupon->code);
+    }
+
+    public function test_a_code_typed_with_a_space_or_dash_still_works(): void
+    {
+        $this->enableOffer();
+        $hers = app(ReviewThankYouOffer::class)->forOrder($this->deliveredOrder('01711111111'));
+
+        app(CartService::class)->add($this->product('Necklace', 2000), null, 1);
+
+        $spaced = substr($hers->code, 0, 3).' '.substr($hers->code, 3);
+        $this->post(route('cart.coupon'), ['code' => $spaced])->assertSessionHas('success');
+
+        $this->assertSame(200.0, app(CartService::class)->couponDiscount());
+    }
+
     public function test_the_short_link_opens_the_review_page(): void
     {
         $order = $this->deliveredOrder();
