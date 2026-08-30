@@ -75,6 +75,9 @@ class BackfillGiftSeo extends Command
         'garden', 'tennis', 'hoop', 'stud',
     ];
 
+    /** Wedding pieces: Anniversary's, not Birthday Gift's. */
+    private const BRIDAL = ['bridal', 'wedding', 'engagement'];
+
     private const GIFT_MIN_PRICE = 850;
 
     private const GIFT_MAX_PRICE = 2000;
@@ -261,25 +264,40 @@ class BackfillGiftSeo extends Command
         // looks for `gift` ever since.
         $tags = array_map(fn ($t) => strtolower($t) === 'git' ? 'gift' : $t, $tags);
 
-        // Name and tags only, never the marketing copy. Every description in
-        // this catalogue reaches for the same register — "perfect for brides
-        // and lovers", "radiant", "timeless" — so matching on it put a plain
-        // silver ring in Anniversary because its blurb used the word "love".
-        // The name and the owner's own tags are the precise signals.
-        $haystack = mb_strtolower($product->name.' '.$product->tags);
+        // The product NAME, and nothing else.
+        //
+        // Not the marketing copy: every description in this catalogue reaches
+        // for the same register, so matching on it put a plain silver ring in
+        // Anniversary because its blurb said "lovers". And not the tag list
+        // either — around fifty products carry an identical bulk-applied set
+        // ("Statement, gift, romantic"), which swept the same fifty into both
+        // Anniversary and Date Night and left the two collections as copies of
+        // each other. The name is the one field written per product.
+        //
+        // An occasion tag already set by hand is honoured below, separately.
+        $haystack = mb_strtolower($product->name);
+        $named = fn (string $tag) => $this->hasTag($existing, $tag);
 
         $price = (float) $product->price;
         $add = [];
 
-        if ($this->matches($haystack, self::ANNIVERSARY)) {
+        $anniversary = $this->matches($haystack, self::ANNIVERSARY)
+            || $named('anniversary') || $named('love');
+
+        if ($anniversary) {
             $add[] = 'anniversary';
         }
 
-        if ($this->matches($haystack, self::DATE_NIGHT)) {
+        if ($this->matches($haystack, self::DATE_NIGHT) || $named('datenight')) {
             $add[] = 'datenight';
         }
 
-        if ($price <= self::BIRTHDAY_MAX_PRICE) {
+        // The broad one, and the catch-all: anything a person would plausibly
+        // buy as a present. Bridal and wedding pieces are held out — they are
+        // an Anniversary purchase, and a wedding set in "Birthday Gift" makes
+        // the page read as an undifferentiated dump of the whole catalogue.
+        if ($named('birthday')
+            || ($price <= self::BIRTHDAY_MAX_PRICE && ! $this->matches($haystack, self::BRIDAL))) {
             $add[] = 'birthday';
         }
 
