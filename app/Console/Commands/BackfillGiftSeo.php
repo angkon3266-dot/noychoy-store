@@ -53,11 +53,15 @@ class BackfillGiftSeo extends Command
         'solitaire', 'moonstone', 'rose quartz', 'tennis', 'anniversary',
     ];
 
-    /** Pieces that catch light across a table: statement, drop, hoop, cocktail. */
+    /**
+     * Pieces that catch light across a table. Kept to shapes, not adjectives:
+     * "radiant", "luminous" and "sparkle" appear in half the product names in
+     * this catalogue, so matching on them put almost everything in here and
+     * made the collection meaningless. "Drop" and "cluster" went the same way.
+     */
     private const DATE_NIGHT = [
-        'statement', 'cocktail', 'cascade', 'tassel', 'drop', 'dangle', 'hoop',
-        'huggie', 'chandelier', 'cluster', 'radiance', 'radiant', 'luminous',
-        'brilliance', 'sparkle', 'crystal',
+        'statement', 'cocktail', 'cascade', 'tassel', 'hoop', 'huggie',
+        'dangle', 'chandelier',
     ];
 
     /**
@@ -76,10 +80,11 @@ class BackfillGiftSeo extends Command
     private const GIFT_MAX_PRICE = 2000;
 
     /**
-     * Above this a piece reads as a wedding purchase, not a birthday present.
-     * The bridal sets sit at ৳6,500 and are excluded by it.
+     * Above this a piece reads as a wedding or milestone purchase rather than a
+     * birthday present — the bridal sets sit at ৳6,500 — so it goes to
+     * Anniversary or Date Night on its own merits instead.
      */
-    private const BIRTHDAY_MAX_PRICE = 3500;
+    private const BIRTHDAY_MAX_PRICE = 2000;
 
     /**
      * Two or three phrasings per combination, chosen by product id. One
@@ -134,6 +139,7 @@ class BackfillGiftSeo extends Command
         $tagChanges = 0;
         $descChanges = 0;
         $rows = [];
+        $projected = ['anniversary' => 0, 'birthday' => 0, 'datenight' => 0, 'giftforher' => 0];
 
         foreach ($products as $product) {
             $existing = $this->tagList($product);
@@ -151,6 +157,10 @@ class BackfillGiftSeo extends Command
                     ['anniversary', 'birthday', 'datenight', 'giftforher'],
                     array_map('strtolower', $existing),
                 ));
+            }
+
+            foreach ($occasions as $occasion) {
+                $projected[$occasion]++;
             }
 
             $dirty = [];
@@ -192,7 +202,7 @@ class BackfillGiftSeo extends Command
 
         $this->newLine();
         $this->info("Tag changes: {$tagChanges}   Description changes: {$descChanges}");
-        $this->reportCollections();
+        $this->reportCollections($projected);
 
         if ($dry) {
             $this->newLine();
@@ -251,12 +261,12 @@ class BackfillGiftSeo extends Command
         // looks for `gift` ever since.
         $tags = array_map(fn ($t) => strtolower($t) === 'git' ? 'gift' : $t, $tags);
 
-        $haystack = mb_strtolower(implode(' ', [
-            $product->name,
-            $product->short_description,
-            $product->description,
-            $product->tags,
-        ]));
+        // Name and tags only, never the marketing copy. Every description in
+        // this catalogue reaches for the same register — "perfect for brides
+        // and lovers", "radiant", "timeless" — so matching on it put a plain
+        // silver ring in Anniversary because its blurb used the word "love".
+        // The name and the owner's own tags are the precise signals.
+        $haystack = mb_strtolower($product->name.' '.$product->tags);
 
         $price = (float) $product->price;
         $add = [];
@@ -279,10 +289,11 @@ class BackfillGiftSeo extends Command
             $add[] = 'giftforher';
         }
 
-        // Nothing should fall through every collection — an untagged product is
-        // one the occasion tiles can never reach.
+        // Nothing may fall through every collection — an untagged product is
+        // one the occasion tiles can never reach. Birthday is the catch-all
+        // rather than Gift for Her, which the owner asked to keep curated.
         if (! $add) {
-            $add[] = 'giftforher';
+            $add[] = 'birthday';
         }
 
         foreach ($add as $tag) {
@@ -402,22 +413,37 @@ class BackfillGiftSeo extends Command
         return $options[$product->id % count($options)];
     }
 
-    /** What each collection holds once the tags are in place. */
-    private function reportCollections(): void
+    /**
+     * What each collection holds now, and what it will hold. The projection is
+     * the point of the dry run: a rule change and a tag change land together,
+     * so counting the live database before either is applied tells you nothing.
+     *
+     * @param  array<string,int>  $projected
+     */
+    private function reportCollections(array $projected): void
     {
         $this->newLine();
         $service = app(\App\Services\CollectionService::class);
         $rows = [];
 
         foreach (Collection::orderBy('id')->get() as $collection) {
+            $rules = (array) ($collection->rules ?? []);
+            $tag = strtolower((string) ($rules[0]['value'] ?? ''));
+
+            // The one rule this command corrects.
+            if ($collection->slug === 'date-night' && $tag === 'birthday') {
+                $tag = 'datenight';
+            }
+
             $rows[] = [
                 $collection->name,
                 '/collection/'.$collection->slug,
-                json_encode($collection->rules),
+                $tag,
                 $service->query($collection)->count(),
+                $projected[$tag] ?? '?',
             ];
         }
 
-        $this->table(['Collection', 'URL', 'Rules', 'Products'], $rows);
+        $this->table(['Collection', 'URL', 'Matches tag', 'Now', 'After'], $rows);
     }
 }
