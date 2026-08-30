@@ -547,17 +547,23 @@
                 <h2 class="font-semibold mb-3">Images</h2>
                 @if($product->exists && $product->images->isNotEmpty())
                     <div class="flex items-center justify-between mb-2">
-                        <p class="text-xs text-ink-700/50">Drag to reorder. The ★ image is the primary. Tick boxes to delete several at once.</p>
+                        <p class="text-xs text-ink-700/50">Drag to reorder (or focus an image and use ← →). The ★ image is the primary. Tick boxes to delete several at once. <strong>Save the product</strong> to keep a new order.</p>
                         <button type="button" id="imgBulkDelBtn" class="text-xs text-red-600 hover:underline hidden">Delete selected (<span id="imgSelCount">0</span>)</button>
                     </div>
                     {{-- Star and Del act over fetch, so choosing a primary image
                          or removing one doesn't reload the page and lose the
                          rest of the half-filled product form. --}}
-                    <div id="imgGrid" class="grid grid-cols-3 gap-2 mb-3" x-data="imageGrid()">
+                    <div id="imgGrid" class="grid grid-cols-3 gap-2 mb-3" role="list" x-data="imageGrid()">
                         @foreach($product->images as $image)
-                            <div class="img-card relative group cursor-move" draggable="true" data-img-id="{{ $image->id }}"
+                            {{-- touch-none: without it the browser claims the
+                                 gesture for scrolling and a drag never starts on
+                                 a phone or tablet. tabindex, so the arrow keys
+                                 have something to move. --}}
+                            <div class="img-card relative group cursor-move touch-none select-none rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+                                 tabindex="0" role="listitem" data-img-id="{{ $image->id }}"
+                                 aria-label="Image {{ $loop->iteration }} of {{ $product->images->count() }} — drag, or press left and right arrow to move"
                                  :class="busy === {{ $image->id }} && 'opacity-40 pointer-events-none'">
-                                <img src="{{ $image->url }}" data-img
+                                <img src="{{ $image->url }}" data-img draggable="false"
                                      class="aspect-square w-full object-cover rounded-lg pointer-events-none {{ $image->is_primary ? 'ring-2 ring-gold-500' : '' }}" alt="">
                                 <input type="checkbox" class="img-sel-cb absolute top-1.5 left-1.5 w-4 h-4 z-10" value="{{ $image->id }}" title="Select for bulk delete">
                                 <span data-star class="absolute top-1 right-1 text-xs bg-gold-500 text-white rounded px-1 {{ $image->is_primary ? '' : 'hidden' }}">★</span>
@@ -644,71 +650,11 @@
     <form id="img-bulk-del" action="{{ route('admin.products.images.bulk-delete', $product) }}" method="POST" class="hidden">@csrf @method('DELETE')<div id="imgBulkInputs"></div></form>
 @endif
 
-<script>
-(function () {
-    const grid = document.getElementById('imgGrid');
-    if (!grid) return;
-    const form = grid.closest('form');
-    const out = document.getElementById('imgOrderInputs');
-    let dragEl = null;
-
-    grid.querySelectorAll('.img-card').forEach(card => {
-        card.addEventListener('dragstart', () => { dragEl = card; card.classList.add('opacity-40'); });
-        card.addEventListener('dragend', () => { card.classList.remove('opacity-40'); });
-        card.addEventListener('dragover', e => {
-            e.preventDefault();
-            if (!dragEl || dragEl === card) return;
-            const rect = card.getBoundingClientRect();
-            const after = (e.clientY - rect.top) > rect.height / 2 || (e.clientX - rect.left) > rect.width / 2;
-            grid.insertBefore(dragEl, after ? card.nextSibling : card);
-        });
-    });
-
-    // Serialise the current order into hidden inputs right before submit.
-    form.addEventListener('submit', () => {
-        out.innerHTML = '';
-        grid.querySelectorAll('.img-card').forEach(card => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'image_order[]';
-            input.value = card.dataset.imgId;
-            out.appendChild(input);
-        });
-    });
-
-    // Multi-select delete.
-    const cbs = grid.querySelectorAll('.img-sel-cb');
-    const delBtn = document.getElementById('imgBulkDelBtn');
-    const countEl = document.getElementById('imgSelCount');
-    const bulkForm = document.getElementById('img-bulk-del');
-    const bulkInputs = document.getElementById('imgBulkInputs');
-    const selected = () => Array.from(cbs).filter(c => c.checked);
-    const refresh = () => {
-        const n = selected().length;
-        if (countEl) countEl.textContent = n;
-        if (delBtn) delBtn.classList.toggle('hidden', n === 0);
-    };
-    // Don't let a click on the checkbox start a drag.
-    cbs.forEach(cb => {
-        cb.addEventListener('change', refresh);
-        cb.addEventListener('mousedown', e => e.stopPropagation());
-    });
-    if (delBtn && bulkForm) {
-        delBtn.addEventListener('click', () => {
-            const ids = selected().map(c => c.value);
-            if (!ids.length) return;
-            if (!confirm('Delete ' + ids.length + ' selected image(s)? This cannot be undone.')) return;
-            bulkInputs.innerHTML = '';
-            ids.forEach(id => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'image_ids[]';
-                input.value = id;
-                bulkInputs.appendChild(input);
-            });
-            bulkForm.submit();
-        });
-    }
-})();
-</script>
+{{-- The reordering and bulk-delete script that used to sit here is now the
+     imageGrid Alpine component in resources/js/app.js. It had to move: this
+     markup renders inside <main>, admin-ajax.js swaps <main> with innerHTML
+     after a background save, and a <script> introduced that way never runs
+     again — so image dragging worked once per full page load and was dead
+     from the first save onwards. Alpine re-initialises swapped-in components,
+     so the behaviour comes back every time. --}}
 @endsection

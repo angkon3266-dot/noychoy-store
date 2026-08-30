@@ -605,6 +605,214 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('imageGrid', () => ({
         busy: null,
 
+        // ── Reordering ──────────────────────────────────────────────────
+        //
+        // This lived in an inline <script> at the bottom of the product form
+        // and stopped working the first time anything on that page was saved:
+        // admin-ajax.js swaps <main> with `innerHTML`, which drops the script's
+        // element listeners, and a <script> inserted that way never runs again.
+        // So dragging worked exactly once per full page load and silently died
+        // after the first background save — which is most of the time.
+        //
+        // Alpine re-initialises components inside swapped markup, so living
+        // here means it comes back every time. The listeners are delegated to
+        // the grid, so images added or removed after load are draggable too.
+        //
+        // Pointer events rather than HTML5 drag-and-drop: the old version never
+        // called dataTransfer.setData(), so Firefox refused to begin a drag at
+        // all, and it had no touch support of any kind.
+        drag: null,
+        from: null,
+
+        init() {
+            const grid = this.$root;
+
+            // passive:false — a touch drag has to be able to preventDefault.
+            grid.addEventListener('pointerdown', (e) => this.onDown(e), { passive: false });
+            grid.addEventListener('pointermove', (e) => this.onMove(e), { passive: false });
+            grid.addEventListener('pointerup', () => this.onUp());
+            grid.addEventListener('pointercancel', () => this.onUp());
+            grid.addEventListener('keydown', (e) => this.onKey(e));
+            grid.addEventListener('change', (e) => {
+                if (e.target.classList.contains('img-sel-cb')) this.refreshSelection();
+            });
+            // Native image dragging would otherwise fight the pointer handlers.
+            grid.addEventListener('dragstart', (e) => e.preventDefault());
+
+            this.refreshSelection();
+            document.getElementById('imgBulkDelBtn')
+                ?.addEventListener('click', () => this.bulkDelete());
+        },
+
+        onDown(e) {
+            // Buttons, the select checkbox and links keep their own behaviour.
+            if (e.target.closest('button, input, label, a')) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+            const card = e.target.closest('.img-card');
+            if (!card || !this.$root.contains(card)) return;
+
+            this.from = { x: e.clientX, y: e.clientY, card, id: e.pointerId };
+        },
+
+        onMove(e) {
+            if (!this.from) return;
+
+            if (!this.drag) {
+                // A threshold, so a click on a card is still a click.
+                const moved = Math.hypot(e.clientX - this.from.x, e.clientY - this.from.y);
+                if (moved < (e.pointerType === 'touch' ? 8 : 5)) return;
+
+                this.drag = this.from.card;
+                this.drag.classList.add('opacity-50', 'ring-2', 'ring-gold-500');
+                document.body.style.userSelect = 'none';
+
+                // Capture keeps the moves coming when the pointer leaves the
+                // grid — dragging the last image below the fold, say. It throws
+                // if the pointer has already been released, and losing capture
+                // is survivable while losing the drag is not.
+                try {
+                    this.$root.setPointerCapture(this.from.id);
+                } catch (err) {
+                    // No active pointer to capture; carry on without it.
+                }
+            }
+
+            e.preventDefault();
+            this.placeAt(e.clientX, e.clientY);
+        },
+
+        onUp() {
+            if (this.drag) {
+                this.drag.classList.remove('opacity-50', 'ring-2', 'ring-gold-500');
+                this.drag.focus?.();
+                this.syncOrder();
+            }
+
+            if (this.from) {
+                try {
+                    this.$root.releasePointerCapture(this.from.id);
+                } catch (err) {
+                    // The pointer is already gone; nothing to release.
+                }
+            }
+
+            document.body.style.userSelect = '';
+            this.drag = null;
+            this.from = null;
+        },
+
+        /**
+         * Move the dragged card to wherever the pointer is.
+         *
+         * Nearest card by centre distance, then before or after it depending on
+         * which side of its middle the pointer sits. The old version asked "is
+         * the pointer past halfway vertically OR horizontally", which in a
+         * three-column grid made the top-right of a tile and its bottom-left
+         * both count as "after" — so an image jumped a slot or refused to move
+         * depending on where inside a tile you happened to be. Centre distance
+         * reads a wrapped grid the way a person does.
+         */
+        placeAt(x, y) {
+            const cards = Array.from(this.$root.querySelectorAll('.img-card'))
+                .filter((c) => c !== this.drag);
+
+            let best = null;
+            let bestDistance = Infinity;
+
+            for (const card of cards) {
+                const box = card.getBoundingClientRect();
+                const distance = Math.hypot(
+                    x - (box.left + box.width / 2),
+                    y - (box.top + box.height / 2),
+                );
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = { card, after: x > box.left + box.width / 2 };
+                }
+            }
+
+            if (!best) return;
+
+            const target = best.after ? best.card.nextSibling : best.card;
+            if (target !== this.drag) this.$root.insertBefore(this.drag, target);
+        },
+
+        /** Arrow keys move a focused image. A drag is not everyone's pointer. */
+        onKey(e) {
+            const card = e.target.closest('.img-card');
+            if (!card || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+
+            e.preventDefault();
+            const sibling = e.key === 'ArrowLeft' ? card.previousElementSibling : card.nextElementSibling;
+            if (!sibling) return;
+
+            this.$root.insertBefore(
+                e.key === 'ArrowLeft' ? card : sibling,
+                e.key === 'ArrowLeft' ? sibling : card,
+            );
+            card.focus();
+            this.syncOrder();
+        },
+
+        /**
+         * Write the order into hidden inputs after every change rather than on
+         * submit. The submit listener this replaces was registered by that same
+         * dead inline script, so after a background save the form posted no
+         * order at all — a drag appeared to work and was then forgotten.
+         */
+        syncOrder() {
+            const out = document.getElementById('imgOrderInputs');
+            if (!out) return;
+
+            out.innerHTML = '';
+            this.$root.querySelectorAll('.img-card').forEach((card) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'image_order[]';
+                input.value = card.dataset.imgId;
+                out.appendChild(input);
+            });
+        },
+
+        // ── Bulk delete ─────────────────────────────────────────────────
+        selected() {
+            return Array.from(this.$root.querySelectorAll('.img-sel-cb')).filter((c) => c.checked);
+        },
+
+        refreshSelection() {
+            const n = this.selected().length;
+            const count = document.getElementById('imgSelCount');
+            const button = document.getElementById('imgBulkDelBtn');
+
+            if (count) count.textContent = n;
+            if (button) button.classList.toggle('hidden', n === 0);
+        },
+
+        bulkDelete() {
+            const ids = this.selected().map((c) => c.value);
+            if (!ids.length) return;
+            if (! window.confirm('Delete ' + ids.length + ' selected image(s)? This cannot be undone.')) return;
+
+            const form = document.getElementById('img-bulk-del');
+            const inputs = document.getElementById('imgBulkInputs');
+            if (!form || !inputs) return;
+
+            inputs.innerHTML = '';
+            ids.forEach((id) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'image_ids[]';
+                input.value = id;
+                inputs.appendChild(input);
+            });
+
+            // requestSubmit, not submit: the latter bypasses the submit event,
+            // and with it admin-ajax's background post.
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+        },
+
         async makePrimary(id, url) {
             if (this.busy) return;
             this.busy = id;
