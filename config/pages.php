@@ -39,7 +39,7 @@ return [
         'lede' => 'Hand-picked pieces, checked before they ship, and priced to be worn — not saved for a day that never comes.',
         'hero_image' => null,
         'body' => '<h2>Why we started</h2>
-<p>Fine jewelry in Bangladesh tends to arrive one of two ways: a glass counter where the price is whatever the shopkeeper decides that afternoon, or an online photo that looks nothing like the parcel. We wanted a third way — a fixed, fair price on the page, a real photograph of the actual piece, and a box you would be happy to hand to someone.</p>
+<p>Fine jewelry in Bangladesh tends to arrive one of two ways: a glass counter where the price is whatever the shopkeeper decides that afternoon, or an online photo that looks nothing like the parcel. We wanted a third way — a fixed, fair price on the page, a real photograph of the actual piece, and no surprises at the door.</p>
 <h2>What we make</h2>
 <p>Brilliant-cut cubic zirconia set in gold-plated and rhodium-plated settings, with sterling silver on selected pieces. Earrings, necklaces, rings, bracelets and anklets — everyday pieces and occasion pieces, made to be worn to work on Tuesday and to a wedding on Friday.</p>
 <h2>We tell you exactly what it is</h2>
