@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- Marks the document as script-capable before anything paints, so the
+         pre-hydration shell below can be held back for visitors who are
+         getting the real React page a moment later. --}}
+    <script>document.documentElement.classList.add('js')</script>
     {{-- Every SEO tag on the site — title, description, robots, canonical,
          hreflang, OG/Twitter and the JSON-LD graph — lives in one partial
          shared with layouts/shop.blade.php. $pageTitle / $metaDescription /
@@ -88,6 +92,21 @@
             --font-sans: '{{ $fBody }}', ui-sans-serif, system-ui, sans-serif;
             --font-serif: '{{ $fHeading }}', Georgia, 'Times New Roman', serif;
         }
+        /* The pre-hydration shell (partials/seo-body) is a real fallback: a
+           crawler and a JS-less visitor read it, and it is the only HTML this
+           page has until React mounts. But a visitor WITH working JavaScript
+           gets the actual page a few hundred milliseconds later, and showing
+           them plain document text in the meantime reads as a broken flash —
+           and shifts the layout when React swaps it out.
+
+           So it is held back only where JS is running, and only briefly: if
+           the bundle is slow or fails outright, it appears rather than
+           leaving a white screen. No cloaking — the shell says exactly what
+           React renders, and a JS-executing crawler sees the React page. */
+        .js #seo-shell { opacity: 0; animation: seo-shell-in .25s 1.2s forwards; }
+        @keyframes seo-shell-in { to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .js #seo-shell { animation-duration: .01s; } }
+
         /* Logo & menu icon sized before React mounts — no flash/layout shift. */
         .logo-d { height: {{ (int) (theme('logo_height_desktop') ?: 40) }}px; width: auto; }
         .logo-m { height: {{ (int) (theme('logo_height_mobile') ?: 32) }}px; width: auto; }

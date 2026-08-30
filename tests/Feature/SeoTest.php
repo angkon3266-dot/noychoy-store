@@ -305,4 +305,31 @@ class SeoTest extends TestCase
         $this->assertArrayHasKey('seo_title', config('home.defaults'));
         $this->assertArrayHasKey('seo_description', config('home.defaults'));
     }
+
+    public function test_the_prehydration_shell_is_served_but_held_back_from_script_capable_visitors(): void
+    {
+        // The shell is the only HTML a crawler or a JS-less visitor gets, so
+        // it must always be in the response. It is also plain document text
+        // that React throws away on mount, so a visitor who IS getting the
+        // real page must not be shown it first — that flash was reported from
+        // the live homepage. Both halves are pinned here: deleting the shell
+        // would silently undo the SEO work, and deleting the holdback would
+        // bring the flash back.
+        //
+        // Asserted on the React homepage specifically, which is what the live
+        // store serves; the Blade templates render their own layout and never
+        // had the shell.
+        \App\Models\Setting::put('theme', ['homepage_template' => \App\Support\HomePage::REACT_TEMPLATE]);
+
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="seo-shell"', $html);
+        $this->assertStringContainsString("classList.add('js')", $html);
+        $this->assertMatchesRegularExpression('/\.js #seo-shell\s*\{[^}]*opacity:\s*0/', $html);
+
+        // The holdback must be time-boxed: if the bundle never arrives the
+        // shell has to appear rather than leaving a white screen forever.
+        $this->assertMatchesRegularExpression('/animation:\s*seo-shell-in[^;]*forwards/', $html);
+        $this->assertStringContainsString('@keyframes seo-shell-in', $html);
+    }
 }

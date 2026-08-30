@@ -53,7 +53,6 @@ return [
         'font_body_src' => 'google',
         'font_body_file' => null,
         'homepage_template' => 'storefront',
-        'product_template' => 'showcase',
 
         // Announcement bar
         'announcement_enabled' => true,

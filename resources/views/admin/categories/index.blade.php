@@ -17,15 +17,6 @@
                 </select>
             </div>
             <div><label class="label">Description</label><textarea name="description" rows="2" class="input"></textarea></div>
-            <div>
-                <label class="label">Product page template (override)</label>
-                <select name="product_template" class="input">
-                    <option value="">Use store default</option>
-                    @foreach(config('theme.product_templates') as $key => $tpl)
-                        <option value="{{ $key }}">{{ $tpl['name'] }}</option>
-                    @endforeach
-                </select>
-            </div>
             <div class="grid grid-cols-2 gap-3">
                 <div><label class="label">Position</label><input name="position" type="number" value="0" class="input"></div>
                 <label class="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" name="is_active" value="1" checked> Active</label>
@@ -46,7 +37,6 @@
                         <td class="px-4 py-3">
                             <span class="{{ $cat->parent_id ? 'pl-6 text-ink-700/90' : 'font-medium' }}">
                                 @if($cat->parent_id)<span class="text-ink-300 mr-1">└</span>@endif<a href="{{ route('category.show', $cat->slug) }}" target="_blank" rel="noopener" class="hover:text-gold-700 hover:underline" title="Open {{ $cat->name }} on the storefront">{{ $cat->name }}</a>
-                                @if($cat->product_template)<span class="badge bg-gold-100 text-gold-700 ml-1">{{ config('theme.product_templates.'.$cat->product_template.'.name', $cat->product_template) }}</span>@endif
                             </span>
                         </td>
                         <td class="px-4 py-3 text-ink-700/70">{{ $cat->parent->name ?? '—' }}</td>
