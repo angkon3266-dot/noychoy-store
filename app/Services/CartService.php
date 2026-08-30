@@ -323,15 +323,20 @@ class CartService
             // every percentage further down applies to what is actually paid.
             $gift = $take($this->rawGiftDiscount());
 
-            $offer = $take($this->offerDiscount());
-            $promo = $take($this->rawPromoDiscount());
-            $member = $take($this->rawMemberSignupDiscount());
-            $customer = $take($this->rawCustomerOfferDiscount());
+            // An exclusive coupon does not stack — it competes with the other
+            // discounts, and whichever saves the customer more is the one that
+            // applies. Decided once, here, so every stage below agrees.
+            [$stackOthers, $allowCoupon] = $this->exclusiveVerdict($remaining);
+
+            $offer = $take($stackOthers ? $this->offerDiscount() : 0.0);
+            $promo = $take($stackOthers ? $this->rawPromoDiscount() : 0.0);
+            $member = $take($stackOthers ? $this->rawMemberSignupDiscount() : 0.0);
+            $customer = $take($stackOthers ? $this->rawCustomerOfferDiscount() : 0.0);
 
             // The coupon is validated against — and limited to — what is left,
             // so "20% off" never means 20% of a price already discounted away.
             $baseBeforeCoupon = $remaining;
-            $couponModel = $this->couponFor($baseBeforeCoupon);
+            $couponModel = $allowCoupon ? $this->couponFor($baseBeforeCoupon) : null;
             $coupon = $take($couponModel ? $couponModel->discountFor($baseBeforeCoupon, $this) : 0.0);
 
             // Points are clamped to their own remaining base, in whole steps.
@@ -497,16 +502,125 @@ class CartService
         return $this->cascade()['base_before_coupon'];
     }
 
-    /** The stored coupon, if it is valid against the given remaining base. */
-    protected function couponFor(float $base): ?Coupon
+    /** The coupon code sitting in the session, whatever its validity. */
+    protected function storedCoupon(): ?Coupon
     {
         $code = session($this->couponKey);
         if (! $code) {
             return null;
         }
-        $coupon = $this->memo('coupon_row', fn () => Coupon::where('code', $code)->first());
 
-        return ($coupon && $coupon->isValidFor($base, $this)) ? $coupon : null;
+        return $this->memo('coupon_row', fn () => Coupon::where('code', $code)->first());
+    }
+
+    /** The stored coupon, if it is valid against the given remaining base. */
+    protected function couponFor(float $base): ?Coupon
+    {
+        $coupon = $this->storedCoupon();
+
+        if (! $coupon || ! $coupon->isValidFor($base, $this)) {
+            return null;
+        }
+
+        // A coupon reserved for one person must not discount a logged-in
+        // stranger's cart. Guests are decided at checkout, where the phone is
+        // finally known — see PlaceOrder.
+        if ($coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
+            return null;
+        }
+
+        return $coupon;
+    }
+
+    /**
+     * Whether the other discounts stack, and whether the coupon applies.
+     *
+     * Only an exclusive coupon changes anything here: it is weighed against
+     * everything it would otherwise stack on top of, and the larger saving
+     * wins. The milestone gift and redeemed points are deliberately outside
+     * the comparison — the gift is a physical item already in the cart, and
+     * points are the customer's own currency, not a discount the shop chose
+     * to give.
+     *
+     * @return array{0:bool,1:bool} [stack the other discounts?, allow the coupon?]
+     */
+    protected function exclusiveVerdict(float $base): array
+    {
+        $coupon = $this->storedCoupon();
+
+        if (! $coupon || ! $coupon->is_exclusive) {
+            return [true, true];
+        }
+        if (! $coupon->isValidFor($base, $this)
+            || $coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
+            return [true, false];
+        }
+
+        $others = $this->offerDiscount()
+            + $this->rawPromoDiscount()
+            + $this->rawMemberSignupDiscount()
+            + $this->rawCustomerOfferDiscount();
+
+        // Delivery counts. A coupon that loses is dropped whole — including
+        // its free_shipping — so weighing money against money would discard a
+        // "5% and free delivery" code in favour of a 10% offer that leaves her
+        // paying the courier, and then tell her the offer saved her more.
+        $alone = $coupon->discountFor($base, $this) + $this->couponShippingValue($coupon);
+
+        // Ties go to the existing discounts: they need no code typed, and a
+        // coupon left unspent can still be used on another order.
+        return $alone > round($others, 2) ? [false, true] : [true, false];
+    }
+
+    /**
+     * What this coupon's free delivery is actually worth right now — nothing
+     * if the cart already ships free for some other reason.
+     *
+     * Deliberately does not call shipping()/hasFreeShipping(): both read
+     * coupon(), which is resolved by the cascade this feeds.
+     */
+    protected function couponShippingValue(Coupon $coupon): float
+    {
+        if (! $coupon->free_shipping) {
+            return 0.0;
+        }
+        if ($this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
+            return 0.0;
+        }
+        $threshold = free_shipping_threshold();
+        if ($threshold !== null && $this->subtotal() >= $threshold) {
+            return 0.0;
+        }
+
+        // The zone is unknown in the cart, so value it at the rate most
+        // customers pay.
+        return (float) Setting::get('shipping_outside', config('store.shipping.outside_dhaka'));
+    }
+
+    /**
+     * Why an applied code is showing no discount, in the customer's words.
+     *
+     * An exclusive coupon that loses the comparison is silently dropped from
+     * the totals. Without this the shopper types the code from her SMS, sees
+     * the total not move, and assumes the code is broken.
+     */
+    public function couponNotice(): ?string
+    {
+        $coupon = $this->storedCoupon();
+
+        if (! $coupon || $this->isEmpty()) {
+            return null;
+        }
+
+        if ($coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
+            return 'Code '.$coupon->code.' belongs to a different account.';
+        }
+
+        if ($coupon->is_exclusive && $this->couponDiscount() <= 0 && $this->discount() > 0) {
+            return 'Code '.$coupon->code.' is saved for another order — the offers already on this one save you more.';
+        }
+
+        return null;
     }
 
     public function coupon(): ?Coupon

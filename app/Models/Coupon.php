@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 class Coupon extends Model
 {
     protected $fillable = [
-        'code', 'type', 'value', 'applies_to', 'category_ids', 'product_ids',
+        'code', 'label', 'type', 'value', 'applies_to', 'category_ids', 'product_ids',
         'exclude_sale_items', 'min_order', 'min_qty', 'max_qty', 'usage_limit',
-        'per_customer_limit', 'used_count', 'free_shipping', 'starts_at', 'expires_at', 'is_active',
+        'per_customer_limit', 'reserved_for_phone', 'used_count', 'free_shipping',
+        'is_exclusive', 'starts_at', 'expires_at', 'is_active',
     ];
 
     protected $casts = [
@@ -20,6 +21,7 @@ class Coupon extends Model
         'product_ids' => 'array',
         'exclude_sale_items' => 'boolean',
         'free_shipping' => 'boolean',
+        'is_exclusive' => 'boolean',
         'min_qty' => 'integer',
         'max_qty' => 'integer',
         'per_customer_limit' => 'integer',
@@ -90,6 +92,24 @@ class Coupon extends Model
         return (float) round(max(0, min($discount, $base)), 2);
     }
 
+    /**
+     * True when this code belongs to somebody else.
+     *
+     * A blank phone is NOT a refusal: a guest has not typed one yet when the
+     * code is applied in the cart, and `PlaceOrder` re-checks with the real
+     * number before the order is written. That is the same shape as
+     * `customerLimitReached()`, and it keeps the cart from rejecting a
+     * legitimate owner who simply has not reached the checkout form.
+     */
+    public function reservedForSomeoneElse(?string $phone): bool
+    {
+        if (blank($this->reserved_for_phone) || blank($phone)) {
+            return false;
+        }
+
+        return bd_phone($phone) !== bd_phone($this->reserved_for_phone);
+    }
+
     /** Whether a per-customer usage cap has been reached for the given phone. */
     public function customerLimitReached(?string $phone): bool
     {
@@ -105,10 +125,17 @@ class Coupon extends Model
 
     // ── Scope helpers ───────────────────────────────────────────────────────
 
-    /** Cart line items this coupon applies to (respects scope + sale exclusion). */
+    /**
+     * Cart line items this coupon applies to (respects scope + sale exclusion).
+     *
+     * `discountableItems()`, not `items()`: a gift-ladder unit the customer is
+     * not paying for must not earn a percentage, and must not count toward
+     * `min_qty` either. Offer and CustomerOffer already price this way — this
+     * was the last place free units were still billable.
+     */
     public function eligibleItems(CartService $cart)
     {
-        return $cart->items()->filter(fn ($item) => $this->itemEligible($item));
+        return $cart->discountableItems()->filter(fn ($item) => $this->itemEligible($item));
     }
 
     public function eligibleSubtotal(CartService $cart): float

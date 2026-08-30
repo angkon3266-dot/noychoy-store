@@ -362,6 +362,13 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                     ))}
 
+                    {summary.coupon_notice && (
+                        <div className="mt-3 rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
+                            <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
+                            <span>{summary.coupon_notice}</span>
+                        </div>
+                    )}
+
                     {loyalty && <Points loyalty={loyalty} />}
 
                     {registerPct && (

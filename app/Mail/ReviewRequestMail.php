@@ -12,8 +12,15 @@ class ReviewRequestMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /** @param  string  $reviewLink  signed URL to the guest-safe review page */
-    public function __construct(public Order $order, public string $reviewLink) {}
+    /**
+     * @param  string  $reviewLink  signed URL to the guest-safe review page
+     * @param  string  $offerLine  the thank-you discount sentence, or '' when
+     *                             the offer is off. The same promise has to
+     *                             appear in both channels — a buyer who reads
+     *                             the email and never the SMS must still be
+     *                             told about the code that was created for her.
+     */
+    public function __construct(public Order $order, public string $reviewLink, public string $offerLine = '') {}
 
     public function build()
     {
@@ -28,6 +35,7 @@ class ReviewRequestMail extends Mailable
             ->subject($subject)
             ->view('emails.review-request', [
                 'reviewLink' => $this->reviewLink,
+                'offerLine' => $this->offerLine,
                 'intro' => trim((string) Setting::get('review_request_email_body', ''))
                     ?: 'Your order has arrived. Tell other shoppers what you think — it takes about 30 seconds.',
             ]);

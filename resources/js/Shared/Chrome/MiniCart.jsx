@@ -11,7 +11,7 @@ import { trapTab } from '../focusTrap';
 export default function MiniCart() {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
-    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, freeShipping, remove, cartTrigger } = useCart();
+    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, remove, cartTrigger } = useCart();
     const panelRef = useRef(null);
 
     useEffect(() => {
@@ -92,6 +92,12 @@ export default function MiniCart() {
                         {hints.map((h) => (
                             <div key={h} className="rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{h}</div>
                         ))}
+                        {couponNotice && (
+                            <div className="rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
+                                <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
+                                <span>{couponNotice}</span>
+                            </div>
+                        )}
                         <Link href={urls.cart || '/cart'} onClick={() => setDrawer(false)} className="btn-outline w-full block text-center">View cart</Link>
                         <SmartLink href={urls.checkout || '/checkout'} onClick={() => setDrawer(false)} className="btn-primary w-full block text-center">Checkout</SmartLink>
                     </div>

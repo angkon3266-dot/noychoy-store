@@ -9,6 +9,9 @@
             <p style="text-align:center;margin:28px 0;">
                 <a href="{{ $reviewLink }}" style="background:#9a6c2e;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:15px;display:inline-block;">Rate your order</a>
             </p>
+            @if(filled($offerLine ?? ''))
+                <p style="font-size:15px;line-height:1.6;margin:16px 0;padding:14px 16px;background:#faf5ea;border:1px solid #e8dcc2;border-radius:8px;">{{ $offerLine }}</p>
+            @endif
             <p style="font-size:13px;line-height:1.6;color:#666;margin:16px 0;">Order {{ $order->order_number }}. Your rating helps the next shopper decide.</p>
             <p style="font-size:12px;color:#999;word-break:break-all;">Or paste this link into your browser:<br>{{ $reviewLink }}</p>
         </div>

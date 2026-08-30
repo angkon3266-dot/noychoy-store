@@ -15,6 +15,7 @@ export function CartProvider({ children }) {
     const [discountLines, setDiscountLines] = useState([]);
     const [hints, setHints] = useState([]);
     const [gift, setGift] = useState(null);
+    const [couponNotice, setCouponNotice] = useState(null);
     const [freeShipping, setFreeShipping] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [toast, setToast] = useState(null);
@@ -37,6 +38,7 @@ export function CartProvider({ children }) {
         setDiscountLines(data.discount_lines || []);
         setHints(data.hints || []);
         setGift(data.gift || null);
+        setCouponNotice(data.coupon_notice || null);
         setFreeShipping(!!data.free_shipping);
     }, []);
 
@@ -117,7 +119,7 @@ export function CartProvider({ children }) {
 
     return (
         <CartContext.Provider value={{
-            count, items, subtotalText, discountLines, hints, gift, freeShipping,
+            count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping,
             drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, remove, refresh,
         }}>
             {children}

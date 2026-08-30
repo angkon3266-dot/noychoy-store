@@ -155,10 +155,16 @@ class SmsService
         return filled($value) ? $value : config("sms.templates.{$key}");
     }
 
-    /** Send a configured template for an order, replacing {placeholders}. */
-    public function sendTemplate(string $templateKey, Order $order, array $extra = []): bool
+    /**
+     * Send a configured template for an order, replacing {placeholders}.
+     *
+     * $template overrides the stored/config wording for this one send — used
+     * where the caller has to guarantee a placeholder exists even if the owner
+     * has rewritten the template without it.
+     */
+    public function sendTemplate(string $templateKey, Order $order, array $extra = [], ?string $template = null): bool
     {
-        $template = $this->template($templateKey);
+        $template ??= $this->template($templateKey);
         if (! $template) {
             return false;
         }

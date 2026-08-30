@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\ReviewRequestMail;
 use App\Models\Order;
+use App\Services\ReviewThankYouOffer;
 use App\Services\SmsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,7 +35,7 @@ class SendReviewRequest implements ShouldQueue
 
     public function __construct(public Order $order) {}
 
-    public function handle(SmsService $sms): void
+    public function handle(SmsService $sms, ReviewThankYouOffer $offers): void
     {
         $order = $this->order->fresh('items') ?? $this->order;
 
@@ -43,13 +44,47 @@ class SendReviewRequest implements ShouldQueue
         // reach almost nobody.
         $link = URL::signedRoute('order.review', ['orderNumber' => $order->order_number]);
 
+        // Minted before the send, because the code has to be inside the
+        // message. Deriving it from the order number keeps a retry from
+        // issuing her a second one.
+        //
+        // Wrapped like every other step: the order is stamped as asked BEFORE
+        // this job runs, and the un-stamp net below sits after the sends — so
+        // a throw here would exit past it and exclude her from every future
+        // run, costing the review request itself over a discount that is only
+        // a bonus.
+        $offerLine = '';
+
+        try {
+            if ($coupon = $offers->forOrder($order)) {
+                $offerLine = $offers->smsLine($coupon);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $smsOk = false;
         $mailOk = false;
 
         try {
+            $template = $sms->template('review_request');
+
+            // The owner can rewrite this template in Admin → Integrations. If
+            // she has, and her wording predates the thank-you offer, the code
+            // would silently never reach anyone — so append the placeholder
+            // rather than quietly dropping a discount we already created.
+            if ($template && $offerLine !== '' && ! str_contains($template, '{offer}')) {
+                $template = rtrim($template).'{offer}';
+            }
+
             // sendTemplate returns false — it does not throw — when the gateway
             // is off, the balance is spent, or the provider rejects the message.
-            $smsOk = (bool) $sms->sendTemplate('review_request', $order, ['{link}' => $link]);
+            $smsOk = (bool) $sms->sendTemplate('review_request', $order, [
+                '{link}' => $link,
+                // Carries its own leading space so the template reads
+                // "{link}{offer}" and loses nothing when there is no offer.
+                '{offer}' => $offerLine === '' ? '' : ' '.$offerLine,
+            ], $template);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -57,7 +92,7 @@ class SendReviewRequest implements ShouldQueue
         // Email is optional at checkout — phone is the required field.
         if (filled($order->customer_email)) {
             try {
-                Mail::to($order->customer_email)->send(new ReviewRequestMail($order, $link));
+                Mail::to($order->customer_email)->send(new ReviewRequestMail($order, $link, $offerLine));
                 $mailOk = true;
             } catch (\Throwable $e) {
                 report($e);

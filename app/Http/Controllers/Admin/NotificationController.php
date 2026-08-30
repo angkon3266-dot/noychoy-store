@@ -17,7 +17,14 @@ class NotificationController extends Controller
             'memberCount' => \App\Models\Customer::whereNotNull('password')->count(),
             'segments' => \App\Models\CustomerSegment::orderBy('name')->get(),
             // Live coupons the admin can attach to a push as a real offer.
+            //
+            // Codes reserved to one buyer are excluded. They are auto-minted
+            // and therefore the newest rows in the table, so they would sit at
+            // the top of this picker: one wrong click would broadcast a
+            // private code to every subscriber, and every one of them would be
+            // turned away at checkout by the reservation.
             'coupons' => \App\Models\Coupon::where('is_active', true)
+                ->whereNull('reserved_for_phone')
                 ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
                 ->orderByDesc('id')->get(),
             'settings' => [
@@ -44,6 +51,10 @@ class NotificationController extends Controller
                 'review_request_per_run' => (int) Setting::get('review_request_per_run', 100),
                 'review_request_email_subject' => Setting::get('review_request_email_subject', ''),
                 'review_request_email_body' => Setting::get('review_request_email_body', ''),
+                // The thank-you discount that rides along with the request.
+                'review_offer_enabled' => (bool) Setting::get('review_offer_enabled', false),
+                'review_offer_percent' => (float) Setting::get('review_offer_percent', 10),
+                'review_offer_days' => (int) Setting::get('review_offer_days', 30),
                 // Abandoned-cart SMS. Off by default — it spends SMS credit.
                 'abandoned_sms_enabled' => (bool) Setting::get('abandoned_sms_enabled', false),
                 'abandoned_sms_delay_minutes' => (int) Setting::get('abandoned_sms_delay_minutes', 60),
@@ -320,6 +331,10 @@ class NotificationController extends Controller
             'review_request_per_run' => ['required', 'integer', 'min:1', 'max:500'],
             'review_request_email_subject' => ['nullable', 'string', 'max:150'],
             'review_request_email_body' => ['nullable', 'string', 'max:400'],
+            // Optional so a form posted without them (or an older one) keeps
+            // whatever is already set rather than failing validation.
+            'review_offer_percent' => ['nullable', 'numeric', 'min:0', 'max:90'],
+            'review_offer_days' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
         Setting::put('review_request_enabled', $request->boolean('review_request_enabled'));
@@ -328,6 +343,9 @@ class NotificationController extends Controller
         Setting::put('review_request_per_run', $data['review_request_per_run']);
         Setting::put('review_request_email_subject', $data['review_request_email_subject'] ?? '');
         Setting::put('review_request_email_body', $data['review_request_email_body'] ?? '');
+        Setting::put('review_offer_enabled', $request->boolean('review_offer_enabled'));
+        Setting::put('review_offer_percent', (float) ($data['review_offer_percent'] ?? Setting::get('review_offer_percent', 10)));
+        Setting::put('review_offer_days', (int) ($data['review_offer_days'] ?? Setting::get('review_offer_days', 30)));
 
         return back()->with('success', 'Review-request settings saved.');
     }

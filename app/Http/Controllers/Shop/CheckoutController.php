@@ -79,6 +79,7 @@ class CheckoutController extends Controller
                 'discountPct' => ($discount > 0 && $this->cart->subtotal() > 0)
                     ? round($discount / $this->cart->subtotal() * 100) : 0,
                 'hints' => $this->cart->offerHints(),
+                'coupon_notice' => $this->cart->couponNotice(),
                 // Client-side shipping math inputs (same rules the server applies).
                 'sub' => (float) ($this->cart->subtotal() - $discount),
                 'rawSubtotal' => (float) $this->cart->subtotal(),

@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Exceptions\CheckoutException;
 use App\Jobs\SendOrderPlacedEffects;
 use App\Models\AbandonedCart;
+use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
@@ -59,6 +60,49 @@ class PlaceOrder
                 );
             }
 
+            // A code reserved for one buyer is only decided here: almost every
+            // checkout is a guest, so the cart applied it without knowing who
+            // was typing.
+            //
+            // The strength of this is worth being honest about. The phone is
+            // free text and nothing verifies it, so the reservation stops a
+            // code that has been shared or posted somewhere public from being
+            // spent by people who do not know whose it is — it cannot stop
+            // someone the owner hands both the code and her number to. Making
+            // it airtight means an OTP or a login at checkout, which this
+            // cash-on-delivery store deliberately does not have.
+            if ($coupon && $coupon->reservedForSomeoneElse($data['phone'])) {
+                $this->cart->removeCoupon();
+
+                throw new CheckoutException(
+                    'The code '.$coupon->code.' was issued to a different phone number and cannot be '
+                    .'used on this order. Please review your cart before ordering.'
+                );
+            }
+
+            // Re-read the coupon under a row lock before anything is written.
+            // Everything above tested an unlocked snapshot taken when the cart
+            // was priced, so two checkouts racing on a single-use code both
+            // saw used_count = 0 and both spent it. The lock holds until this
+            // transaction commits, so the loser waits and then sees the truth.
+            if ($coupon) {
+                $locked = Coupon::whereKey($coupon->id)->lockForUpdate()->first();
+
+                if (! $locked
+                    || ! $locked->is_active
+                    || ($locked->usage_limit !== null && $locked->used_count >= $locked->usage_limit)
+                    || $locked->customerLimitReached($data['phone'])) {
+                    $this->cart->removeCoupon();
+
+                    throw new CheckoutException(
+                        'The code '.$coupon->code.' has already been used. Please review your cart '
+                        .'before ordering.'
+                    );
+                }
+
+                $coupon = $locked;
+            }
+
             // Totals are read AFTER validation, not before: validateLines() can
             // reprice a line or refresh a stale offer snapshot, and totals taken
             // beforehand would bake in the values it just corrected. It also
@@ -74,7 +118,15 @@ class PlaceOrder
             $pointsDiscount = $this->cart->pointsDiscount();
 
             // Personalized offer applied to this order (marked redeemed below).
+            //
+            // Only when it actually paid out: customerOffer() resolves the best
+            // eligible offer independently of the cascade, so an exclusive
+            // coupon that beat it leaves it resolved but worth nothing. Marking
+            // that redeemed would spend a one-use offer the customer never
+            // received a taka from.
             $customerOffer = $this->cart->customerOffer();
+            $customerOfferPaidOut = $customerOffer
+                && ($this->cart->customerOfferDiscount() > 0 || $this->cart->hasCustomerFreeShipping());
 
             // Member-pricing portion of the discount (for "saved as a member").
             $memberDiscount = $this->cart->memberSignupDiscount();
@@ -154,7 +206,7 @@ class PlaceOrder
 
             // Count this redemption of the customer's personalized offer; stamp
             // redeemed_at when its usage cap (if any) is reached.
-            if ($customerOffer && auth('customer')->check() && (int) $customerOffer->customer_id === (int) $customer->id) {
+            if ($customerOfferPaidOut && auth('customer')->check() && (int) $customerOffer->customer_id === (int) $customer->id) {
                 $customerOffer->increment('redemptions');
                 if (! $customerOffer->hasUsesLeft() && $customerOffer->redeemed_at === null) {
                     $customerOffer->update(['redeemed_at' => now()]);

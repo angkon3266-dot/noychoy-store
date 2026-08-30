@@ -145,7 +145,24 @@
                 </div>
                 <div><label class="label text-xs">Email subject <span class="text-ink-700/40">(blank = default)</span></label><input name="review_request_email_subject" value="{{ $settings['review_request_email_subject'] }}" maxlength="150" class="input py-1.5 text-sm"></div>
                 <div><label class="label text-xs">Email message <span class="text-ink-700/40">(blank = default)</span></label><textarea name="review_request_email_body" rows="2" maxlength="400" class="input py-1.5 text-sm">{{ $settings['review_request_email_body'] }}</textarea></div>
-                <p class="text-xs text-ink-700/50">The SMS wording lives on the <a href="{{ route('admin.system-config.integrations') }}" class="text-gold-700 hover:underline">Integrations</a> page, under SMS templates.</p>
+
+                {{-- The thank-you discount that travels with the request. --}}
+                <div class="border-t border-ink-100 pt-3 mt-1">
+                    <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="review_offer_enabled" value="1" @checked($settings['review_offer_enabled'])> Include a private thank-you discount</label>
+                    <p class="text-xs text-ink-700/60 mt-1">
+                        Creates a one-use code for that buyer alone, locked to the phone the order was placed with,
+                        and puts it in the same SMS. A forwarded code is refused at checkout. It does
+                        <strong>not</strong> stack — if the offers already running save her more, those apply instead
+                        and the code stays unspent for another order.
+                    </p>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <div><label class="label text-xs">Discount %</label><input type="number" step="0.5" name="review_offer_percent" value="{{ rtrim(rtrim(number_format($settings['review_offer_percent'], 2), '0'), '.') }}" min="0" max="90" class="input py-1.5 text-sm" required></div>
+                        <div><label class="label text-xs">Valid for (days)</label><input type="number" name="review_offer_days" value="{{ $settings['review_offer_days'] }}" min="1" max="365" class="input py-1.5 text-sm" required></div>
+                    </div>
+                    <p class="text-xs text-ink-700/50 mt-1">Adds roughly 70 characters to the SMS — check the segment cost note above.</p>
+                </div>
+
+                <p class="text-xs text-ink-700/50">The SMS wording lives on the <a href="{{ route('admin.system-config.integrations') }}" class="text-gold-700 hover:underline">Integrations</a> page, under SMS templates. The <code>{offer}</code> placeholder is where the code lands.</p>
                 <div class="flex gap-2">
                     <button class="btn-outline text-sm">Save review-request settings</button>
                 </div>

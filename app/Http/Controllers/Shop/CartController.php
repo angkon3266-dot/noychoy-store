@@ -92,6 +92,7 @@ class CartController extends Controller
                 'free_shipping_offer' => $cart->hasFreeShippingOffer(),
                 'total_text' => money($cart->subtotal() - $cart->discount()),
                 'hints' => $cart->offerHints(),
+                'coupon_notice' => $cart->couponNotice(),
             ],
             'coupon' => ($c = $cart->coupon()) ? ['code' => $c->code] : null,
             'giftBar' => $cart->giftProgress(),
@@ -190,6 +191,7 @@ class CartController extends Controller
                 ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
             'hints' => $this->cart->offerHints(),
             'gift' => $this->cart->giftProgress(),
+            'coupon_notice' => $this->cart->couponNotice(),
             'free_shipping' => $this->cart->hasFreeShipping(),
             'items' => $this->cart->items()->map(fn ($i) => [
                 'key' => $i['key'],
@@ -361,6 +363,13 @@ class CartController extends Controller
         // accepted here and then silently dropped, discounting nothing.
         if (! $coupon || ! $coupon->isValidFor($this->cart->couponBase(), $this->cart)) {
             return back()->with('error', 'This coupon can’t be applied to your cart (check the items, minimum spend or quantity).');
+        }
+
+        // Reserved codes: refuse a logged-in stranger here rather than letting
+        // the cart show a discount that checkout will take back. A guest is
+        // decided at checkout, once there is a phone number to judge by.
+        if ($coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
+            return back()->with('error', 'This code was issued to a different customer.');
         }
 
         // Per-customer cap (best-effort for logged-in customers; re-checked at checkout).
