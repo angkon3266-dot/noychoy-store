@@ -43,6 +43,19 @@
             ->map(fn ($c) => ['name' => $c->name, 'url' => route('category.show', $c->slug)])
             ->all();
     });
+
+    // The gift collections. They are linked only from the homepage's "shop by
+    // occasion" tiles, which React draws — so to a crawler these four pages had
+    // no inbound links at all, and an unlinked page is one Google has little
+    // reason to rank. They are also the pages carrying the gift intent
+    // ("birthday gift", "anniversary gift") the product pages cannot.
+    $seoCollections = \Illuminate\Support\Facades\Cache::remember('seo.nav.collections', 3600, function () {
+        return \App\Models\Collection::active()
+            ->orderBy('position')
+            ->get(['name', 'slug'])
+            ->map(fn ($c) => ['name' => $c->name, 'url' => route('collection.show', $c->slug)])
+            ->all();
+    });
 @endphp
 <div id="seo-shell" style="max-width:64rem;margin:0 auto;padding:2rem 1.25rem;font-family:var(--font-sans,system-ui,sans-serif);color:var(--color-ink-900,#2a1a00);line-height:1.6">
     <p style="font-size:.95rem;margin:0 0 1.25rem">
@@ -97,6 +110,15 @@
         <h2 style="font-family:var(--font-serif,Georgia,serif);font-size:1.1rem;margin:1.75rem 0 .5rem">Shop by category</h2>
         <ul style="list-style:none;padding:0;margin:0 0 1.5rem;display:flex;flex-wrap:wrap;gap:.35rem 1rem">
             @foreach($seoNav as $item)
+                <li><a href="{{ $item['url'] }}" style="color:inherit">{{ $item['name'] }}</a></li>
+            @endforeach
+        </ul>
+    @endif
+
+    @if($seoCollections)
+        <h2 style="font-family:var(--font-serif,Georgia,serif);font-size:1.1rem;margin:1.75rem 0 .5rem">Shop by occasion</h2>
+        <ul style="list-style:none;padding:0;margin:0 0 1.5rem;display:flex;flex-wrap:wrap;gap:.35rem 1rem">
+            @foreach($seoCollections as $item)
                 <li><a href="{{ $item['url'] }}" style="color:inherit">{{ $item['name'] }}</a></li>
             @endforeach
         </ul>
