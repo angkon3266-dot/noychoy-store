@@ -223,9 +223,25 @@ class TrafficSource
             }
         }
 
-        // Meta's {{campaign.id}} macro resolves to a long numeric id. A human
-        // naming a campaign does not write seventeen digits and nothing else.
-        $campaign = (string) self::str($request->query('utm_campaign'));
+        return self::isPlatformCampaignId((string) self::str($request->query('utm_campaign')));
+    }
+
+    /**
+     * Does this campaign value look like a platform's own id rather than a name
+     * somebody chose?
+     *
+     * Meta's `{{campaign.id}}` macro resolves to a long run of digits. A human
+     * naming a campaign does not write eighteen digits and nothing else, so this
+     * is reliable evidence that the link came out of an ad tool — which is the
+     * only signal available when `utm_medium` was never set.
+     *
+     * Public because `visits:reclassify` applies the same rule to rows recorded
+     * before this existed; if the two ever drifted, the same ad click would sit
+     * under two different channels depending on when it happened.
+     */
+    public static function isPlatformCampaignId(?string $campaign): bool
+    {
+        $campaign = trim((string) $campaign);
 
         return $campaign !== '' && ctype_digit($campaign) && strlen($campaign) >= 12;
     }

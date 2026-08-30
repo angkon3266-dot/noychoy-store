@@ -39,12 +39,13 @@ class ReclassifyVisits extends Command
         }
 
         $visits = $this->reclassifyVisits($dry);
+        $paid = $this->markPaidTraffic($dry);
         $orders = $this->reclassifyOrders($dry);
 
         $this->newLine();
         $this->info($dry
-            ? "Dry run: {$visits} visit(s) and {$orders} order(s) would be re-filed."
-            : "Re-filed {$visits} visit(s) and {$orders} order(s).");
+            ? "Dry run: {$visits} visit(s) would be re-filed, {$paid} marked as paid, {$orders} order(s) re-filed."
+            : "Re-filed {$visits} visit(s), marked {$paid} as paid, re-filed {$orders} order(s).");
 
         if (! $dry && ($visits || $orders)) {
             \Illuminate\Support\Facades\Cache::flush();
@@ -81,6 +82,48 @@ class ReclassifyVisits extends Command
                     ->where(fn ($q) => $q->where('source', 'referral')->orWhereNull('source')->orWhere('source', ''))
                     ->where('referrer_host', $row->referrer_host)
                     ->update(['source' => $channel]);
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Separate the ad clicks from the organic ones.
+     *
+     * A referrer host says which platform, never whether money changed hands —
+     * so the pass above can only ever land on "Facebook". `utm_campaign` was
+     * recorded from the start, and Meta's `{{campaign.id}}` macro resolves to a
+     * long numeric id that no human types as a campaign name. That is the same
+     * inference the live classifier now makes, so applying it here leaves the
+     * history and everything recorded from today agreeing with each other
+     * instead of splitting the same ad across two channels.
+     */
+    protected function markPaidTraffic(bool $dry): int
+    {
+        $total = 0;
+
+        foreach (['facebook' => 'facebook_ads', 'instagram' => 'instagram_ads', 'google' => 'google_ads'] as $organic => $paid) {
+            // Filtered in PHP rather than SQL: SQLite ships no REGEXP, and
+            // TrafficSource owns the rule — duplicating it in a WHERE clause is
+            // how the two would come to disagree.
+            $ids = Visit::query()->where('source', $organic)
+                ->whereNotNull('campaign')->where('campaign', '!=', '')
+                ->distinct()->pluck('campaign')
+                ->filter(fn ($c) => TrafficSource::isPlatformCampaignId($c))
+                ->values();
+
+            if ($ids->isEmpty()) {
+                continue;
+            }
+
+            $count = Visit::where('source', $organic)->whereIn('campaign', $ids)->count();
+
+            $this->line(sprintf('  paid  %-28s %6d  → %s', $organic, $count, TrafficSource::label($paid)));
+            $total += $count;
+
+            if (! $dry) {
+                Visit::where('source', $organic)->whereIn('campaign', $ids)->update(['source' => $paid]);
             }
         }
 
