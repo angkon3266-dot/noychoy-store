@@ -106,26 +106,32 @@ class BackfillGiftSeo extends Command
         'bridal' => [
             'Made for the wedding, the holud, and the anniversaries after.',
             'Bridal jewelry for the day and the years that follow.',
+            'A bridal piece, and an anniversary one after.',
         ],
         'anniversary' => [
             'Made for anniversaries and the milestones worth marking.',
             'A romantic gift for the years you have counted together.',
+            'A romantic anniversary gift.',
         ],
         'birthday+datenight' => [
             'A birthday gift with date-night sparkle.',
             'Birthday present by day, date-night piece by night.',
+            'A birthday gift with a night out in it.',
         ],
         'birthday' => [
             'A birthday gift she will actually wear.',
             'The kind of birthday present that gets worn, not stored.',
+            'A birthday gift worth unwrapping.',
         ],
         'datenight' => [
             'Built to catch the light on a night out.',
             'Quiet by day, unmistakable under low light.',
+            'Made for a night out.',
         ],
         'default' => [
             'A gift for her that needs no occasion.',
             'A thoughtful gift for her, whatever the day.',
+            'A gift for her.',
         ],
     ];
 
@@ -383,18 +389,37 @@ class BackfillGiftSeo extends Command
         $lead = preg_replace('/^discover (our |the )?/i', '', $lead) ?: $lead;
         $lead = Str::ucfirst($lead);
 
-        $occasion = $this->occasionSentence($product, $occasions);
-
         // Budget against what the rendered snippet will be, not the stored
         // string: Meta::productDescription adds roughly 50 characters of price
         // and cash-on-delivery on top of this.
         $tail = 'Price '.config('store.currency_symbol', '৳')
             .number_format((float) $product->price).'. Cash on delivery all over Bangladesh.';
 
-        $room = 158 - mb_strlen($tail) - mb_strlen($occasion) - 1;
-        $lead = $this->trimToFit($lead, max(48, $room));
+        $budget = 158 - mb_strlen($tail);
+        $whole = rtrim(trim($lead), " 	.,;:—-");
+
+        // Spend the room on the product's own sentence first. The occasion
+        // lines come in long and short phrasings, so before cutting a
+        // description in half, try saying the occasion in fewer words — the
+        // sentence the shop wrote about the piece is worth more than ours.
+        foreach ($this->occasionOptions($product, $occasions) as $occasion) {
+            if (mb_strlen($whole) + 2 + mb_strlen($occasion) <= $budget) {
+                return $whole.'. '.$occasion;
+            }
+        }
+
+        $occasion = $this->shortest($this->occasionOptions($product, $occasions));
+        $lead = $this->trimToFit($lead, max(48, $budget - mb_strlen($occasion) - 2));
 
         return trim($lead.'. '.$occasion);
+    }
+
+    /** @param  list<string>  $options */
+    private function shortest(array $options): string
+    {
+        usort($options, fn ($a, $b) => mb_strlen($a) <=> mb_strlen($b));
+
+        return $options[0];
     }
 
     /**
@@ -438,8 +463,14 @@ class BackfillGiftSeo extends Command
         return $cut;
     }
 
-    /** @param  list<string>  $occasions */
-    private function occasionSentence(Product $product, array $occasions): string
+    /**
+     * The occasion phrasings for this product, best first. Rotated by product
+     * id so a catalogue page is not 105 copies of one sentence.
+     *
+     * @param  list<string>  $occasions
+     * @return list<string>
+     */
+    private function occasionOptions(Product $product, array $occasions): array
     {
         $has = fn (string $t) => in_array($t, $occasions, true);
 
@@ -457,8 +488,12 @@ class BackfillGiftSeo extends Command
         };
 
         $options = self::OCCASION_COPY[$key];
+        $start = $product->id % count($options);
 
-        return $options[$product->id % count($options)];
+        return array_merge(
+            array_slice($options, $start),
+            array_slice($options, 0, $start),
+        );
     }
 
     /**
