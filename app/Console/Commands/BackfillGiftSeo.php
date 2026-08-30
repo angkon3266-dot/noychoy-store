@@ -103,6 +103,10 @@ class BackfillGiftSeo extends Command
             'A romantic anniversary piece with enough sparkle for a night out.',
             'Made for anniversaries, dressed for date night.',
         ],
+        'bridal' => [
+            'Made for the wedding, the holud, and the anniversaries after.',
+            'Bridal jewelry for the day and the years that follow.',
+        ],
         'anniversary' => [
             'Made for anniversaries and the milestones worth marking.',
             'A romantic gift for the years you have counted together.',
@@ -413,8 +417,25 @@ class BackfillGiftSeo extends Command
 
         $cut = mb_substr($text, 0, $limit);
         $space = mb_strrpos($cut, ' ');
+        $cut = $clean($space !== false && $space > 20 ? mb_substr($cut, 0, $space) : $cut);
 
-        return $clean($space !== false && $space > 20 ? mb_substr($cut, 0, $space) : $cut);
+        // "Stunning drop earrings for special occasions and." is a whole word
+        // and still an obvious truncation. Walk back off any word that cannot
+        // end a sentence until one can.
+        $dangling = ['and', 'or', 'for', 'with', 'in', 'on', 'to', 'the', 'a',
+            'an', 'of', 'at', 'by', 'from', 'that', 'plus', 'its', 'your'];
+
+        while (($space = mb_strrpos($cut, ' ')) !== false && $space > 20) {
+            $last = mb_strtolower(mb_substr($cut, $space + 1));
+
+            if (! in_array($last, $dangling, true)) {
+                break;
+            }
+
+            $cut = $clean(mb_substr($cut, 0, $space));
+        }
+
+        return $cut;
     }
 
     /** @param  list<string>  $occasions */
@@ -422,7 +443,11 @@ class BackfillGiftSeo extends Command
     {
         $has = fn (string $t) => in_array($t, $occasions, true);
 
+        // A wedding set is not "the years you have counted together" yet.
+        $bridal = $this->matches(mb_strtolower($product->name), self::BRIDAL);
+
         $key = match (true) {
+            $bridal => 'bridal',
             $has('anniversary') && $has('datenight') => 'anniversary+datenight',
             $has('anniversary') => 'anniversary',
             $has('birthday') && $has('datenight') => 'birthday+datenight',
