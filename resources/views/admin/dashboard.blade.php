@@ -316,9 +316,19 @@
             <div class="space-y-2.5 mt-3">
                 @foreach($f['steps'] as $s)
                     <div>
-                        <div class="flex justify-between text-sm">
-                            <span>{{ $s['label'] }}</span>
-                            <span class="font-medium">{{ number_format($s['value']) }} <span class="text-ink-700/40 text-xs">{{ $s['pct'] === null ? '' : $s['pct'].'%' }}</span></span>
+                        <div class="flex justify-between items-baseline text-sm gap-3">
+                            <span class="flex items-baseline gap-2 min-w-0">
+                                <span>{{ $s['label'] }}</span>
+                                {{-- The money each step carried. A count is people;
+                                     a value is money, summed over every event —
+                                     one shopper can carry three items' worth. --}}
+                                @if(($s['money'] ?? null) !== null)
+                                    <span class="text-xs font-medium text-gold-700 whitespace-nowrap">{{ money($s['money']) }}</span>
+                                @elseif(($s['unmeasured'] ?? 0) > 0)
+                                    <span class="text-xs text-ink-700/40 whitespace-nowrap" title="These events were recorded before the funnel started storing values.">value not recorded</span>
+                                @endif
+                            </span>
+                            <span class="font-medium whitespace-nowrap">{{ number_format($s['count']) }} <span class="text-ink-700/40 text-xs">{{ $s['pct'] === null ? '' : $s['pct'].'%' }}</span></span>
                         </div>
                         <div class="h-2 rounded-full bg-ink-100 overflow-hidden mt-1">
                             <div class="h-full bg-gold-500" style="width: {{ min(100, $s['pct'] ?? 0) }}%"></div>
@@ -326,8 +336,21 @@
                     </div>
                 @endforeach
             </div>
-            <p class="text-sm mt-4">Visitor → order conversion:
-                <strong>{{ $f['conversion'] === null ? '—' : $f['conversion'].'%' }}</strong></p>
+
+            <div class="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+                <span>Visitor → order conversion:
+                    <strong>{{ $f['conversion'] === null ? '—' : $f['conversion'].'%' }}</strong></span>
+                <span>Order value: <strong>{{ money($f['revenue'] ?? 0) }}</strong></span>
+                @if(($f['abandoned'] ?? null) > 0)
+                    <span class="text-amber-700">Left at checkout: <strong>{{ money($f['abandoned']) }}</strong></span>
+                @endif
+            </div>
+            @if(($f['unmeasured'] ?? 0) > 0)
+                <p class="text-[11px] text-ink-700/45 mt-1.5">
+                    {{ $f['unmeasured'] }} cart/checkout event{{ $f['unmeasured'] === 1 ? '' : 's' }} in this window predate value
+                    tracking, so the totals above cover only the ones we measured.
+                </p>
+            @endif
         </div>
 
         {{-- Where visitors come from. Each row opens to name the sites and

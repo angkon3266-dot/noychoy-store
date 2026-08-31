@@ -10,9 +10,11 @@ class Visit extends Model
     public const UPDATED_AT = null;
 
     protected $fillable = [
-        'visitor_token', 'event', 'path', 'product_id', 'referrer_host',
+        'visitor_token', 'event', 'path', 'product_id', 'value', 'referrer_host',
         'source', 'campaign', 'medium', 'content', 'ad_id',
     ];
+
+    protected $casts = ['value' => 'decimal:2'];
 
     /** Columns added after the table shipped, keyed by the flag that gates them. */
     public const AD_COLUMNS = ['medium', 'content', 'ad_id'];
@@ -50,7 +52,14 @@ class Visit extends Model
                 $row = array_diff_key($row, array_flip(self::AD_COLUMNS));
             }
 
-            static::create(array_merge($row, $attrs));
+            $row = array_merge($row, $attrs);
+
+            // Same treatment for the money column, which arrived later still.
+            if (! static::valueColumnReady()) {
+                unset($row['value']);
+            }
+
+            static::create($row);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -125,6 +134,8 @@ class Visit extends Model
 
     public const ORDER_AD_READY_KEY = 'orders.source_content_ready';
 
+    public const VALUE_READY_KEY = 'visits.value_ready';
+
     protected static function attributionColumnsReady(): bool
     {
         return static::schemaFlag(self::READY_KEY, 'orders', 'source_channel');
@@ -138,6 +149,11 @@ class Visit extends Model
     protected static function orderAdColumnReady(): bool
     {
         return static::schemaFlag(self::ORDER_AD_READY_KEY, 'orders', 'source_content');
+    }
+
+    protected static function valueColumnReady(): bool
+    {
+        return static::schemaFlag(self::VALUE_READY_KEY, 'visits', 'value');
     }
 
     /**

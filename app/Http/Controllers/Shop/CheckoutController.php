@@ -22,8 +22,12 @@ class CheckoutController extends Controller
         $customer = auth('customer')->user();
         $address = $customer?->defaultAddress;
 
-        // Funnel step for the dashboard's conversion report.
-        \App\Models\Visit::record('checkout_start');
+        // Funnel step for the dashboard's conversion report, carrying what the
+        // cart was worth at this moment — the same figure the Meta
+        // InitiateCheckout below reports, so the two can be reconciled.
+        \App\Models\Visit::record('checkout_start', [
+            'value' => round((float) ($this->cart->subtotal() - $this->cart->discount()), 2),
+        ]);
 
         // InitiateCheckout — server-side (CAPI) + shared event id for the browser
         // Pixel. content_ids match the catalog retailer_id.

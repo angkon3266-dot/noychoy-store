@@ -151,8 +151,15 @@ class CartController extends Controller
 
         $this->cart->add($product, $variant, $data['qty'] ?? 1);
 
-        // Funnel step for the dashboard's conversion report.
-        Visit::record('cart_add', ['product_id' => $product->id]);
+        // Funnel step for the dashboard's conversion report. The line's value
+        // goes with it — a funnel that counts people but not money cannot say
+        // whether an abandoned cart was worth chasing. Variant price wins where
+        // there is one, since that is what the shopper is actually buying.
+        $addedQty = max(1, (int) ($data['qty'] ?? 1));
+        Visit::record('cart_add', [
+            'product_id' => $product->id,
+            'value' => round((float) ($variant->price ?? $product->price) * $addedQty, 2),
+        ]);
 
         // AddToCart — server-side (CAPI) with the SAME event id the browser Pixel
         // used, so Meta collapses the two into one deduplicated event. Sent
@@ -283,6 +290,17 @@ class CartController extends Controller
 
         $this->cart->add($product, $variant, $data['qty'] ?? 1);
 
+        // Buy now puts a piece in the cart exactly like Add to cart does, so it
+        // is the same funnel step. Recording it only in add() meant the
+        // strongest intent on the page was invisible to the dashboard: the
+        // shopper reappeared at "Started checkout" having apparently never
+        // added anything.
+        $buyQty = max(1, (int) ($data['qty'] ?? 1));
+        Visit::record('cart_add', [
+            'product_id' => $product->id,
+            'value' => round((float) ($variant->price ?? $product->price) * $buyQty, 2),
+        ]);
+
         // Buy now is the strongest intent on the page and used to reach Meta as
         // nothing. Deferred past the response like the other storefront events.
         if (filled($data['event_id'] ?? null)) {
@@ -307,12 +325,26 @@ class CartController extends Controller
 
         $products = Product::published()->whereIn('id', $data['product_ids'])->get();
         $added = 0;
+        $bundleValue = 0.0;
+        $firstProductId = null;
         foreach ($products as $product) {
             if ($product->has_variants) {
                 continue; // variant products need explicit option selection
             }
             $this->cart->add($product, null, 1);
+            $bundleValue += (float) $product->price;
+            $firstProductId ??= $product->id;
             $added++;
+        }
+
+        // One funnel event for the bundle, not one per piece: the shopper made a
+        // single decision, and counting it three times would flatter the
+        // add-to-cart step. The value is the whole bundle.
+        if ($added) {
+            Visit::record('cart_add', [
+                'product_id' => $firstProductId,
+                'value' => round($bundleValue, 2),
+            ]);
         }
 
         // "Buy now" sends the shopper straight to checkout with the selected items.

@@ -184,19 +184,89 @@ class DashboardAnalytics
 
             $pct = fn ($v) => $visitors > 0 ? round($v / $visitors * 100, 1) : null;
 
+            // What each step was worth. Note the deliberate mismatch with the
+            // counts above: a count is *people* (distinct visitors), a value is
+            // *money* (summed over every event). One shopper who added three
+            // pieces is one person carrying three items' worth.
+            $money = $this->funnelValue($range);
+            $revenue = round((float) $range->constrain($this->sold())->sum('total'), 2);
+
             return [
                 'visitors' => $visitors,
                 'tracking' => $range->constrain(Visit::query())->exists(),
                 'conversion' => $visitors > 0 ? round($orders / $visitors * 100, 2) : null,
+                'revenue' => $revenue,
+                // How much reached checkout and did not become an order. This is
+                // the recoverable number — what the abandoned-cart chase is for.
+                'abandoned' => $money['checkout_start'] === null
+                    ? null
+                    : round(max(0, $money['checkout_start'] - $revenue), 2),
+                // Events whose money was never recorded, so the panel can say
+                // "of the N we measured" instead of under-reporting silently.
+                'unmeasured' => $money['cart_add_missing'] + $money['checkout_start_missing'],
                 'steps' => [
-                    ['label' => 'Visitors', 'value' => $visitors, 'pct' => $visitors ? 100.0 : null],
-                    ['label' => 'Viewed a product', 'value' => $viewed, 'pct' => $pct($viewed)],
-                    ['label' => 'Added to cart', 'value' => $carted, 'pct' => $pct($carted)],
-                    ['label' => 'Started checkout', 'value' => $checkout, 'pct' => $pct($checkout)],
-                    ['label' => 'Ordered', 'value' => $orders, 'pct' => $pct($orders)],
+                    ['label' => 'Visitors', 'count' => $visitors, 'pct' => $visitors ? 100.0 : null, 'money' => null],
+                    ['label' => 'Viewed a product', 'count' => $viewed, 'pct' => $pct($viewed), 'money' => null],
+                    ['label' => 'Added to cart', 'count' => $carted, 'pct' => $pct($carted), 'money' => $money['cart_add'], 'unmeasured' => $money['cart_add_missing']],
+                    ['label' => 'Started checkout', 'count' => $checkout, 'pct' => $pct($checkout), 'money' => $money['checkout_start'], 'unmeasured' => $money['checkout_start_missing']],
+                    ['label' => 'Ordered', 'count' => $orders, 'pct' => $pct($orders), 'money' => $revenue],
                 ],
             ];
         }, $range->cacheSeconds());
+    }
+
+    /**
+     * What the cart and checkout steps were worth in this window.
+     *
+     * Events recorded before the `value` column existed carry null, and null is
+     * not zero — summing them as zero would report a real ৳4,500 checkout as
+     * nothing. So each step also reports how many of its events went
+     * unmeasured, and the panel says so rather than quietly under-counting. The
+     * caveat disappears on its own as the old rows age out of the window.
+     *
+     * @return array{cart_add:?float, checkout_start:?float, cart_add_missing:int, checkout_start_missing:int}
+     */
+    protected function funnelValue(DateRange $range): array
+    {
+        $blank = [
+            'cart_add' => null, 'checkout_start' => null,
+            'cart_add_missing' => 0, 'checkout_start_missing' => 0,
+        ];
+
+        if (! $this->visitsHaveValueColumn()) {
+            return $blank;
+        }
+
+        $rows = $range->constrain(Visit::whereIn('event', ['cart_add', 'checkout_start']))
+            ->selectRaw('event, SUM(value) as total, SUM(value IS NULL) as unmeasured, COUNT(*) as events')
+            ->groupBy('event')->get()->keyBy('event');
+
+        $out = $blank;
+
+        foreach (['cart_add', 'checkout_start'] as $event) {
+            $row = $rows[$event] ?? null;
+
+            if (! $row) {
+                continue;
+            }
+
+            $measured = (int) $row->events - (int) $row->unmeasured;
+
+            $out[$event] = $measured > 0 ? round((float) $row->total, 2) : null;
+            $out[$event.'_missing'] = (int) $row->unmeasured;
+        }
+
+        return $out;
+    }
+
+    /** Whether the funnel-value column exists yet (see the visits migration). */
+    protected function visitsHaveValueColumn(): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasColumn('visits', 'value');
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /** Most bars the visitors chart will draw before it starts grouping days. */
