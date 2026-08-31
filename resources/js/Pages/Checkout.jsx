@@ -42,6 +42,11 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     // materially different number must re-send. Identical ones do not.
     const leadSent = useRef('');
     const leadBusy = useRef(false);
+    // Totals recomputed by the server once it knows who is checking out: a
+    // coupon assigned to her phone applies the moment she finishes typing it,
+    // rather than appearing out of nowhere on the confirmation screen. Null
+    // until then, so the page starts from the props it was rendered with.
+    const [live, setLive] = useState(null);
     const [code, setCode] = useState('');
     const [couponBusy, setCouponBusy] = useState(false);
 
@@ -99,8 +104,10 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     }, [form.data.address, form.data.area]);
     // The server is the authority on free delivery (threshold, coupon, offer
     // or a per-customer perk) — mirror its verdict rather than re-deriving it.
-    const ship = freeShipping ? 0 : (inside ? summary.shipInside : summary.shipOutside);
-    const total = summary.sub + ship;
+    const view = live ? { ...summary, ...live } : summary;
+    const freeShip = live ? live.freeShipping : freeShipping;
+    const ship = freeShip ? 0 : (inside ? view.shipInside : view.shipOutside);
+    const total = view.sub + ship;
 
     // Capture the lead the moment a valid phone is typed — a COD order the
     // customer abandons is still a phone number the team can follow up.
@@ -121,7 +128,10 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone, name: name || null, email: null }),
         })
-            .then(() => { leadSent.current = key; })
+            .then((res) => {
+                leadSent.current = key;
+                if (res?.summary) setLive(res.summary);
+            })
             .catch(() => {})
             .finally(() => { leadBusy.current = false; });
     };
@@ -217,7 +227,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         {err('area') && <p id="co-area-error" className="text-xs text-danger-600 mt-1">{err('area')}</p>}
                     </div>
 
-                    {freeShipping ? (
+                    {freeShip ? (
                         /* Nothing to choose between when both zones cost ৳0 —
                            the zone still travels with the order, inferred from
                            the address above. */
@@ -236,11 +246,11 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         <div className="flex gap-3" role="radiogroup" aria-label="Delivery zone">
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
                                 <input id="co-is_inside_dhaka" aria-invalid={err('is_inside_dhaka') ? 'true' : undefined} type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '1'); }} className="sr-only" />
-                                Inside Dhaka — ৳{summary.shipInside}
+                                Inside Dhaka — ৳{view.shipInside}
                             </label>
                             <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${!inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
                                 <input type="radio" name="is_inside_dhaka" value="0" checked={!inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '0'); }} className="sr-only" />
-                                Outside Dhaka — ৳{summary.shipOutside}
+                                Outside Dhaka — ৳{view.shipOutside}
                             </label>
                         </div>
                         {/* The radios are sr-only, so the effect scrolls to the
@@ -342,30 +352,30 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     </div>
 
                     <dl className="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
-                        <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{summary.subtotalText}</dd></div>
-                        {summary.discountLines.length ? summary.discountLines.map((line, i) => (
+                        <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{view.subtotalText}</dd></div>
+                        {view.discountLines.length ? view.discountLines.map((line, i) => (
                             <div key={i} className="flex justify-between text-success-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
-                        )) : (summary.discountText && (
-                            <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{summary.discountText}</dd></div>
+                        )) : (view.discountText && (
+                            <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{view.discountText}</dd></div>
                         ))}
                         <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>৳{ship}</dd></div>
                         <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{money(total)}</dd></div>
                     </dl>
 
-                    {summary.discountText && (
+                    {view.discountText && (
                         <div className="mt-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm font-medium">
-                            You're saving {summary.discountText}{summary.discountPct > 0 ? ` (${summary.discountPct}% off)` : ''}
+                            You're saving {view.discountText}{view.discountPct > 0 ? ` (${view.discountPct}% off)` : ''}
                         </div>
                     )}
 
-                    {summary.hints.map((hint, i) => (
+                    {view.hints.map((hint, i) => (
                         <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                     ))}
 
-                    {summary.coupon_notice && (
+                    {view.coupon_notice && (
                         <div className="mt-3 rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
                             <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
-                            <span>{summary.coupon_notice}</span>
+                            <span>{view.coupon_notice}</span>
                         </div>
                     )}
 

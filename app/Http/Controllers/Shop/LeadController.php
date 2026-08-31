@@ -51,6 +51,34 @@ class LeadController extends Controller
             ],
         );
 
-        return response()->json(['ok' => true]);
+        // Now we know who is checking out, so any coupon waiting for this
+        // number can apply itself. This is the only moment a cash-on-delivery
+        // shop learns the shopper's identity — she never logs in.
+        $this->cart->rememberCheckoutPhone($data['phone']);
+
+        return response()->json([
+            'ok' => true,
+            // The totals *after* the assigned coupon, so the checkout can show
+            // the discount the moment she finishes typing rather than springing
+            // it on her at the end.
+            'summary' => $this->summary(),
+        ]);
+    }
+
+    /** The subset of checkout totals a recalculation can change. */
+    protected function summary(): array
+    {
+        $discount = $this->cart->discount();
+
+        return [
+            'discountLines' => collect($this->cart->discountLines())
+                ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
+            'discountText' => $discount > 0 ? money($discount) : null,
+            'discountPct' => ($discount > 0 && $this->cart->subtotal() > 0)
+                ? round($discount / $this->cart->subtotal() * 100) : 0,
+            'coupon_notice' => $this->cart->couponNotice(),
+            'sub' => (float) ($this->cart->subtotal() - $discount),
+            'freeShipping' => $this->cart->hasFreeShipping(),
+        ];
     }
 }

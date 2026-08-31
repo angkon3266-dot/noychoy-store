@@ -7,11 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class Coupon extends Model
 {
+    /** Who an auto-applying coupon is for. */
+    public const AUDIENCES = [
+        'all' => 'Every order',
+        'phones' => 'A list of phone numbers',
+        'rule' => 'Anyone matching a condition',
+    ];
+
     protected $fillable = [
         'code', 'label', 'type', 'value', 'applies_to', 'category_ids', 'product_ids',
         'exclude_sale_items', 'min_order', 'min_qty', 'max_qty', 'usage_limit',
         'per_customer_limit', 'reserved_for_phone', 'used_count', 'free_shipping',
         'is_exclusive', 'starts_at', 'expires_at', 'is_active',
+        'auto_apply', 'audience', 'audience_rules',
     ];
 
     protected $casts = [
@@ -28,7 +36,14 @@ class Coupon extends Model
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'is_active' => 'boolean',
+        'auto_apply' => 'boolean',
+        'audience_rules' => 'array',
     ];
+
+    public function recipients(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CouponRecipient::class);
+    }
 
     /**
      * Validity check. When a cart is supplied, scope/quantity rules are enforced;
@@ -108,6 +123,75 @@ class Coupon extends Model
         }
 
         return bd_phone($phone) !== bd_phone($this->reserved_for_phone);
+    }
+
+    /**
+     * Is this coupon meant for the person checking out with this phone?
+     *
+     * Only asked of coupons that apply themselves. A typed code is governed by
+     * `reserved_for_phone` as before — this is the audience test, which is a
+     * different question from "may this person spend a code they were given".
+     *
+     * A blank phone means we do not know who is shopping yet: `all` still
+     * matches (it is for everybody), the targeted audiences do not, so nothing
+     * personal is shown to a stranger before they identify themselves.
+     */
+    public function audienceIncludes(?string $phone): bool
+    {
+        $phone = filled($phone) ? bd_phone($phone) : null;
+
+        return match ($this->audience ?? 'all') {
+            'phones' => filled($phone) && $this->recipients()->where('phone', $phone)->exists(),
+            'rule' => filled($phone) && $this->ruleMatches($phone),
+            default => true,
+        };
+    }
+
+    /**
+     * A standing condition, evaluated against whatever the shop knows about
+     * this number right now.
+     *
+     * Someone who has never ordered has no customer row at all, which is the
+     * point: "first order" has to match a person who does not exist yet.
+     */
+    protected function ruleMatches(string $phone): bool
+    {
+        $r = (array) ($this->audience_rules ?? []);
+        $customer = Customer::where('phone', $phone)->first();
+
+        $orders = (int) ($customer->total_orders ?? 0);
+        $spent = (float) ($customer->total_spent ?? 0);
+
+        if (! empty($r['first_order_only']) && $orders > 0) {
+            return false;
+        }
+        if (! empty($r['members_only']) && blank($customer?->password)) {
+            return false;
+        }
+        if (isset($r['min_orders']) && $r['min_orders'] !== '' && $orders < (int) $r['min_orders']) {
+            return false;
+        }
+        if (isset($r['min_spend']) && $r['min_spend'] !== '' && $spent < (float) $r['min_spend']) {
+            return false;
+        }
+        if (isset($r['lapsed_days']) && $r['lapsed_days'] !== '') {
+            // "Has not ordered in N days" only means something for someone who
+            // has ordered before — otherwise every new shopper is "lapsed".
+            $last = $customer?->last_order_at;
+            if ($orders < 1 || ($last && $last->gt(now()->subDays((int) $r['lapsed_days'])))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Coupons that apply themselves and are live right now. */
+    public function scopeAutoApplying($q)
+    {
+        return $q->where('auto_apply', true)->where('is_active', true)
+            ->where(fn ($w) => $w->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>=', now()));
     }
 
     /** Whether a per-customer usage cap has been reached for the given phone. */

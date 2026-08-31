@@ -260,6 +260,9 @@ Route::middleware('admin')->group(function () {
     Route::post('coupons', [CouponController::class, 'store'])->name('coupons.store');
     Route::put('coupons/{coupon}', [CouponController::class, 'update'])->name('coupons.update');
     Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('coupons.destroy');
+    // Who an auto-applying coupon is waiting for.
+    Route::post('coupons/{coupon}/recipients', [CouponController::class, 'addRecipients'])->name('coupons.recipients.add');
+    Route::delete('coupons/{coupon}/recipients/{recipient}', [CouponController::class, 'removeRecipient'])->name('coupons.recipients.remove');
 
     // SMS
     Route::get('sms', [SmsController::class, 'index'])->name('sms.index');

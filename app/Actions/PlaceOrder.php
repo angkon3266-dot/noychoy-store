@@ -33,6 +33,14 @@ class PlaceOrder
         // so the order, the customer record and lookups all match.
         $data['phone'] = bd_phone($data['phone']);
 
+        // Price this order as the person who is actually placing it. Assigned
+        // coupons are matched on the phone, and the number submitted here beats
+        // whatever the form captured earlier — she may have corrected it on the
+        // last screen. Everything below reads the cart *after* this, so the
+        // reservation check, the per-phone cap and the row lock all judge the
+        // same coupon the customer was shown.
+        $this->cart->rememberCheckoutPhone($data['phone']);
+
         $insideDhaka = (bool) ($data['is_inside_dhaka'] ?? false);
 
         $order = DB::transaction(function () use ($data, $insideDhaka) {
@@ -85,13 +93,28 @@ class PlaceOrder
             // was priced, so two checkouts racing on a single-use code both
             // saw used_count = 0 and both spent it. The lock holds until this
             // transaction commits, so the loser waits and then sees the truth.
-            if ($coupon) {
+            // Each candidate is locked before it is judged, and an assigned one
+            // that loses the race is dropped so the next-best can be tried —
+            // never spent on the strength of an unlocked read. Bounded, because
+            // a cart with an unbounded supply of failing coupons is a bug, not
+            // a shopper to keep serving.
+            for ($attempt = 0; $coupon && $attempt < 3; $attempt++) {
                 $locked = Coupon::whereKey($coupon->id)->lockForUpdate()->first();
 
-                if (! $locked
+                $spent = ! $locked
                     || ! $locked->is_active
                     || ($locked->usage_limit !== null && $locked->used_count >= $locked->usage_limit)
-                    || $locked->customerLimitReached($data['phone'])) {
+                    || $locked->customerLimitReached($data['phone']);
+
+                if (! $spent) {
+                    $coupon = $locked;
+                    break;
+                }
+
+                // A code she typed herself is worth stopping her for: she chose
+                // it, and the total she agreed to was built on it. One assigned
+                // on her behalf simply falls away.
+                if (! $this->cart->couponIsAutoApplied()) {
                     $this->cart->removeCoupon();
 
                     throw new CheckoutException(
@@ -100,7 +123,8 @@ class PlaceOrder
                     );
                 }
 
-                $coupon = $locked;
+                $this->cart->suppressCoupon($coupon->id);
+                $coupon = $this->cart->coupon();
             }
 
             // Totals are read AFTER validation, not before: validateLines() can

@@ -23,6 +23,14 @@ class CartService
     protected string $pointsKey = 'cart_points';
 
     /**
+     * The phone typed into the checkout form. Not an identity the shopper
+     * proved — it is what she says her number is — but on a
+     * cash-on-delivery store it is the only one an order carries, and it is
+     * what assigned coupons are matched on.
+     */
+    protected string $phoneKey = 'checkout_phone';
+
+    /**
      * Per-request memo. This service is a singleton, so one cart render used to
      * recompute the whole discount cascade a dozen times — `discount()` alone
      * cost 11 queries, six of them the identical member-usage count, because
@@ -43,6 +51,7 @@ class CartService
         $this->offerCache = null;
         $this->resolvedCustomerOffer = null;
         $this->customerOfferResolved = false;
+        app(CouponAutoApply::class)->flush();
     }
 
     public function items(): Collection
@@ -513,23 +522,121 @@ class CartService
         return $this->memo('coupon_row', fn () => Coupon::where('code', $code)->first());
     }
 
-    /** The stored coupon, if it is valid against the given remaining base. */
+    /**
+     * The coupon this order gets: the better of the code she typed and the one
+     * assigned to her, or null.
+     *
+     * Only one coupon ever applies. The owner's rule is that a coupon stacks
+     * with the offers and the member discount — different things — but two
+     * coupons compete, and the customer keeps whichever is worth more.
+     */
     protected function couponFor(float $base): ?Coupon
     {
-        $coupon = $this->storedCoupon();
+        $typed = $this->storedCoupon();
 
-        if (! $coupon || ! $coupon->isValidFor($base, $this)) {
-            return null;
+        if ($typed && (isset($this->suppressedCoupons[$typed->id]) || ! $this->couponUsableHere($typed, $base))) {
+            $typed = null;
         }
 
-        // A coupon reserved for one person must not discount a logged-in
-        // stranger's cart. Guests are decided at checkout, where the phone is
-        // finally known — see PlaceOrder.
-        if ($coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
-            return null;
+        $auto = app(CouponAutoApply::class)->bestFor($this->checkoutPhone(), $this, $base);
+
+        if ($auto && isset($this->suppressedCoupons[$auto->id])) {
+            $auto = null;
         }
 
-        return $coupon;
+        if (! $typed) {
+            return $auto;
+        }
+        if (! $auto || $auto->is($typed)) {
+            return $typed;
+        }
+
+        // Delivery counts on both sides, for the same reason it does in
+        // exclusiveVerdict(): a code worth 5% and free delivery beats a flat
+        // 10% on a small order.
+        $worth = fn (Coupon $c) => $c->discountFor($base, $this) + $this->couponShippingValue($c);
+
+        // Ties go to the code she typed — she went to the trouble, and the
+        // assigned one is still there for her next order.
+        return $worth($auto) > $worth($typed) ? $auto : $typed;
+    }
+
+    /** Is this coupon valid for this cart, and allowed for whoever is shopping? */
+    protected function couponUsableHere(Coupon $coupon, float $base): bool
+    {
+        if (! $coupon->isValidFor($base, $this)) {
+            return false;
+        }
+
+        // A reserved code is judged against the *logged-in* customer only, not
+        // the checkout phone — deliberately, and not an oversight.
+        //
+        // Dropping it here for a guest would be worse than leaving it: she was
+        // shown a discounted total, and a silently smaller discount at the last
+        // step means the rider asks for a number she never agreed to. PlaceOrder
+        // refuses the order outright instead, with an explanation, which is the
+        // behaviour the reserved-code feature was built around.
+        return ! $coupon->reservedForSomeoneElse(auth('customer')->user()?->phone);
+    }
+
+    /**
+     * Who is checking out, as far as the cart knows.
+     *
+     * The phone from the checkout form once it has been entered (captured by
+     * LeadController the moment it is typed), falling back to the logged-in
+     * customer's own. This is the identity everything personal keys on: on a
+     * cash-on-delivery store almost nobody logs in, so a session login is not
+     * an identity the shop can rely on having.
+     */
+    public function checkoutPhone(): ?string
+    {
+        $phone = session($this->phoneKey) ?: auth('customer')->user()?->phone;
+
+        return filled($phone) ? bd_phone((string) $phone) : null;
+    }
+
+    /**
+     * Was the applied coupon assigned rather than typed?
+     *
+     * The two fail differently. A typed code that turns out to be spent has to
+     * bounce the customer — she chose it and the total she agreed to depends on
+     * it. An assigned one she never asked for should simply fall away.
+     */
+    public function couponIsAutoApplied(): bool
+    {
+        $coupon = $this->coupon();
+
+        return $coupon !== null && $coupon->code !== session($this->couponKey);
+    }
+
+    /**
+     * Take a coupon out of the running for the rest of this request.
+     *
+     * Used when the row lock at checkout finds an assigned coupon was spent
+     * between pricing and writing: the order re-prices without it instead of
+     * failing in the customer's face over a discount she never asked for.
+     *
+     * @var array<int,true>
+     */
+    protected array $suppressedCoupons = [];
+
+    public function suppressCoupon(int $couponId): void
+    {
+        $this->suppressedCoupons[$couponId] = true;
+        $this->forgetMemo();
+    }
+
+    /** Remember who is checking out, so assigned coupons can find them. */
+    public function rememberCheckoutPhone(?string $phone): void
+    {
+        if (blank($phone)) {
+            session()->forget($this->phoneKey);
+
+            return;
+        }
+
+        session([$this->phoneKey => bd_phone($phone)]);
+        $this->forgetMemo();
     }
 
     /**
@@ -546,14 +653,13 @@ class CartService
      */
     protected function exclusiveVerdict(float $base): array
     {
-        $coupon = $this->storedCoupon();
+        // The winning coupon, typed or assigned — an auto-applied exclusive
+        // has to be weighed exactly like a typed one, or it would quietly stack
+        // on discounts it was meant to replace.
+        $coupon = $this->couponFor($base);
 
         if (! $coupon || ! $coupon->is_exclusive) {
             return [true, true];
-        }
-        if (! $coupon->isValidFor($base, $this)
-            || $coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
-            return [true, false];
         }
 
         $others = $this->offerDiscount()
@@ -579,6 +685,16 @@ class CartService
      * Deliberately does not call shipping()/hasFreeShipping(): both read
      * coupon(), which is resolved by the cascade this feeds.
      */
+    /**
+     * Public face of couponShippingValue, for the auto-apply resolver: it has
+     * to compare candidates the same way exclusiveVerdict() does, or a coupon
+     * carrying free delivery would be judged on its percentage alone.
+     */
+    public function deliveryValueOf(Coupon $coupon): float
+    {
+        return $this->couponShippingValue($coupon);
+    }
+
     protected function couponShippingValue(Coupon $coupon): float
     {
         if (! $coupon->free_shipping) {
@@ -612,8 +728,15 @@ class CartService
             return null;
         }
 
-        if ($coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
+        if ($coupon->reservedForSomeoneElse($this->checkoutPhone())) {
             return 'Code '.$coupon->code.' belongs to a different account.';
+        }
+
+        // She typed a code but an assigned one is worth more, so the total moved
+        // by an amount her code does not explain. Say which one won.
+        $winner = $this->coupon();
+        if ($winner && ! $winner->is($coupon)) {
+            return 'Code '.$coupon->code.' was not used — the discount already on this order saves you more.';
         }
 
         if ($coupon->is_exclusive && $this->couponDiscount() <= 0 && $this->discount() > 0) {

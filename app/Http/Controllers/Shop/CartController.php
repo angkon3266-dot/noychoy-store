@@ -405,15 +405,17 @@ class CartController extends Controller
             return back()->with('error', 'This coupon can’t be applied to your cart (check the items, minimum spend or quantity).');
         }
 
-        // Reserved codes: refuse a logged-in stranger here rather than letting
-        // the cart show a discount that checkout will take back. A guest is
-        // decided at checkout, once there is a phone number to judge by.
-        if ($coupon->reservedForSomeoneElse(auth('customer')->user()?->phone)) {
+        // Reserved codes: refuse a stranger here rather than letting the cart
+        // show a discount that checkout will take back. The phone comes from
+        // the checkout form when it has been typed, and from the login
+        // otherwise; when neither is known this passes and PlaceOrder decides.
+        $phone = $this->cart->checkoutPhone();
+
+        if ($coupon->reservedForSomeoneElse($phone)) {
             return back()->with('error', 'This code was issued to a different customer.');
         }
 
-        // Per-customer cap (best-effort for logged-in customers; re-checked at checkout).
-        $phone = auth('customer')->user()?->phone;
+        // Per-customer cap (best-effort here; re-checked under a lock at checkout).
         if ($coupon->customerLimitReached($phone)) {
             return back()->with('error', 'You’ve already used this coupon the maximum number of times.');
         }
