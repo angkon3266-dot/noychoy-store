@@ -182,6 +182,50 @@ class SmsBroadcastTest extends TestCase
         (new SendBroadcastSms(['01711111111'], 'Hello'))->handle(app(SmsService::class));
     }
 
+    /**
+     * A "%" in the wording must not reach the gateway through the URL.
+     *
+     * The gateway decodes its query string twice, so a correctly-escaped
+     * "20%25 OFF" arrived as a stray "% O", the parse of the whole query
+     * string collapsed, and the destination went with it — every promotional
+     * broadcast quoting a discount came back "-55 Destination ID Empty" and
+     * not one customer was messaged. The text belongs in the form body, which
+     * is parsed once.
+     */
+    public function test_the_message_travels_in_the_body_not_the_url(): void
+    {
+        $this->enableSms();
+        Http::fake(['*' => Http::response(['Status' => '0', 'Text' => 'ACCEPTD'], 200)]);
+
+        $message = "Meridian \u{c9}clat: up to 20% OFF & free delivery.\n\nShop: meridianeclat.shop";
+
+        app(SmsService::class)->send('01711111111', $message);
+
+        Http::assertSent(function ($request) use ($message) {
+            $this->assertSame('POST', $request->method());
+            $this->assertStringNotContainsString('?', $request->url(),
+                'nothing may ride in the query string — the gateway double-decodes it');
+
+            $this->assertSame($message, $request['messageContent'], 'the wording must arrive verbatim');
+            $this->assertSame('8801711111111', $request['toUser']);
+
+            return true;
+        });
+    }
+
+    public function test_a_discount_broadcast_is_accepted_for_every_recipient(): void
+    {
+        $this->enableSms();
+        Http::fake(['*' => Http::response(['Status' => '0', 'Text' => 'ACCEPTD'], 200)]);
+
+        (new SendBroadcastSms(['01711111111', '01722222222'], 'Enjoy 20% OFF today.'))
+            ->handle(app(SmsService::class));
+
+        $log = SmsLog::sole();
+        $this->assertSame(2, $log->recipients);
+        $this->assertSame('ACCEPTD', $log->status);
+    }
+
     public function test_broadcasting_with_sms_switched_off_says_so_instead_of_queueing(): void
     {
         Queue::fake();

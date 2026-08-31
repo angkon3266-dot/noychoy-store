@@ -10,9 +10,10 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * KhudeBarta (SoftifyBD) SMS HTTP API client.
- * Send: GET {base}/sendtext?apikey=&secretkey=&callerID=&toUser=&messageContent=
- * Success when JSON Status === "0". Credentials & masking (callerID) are read
- * from the admin Settings panel first, falling back to config/.env.
+ * Send: POST {base}/sendtext with apikey, secretkey, callerID, toUser,
+ * messageContent as form fields. Success when JSON Status === "0".
+ * Credentials & masking (callerID) are read from the admin Settings panel
+ * first, falling back to config/.env.
  */
 class SmsService
 {
@@ -80,7 +81,15 @@ class SmsService
             ];
 
             $endpoint = $this->baseUrl().'/sendtext';
-            $response = Http::timeout(config('sms.timeout', 20))->get($endpoint, $params);
+            // POST, not GET. The gateway decodes its query string twice, so a
+            // correctly-escaped "%" in the body ("20%25 OFF") comes back as a
+            // stray "% O", the parse of the whole query string collapses, and
+            // the destination is lost with it — the gateway then rejects the
+            // send as "-55 Destination ID Empty" while blaming the number.
+            // Any "%" killed a broadcast; "&", "+" and "#" are the same hazard.
+            // A form body is parsed once, so the text arrives verbatim. This is
+            // also what KhudeBarta's own WordPress plugin does.
+            $response = Http::timeout(config('sms.timeout', 20))->asForm()->post($endpoint, $params);
 
             $this->lastResponse = $response->json() ?? ['raw' => $response->body()];
             // Surface the endpoint + HTTP code (no secrets) to aid diagnosis.
@@ -142,6 +151,9 @@ class SmsService
             $hint = ' — The sender/caller ID was rejected. For non-masking, set the Caller ID to your approved numeric sender (e.g. 123); for masking, use your approved brand name.';
         } elseif (stripos($desc, 'balance') !== false || stripos($desc, 'insufficient') !== false) {
             $hint = ' — Your KhudeBarta account has insufficient balance.';
+        } elseif (stripos($desc, 'destination') !== false) {
+            $hint = ' — The gateway found no valid destination number in the send. '
+                  . 'Check the number is a real Bangladeshi mobile in 88017XXXXXXXX form.';
         }
 
         return $hint.' — gateway response: '.json_encode($resp);
