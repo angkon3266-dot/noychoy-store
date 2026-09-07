@@ -164,6 +164,50 @@ class AssistantChatTest extends TestCase
         });
     }
 
+    public function test_a_signed_in_member_gets_their_own_orders_without_typing_anything(): void
+    {
+        $this->enable();
+        $customer = \App\Models\Customer::create(['name' => 'Areeba Khan', 'phone' => '01711111122', 'password' => 'secret-pass', 'points' => 250]);
+        $order = Order::create([
+            'order_number' => 'NC-2002', 'customer_id' => $customer->id, 'customer_name' => 'Areeba Khan', 'customer_phone' => '01711111122',
+            'shipping_address' => 'House 9, Dhanmondi', 'subtotal' => 1150, 'shipping_cost' => 80, 'discount' => 0, 'total' => 1230,
+            'payment_method' => 'cod', 'payment_status' => 'unpaid', 'status' => 'processing',
+        ]);
+        $order->items()->create(['product_id' => $this->product('Pearl Drop Earrings', 1150)->id, 'name' => 'Pearl Drop Earrings', 'price' => 1150, 'quantity' => 1, 'subtotal' => 1150]);
+        $this->actingAs($customer, 'customer');
+
+        Http::fake(['api.openai.com/*' => Http::sequence()
+            ->push($this->toolCall('my_orders', []))
+            ->push($this->text('Areeba, your Pearl Drop Earrings are being prepared.'))]);
+
+        $this->ask('where is my order?')->assertOk()->assertJsonPath('ok', true);
+
+        Http::assertSent(function (ClientRequest $request) {
+            $system = $request['messages'][0]['content'];
+            $tools = collect($request['tools'])->pluck('function.name')->all();
+
+            return str_contains($system, 'Signed in as Areeba') && str_contains($system, 'Points balance: 250')
+                && $tools === ['my_orders', 'search_products', 'order_status'];
+        });
+        Http::assertSent(function (ClientRequest $request) {
+            $tool = collect($request['messages'])->firstWhere('role', 'tool');
+
+            return $tool && str_contains($tool['content'], 'NC-2002') && str_contains($tool['content'], 'Pearl Drop Earrings × 1')
+                && str_contains($tool['content'], '"status":"Processing"');
+        });
+    }
+
+    public function test_a_guest_is_never_offered_the_member_tool(): void
+    {
+        $this->enable();
+        Http::fake(['api.openai.com/*' => Http::response($this->text('Sure — what is the order number and phone?'))]);
+
+        $this->ask('where is my order?')->assertOk();
+
+        Http::assertSent(fn (ClientRequest $request) => collect($request['tools'])->pluck('function.name')->all() === ['search_products', 'order_status']
+            && ! str_contains($request['messages'][0]['content'], 'CUSTOMER (signed in'));
+    }
+
     public function test_oversized_conversations_are_refused_before_any_call(): void
     {
         $this->enable();

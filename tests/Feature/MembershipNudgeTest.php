@@ -67,6 +67,23 @@ class MembershipNudgeTest extends TestCase
         );
     }
 
+    public function test_a_member_sees_the_taka_that_would_reach_the_next_tier(): void
+    {
+        Setting::put('loyalty_earn_per_taka', 0.1);
+        $customer = Customer::create(['name' => 'Member', 'phone' => '01722222255', 'password' => 'secret-pass', 'points' => 400, 'points_lifetime' => 1000]);
+        $this->actingAs($customer, 'customer');
+
+        // Silver at 1,000 lifetime points; Gold opens at 3,000 → 2,000 points
+        // → ৳20,000 of orders at 0.1 point per taka.
+        $this->get('/shop')->assertInertia(fn (Assert $page) => $page
+            ->where('chrome.membership.tier.current', 'Silver')
+            ->where('chrome.membership.tier.next', 'Gold')
+            ->where('chrome.membership.tier.toNextPoints', 2000)
+            ->where('chrome.membership.tier.toNextSpendText', money(20000))
+            ->where('chrome.membership.tier.points', 400),
+        );
+    }
+
     public function test_a_member_is_not_nudged_to_join(): void
     {
         Setting::put('register_offer_percent', 3);

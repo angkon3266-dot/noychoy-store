@@ -43,6 +43,21 @@ tools and is instructed to use only them:
 |---|---|---|
 | `search_products(query, max_price?)` | `Product::published()->search()` + `ProductSearch::orderByRelevance()` (+ `didYouMean()` fallback) | up to 6 pieces: name, price, member price, availability, URL. The same rows come back to the widget as product cards. |
 | `order_status(order_number, phone)` | the exact query the public Track page uses: order number **and** canonical phone must both match | status label, last three updates, courier status + tracking code, track URL. No items, address, totals or staff notes. |
+| `my_orders()` — **signed-in customers only** | `$customer->orders()` (ownership proven by the session) | the last five orders with items, totals, status, courier tracking and account links. Guests never see this tool. |
+
+A signed-in customer also gets a `CUSTOMER` block in the prompt: first name,
+points balance and tier, the pieces they loved (as gift-idea hints), and their
+last three order numbers — so "where is my order?" needs no number typed.
+
+## Voice
+
+The assistant is named **{store name} AI Assistant** and briefed to be warm and
+a little playful, "like the best attendant in a jewelry shop". It mirrors the
+customer's register: Bangla script → Bangla, Banglish ("delivery charge
+koto?") → Banglish ("Beshi na sir, matro ৳85 …"), English → English. The
+worked examples in the prompt are generated from the live delivery numbers,
+so the style guide can never contradict the facts. The owner can add house
+rules in **Extra instructions**.
 
 ## The endpoint
 

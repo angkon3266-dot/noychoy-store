@@ -217,8 +217,28 @@ class HandleInertiaRequests extends Middleware
             $facts[] = $signup.' welcome points';
         }
 
+        // A member's distance to the next tier, in points AND in the taka of
+        // orders that would earn them — the number a shopper can act on.
+        $tier = null;
+        if ($customer && $loyaltyOn) {
+            $loyalty = app(\App\Services\LoyaltyService::class);
+            $t = $loyalty->tierFor($customer);
+            $rate = $loyalty->earnPerTaka();
+            $tier = [
+                'current' => $t['current']['label'],
+                'next' => $t['next']['label'] ?? null,
+                'nextPerk' => $t['next']['perk'] ?? null,
+                'toNextPoints' => $t['to_next'],
+                'toNextSpendText' => $t['next'] && $rate > 0 ? money(ceil($t['to_next'] / $rate)) : null,
+                'progress' => $t['progress'],
+                'points' => (int) $customer->points,
+                'pointsValueText' => money($loyalty->pointsValue((int) $customer->points)),
+            ];
+        }
+
         return [
             'isMember' => (bool) $customer,
+            'tier' => $tier,
             'pct' => $pctText,
             'pointsPer1000' => $per1000 > 0 ? $per1000 : null,
             'signupPoints' => $signup > 0 ? $signup : null,

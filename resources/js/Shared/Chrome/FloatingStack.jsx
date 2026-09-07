@@ -33,9 +33,19 @@ export default function FloatingStack() {
     const ai = chrome.ai;
     const anyRight = ai || offers || floats.call || floats.messenger || floats.whatsapp;
 
-    // The money page gets no floating chrome over its form; product pages
-    // lift the stacks above the sticky buy bar so nothing covers "Buy now".
-    if (component === 'Checkout') return null;
+    // The money page gets no floating chrome over its form — except the
+    // assistant, which is exactly where a "delivery charge koto?" happens.
+    // Product pages lift the stacks above the sticky buy bar so nothing
+    // covers "Buy now".
+    if (component === 'Checkout') {
+        return ai ? (
+            <div className="fixed right-5 z-50 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:bottom-5">
+                <button type="button" onClick={() => window.NoyChat?.toggle()} className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-ink-900 text-white shadow-lg hover:scale-105 transition p-3.5" title={ai.label} aria-label={ai.label} data-noy-chat-launcher>
+                    <Icon name="chat" className="w-full h-full" strokeWidth={1.8} />
+                </button>
+            </div>
+        ) : null;
+    }
     const onProduct = component === 'Product';
     const leftPos = onProduct ? 'bottom-[calc(9.5rem_+_env(safe-area-inset-bottom))] md:bottom-5' : 'bottom-20 md:bottom-5';
     const rightPos = onProduct ? 'bottom-[calc(9.5rem_+_env(safe-area-inset-bottom))] md:bottom-5' : 'bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:bottom-5';

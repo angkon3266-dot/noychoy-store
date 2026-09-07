@@ -161,6 +161,13 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                         </p>
                     )}
 
+                    {props.chrome?.membership?.tier?.next && (
+                        <p className="mt-2 text-xs text-ink-800">
+                            <Icon name="medal" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
+                            <strong>{props.chrome.membership.tier.current} member</strong> · {props.chrome.membership.tier.toNextSpendText ? `${props.chrome.membership.tier.toNextSpendText} more in orders` : `${props.chrome.membership.tier.toNextPoints} points`} to reach <strong>{props.chrome.membership.tier.next}</strong>{props.chrome.membership.tier.nextPerk ? ` (${props.chrome.membership.tier.nextPerk})` : ''}.
+                        </p>
+                    )}
+
                     {memberNudge && (
                         <a href={urls.register} className="mt-3 block rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100">
                             <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />

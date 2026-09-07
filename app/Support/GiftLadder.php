@@ -327,12 +327,13 @@ class GiftLadder
     }
 
     /**
-     * Everything the ladder bar needs, or null when the ladder is off or the
-     * cart is empty.
+     * Everything the ladder bar and the always-on strip need, or null when
+     * the ladder is off. An empty cart still gets a payload (rung 0, first
+     * rung next) so the strip can invite the first piece.
      */
     public function progressFor(CartService $cart): ?array
     {
-        if (! $this->enabled() || $cart->isEmpty()) {
+        if (! $this->enabled()) {
             return null;
         }
 

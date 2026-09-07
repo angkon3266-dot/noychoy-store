@@ -98,6 +98,12 @@ export default function MiniCart() {
                                 <span>{couponNotice}</span>
                             </div>
                         )}
+                        {props.customer && props.chrome?.membership?.tier?.next && (
+                            <p className="text-xs text-ink-800 rounded-md bg-gold-50 border border-gold-100 px-3 py-2">
+                                <Icon name="medal" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
+                                {props.chrome.membership.tier.toNextSpendText ? `${props.chrome.membership.tier.toNextSpendText} more in orders` : `${props.chrome.membership.tier.toNextPoints} points`} to reach <strong>{props.chrome.membership.tier.next}</strong>.
+                            </p>
+                        )}
                         {!props.customer && props.chrome?.membership?.pct && (
                             <a href={urls.register} onClick={() => setDrawer(false)} className="block rounded-md border border-gold-200 bg-gold-50 px-3 py-2 text-xs text-ink-800 hover:bg-gold-100">
                                 <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
