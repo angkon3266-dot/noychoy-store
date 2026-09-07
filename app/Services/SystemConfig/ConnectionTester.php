@@ -28,6 +28,7 @@ class ConnectionTester
                 'meta' => $this->meta($values),
                 'sms' => $this->sms($values),
                 'google' => $this->google($values),
+                'openai' => $this->openai($values),
                 default => ['ok' => false, 'message' => 'No test available for this section.'],
             };
         } catch (\Throwable $e) {
@@ -173,6 +174,28 @@ class ConnectionTester
         $ok = $res->successful() && ! in_array(strtoupper($status), ['ERROR', '-1'], true);
 
         return ['ok' => $ok, 'message' => $ok ? '✅ SMS gateway reachable.' : '❌ SMS gateway rejected the credentials (check IP whitelist).'];
+    }
+
+    private function openai(array $v): array
+    {
+        $key = $this->val($v, 'ai.api_key', 'services.openai.key');
+        $model = $this->val($v, 'ai.model', 'services.openai.model') ?: 'gpt-5-mini';
+
+        if (! $key) {
+            return ['ok' => false, 'message' => '❌ An OpenAI API key is required.'];
+        }
+
+        // The cheapest possible round trip that still proves the key AND the
+        // model name: the model endpoint costs nothing and 404s on a typo.
+        $res = Http::withToken($key)->acceptJson()->timeout(15)
+            ->get('https://api.openai.com/v1/models/'.rawurlencode($model));
+
+        return match (true) {
+            $res->successful() => ['ok' => true, 'message' => "✅ OpenAI key accepted and model \"{$model}\" is available."],
+            $res->status() === 401 => ['ok' => false, 'message' => '❌ OpenAI rejected the API key.'],
+            $res->status() === 404 => ['ok' => false, 'message' => "❌ The key works, but there is no model called \"{$model}\"."],
+            default => ['ok' => false, 'message' => '❌ '.$res->json('error.message', 'OpenAI returned '.$res->status().'.')],
+        };
     }
 
     private function google(array $v): array

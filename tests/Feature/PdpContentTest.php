@@ -62,7 +62,7 @@ class PdpContentTest extends TestCase
         $this->get(route('product.show', $this->product()))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('giftBadge.url', $collection->url())
-                ->where('giftBadge.label', 'Shop More, Unlock Up to '.money(1500.0).' in Gifts'),
+                ->where('giftBadge.label', 'Add more, save more — '.money(50).' off from the 1st piece, free delivery from the 3rd piece, a free gift at the 9th piece'),
             );
     }
 

@@ -450,9 +450,10 @@ class ReviewThankYouOfferTest extends TestCase
         $collection = \App\Models\Collection::create(['name' => 'Gifts', 'type' => 'manual', 'is_active' => true]);
         $collection->products()->attach($gift->id, ['position' => 0]);
 
+        // A single free-gift rung at 2 paid pieces: 3 studs + 1 bangle is 4
+        // units, so the cheapest stud goes free and 3 units are paid.
         Setting::put('gift_ladder_enabled', true);
-        Setting::put('gift_ladder_buy', 2);
-        Setting::put('gift_ladder_max', 3);
+        Setting::put('gift_ladder_tiers', [['threshold' => 2, 'type' => 'free_gift', 'value' => null]]);
         Setting::put('gift_ladder_gifts_collection_id', $collection->id);
         app()->forgetInstance(\App\Support\GiftLadder::class);
 

@@ -23,7 +23,10 @@ export default function Login({ old }) {
                 </div>
                 <button className="btn-primary w-full" disabled={form.processing}>{form.processing ? 'Logging in…' : 'Log in'}</button>
             </form>
-            <p className="text-center text-sm mt-4">No account? <Link href={urls.register} className="text-gold-700 hover:underline">Register</Link></p>
+            <p className="text-center text-sm mt-4">
+                New here? <Link href={urls.register} className="text-gold-700 hover:underline">Join free</Link>
+                {props.chrome?.membership?.pct ? <span className="text-ink-700/70"> — members save {props.chrome.membership.pct}% on every piece</span> : null}
+            </p>
         </AuthCard>
     );
 }

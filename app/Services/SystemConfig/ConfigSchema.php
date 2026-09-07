@@ -156,6 +156,19 @@ class ConfigSchema
                 ],
             ],
 
+            'ai' => [
+                'label' => 'AI assistant',
+                'description' => 'The storefront chat assistant (OpenAI). It answers in Bangla or English, searches the live catalogue, and checks an order when the customer gives the order number and phone. The key is stored encrypted.',
+                'test' => 'openai',
+                'fields' => [
+                    ['key' => 'ai.enabled', 'label' => 'Show the assistant on the storefront', 'type' => 'bool', 'config' => 'services.openai.assistant_enabled', 'env' => 'AI_ASSISTANT_ENABLED'],
+                    ['key' => 'ai.api_key', 'label' => 'OpenAI API key', 'type' => 'password', 'config' => 'services.openai.key', 'env' => 'OPENAI_API_KEY', 'sensitive' => true],
+                    ['key' => 'ai.model', 'label' => 'Model', 'type' => 'text', 'config' => 'services.openai.model', 'env' => 'OPENAI_MODEL'],
+                    ['key' => 'ai.greeting', 'label' => 'Greeting (first bubble)', 'type' => 'text', 'config' => 'services.openai.greeting', 'env' => null],
+                    ['key' => 'ai.instructions', 'label' => 'Extra instructions for the assistant', 'type' => 'textarea', 'config' => 'services.openai.instructions', 'env' => null],
+                ],
+            ],
+
             'security' => [
                 'label' => 'Security',
                 'description' => 'Session and password policy.',

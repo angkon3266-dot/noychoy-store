@@ -101,8 +101,13 @@ export default function Header() {
                                 </a>
                             </>
                         ) : (
-                            <a href={urls.login} className="p-2 hover:text-gold-700" title="Login" aria-label="Sign in">
+                            /* The bare icon said nothing about what joining is worth;
+                               the label puts the member price on every page. */
+                            <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className="p-2 hover:text-gold-700 inline-flex items-center gap-1.5" title={props.chrome?.membership?.pct ? `Join free — members save ${props.chrome.membership.pct}%` : 'Login'} aria-label="Sign in or join">
                                 <Icon name="user" />
+                                {props.chrome?.membership?.pct && (
+                                    <span className="hidden md:inline text-xs font-semibold text-gold-700 whitespace-nowrap">Join · {props.chrome.membership.pct}% off</span>
+                                )}
                             </a>
                         )}
                         <button type="button" onClick={openDrawer} className="relative p-2 hover:text-gold-700" title="Cart" aria-label={count > 0 ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'}>

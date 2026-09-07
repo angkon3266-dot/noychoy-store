@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import Carousel from '../Shared/Carousel';
@@ -23,6 +24,7 @@ export default function Home(props) {
             <FeatureStrip strip={featureStrip} />
             <Occasions section={occasions} />
             <Deals deals={deals} />
+            <MembershipBand />
             <CardSection section={bestSellers} eyebrow="Most loved" viewAll="/best-sellers" viewAllLabel="View all best sellers" />
             <GiftFinder finder={giftFinder} />
             <CategoryLookbook section={categoriesSection} />
@@ -37,6 +39,51 @@ export default function Home(props) {
 }
 
 Home.layout = (page) => <Layout>{page}</Layout>;
+
+/* ── Membership: what joining is worth ──────────────────────────────────── */
+// The store had member prices, points and tiers, and the home page never
+// mentioned any of it. Facts come from chrome.membership, the same source
+// the header, cart and checkout nudges read, so the numbers cannot drift.
+function MembershipBand() {
+    const { props } = usePage();
+    const m = props.chrome?.membership;
+    const urls = props.chrome?.urls || {};
+    if (!m || (!m.pct && !m.pointsPer1000)) return null;
+
+    const topTier = m.tiers?.length ? m.tiers[m.tiers.length - 1] : null;
+    const tiles = [
+        m.pct ? { icon: 'tag', title: `${m.pct}% member price`, text: 'On every piece, applied at checkout' } : null,
+        m.pointsPer1000 ? { icon: 'medal', title: `${m.pointsPer1000} points per ৳1,000`, text: 'Redeem points for taka off your next order' } : null,
+        topTier ? { icon: 'diamond', title: `${m.tiers.map((t) => t.label).join(' · ')}`, text: topTier.perk } : null,
+    ].filter(Boolean);
+
+    return (
+        <section className="mx-auto max-w-7xl px-4 py-10 lg:py-12" aria-labelledby="membership-heading">
+            <div className="rounded-2xl bg-ink-900 text-white px-6 py-8 lg:px-10 lg:py-10 flex flex-col lg:flex-row lg:items-center gap-8">
+                <div className="flex-1 min-w-0">
+                    <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3">{m.isMember ? 'Your membership' : 'Free membership'}</p>
+                    <h2 id="membership-heading" className="font-display text-2xl sm:text-3xl leading-snug">
+                        {m.pct ? <>Members save <span className="text-gold-300">{m.pct}%</span> on every piece</> : 'Members earn on every piece'}
+                    </h2>
+                    <p className="mt-3 text-white/70 text-sm max-w-xl">{m.text || m.pitch}</p>
+                    <SmartLink href={m.isMember ? urls.account : urls.register} className="inline-flex items-center gap-2 mt-6 rounded-full bg-gold-500 text-ink-900 px-6 py-3 text-sm font-semibold hover:bg-gold-400 transition">
+                        {m.isMember ? 'See my points' : 'Join free'}
+                        <Icon name="diamond" className="w-4 h-4" />
+                    </SmartLink>
+                </div>
+                <ul className="grid sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 gap-3 lg:w-[50%]">
+                    {tiles.map((t) => (
+                        <li key={t.title} className="rounded-xl bg-white/5 border border-white/10 p-4">
+                            <Icon name={t.icon} className="w-5 h-5 text-gold-300" />
+                            <p className="mt-2 font-semibold text-sm">{t.title}</p>
+                            <p className="mt-1 text-xs text-white/60">{t.text}</p>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </section>
+    );
+}
 
 /* ── Shared section heading ─────────────────────────────────────────────── */
 function Heading({ eyebrow, title, subtitle = null, action = null, center = false }) {

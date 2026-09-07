@@ -216,6 +216,10 @@ class CheckoutController extends Controller
                 ])->values(),
                 'subtotalText' => money($order->subtotal),
                 'discountText' => $order->discount > 0 ? money($order->discount) : null,
+                // What the reward ladder unlocked on this order, in one line.
+                'ladderText' => ($order->ladder_tier ?? 0) > 0
+                    ? 'Reward ladder · rung '.$order->ladder_tier.': '.collect($order->ladder_rewards ?? [])->pluck('label')->implode(' · ')
+                    : null,
                 'shippingText' => money($order->shipping_cost),
                 'totalText' => money($order->total),
                 'isGift' => (bool) $order->is_gift,

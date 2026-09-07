@@ -8,7 +8,7 @@ import Icon from '../Shared/Icons';
 
 // Full cart page. Mutations go through Inertia (server redirects back to /cart
 // with fresh props + flash), with optimistic qty display while in flight.
-export default function Cart({ items, summary, coupon, giftBar, freeBar, offersPanel, memberUsage, suggestions, cartUrls }) {
+export default function Cart({ items, summary, coupon, giftBar, freeBar, offersPanel, memberUsage, memberNudge, suggestions, cartUrls }) {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
     const [code, setCode] = useState('');
@@ -159,6 +159,14 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                                 ? <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount: <strong>{memberUsage.remaining} of {memberUsage.max}</strong> uses left{memberUsage.resets ? ` (resets ${memberUsage.resets})` : ''}.</>
                                 : <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount used up for now{memberUsage.resets ? ` — resets ${memberUsage.resets}` : ''}.</>}
                         </p>
+                    )}
+
+                    {memberNudge && (
+                        <a href={urls.register} className="mt-3 block rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100">
+                            <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
+                            Join free and save <strong>{memberNudge.saving_text}</strong> on this order — members get {memberNudge.pct}% off every piece
+                            {props.chrome?.membership?.pointsPer1000 ? ` and earn ${props.chrome.membership.pointsPer1000} points per ৳1,000` : ''}.
+                        </a>
                     )}
 
                     {summary.hints.map((hint, i) => (

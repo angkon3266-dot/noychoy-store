@@ -12,52 +12,79 @@
     For single-use codes use <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a>.
 </p>
 
-{{-- Milestone gift ladder — every Nth piece free, from a picked collection --}}
-<div class="card p-5 mb-6 max-w-3xl">
-    <h2 class="font-semibold mb-1">Milestone gift ladder</h2>
+{{-- Reward ladder — every paid piece climbs a rung, each rung's reward stays unlocked --}}
+<div class="card p-5 mb-6 max-w-3xl" x-data="{ tiers: @js($giftLadder['tiers']) }">
+    <h2 class="font-semibold mb-1">Reward ladder</h2>
     <p class="text-xs text-ink-700/60 mb-3">
-        “Every 3rd piece free”: for every <strong>{{ $giftLadder['buy'] }}</strong> qualifying pieces a customer buys,
-        they may add <strong>1 piece from the gifts collection</strong> to the cart free — up to the per-order cap.
-        The storefront shows a milestone progress bar in the cart and an “unlock gifts” badge on every product page.
-        Build the two collections under <a href="{{ route('admin.collections.index') }}" class="text-gold-700 underline">Products → Collections</a> first
-        (a manual collection is a hand-picked list), then choose them here.
+        “Add more, save more”: every <strong>paid piece</strong> in the cart climbs one rung, and each rung's reward
+        <strong>stays unlocked</strong> as the cart grows — at 4 pieces the customer holds rungs 1 to 4 at once.
+        Four reward types: <strong>৳ off</strong>, <strong>% off</strong> what is paid, <strong>free delivery</strong>, and a
+        <strong>free gift</strong> (the customer adds a piece from the gifts collection and the cheapest one goes to ৳0;
+        a gift never counts as a paid piece). The storefront shows the ladder in the cart and mini-cart and a one-line
+        promise on every product page. Build the gifts collection under
+        <a href="{{ route('admin.collections.index') }}" class="text-gold-700 underline">Products → Collections</a> first.
     </p>
-    <form action="{{ route('admin.offers.gift-ladder') }}" method="POST" class="flex flex-wrap items-end gap-3">
+    <form action="{{ route('admin.offers.gift-ladder') }}" method="POST">
         @csrf
-        <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm w-full sm:w-auto">
-            <input type="checkbox" name="enabled" value="1" @checked($giftLadder['enabled'])>
-            Ladder is live
-        </label>
-        <div>
-            <label class="label">Buy (pieces per gift)</label>
-            <input name="buy" type="number" min="1" max="20" value="{{ $giftLadder['buy'] }}" class="input w-28">
+        <div class="flex flex-wrap items-end gap-3 mb-3">
+            <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
+                <input type="checkbox" name="enabled" value="1" @checked($giftLadder['enabled'])>
+                Ladder is live
+            </label>
+            <div class="flex-1 min-w-[220px]">
+                <label class="label">Gifts collection (for the free-gift rung)</label>
+                <select name="gifts_collection_id" class="input">
+                    <option value="">— none —</option>
+                    @foreach($giftLadder['collections'] as $c)
+                        <option value="{{ $c['id'] }}" @selected($giftLadder['gifts_collection_id'] === $c['id'])>{{ $c['name'] }} ({{ $c['count'] }})</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
-        <div>
-            <label class="label">Max gifts / order</label>
-            <input name="max" type="number" min="1" max="10" value="{{ $giftLadder['max'] }}" class="input w-28">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-ink-700/60">
+                        <th class="py-1 pr-2 font-medium">Rung</th>
+                        <th class="py-1 pr-2 font-medium">Unlocks at (paid pieces)</th>
+                        <th class="py-1 pr-2 font-medium">Reward</th>
+                        <th class="py-1 pr-2 font-medium">Value</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(t, i) in tiers" :key="i">
+                        <tr>
+                            <td class="py-1 pr-2 text-ink-700/60" x-text="i + 1"></td>
+                            <td class="py-1 pr-2"><input type="number" min="1" max="50" :name="`tiers[${i}][threshold]`" x-model.number="t.threshold" class="input py-1.5 w-24"></td>
+                            <td class="py-1 pr-2">
+                                <select :name="`tiers[${i}][type]`" x-model="t.type" class="input py-1.5 w-40">
+                                    <option value="flat">৳ off</option>
+                                    <option value="percent">% off what is paid</option>
+                                    <option value="free_delivery">Free delivery</option>
+                                    <option value="free_gift">Free gift</option>
+                                </select>
+                            </td>
+                            <td class="py-1 pr-2">
+                                <input type="number" step="0.01" min="0" :name="`tiers[${i}][value]`" x-model="t.value" class="input py-1.5 w-28"
+                                       x-show="t.type === 'flat' || t.type === 'percent'" :placeholder="t.type === 'percent' ? '%' : '৳'">
+                                <span x-show="t.type !== 'flat' && t.type !== 'percent'" class="text-xs text-ink-700/50">—</span>
+                            </td>
+                            <td class="py-1"><button type="button" @click="tiers.splice(i, 1)" class="text-red-500 px-1 text-lg leading-none" aria-label="Remove rung">&times;</button></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
         </div>
-        <div class="flex-1 min-w-[190px]">
-            <label class="label">Gifts collection (pieces customers take free) *</label>
-            <select name="gifts_collection_id" class="input">
-                <option value="">— choose —</option>
-                @foreach($giftLadder['collections'] as $c)
-                    <option value="{{ $c['id'] }}" @selected($giftLadder['gifts_collection_id'] === $c['id'])>{{ $c['name'] }} ({{ $c['count'] }})</option>
-                @endforeach
-            </select>
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+            <button type="button" x-show="tiers.length < {{ (int) $giftLadder['max_tiers'] }}"
+                    @click="tiers.push({ threshold: (tiers.length ? Math.max(...tiers.map(t => +t.threshold || 0)) : 0) + 1, type: 'flat', value: '' })"
+                    class="btn-outline text-xs py-1">+ Add rung</button>
+            <button class="btn-primary">Save ladder</button>
         </div>
-        <div class="flex-1 min-w-[190px]">
-            <label class="label">Qualifying collection (blank = every product counts)</label>
-            <select name="qualifying_collection_id" class="input">
-                <option value="">All products</option>
-                @foreach($giftLadder['collections'] as $c)
-                    <option value="{{ $c['id'] }}" @selected($giftLadder['qualifying_collection_id'] === $c['id'])>{{ $c['name'] }} ({{ $c['count'] }})</option>
-                @endforeach
-            </select>
-        </div>
-        <button class="btn-primary">Save gift ladder</button>
-        <p class="w-full text-xs text-ink-700/50 mt-1">
-            The cheapest eligible gift pieces go free first, the discount is re-checked server-side at checkout,
-            and gift stock is deducted like any other sale. This gives product away — check your margins before switching it on.
+        <p class="text-xs text-ink-700/50 mt-2">
+            Rewards are re-checked server-side at checkout, and a free gift's stock is deducted like any other sale.
+            A rung at 1 piece applies to <strong>every</strong> order — check your margins before switching it on.
         </p>
     </form>
 </div>

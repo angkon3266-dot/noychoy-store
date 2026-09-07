@@ -34,6 +34,7 @@ class Order extends Model
         'order_number', 'customer_id', 'customer_name', 'customer_phone', 'customer_email',
         'shipping_address', 'area', 'city', 'district', 'is_inside_dhaka',
         'subtotal', 'shipping_cost', 'discount', 'adjustments', 'member_discount', 'total',
+        'ladder_tier', 'ladder_rewards',
         'points_redeemed', 'points_discount', 'points_earned',
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'card_message', 'is_gift', 'source', 'stock_restored',
@@ -52,6 +53,8 @@ class Order extends Model
         'points_redeemed' => 'integer',
         'points_discount' => 'decimal:2',
         'member_discount' => 'decimal:2',
+        'ladder_tier' => 'integer',
+        'ladder_rewards' => 'array',
         'points_earned' => 'integer',
         'review_request_sent_at' => 'datetime',
     ];

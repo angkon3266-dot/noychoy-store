@@ -44,4 +44,17 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    // The storefront chat assistant. Every value here is overridden at runtime
+    // by Admin → System Config → AI assistant (the key is stored encrypted
+    // there), so .env is only the fallback for a fresh install.
+    'openai' => [
+        'assistant_enabled' => env('AI_ASSISTANT_ENABLED', false),
+        'key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-5-mini'),
+        'reasoning_effort' => env('OPENAI_REASONING_EFFORT', 'low'),
+        'greeting' => null,
+        'instructions' => null,
+        'timeout' => 45,
+    ],
+
 ];

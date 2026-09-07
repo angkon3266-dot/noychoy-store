@@ -50,7 +50,7 @@ Route::get('/robots.txt', function () {
     // slamming the door and hoping.
     $disallow = [
         '/admin', '/cart', '/checkout', '/account', '/login', '/register',
-        '/logout', '/password/', '/order/', '/track', '/search/suggest',
+        '/logout', '/password/', '/order/', '/track', '/search/suggest', '/assistant/',
     ];
 
     $body = $private
@@ -196,6 +196,11 @@ Route::get('/terms-and-conditions', [PageController::class, 'legal'])->defaults(
 Route::get('/refund-policy', [PageController::class, 'legal'])->defaults('page', 'refund')->name('page.refund');
 Route::get('/contact', [PageController::class, 'contact'])->name('page.contact');
 Route::post('/contact', [PageController::class, 'submitContact'])->name('page.contact.submit');
+
+// The chat assistant. Every call costs money at OpenAI, so it sits behind the
+// `assistant` limiter (per IP, minute / hour / day) as well as the session.
+Route::post('/assistant/chat', [\App\Http\Controllers\Shop\AssistantController::class, 'chat'])
+    ->middleware('throttle:assistant')->name('assistant.chat');
 
 // Catalog (slug routes last so they don't shadow the above)
 Route::get('/collection/{collection:slug}', [CatalogController::class, 'collection'])->name('collection.show');

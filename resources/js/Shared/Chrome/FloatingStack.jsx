@@ -30,7 +30,8 @@ export default function FloatingStack() {
         return () => document.removeEventListener('click', close);
     }, []);
 
-    const anyRight = offers || floats.call || floats.messenger || floats.whatsapp;
+    const ai = chrome.ai;
+    const anyRight = ai || offers || floats.call || floats.messenger || floats.whatsapp;
 
     // The money page gets no floating chrome over its form; product pages
     // lift the stacks above the sticky buy bar so nothing covers "Buy now".
@@ -61,6 +62,20 @@ export default function FloatingStack() {
             {/* Right: offers, call, messenger, WhatsApp */}
             {anyRight && (
                 <div className={`fixed right-5 z-50 flex flex-col items-center gap-3 ${rightPos}`}>
+                    {ai && (
+                        /* The panel is the ai-chat partial (outside #app, so it
+                           survives Inertia navigations); this only opens it. */
+                        <button
+                            type="button"
+                            onClick={() => window.NoyChat?.toggle()}
+                            className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-ink-900 text-white shadow-lg hover:scale-105 transition p-3.5"
+                            title={ai.label}
+                            aria-label={ai.label}
+                            data-noy-chat-launcher
+                        >
+                            <Icon name="chat" className="w-full h-full" strokeWidth={1.8} />
+                        </button>
+                    )}
                     {offers && (
                         <div className="relative" ref={offersRef}>
                             <button

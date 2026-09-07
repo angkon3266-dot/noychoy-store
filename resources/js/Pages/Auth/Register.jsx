@@ -13,8 +13,24 @@ export default function Register({ old }) {
         form.post(urls.register, { ...keepOnErrors, onError: () => form.reset('password', 'password_confirmation') });
     };
 
+    const m = props.chrome?.membership;
+    const perks = [
+        m?.pct ? `${m.pct}% off every piece, applied automatically at checkout` : null,
+        m?.pointsPer1000 ? `${m.pointsPer1000} points for every ৳1,000 you spend — redeem them for taka off` : null,
+        m?.signupPoints ? `${m.signupPoints} welcome points the moment you join` : null,
+        m?.tiers?.length ? `${m.tiers.map((t) => t.label).join(' → ')} tiers: ${m.tiers[m.tiers.length - 1].perk}` : null,
+        'Order history, saved addresses and one-tap reorders',
+    ].filter(Boolean);
+
     return (
-        <AuthCard title="Create your account">
+        <AuthCard title="Create your account" subtitle={m?.text || m?.pitch || undefined}>
+            {/* The form used to be five bare inputs — it never said what
+                joining was worth. */}
+            <ul className="mt-5 space-y-1.5 text-sm text-ink-800">
+                {perks.map((p) => (
+                    <li key={p} className="flex items-start gap-2"><span className="mt-[3px] grid h-4 w-4 shrink-0 place-items-center rounded-full bg-gold-100 text-gold-700 text-[10px]">✓</span><span>{p}</span></li>
+                ))}
+            </ul>
             <form onSubmit={submit} className="mt-6 space-y-4">
                 <div><label className="label">Full name<input {...f('name')} className="input" required autoComplete="name" /></label></div>
                 <div><label className="label">Mobile number *<input {...f('phone')} placeholder="01XXXXXXXXX" className="input" required autoComplete="tel" inputMode="numeric" /></label></div>

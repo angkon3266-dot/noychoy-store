@@ -328,8 +328,10 @@ class CartService
                 return $amount;
             };
 
-            // Milestone gifts go first: they zero specific units outright, so
-            // every percentage further down applies to what is actually paid.
+            // The reward ladder goes first: its free gift zeroes a specific unit
+            // outright, so every percentage further down applies to what is
+            // actually paid, and its own money rungs are the store's standing
+            // promise rather than a discount that competes with a coupon.
             $gift = $take($this->rawGiftDiscount());
 
             // An exclusive coupon does not stack — it competes with the other
@@ -368,9 +370,9 @@ class CartService
         });
     }
 
-    // ── Milestone gift ladder (Admin → Offers) ─────────────────────────────
+    // ── Reward ladder (Admin → Offers) ─────────────────────────────────────
 
-    /** Value of the free gift units the cart has unlocked. */
+    /** Taka the unlocked ladder rungs take off: flat + percent + the free gift. */
     protected function rawGiftDiscount(): float
     {
         return $this->memo('gift_raw', fn () => app(\App\Support\GiftLadder::class)->discountFor($this));
@@ -382,10 +384,32 @@ class CartService
         return $this->cascade()['gift'];
     }
 
-    /** Milestone progress payload for the cart page / mini-cart, or null. */
+    /** Ladder progress payload for the cart page / mini-cart, or null. */
     public function giftProgress(): ?array
     {
         return $this->memo('gift_progress', fn () => app(\App\Support\GiftLadder::class)->progressFor($this));
+    }
+
+    /** Whether an unlocked ladder rung makes delivery free. */
+    public function ladderFreeDelivery(): bool
+    {
+        return $this->memo('ladder_free_delivery', fn () => app(\App\Support\GiftLadder::class)->freeDeliveryFor($this));
+    }
+
+    /** The ladder rung the cart has climbed to (0 = none / ladder off). */
+    public function ladderTier(): int
+    {
+        return $this->memo('ladder_tier', fn () => app(\App\Support\GiftLadder::class)->tierFor($this));
+    }
+
+    /**
+     * Every unlocked ladder reward, for the order record.
+     *
+     * @return array<int, array{n:int, label:string, amount:float}>
+     */
+    public function ladderRewards(): array
+    {
+        return $this->memo('ladder_rewards', fn () => app(\App\Support\GiftLadder::class)->rewardsFor($this));
     }
 
     /**
@@ -700,7 +724,7 @@ class CartService
         if (! $coupon->free_shipping) {
             return 0.0;
         }
-        if ($this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
+        if ($this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping() || $this->ladderFreeDelivery()) {
             return 0.0;
         }
         $threshold = free_shipping_threshold();
@@ -818,9 +842,9 @@ class CartService
         $offers = $this->matchingOffers()->where('type', 'order_percent');
         $cascade = $this->cascade();
 
-        // One line per free gift piece, so the customer sees exactly which
-        // item the ladder zeroed. Gift goes first in the cascade, so these
-        // amounts are never scaled.
+        // One line per unlocked ladder rung that is worth money, so the
+        // customer sees where each saving came from. The ladder goes first in
+        // the cascade, so these amounts are never scaled.
         if ($cascade['gift'] > 0) {
             foreach (app(\App\Support\GiftLadder::class)->discountLinesFor($this) as $line) {
                 $lines[] = $line;
@@ -870,10 +894,10 @@ class CartService
         return $lines;
     }
 
-    /** True if free delivery is currently unlocked (coupon, offer or threshold). */
+    /** True if free delivery is currently unlocked (coupon, offer, ladder rung or threshold). */
     public function hasFreeShipping(): bool
     {
-        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
+        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping() || $this->ladderFreeDelivery()) {
             return true;
         }
         $threshold = free_shipping_threshold();
@@ -914,8 +938,9 @@ class CartService
 
     public function shipping(bool $insideDhaka = false): float
     {
-        // Free shipping from a coupon or an active offer overrides everything.
-        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping()) {
+        // Free shipping from a coupon, an active offer or an unlocked ladder
+        // rung overrides everything.
+        if ($this->coupon()?->free_shipping || $this->hasFreeShippingOffer() || $this->hasCustomerFreeShipping() || $this->ladderFreeDelivery()) {
             return 0.0;
         }
         $threshold = free_shipping_threshold();

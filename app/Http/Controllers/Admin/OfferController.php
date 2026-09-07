@@ -26,10 +26,11 @@ class OfferController extends Controller
             'memberOverrides' => $this->memberOverrideRows(),
             'giftLadder' => [
                 'enabled' => (bool) \App\Models\Setting::get('gift_ladder_enabled', false),
-                'buy' => (int) \App\Models\Setting::get('gift_ladder_buy', 2),
-                'max' => (int) \App\Models\Setting::get('gift_ladder_max', 3),
+                // The rungs as the solver will read them; the form edits these rows.
+                'tiers' => collect(\App\Support\GiftLadder::normalise(\App\Models\Setting::get('gift_ladder_tiers', config('ladder.tiers', []))))
+                    ->map(fn ($t) => ['threshold' => $t['threshold'], 'type' => $t['type'], 'value' => $t['value']])->values(),
+                'max_tiers' => \App\Support\GiftLadder::MAX_TIERS,
                 'gifts_collection_id' => (int) \App\Models\Setting::get('gift_ladder_gifts_collection_id', 0),
-                'qualifying_collection_id' => (int) \App\Models\Setting::get('gift_ladder_qualifying_collection_id', 0),
                 'collections' => \App\Models\Collection::active()->orderBy('name')->get(['id', 'name'])
                     ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'count' => app(\App\Services\CollectionService::class)->count($c)])
                     ->values(),
@@ -67,38 +68,46 @@ class OfferController extends Controller
     }
 
     /**
-     * Save the milestone gift ladder ("every Nth piece free").
+     * Save the reward ladder ("add more, save more").
      *
-     * Enabling requires a gifts collection with at least one product in it —
-     * a ladder pointing at an empty collection would advertise gifts nobody
-     * can claim.
+     * Switching it on needs at least one usable rung, and a free-gift rung
+     * needs a gifts collection with at least one product in it — a ladder
+     * advertising a gift nobody can claim is worse than no ladder.
      */
     public function saveGiftLadder(Request $request)
     {
         $data = $request->validate([
-            'buy' => ['required', 'integer', 'min:1', 'max:20'],
-            'max' => ['required', 'integer', 'min:1', 'max:10'],
+            'tiers' => ['nullable', 'array', 'max:'.\App\Support\GiftLadder::MAX_TIERS],
+            'tiers.*.threshold' => ['required', 'integer', 'min:1', 'max:50'],
+            'tiers.*.type' => ['required', 'in:'.implode(',', \App\Support\GiftLadder::TYPES)],
+            'tiers.*.value' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'gifts_collection_id' => ['nullable', 'integer', 'exists:collections,id'],
-            'qualifying_collection_id' => ['nullable', 'integer', 'exists:collections,id'],
         ]);
 
         $enabled = $request->boolean('enabled');
         $giftsId = (int) ($data['gifts_collection_id'] ?? 0);
+        $tiers = \App\Support\GiftLadder::normalise($data['tiers'] ?? []);
+        $hasGiftRung = collect($tiers)->contains(fn ($t) => $t['type'] === 'free_gift');
 
-        if ($enabled) {
+        if ($enabled && $tiers === []) {
+            return back()->with('error', 'Add at least one rung (a ৳ or % value is required for money rewards) before switching the ladder on.');
+        }
+
+        if ($enabled && $hasGiftRung) {
             $gifts = $giftsId ? \App\Models\Collection::active()->find($giftsId) : null;
             if (! $gifts || app(\App\Services\CollectionService::class)->count($gifts) < 1) {
-                return back()->with('error', 'Pick a gifts collection with at least one product before switching the ladder on.');
+                return back()->with('error', 'The free-gift rung needs a gifts collection with at least one product. Pick one, or remove that rung.');
             }
         }
 
         \App\Models\Setting::put('gift_ladder_enabled', $enabled);
-        \App\Models\Setting::put('gift_ladder_buy', (int) $data['buy']);
-        \App\Models\Setting::put('gift_ladder_max', (int) $data['max']);
+        \App\Models\Setting::put('gift_ladder_tiers', array_map(
+            fn ($t) => ['threshold' => $t['threshold'], 'type' => $t['type'], 'value' => $t['value']],
+            $tiers,
+        ));
         \App\Models\Setting::put('gift_ladder_gifts_collection_id', $giftsId);
-        \App\Models\Setting::put('gift_ladder_qualifying_collection_id', (int) ($data['qualifying_collection_id'] ?? 0));
 
-        return back()->with('success', $enabled ? 'Gift ladder saved and live.' : 'Gift ladder saved (off).');
+        return back()->with('success', $enabled ? 'Reward ladder saved and live.' : 'Reward ladder saved (off).');
     }
 
     /** Save the "register for an extra discount" offer (shown to guests, applied to members). */

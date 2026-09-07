@@ -183,7 +183,15 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                 <div className="lg:col-span-2 card p-6 space-y-4">
                     <h2 className="font-display text-xl font-semibold">Delivery details</h2>
                     {!isMember && (
-                        <p className="text-sm text-ink-700/70">Have an account? <a href={chromeUrls.login} className="text-gold-700 hover:underline">Log in</a> for faster checkout.</p>
+                        /* "Faster checkout" undersold it: the real offer is the
+                           member price and the points, so say so here where the
+                           decision is made. */
+                        <p className="text-sm text-ink-700/70">
+                            Have an account? <a href={chromeUrls.login} className="text-gold-700 hover:underline">Log in</a>
+                            {props.chrome?.membership?.pct
+                                ? <> — members get <strong className="text-ink-800">{props.chrome.membership.pct}% off</strong>{props.chrome.membership.pointsPer1000 ? ` and ${props.chrome.membership.pointsPer1000} points per ৳1,000` : ''} on this order.</>
+                                : ' for faster checkout.'}
+                        </p>
                     )}
 
                     <div className="grid sm:grid-cols-2 gap-4">

@@ -53,7 +53,14 @@ export default function Footer() {
                         <li><a href={urls.privacy} className="hover:text-white">Privacy Policy</a></li>
                         <li><a href={urls.terms} className="hover:text-white">Terms &amp; Conditions</a></li>
                         <li><a href={urls.refund} className="hover:text-white">Refund Policy</a></li>
-                        {!props.customer && <li><a href={urls.login} className="hover:text-white">Login / Register</a></li>}
+                        {!props.customer && (
+                            <li>
+                                <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className="hover:text-white">
+                                    {props.chrome?.membership?.pct ? `Join free — members save ${props.chrome.membership.pct}%` : 'Login / Register'}
+                                </a>
+                            </li>
+                        )}
+                        {props.customer && <li><a href={urls.account} className="hover:text-white">My account &amp; points</a></li>}
                     </ul>
                 </div>
                 <div>

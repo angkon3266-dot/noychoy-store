@@ -50,6 +50,7 @@ export default function Confirmation({ order, purchase, trackUrl, estimate, stor
                     <dl className="border-t border-ink-100 pt-3 space-y-1 text-sm">
                         <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{order.subtotalText}</dd></div>
                         {order.discountText && <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{order.discountText}</dd></div>}
+                        {order.ladderText && <div className="text-xs text-success-700/80 text-left">{order.ladderText}</div>}
                         <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>{order.shippingText}</dd></div>
                         <div className="flex justify-between font-semibold text-base"><dt>Total (COD)</dt><dd>{order.totalText}</dd></div>
                     </dl>

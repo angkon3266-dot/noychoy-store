@@ -125,5 +125,6 @@
     <script data-page="app" type="application/json">{!! json_encode($page, JSON_HEX_TAG) !!}</script>
     <div id="app">@include('partials.seo-body')</div>
     @include('partials.web-push')
+    @include('partials.ai-chat')
 </body>
 </html>

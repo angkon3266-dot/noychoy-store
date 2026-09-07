@@ -98,6 +98,14 @@ export default function MiniCart() {
                                 <span>{couponNotice}</span>
                             </div>
                         )}
+                        {!props.customer && props.chrome?.membership?.pct && (
+                            <a href={urls.register} onClick={() => setDrawer(false)} className="block rounded-md border border-gold-200 bg-gold-50 px-3 py-2 text-xs text-ink-800 hover:bg-gold-100">
+                                <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
+                                Members save <strong>{props.chrome.membership.pct}%</strong> on this cart
+                                {props.chrome.membership.pointsPer1000 ? ` and earn ${props.chrome.membership.pointsPer1000} points per ৳1,000` : ''}
+                                {' — '}<span className="underline font-medium">join free</span>
+                            </a>
+                        )}
                         <Link href={urls.cart || '/cart'} onClick={() => setDrawer(false)} className="btn-outline w-full block text-center">View cart</Link>
                         <SmartLink href={urls.checkout || '/checkout'} onClick={() => setDrawer(false)} className="btn-primary w-full block text-center">Checkout</SmartLink>
                     </div>

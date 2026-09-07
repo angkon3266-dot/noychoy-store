@@ -137,6 +137,9 @@
                     <tfoot class="border-t border-ink-100 text-sm">
                         <tr><td colspan="2" class="px-5 py-1.5 text-right text-ink-700/70">Subtotal</td><td class="px-5 py-1.5 text-right">{{ money($order->subtotal) }}</td></tr>
                         @if($order->discount > 0)<tr><td colspan="2" class="px-5 py-1.5 text-right text-green-700">Discount {{ $order->coupon_code ? '('.$order->coupon_code.')' : '' }}</td><td class="px-5 py-1.5 text-right text-green-700">−{{ money($order->discount) }}</td></tr>@endif
+                        @if(($order->ladder_tier ?? 0) > 0)
+                            <tr><td colspan="3" class="px-5 py-1 text-right text-xs text-ink-700/60">Reward ladder · rung {{ $order->ladder_tier }}: {{ collect($order->ladder_rewards ?? [])->pluck('label')->implode(' · ') }}</td></tr>
+                        @endif
                         @foreach($order->adjustments ?? [] as $adj)
                             <tr><td colspan="2" class="px-5 py-1.5 text-right {{ $adj['amount'] < 0 ? 'text-green-700' : 'text-ink-700/70' }}">{{ $adj['label'] }}</td><td class="px-5 py-1.5 text-right {{ $adj['amount'] < 0 ? 'text-green-700' : '' }}">{{ $adj['amount'] < 0 ? '−'.money(abs($adj['amount'])) : money($adj['amount']) }}</td></tr>
                         @endforeach

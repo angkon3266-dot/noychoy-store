@@ -155,6 +155,12 @@ class PlaceOrder
             // Member-pricing portion of the discount (for "saved as a member").
             $memberDiscount = $this->cart->memberSignupDiscount();
 
+            // The reward-ladder rung reached and what it unlocked (already in
+            // $discount / $shipping) — recorded so the order can explain itself
+            // later even if the admin reshapes the ladder.
+            $ladderTier = $this->cart->ladderTier();
+            $ladderRewards = $this->cart->ladderRewards();
+
             // A logged-in customer always owns their own order. Check this FIRST:
             // running firstOrCreate() unconditionally created a junk customer row
             // (0 orders, never used) whenever a member shipped to a different
@@ -186,6 +192,8 @@ class PlaceOrder
                 'shipping_cost' => $shipping,
                 'discount' => $discount,
                 'member_discount' => $memberDiscount,
+                'ladder_tier' => $ladderTier,
+                'ladder_rewards' => $ladderRewards ?: null,
                 'points_redeemed' => $pointsRedeemed,
                 'points_discount' => $pointsDiscount,
                 'total' => max(0, $subtotal - $discount + $shipping),

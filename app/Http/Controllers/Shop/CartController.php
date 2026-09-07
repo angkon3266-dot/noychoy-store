@@ -116,6 +116,13 @@ class CartController extends Controller
                 'max' => $memberUsage['max'],
                 'resets' => $memberUsage['resets_at']?->format('d M'),
             ] : null,
+            // What THIS cart would save as a member — a taka figure, next to
+            // the total it applies to. The old hint only appeared when a
+            // members-only offer happened to exist.
+            'memberNudge' => (! $customer && ! $cart->isEmpty() && member_pricing()->enabled() && member_pricing()->basePercent() > 0) ? [
+                'pct' => rtrim(rtrim(number_format(member_pricing()->basePercent(), 2), '0'), '.'),
+                'saving_text' => money(round($cart->subtotal() * member_pricing()->basePercent() / 100)),
+            ] : null,
             'suggestions' => \App\Support\Storefront\ProductCardData::collection($suggestions),
             'cartUrls' => [
                 'update' => route('cart.update'),

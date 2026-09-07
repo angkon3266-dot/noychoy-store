@@ -101,6 +101,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Chat assistant: every reply is a paid OpenAI call. Generous enough
+        // for a real conversation (and a shared office IP), tight enough that
+        // one script cannot run up the bill overnight.
+        RateLimiter::for('assistant', fn (Request $request) => [
+            Limit::perMinute(15)->by('ai-m:'.$request->ip()),
+            Limit::perHour(100)->by('ai-h:'.$request->ip()),
+            Limit::perDay(300)->by('ai-d:'.$request->ip()),
+        ]);
+
         // Authorization: Super-Admin-only modules.
         Gate::define('meta.access', [MetaPolicy::class, 'access']);
         Gate::define('system-config.access', [SystemConfigPolicy::class, 'access']);

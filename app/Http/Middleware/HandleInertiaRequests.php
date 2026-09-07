@@ -119,6 +119,10 @@ class HandleInertiaRequests extends Middleware
                 'key' => md5(theme('cbar_text').theme('cbar_code')),
             ] : null,
             'offers' => $customer ? $this->memberOffers($customer) : null,
+            'membership' => $this->membership($customer),
+            // The chat assistant's launcher lives in the floating stack; the
+            // panel itself is a Blade partial on every root view.
+            'ai' => app(\App\Services\Ai\AssistantService::class)->enabled() ? ['label' => 'Ask us anything'] : null,
             'floats' => [
                 'share' => (bool) theme('show_share_button', true),
                 'call' => theme('show_call_button') ? \App\Models\Setting::get('store_phone', config('store.phone')) : null,
@@ -184,6 +188,45 @@ class HandleInertiaRequests extends Middleware
                 'time' => $n->sent_at?->diffForHumans(),
                 'url' => $n->url ? route('account.notifications.go', $n) : route('account.notifications'),
             ])->values(),
+        ];
+    }
+
+    /**
+     * What joining is worth, for the guest nudges on every page — and, for a
+     * member, the facts the same components restate. The membership system
+     * used to be invisible until the account dashboard; this is the one
+     * source every "join free" line reads, so the numbers can never drift
+     * from what checkout actually applies.
+     */
+    protected function membership($customer): array
+    {
+        $pct = member_pricing()->enabled() ? member_pricing()->basePercent() : 0.0;
+        $loyaltyOn = (bool) \App\Models\Setting::get('loyalty_enabled', config('loyalty.enabled', true));
+        $per1000 = $loyaltyOn ? app(\App\Services\LoyaltyService::class)->pointsForSpend(1000) : 0;
+        $signup = $loyaltyOn ? (int) \App\Models\Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0)) : 0;
+        $pctText = $pct > 0 ? rtrim(rtrim(number_format($pct, 2), '0'), '.') : null;
+
+        $facts = [];
+        if ($pctText) {
+            $facts[] = $pctText.'% off every piece';
+        }
+        if ($per1000 > 0) {
+            $facts[] = $per1000.' points per '.money(1000).' spent';
+        }
+        if ($signup > 0) {
+            $facts[] = $signup.' welcome points';
+        }
+
+        return [
+            'isMember' => (bool) $customer,
+            'pct' => $pctText,
+            'pointsPer1000' => $per1000 > 0 ? $per1000 : null,
+            'signupPoints' => $signup > 0 ? $signup : null,
+            // Admin → Offers → "Nudge text", when the owner has written one.
+            'text' => \App\Models\Setting::get('register_offer_text') ?: null,
+            'pitch' => $facts ? 'Members get '.implode(', ', $facts).'.' : null,
+            'tiers' => collect(config('loyalty.tiers', []))
+                ->map(fn ($t) => ['label' => $t['label'], 'perk' => $t['perk'], 'minPoints' => (int) $t['min_points']])->values(),
         ];
     }
 
