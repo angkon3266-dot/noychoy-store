@@ -18,7 +18,9 @@ class AssistantController extends Controller
         $data = $request->validate([
             'messages' => ['required', 'array', 'min:1', 'max:'.AssistantService::MAX_TURNS],
             'messages.*.role' => ['required', 'in:user,assistant'],
-            'messages.*.content' => ['required', 'string', 'max:'.AssistantService::MAX_CHARS],
+            // Earlier turns include the assistant's own replies, which can run
+            // long; only the customer's new message is held to MAX_CHARS below.
+            'messages.*.content' => ['required', 'string', 'max:'.AssistantService::MAX_TRANSCRIPT_CHARS],
             'page' => ['nullable', 'string', 'max:200'],
         ]);
 
@@ -27,8 +29,12 @@ class AssistantController extends Controller
             $data['messages'],
         ));
 
-        if (end($messages)['role'] !== 'user') {
+        $last = end($messages);
+        if ($last['role'] !== 'user') {
             return response()->json(['message' => 'The last message must be the customer\'s.'], 422);
+        }
+        if (mb_strlen($last['content']) > AssistantService::MAX_CHARS) {
+            return response()->json(['message' => 'Please keep a message under '.AssistantService::MAX_CHARS.' characters.'], 422);
         }
 
         if (! $assistant->enabled()) {

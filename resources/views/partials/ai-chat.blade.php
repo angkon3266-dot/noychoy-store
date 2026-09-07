@@ -213,12 +213,20 @@
             t.remove();
             if (res.status === 429) {
                 bubble('assistant', 'You are sending messages a little too fast — give it a minute and try again.', 'noy-chat__msg--err');
+            } else if (res.status === 422) {
+                // Only the customer's own turn can be rejected now; say why
+                // rather than pretending the assistant is down.
+                bubble('assistant', 'That message is a little long — please keep it under 1,200 characters.', 'noy-chat__msg--err');
             } else if (!data || typeof data.reply !== 'string') {
                 bubble('assistant', cfg.offline, 'noy-chat__msg--err');
+            } else if (!data.ok) {
+                // Shown, but not remembered: a "can't answer right now" is not
+                // part of the conversation and must not be replayed to the model.
+                bubble('assistant', data.reply, 'noy-chat__msg--err');
             } else {
                 msgs.push({ role: 'assistant', content: data.reply, products: data.products && data.products.length ? data.products : null });
                 save();
-                bubble('assistant', data.reply, data.ok ? '' : 'noy-chat__msg--err');
+                bubble('assistant', data.reply);
                 cards(data.products);
             }
         } catch (e) {

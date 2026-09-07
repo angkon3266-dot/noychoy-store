@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Services\Ai\AssistantService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
@@ -54,6 +55,29 @@ class AssistantChatTest extends TestCase
         $messages = array_merge($history, [['role' => 'user', 'content' => $text]]);
 
         return $this->postJson(route('assistant.chat'), ['messages' => $messages, 'page' => '/shop']);
+    }
+
+    /**
+     * Seen live: one long reply from the assistant (a policy quoted in full)
+     * made every later message in that chat fail validation, so the widget
+     * kept saying "I can't answer right now". Its own turns must pass; only
+     * the customer's new message is held to the limit.
+     */
+    public function test_the_assistants_own_long_replies_do_not_break_the_chat(): void
+    {
+        $this->enable();
+        Http::fake(['api.openai.com/*' => Http::response($this->text('Ji sir, ache!'))]);
+
+        $long = str_repeat('Refund policy line. ', 100);   // ~2,000 characters
+        $this->assertGreaterThan(AssistantService::MAX_CHARS, mb_strlen($long));
+
+        $this->ask('adjustable ring ache?', [
+            ['role' => 'user', 'content' => 'return policy?'],
+            ['role' => 'assistant', 'content' => $long],
+        ])->assertOk()->assertJsonPath('reply', 'Ji sir, ache!');
+
+        $this->ask(str_repeat('x', AssistantService::MAX_CHARS + 1))->assertStatus(422);
+        Http::assertSentCount(1);
     }
 
     public function test_switched_off_means_no_call_and_no_widget(): void
