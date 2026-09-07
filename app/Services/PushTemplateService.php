@@ -48,7 +48,7 @@ class PushTemplateService
                 'body' => 'আপনার পছন্দের {product} এখন মাত্র {price} ({old_price} থেকে কমেছে)। শেষ হওয়ার আগেই নিয়ে নিন!',
             ],
             'abandoned_cart' => [
-                'label' => 'Abandoned cart (uses {name}, {product})',
+                'label' => 'Abandoned cart (uses {name}, {product}, {ladder} = next reward rung)',
                 'title' => 'আপনার কার্টে কিছু রয়ে গেছে 🛒',
                 'body' => '{name}, {product} এখনও আপনার কার্টে অপেক্ষা করছে। অর্ডারটি সম্পন্ন করুন!',
             ],
@@ -123,13 +123,17 @@ class PushTemplateService
      *
      * @return array{title:string, body:string, url:string, tag:string}|null
      */
-    public function forCart(string $name, string $productSummary): ?array
+    public function forCart(string $name, string $productSummary, int $units = 0): ?array
     {
         if (! $this->enabled('abandoned_cart')) {
             return null;
         }
 
-        $map = ['{name}' => $name ?: 'Hello', '{product}' => $productSummary];
+        $map = [
+            '{name}' => $name ?: 'Hello',
+            '{product}' => $productSummary,
+            '{ladder}' => $units > 0 ? \App\Support\LadderLine::forUnits($units, 'bn') : '',
+        ];
 
         return [
             'title' => strtr($this->title('abandoned_cart'), $map),

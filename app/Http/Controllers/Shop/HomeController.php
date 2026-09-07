@@ -40,9 +40,15 @@ class HomeController extends Controller
             ];
         });
 
+        // Per-visitor rows — decided OUTSIDE the shared plan cache (they come
+        // from this session's history, loves and gift-finder answers), but
+        // hydrated in the same single query as everything else.
+        $recentIds = \App\Support\Storefront\Recommendations::recentlyViewedIds(8);
+        $pickedIds = \App\Support\Storefront\Recommendations::pickedForYouIds(8, $recentIds);
+
         // One query hydrates every product used anywhere on the page.
         $with = ['images', 'approvedReviews', 'category'];
-        $allIds = collect([$plan['featured'], $plan['new'], $plan['best']])
+        $allIds = collect([$plan['featured'], $plan['new'], $plan['best'], $recentIds, $pickedIds])
             ->flatten()
             ->merge(collect($plan['sections'])->pluck('product_ids')->flatten()->filter())
             ->unique()->values();
@@ -52,6 +58,8 @@ class HomeController extends Controller
         $featured = $pick($plan['featured']);
         $newArrivals = $pick($plan['new']);
         $bestSellers = $pick($plan['best']);
+        $recentlyViewed = $pick($recentIds);
+        $pickedForYou = $pick($pickedIds);
 
         // Category scroller — admin-chosen categories in order, else auto (top parents).
         $scrollerIds = collect(home_content('category_scroller_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
@@ -98,7 +106,7 @@ class HomeController extends Controller
         // the old Blade homepage instead.
         if (\App\Support\HomePage::isReact($key)) {
             $data = \App\Support\Storefront\HomePageData::make(
-                $featured, $newArrivals, $bestSellers, $categories, $sections,
+                $featured, $newArrivals, $bestSellers, $categories, $sections, $recentlyViewed, $pickedForYou,
             );
 
             // First hero slide is the LCP element on almost every home visit.

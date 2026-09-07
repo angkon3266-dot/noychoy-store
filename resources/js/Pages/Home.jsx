@@ -7,6 +7,7 @@ import HomeBlocks from '../Shared/HomeBlocks';
 import SmartLink from '../Shared/SmartLink';
 import useCountdown from '../Shared/useCountdown';
 import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
+import { t } from '../Shared/i18n';
 
 // The Meridian Éclat homepage — conversion-first and gift-led.
 //
@@ -17,15 +18,19 @@ import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
 // Every section is admin-toggleable/editable through the same home_content
 // settings the old templates used; copy falls back to sensible defaults.
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks, heroTrust } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks, heroTrust, pickedForYou, recentlyViewed } = props;
     return (
         <>
             <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} />
             <FeatureStrip strip={featureStrip} />
+            {/* Per-visitor rows: what they told the gift finder, loved or looked
+                at. Both hide themselves until there is a real signal. */}
+            <CardSection section={pickedForYou} eyebrow="Just for you" viewAll="/shop" viewAllLabel="Browse everything" />
             <Occasions section={occasions} />
             <Deals deals={deals} />
             <MembershipBand />
             <CardSection section={bestSellers} eyebrow="Most loved" viewAll="/best-sellers" viewAllLabel="View all best sellers" />
+            <CardSection section={recentlyViewed} eyebrow="Pick up where you left off" viewAll="/shop" viewAllLabel="Keep browsing" tinted />
             <GiftFinder finder={giftFinder} />
             <CategoryLookbook section={categoriesSection} />
             <Featured featured={featured} />
@@ -48,6 +53,7 @@ function MembershipBand() {
     const { props } = usePage();
     const m = props.chrome?.membership;
     const urls = props.chrome?.urls || {};
+    const lang = props.chrome?.lang || 'en';
     if (!m || (!m.pct && !m.pointsPer1000)) return null;
 
     const topTier = m.tiers?.length ? m.tiers[m.tiers.length - 1] : null;
@@ -61,13 +67,13 @@ function MembershipBand() {
         <section className="mx-auto max-w-7xl px-4 py-10 lg:py-12" aria-labelledby="membership-heading">
             <div className="rounded-2xl bg-ink-900 text-white px-6 py-8 lg:px-10 lg:py-10 flex flex-col lg:flex-row lg:items-center gap-8">
                 <div className="flex-1 min-w-0">
-                    <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3">{m.isMember ? 'Your membership' : 'Free membership'}</p>
-                    <h2 id="membership-heading" className="font-display text-2xl sm:text-3xl leading-snug">
-                        {m.pct ? <>Members save <span className="text-gold-300">{m.pct}%</span> on every piece</> : 'Members earn on every piece'}
+                    <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3" lang={lang}>{t(lang, m.isMember ? 'band.eyebrow.member' : 'band.eyebrow.guest')}</p>
+                    <h2 id="membership-heading" className="font-display text-2xl sm:text-3xl leading-snug" lang={lang}>
+                        {m.pct ? <>{t(lang, 'band.title')} <span className="text-gold-300">{m.pct}%</span> {t(lang, 'band.title.tail')}</> : t(lang, 'band.title.nopct')}
                     </h2>
                     <p className="mt-3 text-white/70 text-sm max-w-xl">{m.text || m.pitch}</p>
-                    <SmartLink href={m.isMember ? urls.account : urls.register} className="inline-flex items-center gap-2 mt-6 rounded-full bg-gold-500 text-ink-900 px-6 py-3 text-sm font-semibold hover:bg-gold-400 transition">
-                        {m.isMember ? 'See my points' : 'Join free'}
+                    <SmartLink href={m.isMember ? urls.account : urls.register} className="inline-flex items-center gap-2 mt-6 rounded-full bg-gold-500 text-ink-900 px-6 py-3 text-sm font-semibold hover:bg-gold-400 transition" lang={lang}>
+                        {t(lang, m.isMember ? 'band.cta.member' : 'band.cta.guest')}
                         <Icon name="diamond" className="w-4 h-4" />
                     </SmartLink>
                 </div>
@@ -381,16 +387,46 @@ function CardSection({ section, eyebrow, viewAll, viewAllLabel, tinted = false }
 
 /* ── Gift finder: budget bands + the gifting promise ────────────────────── */
 function GiftFinder({ finder }) {
+    // Who and what for — remembered by the shop (session, and the account
+    // for members) so "Picked for you", pushes and the assistant can use it.
+    const [who, setWho] = useState(finder?.profile?.for || '');
+    const [occasion, setOccasion] = useState(finder?.profile?.occasion || '');
     if (!finder?.show || !finder.budgets?.length) return null;
+
+    const withProfile = (url) => {
+        const extra = ['gift=1', who ? `for=${who}` : null, occasion ? `occasion=${occasion}` : null].filter(Boolean).join('&');
+        return url + (url.includes('?') ? '&' : '?') + extra;
+    };
+    const chip = (active) => `rounded-full px-4 py-1.5 text-xs tracking-wide border transition-colors duration-200 ${active ? 'bg-gold-500 text-ink-900 border-gold-500' : 'border-white/25 text-white/80 hover:border-white hover:text-white'}`;
+
     return (
-        <section id="gift-finder" className="bg-ink-900 text-white py-16 lg:py-20 scroll-mt-20">
+        <section id="gift-finder" className="bg-ink-900 text-white py-16 lg:py-20 scroll-mt-28">
             <div className="mx-auto max-w-5xl px-4 text-center">
                 <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3">Gift finder</p>
                 <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl leading-tight">{finder.title}</h2>
                 {finder.text && <p className="mt-4 text-white/60 max-w-xl mx-auto">{finder.text}</p>}
-                <div className="mt-9 flex flex-wrap justify-center gap-3">
+                {(finder.recipients?.length > 0 || finder.occasions?.length > 0) && (
+                    <div className="mt-8 space-y-3">
+                        {finder.recipients?.length > 0 && (
+                            <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Who is it for?">
+                                {finder.recipients.map(([key, label]) => (
+                                    <button key={key} type="button" onClick={() => setWho(who === key ? '' : key)} className={chip(who === key)} aria-pressed={who === key}>{label}</button>
+                                ))}
+                            </div>
+                        )}
+                        {finder.occasions?.length > 0 && (
+                            <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="What is the occasion?">
+                                {finder.occasions.map(([key, label]) => (
+                                    <button key={key} type="button" onClick={() => setOccasion(occasion === key ? '' : key)} className={chip(occasion === key)} aria-pressed={occasion === key}>{label}</button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                <p className="mt-7 text-[11px] uppercase tracking-[0.25em] text-white/40">Then pick a budget</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-3">
                     {finder.budgets.map((b, i) => (
-                        <SmartLink key={i} href={b.url} className="rounded-full border border-white/25 px-6 sm:px-8 py-3 text-sm tracking-wide hover:bg-white hover:text-ink-900 hover:border-white transition-colors duration-300">{b.label}</SmartLink>
+                        <SmartLink key={i} href={withProfile(b.url)} className="rounded-full border border-white/25 px-6 sm:px-8 py-3 text-sm tracking-wide hover:bg-white hover:text-ink-900 hover:border-white transition-colors duration-300">{b.label}</SmartLink>
                     ))}
                 </div>
                 <div className="mt-10 grid grid-cols-3 gap-4 text-center max-w-2xl mx-auto">

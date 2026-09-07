@@ -71,6 +71,10 @@ Schedule::command('push:drip')->hourly()->name('push-drip')->withoutOverlapping(
 // shopper still remembers the pieces. A no-op when off or nobody is due.
 Schedule::command('sms:abandoned-cart')->everyThirtyMinutes()->name('sms-abandoned-cart')->withoutOverlapping();
 
+// Birthday / anniversary reminders and same-day wishes — one daily pass at
+// 09:30, ahead of the other paid-SMS automations at 11:00 / 11:30.
+Schedule::command('crm:occasions')->dailyAt('09:30')->name('crm-occasions')->withoutOverlapping();
+
 // Post-delivery review requests — one daily pass. A no-op when the automation
 // is off or nothing is past its delay window. 11:30 sits after crm:winback at
 // 11:00 so the two paid-SMS automations do not contend.

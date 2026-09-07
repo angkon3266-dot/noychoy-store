@@ -302,6 +302,40 @@ class MetaCapiPayloadTest extends TestCase
         $this->assertSame('TEST1234', $sent->data()['test_event_code']);
     }
 
+    /**
+     * Without a code the sample would be a real purchase. Events Manager
+     * flagged exactly that ("all Purchase events send the same price"), so
+     * the panel now refuses rather than sends.
+     */
+    public function test_the_admin_test_panel_refuses_without_a_code(): void
+    {
+        $this->configureMeta(['test_event_code' => '']);
+
+        $result = app(MetaTrackingService::class)->sendTest('Purchase');
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('Test Event Code', $result['error']);
+        Http::assertNothingSent();
+    }
+
+    public function test_a_value_that_is_not_above_zero_is_left_out(): void
+    {
+        $this->configureMeta();
+
+        app(MetaTrackingService::class)->initiateCheckout(['prod-1'], 0.0, 1, 'IC.1');
+
+        $sent = null;
+        Http::recorded(function ($request) use (&$sent) {
+            $sent = $request;
+
+            return true;
+        });
+
+        $custom = $sent->data()['data'][0]['custom_data'];
+        $this->assertArrayNotHasKey('value', $custom);
+        $this->assertSame(['prod-1'], $custom['content_ids']);
+    }
+
     protected function order(): Order
     {
         $order = Order::create([

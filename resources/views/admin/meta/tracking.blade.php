@@ -75,7 +75,7 @@
                            placeholder="{{ ($snapshot['has_capi_token'] ?? false) ? '•••••••• (saved — leave blank to keep)' : 'Leave blank to reuse the System User token' }}">
                     <p class="text-xs text-ink-700/50 mt-1">Stored encrypted (AES-256). Blank reuses the System User token.</p>
                 </div>
-                <div><label class="label">Test Event Code <span class="text-ink-700/40">(optional)</span></label><input name="test_event_code" value="{{ old('test_event_code', $testEventCode) }}" class="input" placeholder="TEST12345"></div>
+                <div><label class="label">Test Event Code <span class="text-ink-700/40">(needed by the Test events panel — copy it from Events Manager → Test events)</span></label><input name="test_event_code" value="{{ old('test_event_code', $testEventCode) }}" class="input" placeholder="TEST12345"></div>
                 <div>
                     <label class="label">Store country <span class="text-ink-700/40">(optional)</span></label>
                     <select name="country" class="input">
@@ -117,7 +117,7 @@
     {{-- ── Test events ──────────────────────────────────────────────────────── --}}
     <div class="card p-5">
         <h3 class="font-semibold mb-1">Test events</h3>
-        <p class="text-xs text-ink-700/50 mb-3">Fires a real Conversions API event (with your Test Event Code) and, when the Pixel is configured, the matching browser event with the same <code>event_id</code>. Check Events Manager → Test Events.</p>
+        <p class="text-xs text-ink-700/50 mb-3">Sends one sample Conversions API event carrying your Test Event Code, so it lands in Events Manager → Test events and never in the real dataset. Nothing is fired from this browser: a Pixel event cannot be marked as a test, and a sample purchase from here would count as a real sale — Meta then reports "all Purchase events send the same price" and drops the fake product from the catalogue match rate.</p>
         <div class="flex flex-wrap gap-2">
             @foreach(['PageView','ViewContent','Search','AddToCart','InitiateCheckout','Purchase'] as $ev)
                 <button type="button" @click="test('{{ $ev }}')" class="btn-outline text-sm" :disabled="busy==='{{ $ev }}'">
@@ -132,7 +132,7 @@
                     <div>Event: <span class="font-medium" x-text="result.event"></span></div>
                     <div>HTTP Status: <span class="font-medium" x-text="result.status"></span></div>
                     <div class="sm:col-span-2 break-all">Event ID: <code x-text="result.event_id"></code></div>
-                    <div>Deduplicated: <span x-text="result.deduplicated ? '✅ yes (browser + CAPI)' : (result.browser_sent ? '—' : 'CAPI only')"></span></div>
+                    <div>Channel: Conversions API, test code only</div>
                     <div>Response time: <span x-text="result.ms + ' ms'"></span></div>
                     <div x-show="result.test_event_code">Test code: <span x-text="result.test_event_code"></span></div>
                     <div x-show="result.error" class="sm:col-span-2 text-red-700">Error: <span x-text="result.error"></span></div>
@@ -220,18 +220,7 @@
     </div>
 </div>
 
-{{-- Contained Pixel loader so Test buttons can fire real browser events with the
-     shared event_id (only when a Pixel ID is configured). --}}
-@if($pixelId)
-<script>
-    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
-    document,'script','https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', @json($pixelId));
-</script>
-@endif
+{{-- No Pixel loader on this page: the admin panel must never be an event source. --}}
 
 <script>
     document.addEventListener('alpine:init', () => {
@@ -257,25 +246,19 @@
                 });
             },
 
-            sampleParams(event) {
-                const base = { content_type: 'product', content_ids: ['prod-test'], currency: 'BDT', value: 1 };
-                if (event === 'InitiateCheckout' || event === 'Purchase') return { ...base, num_items: 1 };
-                if (event === 'ViewContent' || event === 'AddToCart') return base;
-                return {};
-            },
-
+            // Server-side only, on purpose. This page used to fire the same
+            // sample through the browser Pixel too, to demonstrate
+            // deduplication — but a Pixel event cannot carry a test code, so
+            // every click was a real ৳1 Purchase for a product that does not
+            // exist. That is exactly what Events Manager flagged.
             async test(event) {
                 this.busy = event;
                 const eventId = event + '.' + ((self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2)));
-                let browserSent = false;
-                if (this.pixelEnabled && window.fbq) {
-                    try { fbq('track', event, this.sampleParams(event), { eventID: eventId }); browserSent = true; } catch (e) {}
-                }
                 try {
                     const res = await fetch(this.testBase + '/' + event, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': this.csrf },
-                        body: JSON.stringify({ event_id: eventId, browser_sent: browserSent }),
+                        body: JSON.stringify({ event_id: eventId }),
                     });
                     const d = await res.json();
                     this.result = d;

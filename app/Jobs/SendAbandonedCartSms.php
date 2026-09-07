@@ -51,8 +51,17 @@ class SendAbandonedCartSms implements ShouldQueue
 
         $ok = false;
 
+        // The reward ladder's next rung, from the snapshot's unit count (a
+        // queued job has no session cart). A template edited before the
+        // placeholder existed gets it appended, so nobody has to re-type it.
+        $ladder = \App\Support\LadderLine::forUnits((int) $cart->item_count);
+        $template = $sms->template('abandoned_cart');
+        if ($template && $ladder !== '' && ! str_contains($template, '{ladder}')) {
+            $template = rtrim($template).'{ladder}';
+        }
+
         try {
-            $ok = (bool) $sms->sendTemplate('abandoned_cart', $this->pseudoOrder($cart), ['{link}' => $link]);
+            $ok = (bool) $sms->sendTemplate('abandoned_cart', $this->pseudoOrder($cart), ['{link}' => $link, '{ladder}' => $ladder], $template);
         } catch (\Throwable $e) {
             report($e);
         }

@@ -4,8 +4,10 @@ import SmartLink from '../SmartLink';
 import Icon from '../Icons';
 import SearchBox from './SearchBox';
 import NotificationsBell from './NotificationsBell';
+import LadderStrip from './LadderStrip';
 import { useCart } from '../CartContext';
 import { useMobileNav } from './MobileDrawer';
+import { t } from '../i18n';
 
 export default function Header() {
     const { props } = usePage();
@@ -106,7 +108,7 @@ export default function Header() {
                             <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className="p-2 hover:text-gold-700 inline-flex items-center gap-1.5" title={props.chrome?.membership?.pct ? `Join free — members save ${props.chrome.membership.pct}%` : 'Login'} aria-label="Sign in or join">
                                 <Icon name="user" />
                                 {props.chrome?.membership?.pct && (
-                                    <span className="hidden md:inline text-xs font-semibold text-gold-700 whitespace-nowrap">Join · {props.chrome.membership.pct}% off</span>
+                                    <span className="hidden md:inline text-xs font-semibold text-gold-700 whitespace-nowrap" lang={chrome.lang}>{t(chrome.lang, 'header.join', { pct: props.chrome.membership.pct })}</span>
                                 )}
                             </a>
                         )}
@@ -125,6 +127,9 @@ export default function Header() {
                         <SearchBox autoFocus onNavigate={() => setMSearch(false)} />
                     </div>
                 )}
+
+                {/* The reward ladder, always in view (sticks with the header). */}
+                <LadderStrip />
             </div>
         </header>
     );

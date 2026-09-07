@@ -57,6 +57,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             TrackVisit::class,
             CaptureMetaClickId::class,
+            // ?ref=CODE → the inviter's cookie (encrypted, httpOnly), before
+            // the Inertia share so the register page can name the inviter.
+            \App\Http\Middleware\CaptureReferral::class,
             HandleInertiaRequests::class,
         ]);
 

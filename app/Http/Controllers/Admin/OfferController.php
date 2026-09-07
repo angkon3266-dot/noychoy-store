@@ -42,8 +42,36 @@ class OfferController extends Controller
                 'review' => (int) \App\Models\Setting::get('loyalty_review_points', config('loyalty.review_points', 200)),
                 'signup' => (int) \App\Models\Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0)),
                 'photo_bonus' => (int) \App\Models\Setting::get('loyalty_review_photo_bonus', config('loyalty.review_photo_bonus', 100)),
+                'referral' => (int) \App\Models\Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300)),
+            ],
+            'occasions' => [
+                'enabled' => \App\Support\Occasions::enabled(),
+                'sms' => \App\Support\Occasions::smsEnabled(),
+                'reminder_days' => \App\Support\Occasions::reminderDays(),
+                'offer_percent' => \App\Support\Occasions::offerPercent(),
+                'offer_days' => \App\Support\Occasions::offerDays(),
+                'on_file' => \App\Models\Customer::query()
+                    ->where(fn ($q) => $q->whereNotNull('birthday_day')->orWhereNotNull('anniversary_day'))->count(),
             ],
         ]);
+    }
+
+    /** Save the birthday / anniversary automation settings. */
+    public function saveOccasions(Request $request)
+    {
+        $data = $request->validate([
+            'reminder_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'offer_percent' => ['nullable', 'numeric', 'min:0', 'max:90'],
+            'offer_days' => ['required', 'integer', 'min:1', 'max:60'],
+        ]);
+
+        \App\Models\Setting::put('occasion_enabled', $request->boolean('enabled'));
+        \App\Models\Setting::put('occasion_sms', $request->boolean('sms'));
+        \App\Models\Setting::put('occasion_reminder_days', (int) $data['reminder_days']);
+        \App\Models\Setting::put('occasion_offer_percent', (float) ($data['offer_percent'] ?? 0));
+        \App\Models\Setting::put('occasion_offer_days', (int) $data['offer_days']);
+
+        return back()->with('success', 'Birthday & anniversary settings saved.');
     }
 
     /** Save the loyalty/points configuration. */
@@ -55,9 +83,11 @@ class OfferController extends Controller
             'review' => ['required', 'integer', 'min:0', 'max:100000'],
             'signup' => ['required', 'integer', 'min:0', 'max:100000'],
             'photo_bonus' => ['required', 'integer', 'min:0', 'max:100000'],
+            'referral' => ['nullable', 'integer', 'min:0', 'max:100000'],
         ]);
 
         \App\Models\Setting::put('loyalty_enabled', $request->boolean('enabled'));
+        \App\Models\Setting::put('loyalty_referral_points', (int) ($data['referral'] ?? 0));
         \App\Models\Setting::put('loyalty_earn_per_taka', (float) $data['per_1000'] / 1000);
         \App\Models\Setting::put('loyalty_redeem_value', (float) $data['value_per_100'] / 100);
         \App\Models\Setting::put('loyalty_review_points', (int) $data['review']);

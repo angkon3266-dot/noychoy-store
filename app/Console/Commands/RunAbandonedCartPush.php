@@ -46,7 +46,7 @@ class RunAbandonedCartPush extends Command
             $name = $first['name'] ?? $first['title'] ?? 'your items';
             $summary = $items->count() > 1 ? $name.' + '.($items->count() - 1).' more' : $name;
 
-            $payload = $templates->forCart($member->name, $summary);
+            $payload = $templates->forCart($member->name, $summary, (int) $cart->item_count);
             if ($payload) {
                 $notifications->pushToCustomer($member->id, $payload);
                 $sent++;

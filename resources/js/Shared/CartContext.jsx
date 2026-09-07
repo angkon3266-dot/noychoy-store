@@ -31,6 +31,12 @@ export function CartProvider({ children }) {
         if (props.cart?.count !== undefined) setCount(props.cart.count);
     }, [props.cart?.count]);
 
+    // Same for the ladder: the strip in the header must never be blank on a
+    // fresh page, and the server's snapshot is authoritative after a redirect.
+    useEffect(() => {
+        if (props.ladder !== undefined) setGift(props.ladder);
+    }, [props.ladder]);
+
     const apply = useCallback((data) => {
         setCount(data.count);
         setItems(data.items || []);

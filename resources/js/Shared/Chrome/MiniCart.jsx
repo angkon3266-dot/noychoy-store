@@ -6,6 +6,7 @@ import SmartLink from '../SmartLink';
 import GiftLadderBar from '../GiftLadderBar';
 import Icon from '../Icons';
 import { trapTab } from '../focusTrap';
+import { t } from '../i18n';
 
 // Mini-cart slide-over — same /cart/mini data contract as the Alpine drawer.
 export default function MiniCart() {
@@ -105,11 +106,11 @@ export default function MiniCart() {
                             </p>
                         )}
                         {!props.customer && props.chrome?.membership?.pct && (
-                            <a href={urls.register} onClick={() => setDrawer(false)} className="block rounded-md border border-gold-200 bg-gold-50 px-3 py-2 text-xs text-ink-800 hover:bg-gold-100">
+                            <a href={urls.register} onClick={() => setDrawer(false)} className="block rounded-md border border-gold-200 bg-gold-50 px-3 py-2 text-xs text-ink-800 hover:bg-gold-100" lang={props.chrome.lang}>
                                 <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
-                                Members save <strong>{props.chrome.membership.pct}%</strong> on this cart
-                                {props.chrome.membership.pointsPer1000 ? ` and earn ${props.chrome.membership.pointsPer1000} points per ৳1,000` : ''}
-                                {' — '}<span className="underline font-medium">join free</span>
+                                {t(props.chrome.lang, 'minicart.save', { pct: props.chrome.membership.pct })}
+                                {props.chrome.membership.pointsPer1000 ? t(props.chrome.lang, 'minicart.points', { points: props.chrome.membership.pointsPer1000 }) : ''}
+                                {' — '}<span className="underline font-medium">{t(props.chrome.lang, 'minicart.join')}</span>
                             </a>
                         )}
                         <Link href={urls.cart || '/cart'} onClick={() => setDrawer(false)} className="btn-outline w-full block text-center">View cart</Link>

@@ -1,12 +1,15 @@
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import Icon, { Facebook, IconOrGlyph, Instagram, WhatsApp } from '../Icons';
 import SmartLink from '../SmartLink';
+import { t } from '../i18n';
 
 export default function Footer() {
     const { props } = usePage();
     const chrome = props.chrome || {};
     const footer = chrome.footer || {};
     const urls = chrome.urls || {};
+    const lang = chrome.lang || 'en';
+    const setLang = (next) => router.post('/lang', { lang: next }, { preserveScroll: true });
 
     return (
         <footer className="mt-16 bg-ink-900 text-gold-100">
@@ -55,12 +58,18 @@ export default function Footer() {
                         <li><a href={urls.refund} className="hover:text-white">Refund Policy</a></li>
                         {!props.customer && (
                             <li>
-                                <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className="hover:text-white">
-                                    {props.chrome?.membership?.pct ? `Join free — members save ${props.chrome.membership.pct}%` : 'Login / Register'}
+                                <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className="hover:text-white" lang={lang}>
+                                    {props.chrome?.membership?.pct ? t(lang, 'footer.join', { pct: props.chrome.membership.pct }) : 'Login / Register'}
                                 </a>
                             </li>
                         )}
-                        {props.customer && <li><a href={urls.account} className="hover:text-white">My account &amp; points</a></li>}
+                        {props.customer && <li><a href={urls.account} className="hover:text-white" lang={lang}>{t(lang, 'footer.account')}</a></li>}
+                        <li className="pt-1">
+                            <span className="text-gold-100/50 mr-2">{t(lang, 'footer.lang')}:</span>
+                            <button type="button" onClick={() => setLang('en')} className={`hover:text-white ${lang === 'en' ? 'text-white font-semibold underline' : ''}`} aria-pressed={lang === 'en'}>English</button>
+                            <span className="mx-1.5 text-gold-100/40">·</span>
+                            <button type="button" onClick={() => setLang('bn')} className={`hover:text-white ${lang === 'bn' ? 'text-white font-semibold underline' : ''}`} aria-pressed={lang === 'bn'} lang="bn">বাংলা</button>
+                        </li>
                     </ul>
                 </div>
                 <div>

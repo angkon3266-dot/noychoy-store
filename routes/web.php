@@ -36,6 +36,32 @@ Route::get('/site.webmanifest', ManifestController::class)->name('manifest');
 
 // Marketing landing pages built in the admin section builder.
 Route::get('/lp/{slug}', [LandingController::class, 'show'])->name('landing.show');
+
+// A member's invite link: remember the inviter in a cookie, then send a guest
+// to register (a member straight to the shop). Unknown codes fall through to
+// the home page rather than 404 — a shared link should never dead-end.
+Route::get('/invite/{code}', function (string $code) {
+    $referrer = \App\Support\Referral::remember(request(), $code);
+    if (! $referrer) {
+        return redirect()->route('home');
+    }
+    if (auth('customer')->check()) {
+        return redirect()->route('shop')->with('success', $referrer->firstName().' sent you here — happy shopping!');
+    }
+    $points = app(\App\Services\LoyaltyService::class)->referralPoints();
+
+    return redirect()->route('customer.register')
+        ->with('success', $referrer->firstName().' invited you to '.store_name().'. Join free — you both get '.$points.' points after your first delivered order.');
+})->where('code', '[A-Za-z0-9]{1,20}')->name('invite');
+
+// The visitor's language (English / বাংলা): a cookie for everyone, and the
+// customer record for members. The assistant sets it too when someone writes
+// in Bangla.
+Route::post('/lang', function () {
+    \App\Support\Locale::remember((string) request('lang'));
+
+    return back();
+})->name('lang')->middleware('throttle:30,1');
 // Honours System Config → SEO. Both settings existed but were ignored here,
 // so switching the shop to "noindex" (a staging copy, a store not open yet)
 // silently did nothing at all — the worst kind of setting.
@@ -184,6 +210,9 @@ Route::middleware('auth:customer')->group(function () {
     // Reviews & loved
     Route::get('/account/reviews', [AccountController::class, 'reviews'])->name('account.reviews');
     Route::get('/account/loved', [AccountController::class, 'loved'])->name('account.loved');
+
+    // Invite friends (referral program)
+    Route::get('/account/referrals', [AccountController::class, 'referrals'])->name('account.referrals');
 
 });
 

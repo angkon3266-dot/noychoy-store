@@ -280,6 +280,14 @@ class MetaTrackingService
                 'external_id' => $context['external_id'] ?? MetaIdentity::externalIds(),
             ]));
 
+            // Meta wants `value` as a number above zero; a 0, a string or a
+            // long float is a data-quality warning against the whole dataset
+            // rather than a rejected event. Two decimals, or no value at all.
+            if (array_key_exists('value', $customData)) {
+                $value = round((float) $customData['value'], 2);
+                $customData['value'] = $value > 0 ? $value : null;
+            }
+
             $payload = [
                 'data' => [[
                     'event_name' => $eventName,
@@ -437,9 +445,21 @@ class MetaTrackingService
     {
         $eventId ??= self::newEventId($event);
 
+        // Never without a test event code. Without one the sample goes into
+        // the real dataset: Events Manager then reports "all Purchase events
+        // send the same price" (every sample carried the same value) and the
+        // made-up content id drags the catalogue match rate down — both of
+        // which happened here, and both of which cost ad delivery.
+        if (! $this->testEventCode()) {
+            return [
+                'ok' => false, 'status' => 0, 'body' => null, 'ms' => 0, 'event_id' => $eventId, 'event' => $event, 'test_event_code' => null,
+                'error' => 'Set a Test Event Code first (Events Manager → Test events → copy the code into Meta → Tracking). Without it a sample would be recorded as a real '.$this->currency().' 1 purchase against a product that does not exist.',
+            ];
+        }
+
         $custom = match ($event) {
-            'ViewContent', 'AddToCart' => ['content_type' => 'product', 'content_ids' => ['prod-test'], 'content_name' => 'Test product', 'currency' => $this->currency(), 'value' => 1.0],
-            'InitiateCheckout', 'Purchase' => ['content_type' => 'product', 'content_ids' => ['prod-test'], 'currency' => $this->currency(), 'value' => 1.0, 'num_items' => 1],
+            'ViewContent', 'AddToCart' => ['content_type' => 'product', 'content_ids' => ['prod-test'], 'content_name' => 'Test product', 'currency' => $this->currency(), 'value' => 1250.0],
+            'InitiateCheckout', 'Purchase' => ['content_type' => 'product', 'content_ids' => ['prod-test'], 'currency' => $this->currency(), 'value' => 1250.0, 'num_items' => 1],
             default => [], // PageView / Search
         };
 

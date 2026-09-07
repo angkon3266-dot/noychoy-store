@@ -155,8 +155,14 @@ function Rewards({ loyalty, shopUrl }) {
                         {loyalty.tier.next && (
                             <div className="mt-3">
                                 <div className="h-2 rounded-full bg-ink-100 overflow-hidden"><div className="h-full bg-gold-600" style={{ width: `${loyalty.tier.next.progress}%` }} /></div>
-                                <p className="text-xs text-ink-700/70 mt-1">Earn {loyalty.tier.next.toNext} more points to reach <strong>{loyalty.tier.next.label}</strong> ({loyalty.tier.next.perk}).</p>
+                                <p className="text-xs text-ink-700/70 mt-1">Earn {loyalty.tier.next.toNext} more points{loyalty.tier.next.toNextSpendText ? <> — about <strong>{loyalty.tier.next.toNextSpendText}</strong> in orders</> : ''} to reach <strong>{loyalty.tier.next.label}</strong> ({loyalty.tier.next.perk}).</p>
                             </div>
+                        )}
+                        {loyalty.referralPoints > 0 && (
+                            <p className="text-xs mt-3 pt-3 border-t border-ink-100">
+                                <Icon name="globe" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
+                                <SmartLink href="/account/referrals" className="text-gold-700 underline font-medium">Invite a friend</SmartLink> — you both get <strong>{loyalty.referralPoints} points</strong> after their first delivery.
+                            </p>
                         )}
                     </div>
 

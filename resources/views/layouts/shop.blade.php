@@ -378,6 +378,38 @@
             </div>
             @endif
 
+            {{-- The reward ladder, always in view. Blade pages (landing pages,
+                 legacy home templates) get the static snapshot; the mini-cart
+                 payload refreshes the message after an add-to-cart. --}}
+            @php $ladderStrip = app(\App\Services\CartService::class)->giftProgress(); @endphp
+            @if($ladderStrip)
+                @php
+                    $ladderTiers = $ladderStrip['tiers'];
+                    $ladderNext = $ladderStrip['next'];
+                    $ladderMsg = ($ladderStrip['gift']['pick_needed'] ?? false)
+                        ? 'A free gift is waiting — pick one in your cart'
+                        : (! $ladderNext
+                            ? 'All '.$ladderStrip['count'].' rewards unlocked'.($ladderStrip['saved_text'] ? ' — '.$ladderStrip['saved_text'].' saved' : '')
+                            : ($ladderStrip['tier'] > 0
+                                ? $ladderStrip['summary'].' unlocked — add '.$ladderNext['more'].' more for '.lcfirst($ladderNext['label'])
+                                : 'Add '.$ladderNext['more'].' '.($ladderNext['more'] === 1 ? 'piece' : 'pieces').' to unlock '.lcfirst($ladderNext['label'])));
+                @endphp
+                <a href="{{ route('cart') }}" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gold-200/70 py-1.5 text-[12px] leading-tight text-ink-800" data-ladder-strip>
+                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold-700 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.08em] text-white">Rewards</span>
+                    <span class="min-w-0 flex-1 basis-40 truncate" x-data x-text="$store.cart.ladderMessage || @js($ladderMsg)">{{ $ladderMsg }}</span>
+                    <span class="flex basis-full items-center justify-between sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
+                        @foreach($ladderTiers as $i => $tier)
+                            @php $edge = $i < 5 || $loop->last; @endphp
+                            @if($i === 5 && count($ladderTiers) > 6)<span class="sm:hidden text-[10px] text-ink-500 px-0.5">…</span>@endif
+                            <span class="{{ $edge ? 'flex' : 'hidden sm:flex' }} flex-col items-center" title="{{ $tier['threshold'] }}: {{ $tier['label'] }}">
+                                <span class="grid h-5 w-5 place-items-center rounded-full border text-[9px] font-semibold {{ $tier['unlocked'] ? 'bg-gold-700 border-gold-700 text-white' : (($ladderNext['n'] ?? 0) === $tier['n'] ? 'bg-white border-gold-600 text-gold-700 ring-2 ring-gold-200' : 'bg-white border-gold-300 text-gold-500') }}">{{ $tier['type'] === 'free_gift' ? '🎁' : ($tier['type'] === 'free_delivery' ? '🚚' : $tier['threshold']) }}</span>
+                                <span class="hidden md:block text-[8px] leading-none mt-0.5 {{ $tier['unlocked'] ? 'text-gold-700 font-semibold' : 'text-ink-500' }}">{{ $tier['short'] }}</span>
+                            </span>
+                        @endforeach
+                    </span>
+                </a>
+            @endif
+
         </div>
 
     </header>
@@ -673,6 +705,13 @@
                     <li><a href="{{ route('page.terms') }}" class="hover:text-white">Terms &amp; Conditions</a></li>
                     <li><a href="{{ route('page.refund') }}" class="hover:text-white">Refund Policy</a></li>
                     @guest('customer')<li><a href="{{ route('customer.login') }}" class="hover:text-white">Login / Register</a></li>@endguest
+                    <li class="pt-1">
+                        @php $lang = \App\Support\Locale::current(); @endphp
+                        <span class="text-gold-100/50 mr-2">{{ \App\Support\Locale::t('Language', 'ভাষা') }}:</span>
+                        <form action="{{ route('lang') }}" method="POST" class="inline">@csrf<input type="hidden" name="lang" value="en"><button class="hover:text-white {{ $lang === 'en' ? 'text-white font-semibold underline' : '' }}">English</button></form>
+                        <span class="mx-1.5 text-gold-100/40">·</span>
+                        <form action="{{ route('lang') }}" method="POST" class="inline">@csrf<input type="hidden" name="lang" value="bn"><button class="hover:text-white {{ $lang === 'bn' ? 'text-white font-semibold underline' : '' }}" lang="bn">বাংলা</button></form>
+                    </li>
                 </ul>
             </div>
             <div>

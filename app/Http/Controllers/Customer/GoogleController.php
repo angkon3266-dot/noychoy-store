@@ -118,6 +118,16 @@ class GoogleController extends Controller
                 'google_id' => $googleId,
                 'avatar' => $profile['picture'] ?? null,
             ]);
+
+            // A brand-new member, exactly like register(): attribute the
+            // invite they arrived on, pay the welcome bonus, start the drips.
+            // This path used to skip all three.
+            \App\Support\Referral::attach($customer, $request);
+            $loyalty = app(\App\Services\LoyaltyService::class);
+            if ($loyalty->enabled() && $loyalty->signupPoints() > 0) {
+                $loyalty->award($customer, $loyalty->signupPoints(), 'signup', 'Welcome bonus');
+            }
+            app(\App\Services\DripService::class)->enrollRegistration($customer);
         }
 
         Auth::guard('customer')->login($customer, true);

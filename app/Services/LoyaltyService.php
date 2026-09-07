@@ -48,6 +48,12 @@ class LoyaltyService
         return (int) Setting::get('loyalty_signup_points', config('loyalty.signup_points', 0));
     }
 
+    /** Points to BOTH sides of a referral when the invited customer's first order is delivered. */
+    public function referralPoints(): int
+    {
+        return (int) Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300));
+    }
+
     // ── Conversions ─────────────────────────────────────────────────────────
 
     /** Points earned for spending an amount of money. */
@@ -184,6 +190,83 @@ class LoyaltyService
         }
 
         return $tx;
+    }
+
+    /**
+     * Pay the referral reward — the same points to the inviter and the invited
+     * customer — the first time an invited customer's order is delivered.
+     *
+     * `referral_rewarded` is the belt, the (type, order) dedupe in award() is
+     * the braces: a delivered → returned → delivered flip-flop can pass the
+     * status guard in TransitionOrderStatus, and neither side may be paid twice.
+     */
+    public function awardReferralForOrder(\App\Models\Order $order): bool
+    {
+        $customer = $order->customer;
+        if (! $this->enabled() || ! $customer || ! $customer->referred_by || $customer->referral_rewarded) {
+            return false;
+        }
+
+        $referrer = Customer::find($customer->referred_by);
+        $points = $this->referralPoints();
+        if (! $referrer || $referrer->id === $customer->id || $points <= 0) {
+            return false;
+        }
+
+        $this->award($referrer, $points, 'referral_referrer', 'Referral: '.$customer->firstName().'\'s first order '.$order->order_number.' delivered', $order);
+        $this->award($customer, $points, 'referral_referred', 'Welcome referral bonus — order '.$order->order_number.' delivered', $order);
+        $customer->forceFill(['referral_rewarded' => true])->saveQuietly();
+
+        try {
+            $notifications = app(\App\Services\NotificationService::class);
+            $notifications->broadcast([
+                'type' => 'referral', 'icon' => '🎉',
+                'title' => $points.' points for inviting '.$customer->firstName(),
+                'body' => 'Their first order was delivered — the points are in your balance.',
+                'url' => route('account.referrals'), 'cta_label' => 'My invites',
+                'recipient_ids' => [$referrer->id],
+            ]);
+            $notifications->broadcast([
+                'type' => 'referral', 'icon' => '🎉',
+                'title' => $points.' welcome points from '.$referrer->firstName().'\'s invite',
+                'body' => 'Your first order was delivered — spend them on your next one at checkout.',
+                'url' => route('account'), 'cta_label' => 'My points',
+                'recipient_ids' => [$customer->id],
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return true;
+    }
+
+    /**
+     * Take a referral reward back when the order that earned it unwinds, so
+     * a returned parcel cannot mint points for two people. The flag is reset,
+     * so a genuine later first delivery pays out again.
+     */
+    public function reverseReferralForOrder(\App\Models\Order $order): bool
+    {
+        $customer = $order->customer;
+        if (! $customer || ! $customer->referral_rewarded) {
+            return false;
+        }
+
+        $paid = PointTransaction::where('reference_id', $order->id)
+            ->whereIn('type', ['referral_referrer', 'referral_referred'])
+            ->get();
+        if ($paid->isEmpty()) {
+            return false;
+        }
+
+        foreach ($paid as $tx) {
+            if ($who = Customer::find($tx->customer_id)) {
+                $this->award($who, -(int) $tx->points, $tx->type.'_reverse', 'Order '.$order->order_number.' returned — referral points reversed', $order);
+            }
+        }
+        $customer->forceFill(['referral_rewarded' => false])->saveQuietly();
+
+        return true;
     }
 
     /**

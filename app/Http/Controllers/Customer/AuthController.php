@@ -41,8 +41,10 @@ class AuthController extends Controller
         return redirect()->intended(route('account'));
     }
 
-    public function showRegister()
+    public function showRegister(Request $request)
     {
+        $inviter = \App\Support\Referral::pending($request);
+
         return \Inertia\Inertia::render('Auth/Register', [
             'pageTitle' => 'Register',
             'old' => [
@@ -50,6 +52,11 @@ class AuthController extends Controller
                 'phone' => old('phone'),
                 'email' => old('email'),
             ],
+            // Named so the page can say who invited them and what it is worth.
+            'invitedBy' => $inviter ? [
+                'name' => $inviter->firstName(),
+                'points' => app(\App\Services\LoyaltyService::class)->referralPoints(),
+            ] : null,
         ])->withViewData(['pageTitle' => 'Register']);
     }
 
@@ -75,6 +82,9 @@ class AuthController extends Controller
             'email' => $data['email'] ?? null,
             'password' => $data['password'],
         ]);
+
+        // Arrived on a member's invite link? Attribute it (paid on first delivery).
+        \App\Support\Referral::attach($customer, $request);
 
         // Welcome loyalty bonus (Admin → Offers → Loyalty & points).
         $loyalty = app(\App\Services\LoyaltyService::class);

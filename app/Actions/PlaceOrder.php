@@ -176,6 +176,16 @@ class PlaceOrder
                 $customer->update(['email' => $data['email']]);
             }
 
+            // Special dates typed at checkout (optional). First answer wins:
+            // a guest's second order never overwrites what they told us before.
+            foreach (array_keys(Customer::OCCASIONS) as $occasion) {
+                $day = (int) ($data[$occasion.'_day'] ?? 0);
+                $month = (int) ($data[$occasion.'_month'] ?? 0);
+                if ($day > 0 && $month > 0 && ! $customer->hasOccasion($occasion)) {
+                    $customer->forceFill([$occasion.'_day' => $day, $occasion.'_month' => $month])->saveQuietly();
+                }
+            }
+
             // Where this buyer came from, read off their own visit history.
             $attribution = Visit::attributionFor(request()->cookie('visitor_token'));
 

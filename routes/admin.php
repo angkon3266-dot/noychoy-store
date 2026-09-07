@@ -216,6 +216,7 @@ Route::middleware('admin')->group(function () {
     Route::post('offers/register-discount', [OfferController::class, 'saveRegisterOffer'])->name('offers.register');
     Route::post('offers/loyalty', [OfferController::class, 'saveLoyalty'])->name('offers.loyalty');
     Route::post('offers/gift-ladder', [OfferController::class, 'saveGiftLadder'])->name('offers.gift-ladder');
+    Route::post('offers/occasions', [OfferController::class, 'saveOccasions'])->name('offers.occasions');
 
     // Media library (browse / optimize / delete uploaded images & videos)
     Route::get('media', [MediaController::class, 'index'])->name('media.index');

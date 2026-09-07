@@ -41,4 +41,18 @@ return [
         ['key' => 'gold', 'label' => 'Gold', 'min_points' => 3000, 'multiplier' => 1.25, 'perk' => '1.25× points + early access to drops'],
         ['key' => 'platinum', 'label' => 'Platinum', 'min_points' => 10000, 'multiplier' => 1.5, 'perk' => '1.5× points + priority support & gifts'],
     ],
+
+    // Birthday / anniversary automations (all overridable from Admin → Offers).
+    // A reminder goes out `reminder_days` before the date with the matching
+    // collection; a wish goes out on the day, with a personal offer when
+    // `offer_percent` is above zero. SMS is the paid channel; in-app + push are
+    // free and always sent to members.
+    'occasions' => [
+        'enabled' => true,
+        'sms' => true,
+        'reminder_days' => 10,
+        'offer_percent' => 0,
+        'offer_days' => 7,
+        'per_run' => 200,
+    ],
 ];

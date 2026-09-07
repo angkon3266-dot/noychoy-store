@@ -59,6 +59,7 @@ class AccountController extends Controller
                 'per1000' => (int) round($loyalty->earnPerTaka() * 1000),
                 'reviewPoints' => $loyalty->reviewPoints(),
                 'reviewPhotoBonus' => $loyalty->reviewPhotoBonus(),
+                'referralPoints' => $loyalty->referralPoints(),
                 'tier' => [
                     'emoji' => ['silver' => '🥈', 'gold' => '🥇', 'platinum' => '💎'][$tier['current']['key']] ?? '⭐',
                     'label' => $tier['current']['label'],
@@ -68,6 +69,9 @@ class AccountController extends Controller
                         'label' => $tier['next']['label'],
                         'perk' => $tier['next']['perk'],
                         'toNext' => number_format($tier['to_next']),
+                        // The same distance in orders — at this tier's earn rate.
+                        'toNextSpendText' => ($rate = $loyalty->earnPerTaka() * $loyalty->tierMultiplier($customer)) > 0
+                            ? money(ceil($tier['to_next'] / $rate)) : null,
                         'progress' => $tier['progress'],
                     ] : null,
                 ],
@@ -302,9 +306,17 @@ class AccountController extends Controller
                 'phone' => $customer->phone,
                 'email' => $customer->email,
                 'gender' => $customer->gender,
+                'locale' => $customer->locale,
+                'birthday_day' => $customer->birthday_day,
+                'birthday_month' => $customer->birthday_month,
+                'anniversary_day' => $customer->anniversary_day,
+                'anniversary_month' => $customer->anniversary_month,
                 'hasPassword' => (bool) $customer->password,
             ],
             'genders' => \App\Models\Customer::GENDERS,
+            'languages' => \App\Models\Customer::LANGUAGES,
+            'occasions' => \App\Models\Customer::OCCASIONS,
+            'reminderDays' => \App\Support\Occasions::reminderDays(),
         ])->withViewData(['pageTitle' => 'Profile & security']);
     }
 
@@ -319,12 +331,51 @@ class AccountController extends Controller
             'email' => ['nullable', 'email', 'max:160', Rule::unique('customers', 'email')->ignore($customer->id)],
             'phone' => ['required', 'string', new \App\Rules\BdPhone, Rule::unique('customers', 'phone')->ignore($customer->id)],
             'gender' => ['nullable', 'in:male,female,other'],
+            'locale' => ['nullable', 'in:en,bn'],
+            'birthday_day' => ['nullable', 'integer', 'between:1,31'],
+            'birthday_month' => ['nullable', 'integer', 'between:1,12'],
+            'anniversary_day' => ['nullable', 'integer', 'between:1,31'],
+            'anniversary_month' => ['nullable', 'integer', 'between:1,12'],
         ]);
-        $data['gender'] = $data['gender'] ?: null;
+        $data['gender'] = ($data['gender'] ?? null) ?: null;
+        $data['locale'] = ($data['locale'] ?? null) ?: null;
+        // A date is day AND month or nothing — half a date reminds nobody.
+        foreach (array_keys(\App\Models\Customer::OCCASIONS) as $occasion) {
+            $day = (int) ($data[$occasion.'_day'] ?? 0);
+            $month = (int) ($data[$occasion.'_month'] ?? 0);
+            $data[$occasion.'_day'] = $day > 0 && $month > 0 ? $day : null;
+            $data[$occasion.'_month'] = $day > 0 && $month > 0 ? $month : null;
+        }
 
         $customer->update($data);
 
+        if ($data['locale']) {
+            \App\Support\Locale::remember($data['locale']);
+        }
+
         return back()->with('success', 'Profile updated.');
+    }
+
+    /** Invite friends: the member's link, share buttons and what it has earned. */
+    public function referrals(\App\Services\LoyaltyService $loyalty)
+    {
+        $customer = $this->customer();
+        $url = \App\Support\Referral::inviteUrl($customer);
+        $points = $loyalty->referralPoints();
+        $text = 'I shop at '.store_name().' — join with my link and we both get '.$points.' points after your first delivered order: '.$url;
+
+        return \Inertia\Inertia::render('Account/Referrals', [
+            'pageTitle' => 'Invite friends',
+            'invite' => [
+                'code' => \App\Support\Referral::codeFor($customer),
+                'url' => $url,
+                'points' => $points,
+                'stats' => \App\Support\Referral::stats($customer),
+                'shareText' => $text,
+                'whatsapp' => 'https://wa.me/?text='.rawurlencode($text),
+                'enabled' => $loyalty->enabled() && $points > 0,
+            ],
+        ])->withViewData(['pageTitle' => 'Invite friends']);
     }
 
     public function updatePassword(Request $request)

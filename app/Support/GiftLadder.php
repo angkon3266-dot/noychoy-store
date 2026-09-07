@@ -168,11 +168,18 @@ class GiftLadder
             'free_delivery' => false, 'rewards' => [], 'free' => null, 'free_by_line' => [], 'gift_pending' => false,
         ];
 
-        if (! $this->enabled() || $cart->isEmpty()) {
+        if (! $this->enabled()) {
             return $empty;
         }
 
         $tiers = $this->tiers();
+
+        // An empty cart still knows the ladder — every rung locked — so the
+        // header strip can name the first milestone before anything is added.
+        if ($cart->isEmpty()) {
+            return ['rewards' => array_map(fn ($t) => $t + ['unlocked' => false, 'pending' => false, 'amount' => 0.0], $tiers)] + $empty;
+        }
+
         $units = (int) $cart->items()->sum('qty');
         $subtotal = $cart->subtotal();
 

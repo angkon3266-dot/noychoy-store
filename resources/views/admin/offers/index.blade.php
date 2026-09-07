@@ -165,8 +165,49 @@
                 <label class="label">Review-with-photo bonus</label>
                 <input name="photo_bonus" type="number" step="1" min="0" value="{{ $loyalty['photo_bonus'] }}" class="input">
             </div>
+            <div>
+                <label class="label">Referral points (each side)</label>
+                <input name="referral" type="number" step="1" min="0" value="{{ $loyalty['referral'] }}" class="input" title="Paid to the inviter AND the invited friend when the friend's first order is delivered. 0 switches invites off.">
+            </div>
         </div>
         <button class="btn-primary mt-3">Save loyalty settings</button>
+    </form>
+</div>
+
+{{-- Birthday & anniversary automations --}}
+<div class="card p-5 mb-6 max-w-3xl">
+    <h2 class="font-semibold mb-1">Birthday &amp; anniversary messages</h2>
+    <p class="text-xs text-ink-700/60 mb-3">
+        Customers can leave a birthday and an anniversary (day + month) at checkout or in their account —
+        <strong>{{ $occasions['on_file'] }}</strong> have so far. A reminder with the matching collection goes out before the date,
+        and a wish on the day. In-app + push are free and always sent to members; SMS costs a segment each.
+        Runs daily at 09:30.
+    </p>
+    <form action="{{ route('admin.offers.occasions') }}" method="POST" class="flex flex-wrap items-end gap-3">
+        @csrf
+        <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
+            <input type="checkbox" name="enabled" value="1" @checked($occasions['enabled'])> Automation on
+        </label>
+        <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
+            <input type="checkbox" name="sms" value="1" @checked($occasions['sms'])> Also send SMS
+        </label>
+        <div>
+            <label class="label">Remind (days before)</label>
+            <input name="reminder_days" type="number" min="1" max="60" value="{{ $occasions['reminder_days'] }}" class="input w-28">
+        </div>
+        <div>
+            <label class="label">Gift on the day (% off, 0 = none)</label>
+            <input name="offer_percent" type="number" step="0.5" min="0" max="90" value="{{ $occasions['offer_percent'] }}" class="input w-32">
+        </div>
+        <div>
+            <label class="label">Gift valid (days)</label>
+            <input name="offer_days" type="number" min="1" max="60" value="{{ $occasions['offer_days'] }}" class="input w-24">
+        </div>
+        <button class="btn-primary">Save</button>
+        <p class="w-full text-xs text-ink-700/50 mt-1">
+            The gift is a personal one-use offer that applies itself at checkout for logged-in members.
+            SMS wording lives under System Config → Integrations → SMS templates (“occasion_reminder”, “occasion_wish”).
+        </p>
     </form>
 </div>
 

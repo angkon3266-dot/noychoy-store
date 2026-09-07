@@ -36,7 +36,17 @@
         @endif
         // Respects the per-event toggles (Meta → Tracking); disabled events no-op.
         window.track = function (event, params, opts) {
-            try { if (window.META_EVENTS && window.META_EVENTS[event] === false) return; fbq('track', event, params || {}, opts || {}); } catch (e) {}
+            try {
+                if (window.META_EVENTS && window.META_EVENTS[event] === false) return;
+                params = params || {};
+                // A numeric value above zero, or none at all: a string, 0 or NaN
+                // here is a data-quality warning against the whole Pixel.
+                if ('value' in params) {
+                    var v = Math.round(Number(params.value) * 100) / 100;
+                    if (isFinite(v) && v > 0) params.value = v; else delete params.value;
+                }
+                fbq('track', event, params, opts || {});
+            } catch (e) {}
         };
     </script>
     <noscript><img height="1" width="1" style="display:none"

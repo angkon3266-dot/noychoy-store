@@ -5,6 +5,7 @@ import ProductCard from '../Shared/ProductCard';
 import SmartLink from '../Shared/SmartLink';
 import GiftLadderBar from '../Shared/GiftLadderBar';
 import Icon from '../Shared/Icons';
+import { t } from '../Shared/i18n';
 
 // Full cart page. Mutations go through Inertia (server redirects back to /cart
 // with fresh props + flash), with optimistic qty display while in flight.
@@ -169,10 +170,10 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                     )}
 
                     {memberNudge && (
-                        <a href={urls.register} className="mt-3 block rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100">
+                        <a href={urls.register} className="mt-3 block rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100" lang={props.chrome?.lang}>
                             <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
-                            Join free and save <strong>{memberNudge.saving_text}</strong> on this order — members get {memberNudge.pct}% off every piece
-                            {props.chrome?.membership?.pointsPer1000 ? ` and earn ${props.chrome.membership.pointsPer1000} points per ৳1,000` : ''}.
+                            {t(props.chrome?.lang, 'cart.join', { saving: memberNudge.saving_text, pct: memberNudge.pct })}
+                            {props.chrome?.membership?.pointsPer1000 ? t(props.chrome?.lang, 'cart.points', { points: props.chrome.membership.pointsPer1000 }) : ''}.
                         </a>
                     )}
 

@@ -2,7 +2,7 @@ import { Link, useForm, usePage } from '@inertiajs/react';
 import Layout from '../../Shared/Chrome/Layout';
 import AuthCard, { keepOnErrors } from '../../Shared/AuthCard';
 
-export default function Register({ old }) {
+export default function Register({ old, invitedBy = null }) {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
     const form = useForm({ name: old.name || '', phone: old.phone || '', email: old.email || '', password: '', password_confirmation: '' });
@@ -24,6 +24,11 @@ export default function Register({ old }) {
 
     return (
         <AuthCard title="Create your account" subtitle={m?.text || m?.pitch || undefined}>
+            {invitedBy && (
+                <div className="mt-4 rounded-md bg-gold-50 border border-gold-200 px-3 py-2.5 text-sm text-ink-800">
+                    🤝 <strong>{invitedBy.name}</strong> invited you — join free and you both get <strong>{invitedBy.points} points</strong> after your first delivered order.
+                </div>
+            )}
             {/* The form used to be five bare inputs — it never said what
                 joining was worth. */}
             <ul className="mt-5 space-y-1.5 text-sm text-ink-800">

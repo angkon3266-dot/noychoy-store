@@ -40,6 +40,12 @@ return [
         'show_new_arrivals' => true,
         'show_highlights' => true,
         'show_videos' => true,
+        // Per-visitor rows (React home): what they looked at, and picks from
+        // the gift finder / loves / co-purchase data. Self-hiding without a signal.
+        'show_recently_viewed' => true,
+        'recently_viewed_title' => 'Recently viewed',
+        'show_picked_for_you' => true,
+        'picked_for_you_title' => 'Picked for you',
 
         // Feature strip (4 reassurance items). Each: icon + title.
         // `icon` is a name from App\Support\StorefrontIcons; an emoji saved

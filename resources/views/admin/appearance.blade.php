@@ -453,6 +453,22 @@
             <p class="text-xs text-ink-700/50 mt-2">Clear a label to delete that tile. Point a link at a category, a landing page (<code>/lp/eid</code>) or any URL.</p>
         </div>
 
+        {{-- Per-visitor rows --}}
+        <div class="mt-8 border-t border-ink-100 pt-5">
+            <h3 class="text-sm font-semibold text-ink-700 mb-1">Personal rows</h3>
+            <p class="text-xs text-ink-700/50 mb-3">Each visitor sees their own: pieces they looked at, and picks from their gift-finder answers, loved pieces and what others bought alongside. A row hides itself until there is enough signal.</p>
+            <label class="flex items-center gap-2 text-sm mb-2">
+                <input type="hidden" name="home_show_picked_for_you_present" value="1">
+                <input type="checkbox" name="home_show_picked_for_you" value="1" @checked($home['show_picked_for_you'] ?? true)>
+                Show “Picked for you”
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="hidden" name="home_show_recently_viewed_present" value="1">
+                <input type="checkbox" name="home_show_recently_viewed" value="1" @checked($home['show_recently_viewed'] ?? true)>
+                Show “Recently viewed”
+            </label>
+        </div>
+
         {{-- Gift finder (budget bands) --}}
         <div class="mt-8 border-t border-ink-100 pt-5">
             <label class="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-1">

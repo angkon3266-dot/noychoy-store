@@ -23,6 +23,14 @@ class CatalogController extends Controller
 
     public function index(Request $request)
     {
+        // The gift finder's answers arrive on its budget links; remember them
+        // and let the occasion narrow the grid to its tag.
+        \App\Support\GiftProfile::rememberFromRequest($request);
+        if ($request->filled('occasion') && ! $request->query('tags')
+            && ($tag = \App\Support\GiftProfile::occasionTag(['occasion' => (string) $request->query('occasion')]))) {
+            $request->query->set('tags', [$tag]);
+        }
+
         $base = Product::published()->search($request->query('q'));
 
         return $this->renderCatalog(

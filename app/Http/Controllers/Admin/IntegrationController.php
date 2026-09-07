@@ -20,8 +20,10 @@ class IntegrationController extends Controller
         'order_delivered' => 'Order delivered / completed',
         'order_cancelled' => 'Order cancelled',
         'review_request' => 'Review request (post-delivery) — extra placeholder: {link}',
-        'abandoned_cart' => 'Abandoned cart reminder — extra placeholder: {link}',
+        'abandoned_cart' => 'Abandoned cart reminder — extra placeholders: {link}, {ladder} (next reward rung)',
         'password_reset' => 'Password reset code — placeholders: {store}, {code}, {minutes}',
+        'occasion_reminder' => 'Birthday / anniversary reminder — placeholders: {name}, {occasion}, {link}',
+        'occasion_wish' => 'Birthday / anniversary wish (on the day) — placeholders: {name}, {occasion}, {offer}',
     ];
 
     public function index(SteadfastService $steadfast, SmsService $sms)

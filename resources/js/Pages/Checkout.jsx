@@ -3,6 +3,7 @@ import { router, useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import { fetchJson, money } from '../Shared/format';
 import Icon, { IconOrGlyph } from '../Shared/Icons';
+import DateField from '../Shared/DateField';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
 // what "the same number" is — and so "017 1234 5678" is not silently dropped.
@@ -76,7 +77,12 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
         notes: '',
         is_gift: false,
         card_message: '',
+        birthday_day: '',
+        birthday_month: '',
+        anniversary_day: '',
+        anniversary_month: '',
     });
+    const [datesOpen, setDatesOpen] = useState(false);
 
     // InitiateCheckout — same event id as the server's CAPI call (dedup).
     useEffect(() => {
@@ -308,6 +314,26 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                             )}
                         </div>
                     )}
+
+                    {/* Special dates — optional and collapsed. The first answer
+                        is kept on the customer record, so a returning shopper
+                        is never asked twice; the store then sends a reminder
+                        with gift ideas before the day and a wish on it. */}
+                    <div className={`rounded-xl border p-4 transition-colors ${datesOpen ? 'border-gold-400 bg-gold-50/60' : 'border-ink-100'}`}>
+                        <button type="button" onClick={() => setDatesOpen(!datesOpen)} className="w-full flex items-center justify-between gap-3 text-left text-sm" aria-expanded={datesOpen}>
+                            <span className="inline-flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-gold-700 shrink-0" /><span>Want a surprise on your special day? <span className="text-ink-700/60">(optional)</span></span></span>
+                            <span className="text-gold-700 text-xs font-medium whitespace-nowrap">{datesOpen ? 'Hide' : 'Add dates'}</span>
+                        </button>
+                        {datesOpen && (
+                            <div className="mt-3 grid sm:grid-cols-2 gap-3">
+                                <DateField compact label="Birthday" day={form.data.birthday_day} month={form.data.birthday_month}
+                                    onDay={(v) => form.setData('birthday_day', v)} onMonth={(v) => form.setData('birthday_month', v)} />
+                                <DateField compact label="Anniversary" day={form.data.anniversary_day} month={form.data.anniversary_month}
+                                    onDay={(v) => form.setData('anniversary_day', v)} onMonth={(v) => form.setData('anniversary_month', v)} />
+                                <p className="sm:col-span-2 text-[11px] text-ink-700/60">We'll send a little reminder with gift ideas before the day, and a wish on it. Day and month only.</p>
+                            </div>
+                        )}
+                    </div>
 
                     <div data-field="notes">
                         <label className="label" htmlFor="co-notes">Order note (optional)</label>

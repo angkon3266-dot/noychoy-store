@@ -54,6 +54,8 @@ class TransitionOrderStatus
 
         if ($status === 'delivered') {
             app(LoyaltyService::class)->awardForOrder($order->fresh('customer'));
+            // An invited customer's first delivery pays the referral, both ways.
+            app(LoyaltyService::class)->awardReferralForOrder($order->fresh('customer'));
 
             // On cash on delivery, "delivered" IS the payment — the courier
             // took the money at the door. Nothing in the codebase ever moved
@@ -78,6 +80,7 @@ class TransitionOrderStatus
         // parcel leaves the customer holding points for a sale that unwound.
         if ($from === 'delivered' && in_array($status, ['returned', 'cancelled'], true)) {
             app(LoyaltyService::class)->reverseForOrder($order->fresh('customer'));
+            app(LoyaltyService::class)->reverseReferralForOrder($order->fresh('customer'));
         }
 
         // Points the customer SPENT are a different ledger from points they

@@ -161,6 +161,11 @@ class CheckoutController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
             'is_gift' => ['nullable', 'boolean'],
             'card_message' => ['nullable', 'string', 'max:'.max(20, min(240, (int) theme('gift_message_max', 100)))],
+            // Optional special dates, day + month only (see PlaceOrder).
+            'birthday_day' => ['nullable', 'integer', 'between:1,31'],
+            'birthday_month' => ['nullable', 'integer', 'between:1,12'],
+            'anniversary_day' => ['nullable', 'integer', 'between:1,31'],
+            'anniversary_month' => ['nullable', 'integer', 'between:1,12'],
         ], [
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);
@@ -315,6 +320,9 @@ class CheckoutController extends Controller
         ]);
 
         $customer->update(['password' => $data['password']]);
+
+        // A guest who arrived on an invite link and now becomes a member.
+        \App\Support\Referral::attach($customer, $request);
 
         $loyalty = app(\App\Services\LoyaltyService::class);
         if ($loyalty->enabled() && $loyalty->signupPoints() > 0) {

@@ -59,6 +59,16 @@ worked examples in the prompt are generated from the live delivery numbers,
 so the style guide can never contradict the facts. The owner can add house
 rules in **Extra instructions**.
 
+It makes the first move. The panel opens with a question ("Hi Rima! … How
+can I help you today?" — the first name when the customer is signed in), four
+starter chips in the visitor's language, and a once-per-session teaser beside
+the launcher six seconds into the visit ("Kichu lagbe? 👋 Ask me anything" /
+"কিছু লাগবে? 👋 আমাকে জিজ্ঞেস করুন"). The teaser never shows on the checkout
+form or once a conversation exists; it is placed from the launcher's live box,
+so it sits correctly on both the React and the Blade floating stacks.
+Signed-in members get their name, tier, points and last three orders in the
+prompt, and the `my_orders` tool.
+
 ## The endpoint
 
 `POST /assistant/chat` (web group: session + CSRF) — body
@@ -93,6 +103,11 @@ browser's `sessionStorage` (`noychat.v1`) and travels with each request.
   orders, the size limits, the clean 502, and the meter.
 
 ## Bangla
+
+Writing to the assistant in Bengali script sets the visitor's language
+(`App\Support\Locale`: the `lang` cookie, and the member record for members),
+which then drives the greeting, the chips, the header strip and the rest of
+the Bangla chrome copy site-wide. The footer toggle does the same by hand.
 
 The model handles Bangla itself. The widget sets `lang="bn"` on Bengali
 bubbles and falls back to system Bengali faces (Noto Sans Bengali, Nirmala

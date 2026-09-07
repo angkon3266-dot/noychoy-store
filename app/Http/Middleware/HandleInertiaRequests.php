@@ -44,6 +44,10 @@ class HandleInertiaRequests extends Middleware
             // Fresh on every response — the badge must never lag an add-to-cart.
             'cart' => fn () => ['count' => app(CartService::class)->count()],
 
+            // The reward ladder's progress (null when the ladder is off) — the
+            // always-visible strip under the header reads this on every page.
+            'ladder' => fn () => app(CartService::class)->giftProgress(),
+
             'customer' => function () {
                 $c = auth('customer')->user();
 
@@ -74,6 +78,8 @@ class HandleInertiaRequests extends Middleware
 
         return [
             'storeName' => store_name(),
+            // 'en' | 'bn' — the visitor's language (cookie, or the member record).
+            'lang' => \App\Support\Locale::current(),
             // SmartLink uses this to decide whether "/" is SPA-navigable —
             // must agree with HomeController's template → Inertia condition.
             'inertiaHome' => \App\Support\HomePage::isReact(),
@@ -110,12 +116,15 @@ class HandleInertiaRequests extends Middleware
             ],
             'notifications' => $customer ? $this->notifications($customer) : null,
             'memberBar' => $customer && theme('cbar_enabled') && filled(theme('cbar_text')) ? [
-                'text' => str_replace('{name}', str($customer->name)->trim()->explode(' ')->first(), theme('cbar_text')),
+                // A Bangla speaker is greeted in Bangla: the admin's own Bangla
+                // line when one is set, else a built-in one.
+                'text' => str_replace('{name}', str($customer->name)->trim()->explode(' ')->first(),
+                    \App\Support\Locale::isBangla() ? (theme('cbar_text_bn') ?: 'ফিরে আসায় খুশি হলাম, {name}!') : theme('cbar_text')),
                 'code' => theme('cbar_code'),
                 'bg' => theme('cbar_bg'),
                 'color' => theme('cbar_color'),
                 'link' => theme('cbar_link'),
-                'linkLabel' => theme('cbar_link_label') ?: 'Shop now',
+                'linkLabel' => theme('cbar_link_label') ?: \App\Support\Locale::t('Shop now', 'এখনই কিনুন'),
                 'key' => md5(theme('cbar_text').theme('cbar_code')),
             ] : null,
             'offers' => $customer ? $this->memberOffers($customer) : null,

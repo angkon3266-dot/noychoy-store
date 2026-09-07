@@ -8,16 +8,26 @@
 --}}
 @php
     $assistant = app(\App\Services\Ai\AssistantService::class);
+    $bn = \App\Support\Locale::isBangla();
     $chatConfig = $assistant->enabled() ? [
         'endpoint' => route('assistant.chat'),
         'csrf' => csrf_token(),
         'store' => store_name(),
         'greeting' => $assistant->greeting(),
         'offline' => $assistant->offlineText(),
-        'chips' => ['Gift under ৳1,000', 'Delivery charge?', 'Track my order', 'আমার অর্ডার কোথায়?'],
+        // The assistant makes the first move: a small "need anything?" beside
+        // the launcher, once per session, never over the checkout form.
+        'teaser' => $bn ? 'কিছু লাগবে? 👋 আমাকে জিজ্ঞেস করুন' : 'Kichu lagbe? 👋 Ask me anything',
+        'chips' => $bn
+            ? ['ডেলিভারি চার্জ কত?', '১,০০০ টাকার নিচে গিফট', 'আমার অর্ডার কোথায়?', 'রিং সাইজ কীভাবে মাপব?']
+            : ['Delivery charge koto?', 'Gift under ৳1,000', 'Track my order', 'Ring size help'],
     ] : null;
 @endphp
 @if($chatConfig)
+<div id="noy-chat-teaser" class="noy-chat-teaser" role="status" hidden>
+    <button type="button" class="noy-chat-teaser__open" data-noy-tease-open></button>
+    <button type="button" class="noy-chat-teaser__x" data-noy-tease-close aria-label="Dismiss">&times;</button>
+</div>
 <div id="noy-chat" class="noy-chat" data-config='@json($chatConfig)' hidden>
 <style>
     .noy-chat{position:fixed;right:1.25rem;bottom:calc(5.75rem + env(safe-area-inset-bottom));z-index:70;width:min(380px,calc(100vw - 2.5rem));max-height:min(72vh,640px);display:flex;flex-direction:column;background:#fff;color:var(--color-ink-900,#161618);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.22),0 2px 8px rgba(0,0,0,.08);overflow:hidden;font-family:inherit,'Noto Sans Bengali','Nirmala UI','Bangla Sangam MN','Vrinda',sans-serif;font-size:14px;line-height:1.45}
@@ -30,7 +40,10 @@
     .noy-chat__close{margin-left:auto;background:transparent;border:0;color:#fff;font-size:22px;line-height:1;cursor:pointer;padding:.25rem .4rem;border-radius:8px}
     .noy-chat__close:hover{background:rgba(255,255,255,.15)}
     .noy-chat__log{flex:1;overflow-y:auto;padding:.9rem 1rem .5rem;display:flex;flex-direction:column;gap:.55rem;scroll-behavior:smooth;background:var(--color-gold-50,#fbf7f1)}
-    .noy-chat__msg{max-width:88%;padding:.55rem .8rem;border-radius:14px;white-space:pre-wrap;word-break:break-word}
+    /* flex:none on every log child: the log is a column flexbox that scrolls, and a
+       child that may itself scroll (the product cards) would otherwise be shrunk
+       to a sliver once the conversation overflows. */
+    .noy-chat__msg{flex:none;max-width:88%;padding:.55rem .8rem;border-radius:14px;white-space:pre-wrap;word-break:break-word}
     .noy-chat__msg--user{align-self:flex-end;background:var(--color-gold-200,#e9d7bd);border-bottom-right-radius:4px}
     .noy-chat__msg--bot{align-self:flex-start;background:#fff;border:1px solid var(--color-gold-100,#f1e7d8);border-bottom-left-radius:4px}
     .noy-chat__msg--bot a{color:var(--color-gold-800,#6f5330);text-decoration:underline}
@@ -38,7 +51,7 @@
     .noy-chat__typing span{display:inline-block;width:6px;height:6px;margin:0 2px;border-radius:50%;background:var(--color-gold-600,#b08768);animation:noy-b 1s infinite}
     .noy-chat__typing span:nth-child(2){animation-delay:.15s}.noy-chat__typing span:nth-child(3){animation-delay:.3s}
     @keyframes noy-b{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-    .noy-chat__cards{display:flex;gap:.5rem;overflow-x:auto;padding:.1rem 0 .3rem;align-self:stretch;scrollbar-width:thin}
+    .noy-chat__cards{flex:none;display:flex;gap:.5rem;overflow-x:auto;padding:.1rem 0 .3rem;align-self:stretch;scrollbar-width:thin}
     .noy-chat__card{flex:0 0 150px;background:#fff;border:1px solid var(--color-gold-100,#f1e7d8);border-radius:12px;padding:.5rem;text-decoration:none;color:inherit;display:block}
     .noy-chat__card img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;background:var(--color-gold-100,#f1e7d8)}
     .noy-chat__card b{display:block;font-size:12px;font-weight:600;margin-top:.4rem;line-height:1.3;max-height:2.6em;overflow:hidden}
@@ -53,6 +66,14 @@
     .noy-chat__send{flex:none;width:40px;height:40px;border-radius:50%;border:0;background:var(--color-ink-900,#161618);color:#fff;cursor:pointer;display:grid;place-items:center}
     .noy-chat__send:disabled{opacity:.45;cursor:default}
     .noy-chat__foot{font-size:10px;color:#8a7f72;text-align:center;padding:0 .75rem .5rem;background:#fff}
+    /* The opening line beside the launcher; right/top are set from the launcher's box. */
+    .noy-chat-teaser{position:fixed;z-index:69;transform:translateY(-50%);display:flex;align-items:center;gap:.1rem;max-width:min(270px,calc(100vw - 6.75rem));background:#fff;color:var(--color-ink-900,#161618);border:1px solid var(--color-gold-200,#e9d7bd);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:.15rem .25rem .15rem .15rem;font-family:inherit,'Noto Sans Bengali','Nirmala UI','Bangla Sangam MN','Vrinda',sans-serif;animation:noy-pop .3s ease-out}
+    .noy-chat-teaser[hidden]{display:none}
+    .noy-chat-teaser:after{content:"";position:absolute;right:-6px;top:50%;width:10px;height:10px;margin-top:-5px;background:#fff;border-top:1px solid var(--color-gold-200,#e9d7bd);border-right:1px solid var(--color-gold-200,#e9d7bd);transform:rotate(45deg)}
+    .noy-chat-teaser__open{border:0;background:transparent;font:inherit;font-size:13px;line-height:1.35;color:inherit;text-align:left;padding:.5rem .3rem .5rem .65rem;cursor:pointer;font-family:inherit}
+    .noy-chat-teaser__x{flex:none;border:0;background:transparent;color:#8a7f72;font-size:18px;line-height:1;padding:.2rem .4rem;cursor:pointer;border-radius:8px}
+    .noy-chat-teaser__x:hover{background:var(--color-gold-100,#f1e7d8)}
+    @keyframes noy-pop{from{opacity:0;transform:translateY(-50%) translateX(8px)}to{opacity:1;transform:translateY(-50%)}}
 </style>
 <div class="noy-chat__head">
     <div class="noy-chat__dot" aria-hidden="true"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.652.213-2.76 1.66-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg></div>
@@ -222,6 +243,7 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !root.hidden) close(); });
 
     function open() {
+        hideTeaser();
         root.hidden = false;
         renderAll();
         setTimeout(function () { input.focus(); }, 50);
@@ -232,6 +254,47 @@
         document.querySelectorAll('[data-noy-chat-launcher]').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
     }
     function toggle() { root.hidden ? open() : close(); }
+
+    // The assistant speaks first. A small "need anything?" appears beside the
+    // launcher a few seconds in, once per session (sessionStorage), never on
+    // the checkout form, never once a conversation exists. Placed from the
+    // launcher's live box, so it sits right on the React and Blade stacks alike.
+    var teaser = document.getElementById('noy-chat-teaser');
+    var TEASED = 'noychat.teased';
+    var teaseTimer = null;
+
+    function placeTeaser() {
+        var b = document.querySelector('[data-noy-chat-launcher]');
+        if (!b || !teaser) return false;
+        var r = b.getBoundingClientRect();
+        if (!r.width || !r.height) return false;
+        teaser.style.right = Math.round(window.innerWidth - r.left + 10) + 'px';
+        teaser.style.top = Math.round(r.top + r.height / 2) + 'px';
+        return true;
+    }
+    function hideTeaser() {
+        if (!teaser || teaser.hidden) return;
+        teaser.hidden = true;
+        clearTimeout(teaseTimer);
+    }
+    function showTeaser() {
+        if (!teaser || !root.hidden || msgs.length || /^\/checkout/.test(location.pathname)) return;
+        try { if (sessionStorage.getItem(TEASED)) return; } catch (e) {}
+        if (!placeTeaser()) return;
+        try { sessionStorage.setItem(TEASED, '1'); } catch (e) {}
+        teaser.hidden = false;
+        teaseTimer = setTimeout(hideTeaser, 15000);
+    }
+    if (teaser) {
+        var teaseOpen = teaser.querySelector('[data-noy-tease-open]');
+        teaseOpen.textContent = cfg.teaser;
+        if (isBangla(cfg.teaser)) teaseOpen.setAttribute('lang', 'bn');
+        teaseOpen.addEventListener('click', function () { hideTeaser(); open(); });
+        teaser.querySelector('[data-noy-tease-close]').addEventListener('click', hideTeaser);
+        window.addEventListener('resize', function () { if (!teaser.hidden && !placeTeaser()) hideTeaser(); });
+        document.addEventListener('inertia:navigate', hideTeaser);
+        setTimeout(showTeaser, 6000);
+    }
 
     window.NoyChat = { open: open, close: close, toggle: toggle, isOpen: function () { return !root.hidden; } };
 })();

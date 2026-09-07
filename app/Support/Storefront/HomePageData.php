@@ -21,7 +21,13 @@ class HomePageData
         Collection $bestSellers,
         Collection $categories,
         Collection $sections,
+        ?Collection $recentlyViewed = null,
+        ?Collection $pickedForYou = null,
     ): array {
+        $recentlyViewed ??= collect();
+        $pickedForYou ??= collect();
+        $giftProfile = \App\Support\GiftProfile::current();
+
         return [
             'pageTitle' => home_content('seo_title') ?: 'Fine Jewelry',
             'hero' => [
@@ -79,6 +85,19 @@ class HomePageData
                 'title' => home_content('best_selling_title') ?: 'Best sellers',
                 'cards' => ProductCardData::collection($bestSellers->take(8)),
             ],
+            // Per-visitor rows. Both need a real signal before they show: two
+            // pieces looked at, four picks — a one-card row reads as broken.
+            'recentlyViewed' => [
+                'show' => (bool) home_content('show_recently_viewed') && $recentlyViewed->count() >= 2,
+                'title' => home_content('recently_viewed_title') ?: 'Recently viewed',
+                'cards' => ProductCardData::collection($recentlyViewed->take(8)),
+            ],
+            'pickedForYou' => [
+                'show' => (bool) home_content('show_picked_for_you') && $pickedForYou->count() >= 4,
+                'title' => (home_content('picked_for_you_title') ?: 'Picked for you')
+                    .($giftProfile && ($desc = \App\Support\GiftProfile::describe($giftProfile)) !== '' ? ' — '.$desc : ''),
+                'cards' => ProductCardData::collection($pickedForYou->take(8)),
+            ],
             'featureStrip' => [
                 'show' => (bool) home_content('show_feature_strip'),
                 'items' => collect(home_content('feature_strip') ?? [])
@@ -108,6 +127,11 @@ class HomePageData
             ],
             'giftFinder' => [
                 'show' => (bool) home_content('show_gift_finder'),
+                // Who and what for — the answers ride on the budget links and
+                // are remembered (GiftProfile), so the shop never asks twice.
+                'recipients' => collect(\App\Support\GiftProfile::RECIPIENTS)->map(fn ($label, $key) => [$key, $label])->values(),
+                'occasions' => collect(\App\Support\GiftProfile::OCCASIONS)->map(fn ($o, $key) => [$key, $o[0]])->values(),
+                'profile' => $giftProfile ? ['for' => $giftProfile['for'] ?? null, 'occasion' => $giftProfile['occasion'] ?? null] : null,
                 'title' => home_content('gift_finder_title') ?: 'Shopping for someone?',
                 'budgets' => collect(home_content('gift_budgets') ?? [])->map(function ($b) {
                     $min = $b['min'] ?? null;

@@ -298,7 +298,7 @@ class AppearanceController extends Controller
         // Only touch a toggle the form actually submitted. The gift-finder
         // checkbox did not exist on this form for a while, so every save was
         // silently writing it false and hiding the section on the storefront.
-        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals', 'show_occasions', 'show_gift_finder'] as $t) {
+        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals', 'show_occasions', 'show_gift_finder', 'show_recently_viewed', 'show_picked_for_you'] as $t) {
             if ($request->has('home_'.$t.'_present')) {
                 $home[$t] = $request->boolean('home_'.$t);
             }

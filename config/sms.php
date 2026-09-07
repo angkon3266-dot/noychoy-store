@@ -22,7 +22,14 @@ return [
         // paid segments on every send. {offer} carries its own leading space,
         // so the line closes cleanly when the discount is switched off.
         'review_request' => '{store}: {name}, rate order {order} {link}{offer}',
-        'abandoned_cart' => 'Hi {name}, your {store} selection is still saved. Finish your order here: {link}',
+        // {ladder} is the reward ladder's next rung (" Add 1 more piece for
+        // free delivery.") — it carries its own leading space and is empty
+        // when the ladder is off or everything is already unlocked.
+        'abandoned_cart' => 'Hi {name}, your {store} selection is still saved.{ladder} Finish your order here: {link}',
         'password_reset' => 'Your {store} password reset code is {code}. Valid for {minutes} minutes.',
+        // Birthday / anniversary automations (crm:occasions). {occasion} is
+        // "birthday" or "anniversary"; {offer} carries its own leading space.
+        'occasion_reminder' => 'Hi {name}, your {occasion} is coming up! {store} picked a few pieces for the day: {link}',
+        'occasion_wish' => 'Happy {occasion}, {name}! Warm wishes from all of us at {store}.{offer}',
     ],
 ];
