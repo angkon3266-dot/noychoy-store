@@ -14,7 +14,7 @@ class DatabaseSeeder extends Seeder
     {
         // ── Admin account ───────────────────────────────────────────────
         User::updateOrCreate(
-            ['email' => 'admin@meridianeclat.shop'],
+            ['email' => 'admin@noychoy.com'],
             ['name' => 'Store Admin', 'password' => 'password', 'role' => 'admin'],
         );
 

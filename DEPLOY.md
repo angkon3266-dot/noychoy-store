@@ -7,7 +7,7 @@ server and the current code on **2026-08-01**.
 
 | | |
 |---|---|
-| **Live domain** | `https://meridianeclat.shop` |
+| **Live domain** | `https://noychoy.com` (since 2026-09-07; `meridianeclat.shop` 301-redirects here) |
 | **Host** | Hostnin shared cPanel (CloudLinux + LiteSpeed) |
 | **SSH host alias** | `hostnin` |
 | **Project path** | `/home/noycuuae/repositories/noychoy-store` (`~/repositories/noychoy-store`) |
@@ -19,8 +19,12 @@ server and the current code on **2026-08-01**.
 | **Cron entries** | exactly **one** — see [§4](#4-how-queued-jobs-actually-run) |
 
 > The path is `~/repositories/noychoy-store`, **not** `~/noychoy-store`. The
-> domain is `meridianeclat.shop`, **not** `nocyhoy.com` (that was the old
-> WooCommerce store this app replaced).
+> live domain is `noychoy.com` since 2026-09-07 (it was `meridianeclat.shop`
+> before that, and `noychoy.com` was the old WooCommerce store). In cPanel,
+> `noychoy.com` is an addon domain whose document root points at the repo's
+> `public/` and whose PHP version is `alt-php83`; `meridianeclat.shop` is still
+> the account's main domain and 301-redirects to `noychoy.com` via
+> `public/.htaccess`.
 
 ---
 
@@ -68,7 +72,7 @@ deploys. Skipping this is the #1 reason "my change didn't go live" — the CLI a
 the web server run separate PHP processes, and the web one is still holding your
 old code.
 
-**7 · Browser smoke test** — open <https://meridianeclat.shop> and check:
+**7 · Browser smoke test** — open <https://noychoy.com> and check:
 home page loads → a product page → add to cart → cart totals look right. Then
 `/admin` still logs in. Two minutes, and it catches almost everything.
 

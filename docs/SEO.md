@@ -1,4 +1,4 @@
-# SEO — meridianeclat.shop
+# SEO — noychoy.com
 
 How this shop gets found in Bangladesh. Two halves: what the code now does
 (shipped, tested, nothing to configure), and what only the owner can do
@@ -19,7 +19,7 @@ over Inertia, so a crawler fetching a product page received a JSON blob and
 copy. Verified against production on 26 Aug:
 
 ```
-$ curl -s https://meridianeclat.shop/product/turquoise-rose-heart-earrings-2 \
+$ curl -s https://noychoy.com/product/turquoise-rose-heart-earrings-2 \
     | grep -c '<h1'      # 0
     | grep -c '<a href'  # 0
 ```
@@ -151,7 +151,7 @@ buy affordable jewellery in Dhaka with cash on delivery" is exactly the kind of
 question those tools now answer with a shortlist. Note the shop is not paid for
 being in that shortlist, which is the point.
 
-Cloudflare dashboard → the `meridianeclat.shop` zone → **AI Crawl Control** (or
+Cloudflare dashboard → the `noychoy.com` zone → **AI Crawl Control** (or
 Settings → Managed robots.txt) → turn the AI-crawler block **off**, or allow
 the ones you want. `Google-Extended` in particular affects AI Overviews, which
 sit above the normal results.
@@ -166,8 +166,8 @@ the deal. If you would rather not, allow `Google-Extended`, `GPTBot` and
 Neither is set up, which means nobody here can see a single real query.
 
 1. [Google Search Console](https://search.google.com/search-console) → add
-   `meridianeclat.shop` as a **Domain** property (DNS TXT via Cloudflare).
-2. Submit `https://meridianeclat.shop/sitemap.xml`.
+   `noychoy.com` as a **Domain** property (DNS TXT via Cloudflare).
+2. Submit `https://noychoy.com/sitemap.xml`.
 3. Use **URL Inspection → Test live URL → View tested page** on one product.
    You should now see the heading, price and links in the raw HTML.
 4. [Bing Webmaster Tools](https://www.bing.com/webmasters) — import from GSC in

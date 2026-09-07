@@ -58,7 +58,7 @@
 
         {{-- Text options --}}
         <div x-show="type==='text'" class="grid sm:grid-cols-2 gap-3">
-            <div><label class="label">Watermark text</label><input name="text" value="{{ $watermark['text'] }}" class="input" placeholder="Meridian Éclat"></div>
+            <div><label class="label">Watermark text</label><input name="text" value="{{ $watermark['text'] }}" class="input" placeholder="NoyChoy"></div>
             <div><label class="label">Text colour</label><input type="color" name="color" value="{{ $watermark['color'] ?: '#ffffff' }}" class="input h-10 w-20 p-1"></div>
             <div class="sm:col-span-2">
                 <label class="label">Font file (.ttf / .otf) — required for text</label>

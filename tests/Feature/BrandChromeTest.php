@@ -19,12 +19,20 @@ class BrandChromeTest extends TestCase
 
     public function test_the_shipped_defaults_no_longer_carry_the_old_brand(): void
     {
+        // Step 02 originally swept "Noychoy" out of the defaults, because the
+        // store traded as Meridian Éclat. On 2026-09-07 the store moved to
+        // noychoy.com and became NoyChoy, so the direction flipped: the old
+        // brand to keep out of shipped defaults is now Meridian Éclat and its
+        // domain. "Meridian" alone is still a legitimate template name.
         foreach (['config/theme.php', 'config/home.php', 'config/pages.php', '.env.example'] as $file) {
-            $this->assertStringNotContainsStringIgnoringCase(
-                'noychoy',
-                file_get_contents(base_path($file)),
-                $file.' still ships the old brand name'
-            );
+            $contents = file_get_contents(base_path($file));
+            foreach (['meridianeclat', 'Meridian Éclat'] as $oldBrand) {
+                $this->assertStringNotContainsStringIgnoringCase(
+                    $oldBrand,
+                    $contents,
+                    $file.' still ships the old brand name'
+                );
+            }
         }
     }
 

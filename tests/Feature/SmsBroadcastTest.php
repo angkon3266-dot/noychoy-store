@@ -197,7 +197,7 @@ class SmsBroadcastTest extends TestCase
         $this->enableSms();
         Http::fake(['*' => Http::response(['Status' => '0', 'Text' => 'ACCEPTD'], 200)]);
 
-        $message = "Meridian \u{c9}clat: up to 20% OFF & free delivery.\n\nShop: meridianeclat.shop";
+        $message = "NoyChoy: up to 20% OFF & free delivery.\n\nShop: noychoy.com";
 
         app(SmsService::class)->send('01711111111', $message);
 

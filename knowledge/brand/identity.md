@@ -4,10 +4,10 @@ topic: identity
 updated: 2026-07-18
 ---
 
-# Brand identity — Meridian Éclat
+# Brand identity — NoyChoy
 
 ## Who we are
-Meridian Éclat (meridianeclat.shop) is a Bangladeshi online fine-jewelry
+NoyChoy (noychoy.com; traded as Meridian Éclat until 2026-09-07) is a Bangladeshi online fine-jewelry
 store: handpicked earrings, rings, necklaces, bracelets, bangles and anklets,
 delivered nationwide with **cash on delivery** — pay only when the piece is in
 your hands. Positioning: **accessible everyday luxury** — pieces that look and

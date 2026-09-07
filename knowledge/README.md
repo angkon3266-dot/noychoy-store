@@ -4,7 +4,7 @@ Single source of truth for the store's brand, catalog, marketing, and support
 knowledge, written for **AI consumption first** (Claude Projects, ChatGPT,
 RAG pipelines, MCP servers, internal automations) and humans second.
 
-This deployment: **Meridian Éclat** (meridianeclat.shop) — fine jewelry,
+This deployment: **NoyChoy** (noychoy.com; traded as Meridian Éclat at meridianeclat.shop until 2026-09-07) — fine jewelry,
 Bangladesh, cash on delivery. The `_templates/` layer is store-agnostic; the
 content layers are this store's real knowledge.
 

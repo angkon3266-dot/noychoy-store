@@ -1,4 +1,4 @@
-/* Meridian Éclat — web push service worker.
+/* NoyChoy — web push service worker.
    Receives encrypted push messages and shows a notification; a click focuses an
    open tab (or opens one) at the target URL. */
 

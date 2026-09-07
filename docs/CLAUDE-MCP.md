@@ -1,7 +1,7 @@
 # Managing the catalogue with Claude (MCP)
 
 The store publishes a **Model Context Protocol** server at
-`https://meridianeclat.shop/mcp`. Connect Claude to it and Claude can manage
+`https://noychoy.com/mcp`. Connect Claude to it and Claude can manage
 products the way it manages a Shopify store: list categories, create products,
 edit details, upload and arrange photos, publish, and archive.
 
@@ -15,7 +15,7 @@ immediately — it is shown once. It looks like `nsk_…`.
 **Claude Code (CLI / desktop app terminal)** — one command:
 
 ```bash
-claude mcp add --transport http meridian https://meridianeclat.shop/mcp --header "Authorization: Bearer nsk_YOUR_TOKEN"
+claude mcp add --transport http meridian https://noychoy.com/mcp --header "Authorization: Bearer nsk_YOUR_TOKEN"
 ```
 
 **Claude Desktop / Cowork** — add to the MCP config (Settings → Developer →
@@ -26,7 +26,7 @@ Edit config), bridging the bearer header with `mcp-remote`:
   "mcpServers": {
     "meridian": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://meridianeclat.shop/mcp",
+      "args": ["-y", "mcp-remote", "https://noychoy.com/mcp",
                "--header", "Authorization: Bearer nsk_YOUR_TOKEN"]
     }
   }

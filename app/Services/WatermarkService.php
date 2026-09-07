@@ -16,7 +16,7 @@ class WatermarkService
 {
     public const DEFAULTS = [
         'type' => 'text',            // 'text' | 'logo'
-        'text' => 'Meridian Éclat',
+        'text' => 'NoyChoy',
         'font_path' => null,         // public-disk path to an uploaded .ttf/.otf
         'logo_path' => null,         // public-disk path to an uploaded PNG
         'position' => 'top-right',   // top-left|top-right|bottom-left|bottom-right|center
@@ -157,7 +157,7 @@ class WatermarkService
         $w = imagesx($base);
         $h = imagesy($base);
         $size = max(8, (int) round($w * max(1, (float) $cfg['size']) / 100));
-        $text = (string) ($cfg['text'] ?: 'Meridian Éclat');
+        $text = (string) ($cfg['text'] ?: store_name());
 
         $bbox = imagettfbbox($size, 0, $font, $text);
         $tw = abs($bbox[2] - $bbox[0]);

@@ -58,13 +58,13 @@
         <h2 class="font-semibold">Email (SMTP)</h2>
         <span class="badge {{ $mail['enabled'] && $mail['host'] ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }}">{{ $mail['enabled'] && $mail['host'] ? 'Active' : 'Off' }}</span>
     </div>
-    <p class="text-xs text-ink-700/60 mb-4">Used to email customers their <strong>order confirmation &amp; invoice</strong> when they provide an email. Create a mailbox in cPanel (e.g. <code>orders@meridianeclat.shop</code>) and enter its SMTP details below.</p>
+    <p class="text-xs text-ink-700/60 mb-4">Used to email customers their <strong>order confirmation &amp; invoice</strong> when they provide an email. Create a mailbox in cPanel (e.g. <code>orders@noychoy.com</code>) and enter its SMTP details below.</p>
 
     <form action="{{ route('admin.settings.mail') }}" method="POST" class="space-y-4">
         @csrf
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="mail_enabled" value="1" @checked($mail['enabled'])> Enable sending email via SMTP</label>
         <div class="grid sm:grid-cols-2 gap-4">
-            <div><label class="label">SMTP host</label><input name="mail_host" value="{{ $mail['host'] }}" class="input" placeholder="mail.meridianeclat.shop"></div>
+            <div><label class="label">SMTP host</label><input name="mail_host" value="{{ $mail['host'] }}" class="input" placeholder="mail.noychoy.com"></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="label">Port</label><input name="mail_port" type="number" value="{{ $mail['port'] }}" class="input" placeholder="465"></div>
                 <div><label class="label">Encryption</label>
@@ -75,10 +75,10 @@
                     </select>
                 </div>
             </div>
-            <div><label class="label">Username (full email)</label><input name="mail_username" value="{{ $mail['username'] }}" class="input" placeholder="orders@meridianeclat.shop"></div>
+            <div><label class="label">Username (full email)</label><input name="mail_username" value="{{ $mail['username'] }}" class="input" placeholder="orders@noychoy.com"></div>
             <div><label class="label">Password</label><input name="mail_password" type="password" class="input" placeholder="{{ $mail['has_password'] ? '•••••••• (unchanged)' : 'mailbox password' }}"><p class="text-xs text-ink-700/40 mt-1">Leave blank to keep the saved password.</p></div>
-            <div><label class="label">From address</label><input name="mail_from_address" type="email" value="{{ $mail['from_address'] }}" class="input" placeholder="orders@meridianeclat.shop"></div>
-            <div><label class="label">From name</label><input name="mail_from_name" value="{{ $mail['from_name'] }}" class="input" placeholder="Meridian Éclat"></div>
+            <div><label class="label">From address</label><input name="mail_from_address" type="email" value="{{ $mail['from_address'] }}" class="input" placeholder="orders@noychoy.com"></div>
+            <div><label class="label">From name</label><input name="mail_from_name" value="{{ $mail['from_name'] }}" class="input" placeholder="NoyChoy"></div>
         </div>
         <button class="btn-primary">Save email settings</button>
     </form>
