@@ -63,6 +63,17 @@ class GenerateImageVariants extends Command
             $optimizer->variant($path, (int) $this->option('hero-width')) ? $made++ : $skipped++;
         }
 
+        // "Shop by occasion" tiles. The home page asks for their 450 variant
+        // and fell back to the 1600px original for a 293px tile when it did
+        // not exist — 120KB where 20KB would do, four times over.
+        $tilePaths = collect(home_content('occasions') ?? [])->pluck('image')
+            ->filter(fn ($p) => filled($p) && ! str_starts_with((string) $p, 'http'));
+
+        foreach ($tilePaths as $path) {
+            $optimizer->variant($path, (int) $this->option('card-width')) ? $made++ : $skipped++;
+            $optimizer->variant($path, (int) $this->option('mid-width')) ? $made++ : $skipped++;
+        }
+
         $this->info("Variants created: {$made} · already present / not needed: {$skipped}");
 
         return self::SUCCESS;
