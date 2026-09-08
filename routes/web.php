@@ -5,6 +5,7 @@ use App\Http\Controllers\Customer\AuthController as CustomerAuthController;
 use App\Http\Controllers\Customer\GoogleController;
 use App\Http\Controllers\Customer\PasswordResetController;
 use App\Http\Controllers\MetaWebhookController;
+use App\Http\Controllers\Shop\AssistantController;
 use App\Http\Controllers\Shop\CartController;
 use App\Http\Controllers\Shop\CatalogController;
 use App\Http\Controllers\Shop\CheckoutController;
@@ -20,6 +21,9 @@ use App\Http\Controllers\Shop\PushController;
 use App\Http\Controllers\Shop\ReviewController;
 use App\Http\Controllers\Shop\SitemapController;
 use App\Http\Controllers\SteadfastWebhookController;
+use App\Services\LoyaltyService;
+use App\Support\Locale;
+use App\Support\Referral;
 use Illuminate\Support\Facades\Route;
 
 // Steadfast delivery-status webhook (register at steadfast.com.bd/user/webhook/add)
@@ -41,14 +45,14 @@ Route::get('/lp/{slug}', [LandingController::class, 'show'])->name('landing.show
 // to register (a member straight to the shop). Unknown codes fall through to
 // the home page rather than 404 — a shared link should never dead-end.
 Route::get('/invite/{code}', function (string $code) {
-    $referrer = \App\Support\Referral::remember(request(), $code);
+    $referrer = Referral::remember(request(), $code);
     if (! $referrer) {
         return redirect()->route('home');
     }
     if (auth('customer')->check()) {
         return redirect()->route('shop')->with('success', $referrer->firstName().' sent you here — happy shopping!');
     }
-    $points = app(\App\Services\LoyaltyService::class)->referralPoints();
+    $points = app(LoyaltyService::class)->referralPoints();
 
     return redirect()->route('customer.register')
         ->with('success', $referrer->firstName().' invited you to '.store_name().'. Join free — you both get '.$points.' points after your first delivered order.');
@@ -58,7 +62,7 @@ Route::get('/invite/{code}', function (string $code) {
 // customer record for members. The assistant sets it too when someone writes
 // in Bangla.
 Route::post('/lang', function () {
-    \App\Support\Locale::remember((string) request('lang'));
+    Locale::remember((string) request('lang'));
 
     return back();
 })->name('lang')->middleware('throttle:30,1');
@@ -106,6 +110,8 @@ Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('sear
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager
 Route::get('/feed/meta.csv', [ProductFeedController::class, 'meta'])->name('feed.meta');
+// Google Shopping feed for Merchant Center's scheduled file fetch
+Route::get('/feed/google.xml', [ProductFeedController::class, 'google'])->name('feed.google');
 // Throttled: order numbers are sequential, so an unthrottled lookup would let
 // someone who knows a phone number enumerate their way to the matching order.
 Route::get('/track', [CheckoutController::class, 'track'])->name('track')->middleware('throttle:20,1');
@@ -228,7 +234,7 @@ Route::post('/contact', [PageController::class, 'submitContact'])->name('page.co
 
 // The chat assistant. Every call costs money at OpenAI, so it sits behind the
 // `assistant` limiter (per IP, minute / hour / day) as well as the session.
-Route::post('/assistant/chat', [\App\Http\Controllers\Shop\AssistantController::class, 'chat'])
+Route::post('/assistant/chat', [AssistantController::class, 'chat'])
     ->middleware('throttle:assistant')->name('assistant.chat');
 
 // Catalog (slug routes last so they don't shadow the above)
