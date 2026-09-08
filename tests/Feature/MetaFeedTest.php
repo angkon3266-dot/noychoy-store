@@ -114,4 +114,49 @@ class MetaFeedTest extends TestCase
         $this->assertNull($product->googleCategory());
         $this->assertSame('', collect($this->rows())->firstWhere('id', meta_content_id($product))['google_product_category']);
     }
+
+    public function test_gallery_videos_are_carried_into_the_feed(): void
+    {
+        $product = $this->product('Cocktail Ring', [
+            'video_urls' => ['product-videos/clip.mp4'],
+        ]);
+
+        $row = collect($this->rows())->firstWhere('id', meta_content_id($product));
+
+        $this->assertStringEndsWith('/storage/product-videos/clip.mp4', $row['video[0].url']);
+        $this->assertStringStartsWith('http', $row['video[0].url']);
+        $this->assertSame('', $row['video[1].url']);
+    }
+
+    /**
+     * Meta downloads the file to re-host it, so a player page never works. A
+     * YouTube link in the gallery has to be left out of the feed rather than
+     * uploaded and rejected item-by-item.
+     */
+    public function test_youtube_gallery_entries_are_left_out_of_the_feed(): void
+    {
+        $product = $this->product('Studio Ring', [
+            'video_urls' => ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'product-videos/real.mp4'],
+        ]);
+
+        $row = collect($this->rows())->firstWhere('id', meta_content_id($product));
+
+        $this->assertStringEndsWith('/storage/product-videos/real.mp4', $row['video[0].url']);
+        $this->assertSame('', $row['video[1].url']);
+    }
+
+    public function test_variant_rows_repeat_the_parents_video(): void
+    {
+        $product = $this->product('Layered Necklace', [
+            'has_variants' => true,
+            'video_urls' => ['product-videos/necklace.mp4'],
+        ]);
+        $variant = ProductVariant::create([
+            'product_id' => $product->id, 'attributes' => ['Size' => 'S'], 'price' => 900, 'stock_quantity' => 2,
+        ]);
+
+        $row = collect($this->rows())->firstWhere('id', 'prod-'.$product->id.'-var-'.$variant->id);
+
+        $this->assertStringEndsWith('/storage/product-videos/necklace.mp4', $row['video[0].url']);
+    }
 }

@@ -152,8 +152,9 @@ class AssistantService
         if ($orders->enabled()) {
             // One customer message = one turn. A quote issued while answering
             // this message cannot be ordered against until she has replied to
-            // it — see ChatOrder::turn().
+            // it — see ChatOrder::turn() — and her reply has to be a yes.
             $orders->nextTurn();
+            $orders->rememberLastWords((string) ($last['content'] ?? ''));
             $rounds = self::ORDER_TOOL_ROUNDS;
         }
 

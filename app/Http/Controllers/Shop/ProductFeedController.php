@@ -14,6 +14,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ProductFeedController extends Controller
 {
+    /**
+     * How many `video[N].url` columns the CSV carries. Meta allows 20, but the
+     * header is fixed for every row, so this stays at the handful a product
+     * actually uses rather than padding 20 empty columns onto the whole feed.
+     */
+    private const MAX_VIDEOS = 3;
+
     public function meta(Request $request): StreamedResponse
     {
         // Brand follows the store's own name — never a hardcoded one, so this
@@ -21,11 +28,11 @@ class ProductFeedController extends Controller
         $brand = config('meta.defaults.brand') ?: store_name();
         $currency = config('store.currency', 'BDT');
 
-        $columns = [
+        $columns = array_merge([
             'id', 'item_group_id', 'title', 'description', 'availability', 'condition',
             'price', 'sale_price', 'link', 'image_link', 'additional_image_link',
             'brand', 'product_type', 'custom_label_0', 'custom_label_1', 'google_product_category',
-        ];
+        ], array_map(fn ($i) => "video[{$i}].url", range(0, self::MAX_VIDEOS - 1)));
 
         $headers = [
             'Content-Type' => 'text/csv; charset=utf-8',
@@ -57,8 +64,9 @@ class ProductFeedController extends Controller
                         $cats = $p->categories->pluck('name');
                         $additional = $images->where('id', '!=', $primary->id)->take(10)
                             ->map(fn ($i) => $this->absUrl($i->url))->implode(',');
+                        $videos = $this->videoColumns($p);
 
-                        $row = fn (array $over = []) => fputcsv($out, array_values(array_replace([
+                        $row = fn (array $over = []) => fputcsv($out, array_values(array_replace(array_merge([
                             // id MUST equal the content_id the Pixel/CAPI sends
                             // (meta_content_id → "prod-{id}"), or Meta counts
                             // every view and purchase as unmatched and the
@@ -79,7 +87,9 @@ class ProductFeedController extends Controller
                             'custom_label_0' => $cats->get(0) ?? '',   // product set per category
                             'custom_label_1' => $cats->get(1) ?? '',
                             'google_product_category' => $p->googleCategory() ?? '',
-                        ], $over)));
+                            // Videos belong to the product, so every variant row
+                            // repeats the parent's clips.
+                        ], $videos), $over)));
 
                         // Variable products: one row per variant, matching the
                         // "prod-{id}-var-{vid}" ids that Purchase events send,
@@ -108,6 +118,32 @@ class ProductFeedController extends Controller
 
             fclose($out);
         }, 200, $headers);
+    }
+
+    /**
+     * The `video[N].url` cells for one product, always MAX_VIDEOS wide so every
+     * row lines up with the header.
+     *
+     * Meta downloads and re-hosts the file, so only a direct link to the video
+     * itself works — a YouTube or Vimeo watch page is a player, not a file, and
+     * is skipped rather than sent and rejected.
+     *
+     * @return array<string, string>
+     */
+    protected function videoColumns(Product $product): array
+    {
+        $urls = collect($product->galleryVideos())
+            ->filter(fn ($v) => ($v['type'] ?? null) === 'file' && filled($v['src'] ?? null))
+            ->map(fn ($v) => $this->absUrl($v['src']))
+            ->take(self::MAX_VIDEOS)
+            ->values();
+
+        $cells = [];
+        foreach (range(0, self::MAX_VIDEOS - 1) as $i) {
+            $cells["video[{$i}].url"] = $urls->get($i, '');
+        }
+
+        return $cells;
     }
 
     /** Make a stored relative image path into an absolute URL. */

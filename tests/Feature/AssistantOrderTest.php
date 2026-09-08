@@ -80,7 +80,8 @@ class AssistantOrderTest extends TestCase
         $this->orders()->chooseItem($p->slug);
         $this->orders()->setDetails($this->details($override));
         $quote = $this->orders()->quote(forReading: true);   // the summary is read to her
-        $this->orders()->nextTurn();                          // she answers: "ok, confirm"
+        $this->orders()->nextTurn();                          // she answers…
+        $this->orders()->rememberLastWords('ji, confirm korun');   // …and it is a yes
 
         return $quote;
     }
@@ -226,6 +227,7 @@ class AssistantOrderTest extends TestCase
         $this->orders()->setDetails($this->details(['is_gift' => true, 'card_message' => 'Shubho jonmodin!']));
         $quote = $this->orders()->quote(forReading: true);
         $this->orders()->nextTurn();
+        $this->orders()->rememberLastWords('ji confirm');
         $this->orders()->place($quote['quote_id']);
 
         $order = Order::firstOrFail();
@@ -370,8 +372,9 @@ class AssistantOrderTest extends TestCase
         $this->assertSame('not_confirmed_yet', $rushed['reason']);
         $this->assertSame(0, Order::count());
 
-        // She writes back; now it may be placed.
+        // She writes back with a yes; now it may be placed.
         $this->orders()->nextTurn();
+        $this->orders()->rememberLastWords('ok confirm');
         $this->assertTrue($this->orders()->place($quote['quote_id'])['ok']);
         $this->assertSame(1, Order::count());
     }
@@ -401,7 +404,45 @@ class AssistantOrderTest extends TestCase
         $read = $this->orders()->quote(forReading: true);
         $this->assertSame($running['quote_id'], $read['quote_id']);
         $this->orders()->nextTurn();
+        $this->orders()->rememberLastWords('ok');
         $this->assertTrue($this->orders()->place($read['quote_id'])['ok']);
+    }
+
+    /**
+     * "She replied" is not "she agreed". Without this the assistant could
+     * order off "koto porbe?" or "amar husband ke jigges kori" — the model was
+     * the only judge of consent, and consent is what decides whether a rider
+     * turns up at someone's door.
+     */
+    public function test_a_reply_that_is_not_a_yes_does_not_place_the_order(): void
+    {
+        $this->enable();
+        $p = $this->product('Pearl Ring', 900);
+
+        foreach (['amar husband ke jigges kori', 'koto porbe?', 'thak, লাগবে না', 'ভাবছি'] as $notYes) {
+            $quote = $this->readyToPlace($p);
+            $this->orders()->rememberLastWords($notYes);
+
+            $result = $this->orders()->place($quote['quote_id']);
+            $this->assertFalse($result['ok'], "placed on: {$notYes}");
+            $this->assertSame('no_clear_yes', $result['reason']);
+            $this->orders()->clear();
+        }
+        $this->assertSame(0, Order::count());
+
+        // And the ways a Bangladeshi customer actually says yes all work. The
+        // caps are lifted here: this is about the words, not the limits.
+        config(['services.openai.orders_per_day' => 99]);
+
+        foreach (['ok', 'ji korun', 'হ্যাঁ', 'thik ache, pathiye din', 'confirm'] as $yes) {
+            $quote = $this->readyToPlace($p);
+            $this->orders()->rememberLastWords($yes);
+
+            $this->assertTrue($this->orders()->place($quote['quote_id'])['ok'], "refused: {$yes}");
+            $this->orders()->clear();
+            session()->forget('chat_order_placed');
+            Order::query()->forceDelete();
+        }
     }
 
     public function test_an_order_can_only_be_placed_against_the_quote_the_customer_agreed_to(): void

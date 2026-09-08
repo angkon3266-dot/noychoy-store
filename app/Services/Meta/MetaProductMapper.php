@@ -70,6 +70,7 @@ class MetaProductMapper
             'link' => $this->link($product),
             'image_link' => $images['primary'],
             'additional_image_link' => $images['additional'] ?: null,
+            'video' => $this->videos($product),
             'google_product_category' => $product->googleCategory(),
             'product_type' => $this->productType($product),
             'color' => $this->firstColor($product),
@@ -101,6 +102,9 @@ class MetaProductMapper
             'link' => $this->link($product),
             'image_link' => $variantImage ?: $images['primary'],
             'additional_image_link' => $images['additional'] ?: null,
+            // Variants inherit the parent's videos — the clip shows the piece,
+            // not the size, so every variant item should carry it.
+            'video' => $this->videos($product),
             'google_product_category' => $product->googleCategory(),
             'product_type' => $this->productType($product),
             'color' => $this->attr($attrs, ['color', 'colour']),
@@ -214,6 +218,38 @@ class MetaProductMapper
             // Meta allows up to 20 additional images.
             'additional' => $urls->slice(1, 20)->implode(','),
         ];
+    }
+
+    /**
+     * Gallery videos as Meta catalog `video` entries.
+     *
+     * Meta fetches and re-hosts the file itself, so the URL has to be a direct
+     * link to the video (.mp4, .mov …). A YouTube or Vimeo watch page is a
+     * player, not a file, and Meta rejects it — those entries are dropped here
+     * rather than sent and left to fail silently in Commerce Manager.
+     *
+     * @return array<int, array{url:string}>|null
+     */
+    private function videos(Product $product): ?array
+    {
+        // `sync_images` is the media toggle: with it off an item has no
+        // image_link and Meta rejects it outright, so sending a video would be
+        // pointless anyway.
+        if (! $this->settings->toggle('sync_images')) {
+            return null;
+        }
+
+        $videos = collect($product->galleryVideos())
+            ->filter(fn ($v) => ($v['type'] ?? null) === 'file' && filled($v['src'] ?? null))
+            // Meta accepts up to 20 videos per item.
+            ->take(20)
+            ->map(fn ($v) => ['url' => $v['src']])
+            ->values()
+            ->all();
+
+        // array_filter() on the payload drops nulls but keeps an empty array,
+        // and Meta reads `"video": []` as "delete the videos on this item".
+        return $videos ?: null;
     }
 
     private function productType(Product $product): ?string

@@ -68,6 +68,44 @@ class ChatOrder
     }
 
     /**
+     * The customer's own last words, kept for the moment of ordering.
+     *
+     * The turn counter proves she wrote back; it cannot tell "hae, korun" from
+     * "ভাবছি" or "let me ask my husband". Whether that was a yes is the one
+     * judgement this feature was leaving entirely to the model, and it is the
+     * judgement that decides whether a rider turns up at a door.
+     */
+    public function rememberLastWords(string $text): void
+    {
+        session([self::KEY.'_said' => Str::limit($text, 300, '')]);
+    }
+
+    /**
+     * Does her last message actually agree? Deliberately a short, closed list:
+     * a false no just makes the assistant ask again, while a false yes sends a
+     * parcel. Matched on whole words so "na" cannot be found inside "nabo".
+     */
+    public function saidYes(): bool
+    {
+        $said = mb_strtolower((string) session(self::KEY.'_said', ''));
+        if ($said === '') {
+            return false;
+        }
+
+        // An explicit no wins outright, however much else the message contains.
+        if (preg_match('/\b(no|na|nah|cancel|thak|thamun|bad dao|লাগবে না|না|বাদ)\b/u', $said)) {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/\b(ok|okay|okey|oke|confirm|confirmed|yes|yep|yeah|sure|done|proceed|place|go ahead|'
+            .'ji|jee|jii|hae|haa|han|haan|hoi|accha|acha|thik|thikache|korun|koren|kore|koro|dao|den|din|'
+            .'nibo|nebo|nite|lagbe|pathan|pathao|pathiye)\b/u',
+            $said,
+        ) || preg_match('/(হ্যাঁ|হ্যা|হা|জি|ঠিক আছে|করুন|করেন|দিন|নিব|নেব|পাঠান|কনফার্ম|ওকে|আচ্ছা)/u', $said);
+    }
+
+    /**
      * The checkout questions, in the order the assistant should ask them, with
      * the SAME rules CheckoutController@store applies. Mirrored rather than
      * shared because the controller validates an HTTP request and this
@@ -594,6 +632,13 @@ class ChatOrder
         if ($quotedOnTurn === null || $quotedOnTurn >= $this->turn()) {
             return ['ok' => false, 'reason' => 'not_confirmed_yet', 'order' => $quote,
                 'message' => 'Read this summary to the customer — pieces, delivery charge, total, cash on delivery and the address — and wait for them to agree. Place the order on their NEXT message, once they have said yes.'];
+        }
+
+        // And her last message has to actually be a yes. "She agreed" was the
+        // only part of this still decided by the model alone.
+        if (! $this->saidYes()) {
+            return ['ok' => false, 'reason' => 'no_clear_yes', 'order' => $quote,
+                'message' => 'That did not read as a clear yes. Ask them plainly to reply "ok" or "confirm" (বা "হ্যাঁ") if they want it placed, and do not order until they do.'];
         }
 
         if ($quote['total_raw'] <= 0) {
