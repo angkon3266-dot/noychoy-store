@@ -87,6 +87,11 @@ class ChatOrder
             // the shop's mail server at a stranger; the SMS and the tracking
             // link do the same job for a chat order.
             'notes' => ['rules' => ['nullable', 'string', 'max:500'], 'ask_en' => 'Anything we should know (optional)', 'ask_bn' => 'কিছু জানানোর থাকলে (ঐচ্ছিক)'],
+            // Gifts: without these a piece ordered as a present ships with the
+            // price slip in the box and no card, which is the one thing the
+            // gift note on the checkout page promises will not happen.
+            'is_gift' => ['rules' => ['nullable', 'boolean'], 'ask_en' => 'Is it a gift?', 'ask_bn' => 'এটি কি উপহার?'],
+            'card_message' => ['rules' => ['nullable', 'string', 'max:200'], 'ask_en' => 'Message for the gift card', 'ask_bn' => 'গিফট কার্ডে কী লিখব?'],
         ];
     }
 
@@ -212,20 +217,32 @@ class ChatOrder
             $chosen = $this->matchVariant($variants, $variant);
 
             if (! $chosen) {
-                return ['ok' => false, 'reason' => 'variant_needed',
+                return ['ok' => false, 'reason' => filled($variant) ? 'variant_unavailable' : 'variant_needed',
                     'product' => $product->name,
+                    'asked_for' => filled($variant) ? $variant : null,
                     'options' => $variants->map(fn ($v) => [
                         'variant' => $v->label,
                         'price' => money($v->effective_price),
                         'in_stock' => (int) $v->stock_quantity > 0,
                     ])->values()->all(),
-                    'message' => 'Ask the customer which one they want, in their own language, then call this tool again with their answer.'];
+                    'message' => filled($variant)
+                        ? 'We do not have that one, or the answer matched more than one. Tell the customer plainly which options we DO have, in their language, and let them pick — never substitute a different size or colour for them.'
+                        : 'Ask the customer which one they want, in their own language, then call this tool again with their answer.'];
             }
 
             if ((int) $chosen->stock_quantity <= 0) {
                 return ['ok' => false, 'reason' => 'variant_sold_out', 'variant' => $chosen->label,
                     'message' => 'That option is sold out. Offer the ones that are still in stock.'];
             }
+        }
+
+        // A variant with a stored 0.00 reads as a real price rather than
+        // inheriting the parent's. The product page hides those; without this
+        // the chat would happily sell one for nothing.
+        $unit = $chosen?->effective_price ?? (float) $product->price;
+        if ($unit <= 0) {
+            return ['ok' => false, 'reason' => 'no_price',
+                'message' => 'That one has no price set, so I cannot sell it here. Give the customer the WhatsApp link and let a person quote it.'];
         }
 
         // A chat order is a conversation, not a wholesale channel. Two of a
@@ -314,11 +331,11 @@ class ChatOrder
         if ($variants->isEmpty()) {
             return null;
         }
-        if ($variants->count() === 1) {
-            return $variants->first();
-        }
         if (blank($wanted)) {
-            return null;
+            // The single-option shortcut lives BELOW this on purpose. Above it,
+            // a customer who says "size 18 lagbe" on a piece whose only live
+            // option is 16 was silently handed the 16.
+            return $variants->count() === 1 ? $variants->first() : null;
         }
 
         $needle = mb_strtolower(trim($wanted));
@@ -363,6 +380,12 @@ class ChatOrder
                 continue;
             }
 
+            if ($key === 'is_gift') {
+                $details[$key] = (bool) filter_var($value, FILTER_VALIDATE_BOOLEAN);
+
+                continue;
+            }
+
             if ($key === 'is_inside_dhaka') {
                 // Only a real yes or no counts. Reading anything else as "no"
                 // would quote the outside-Dhaka rate and call the question
@@ -389,9 +412,12 @@ class ChatOrder
             $details[$key] = $key === 'phone' ? bd_phone($value) : $value;
         }
 
-        // The phone prices the order (assigned coupons are matched on it), so
-        // the scoped cart is told as soon as we have one.
-        if (filled($details['phone'] ?? null)) {
+        // The phone prices the order — assigned coupons are matched on it — so
+        // the scoped cart is told once we have one AND the customer has given
+        // us the rest of her details. Doing it for any number the model relays
+        // would turn the chat into an oracle: type a stranger's number, watch
+        // which private offer appears in the summary.
+        if (filled($details['phone'] ?? null) && filled($details['name'] ?? null) && filled($details['address'] ?? null)) {
             $this->cart()->rememberCheckoutPhone($details['phone']);
         }
 
@@ -449,7 +475,13 @@ class ChatOrder
                 'line_total' => money($i['price'] * $i['qty']),
             ])->values()->all(),
             'subtotal' => money($subtotal),
-            'savings' => collect($cart->discountLines())->map(fn ($l) => ['label' => $l['label'], 'amount' => money($l['amount'])])->values()->all(),
+            // Labels with the coupon code stripped out: the model repeats what
+            // it is given, and a private code read aloud in chat is a code
+            // posted publicly.
+            'savings' => collect($cart->discountLines())->map(fn ($l) => [
+                'label' => preg_replace('/\bCoupon\s+\S+/i', 'Coupon', (string) $l['label']),
+                'amount' => money($l['amount']),
+            ])->values()->all(),
             'delivery' => $cart->hasFreeShipping() ? 'Free' : money($shipping),
             'delivery_zone' => $inside ? 'inside Dhaka' : 'outside Dhaka',
             'total' => money($total),
@@ -562,6 +594,11 @@ class ChatOrder
         if ($quotedOnTurn === null || $quotedOnTurn >= $this->turn()) {
             return ['ok' => false, 'reason' => 'not_confirmed_yet', 'order' => $quote,
                 'message' => 'Read this summary to the customer — pieces, delivery charge, total, cash on delivery and the address — and wait for them to agree. Place the order on their NEXT message, once they have said yes.'];
+        }
+
+        if ($quote['total_raw'] <= 0) {
+            return ['ok' => false, 'reason' => 'no_price',
+                'message' => 'This order comes to nothing, which cannot be right. Give the customer the WhatsApp link so a person can check it.'];
         }
 
         if ($quote['total_raw'] > $this->maxTotal()) {

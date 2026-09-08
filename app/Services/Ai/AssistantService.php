@@ -350,6 +350,8 @@ class AssistantService
                     'is_inside_dhaka' => ['type' => 'boolean', 'description' => 'True if the address is inside Dhaka city. Ask — never guess, it changes the delivery charge.'],
                     'email' => ['type' => 'string', 'description' => 'Optional.'],
                     'notes' => ['type' => 'string', 'description' => 'Anything the customer asked us to note. Optional.'],
+                    'is_gift' => ['type' => 'boolean', 'description' => 'True if it is a gift — the price slip is left out and a card goes in.'],
+                    'card_message' => ['type' => 'string', 'description' => 'What to write on the gift card, in the customer\'s own words.'],
                 ], 'required' => []],
             ]],
             ['type' => 'function', 'function' => [

@@ -163,6 +163,76 @@ class AssistantOrderTest extends TestCase
         $this->assertSame(650.0, $this->orders()->cart()->subtotal());
     }
 
+    /**
+     * Found by an adversarial review of this file's own code: the
+     * single-option shortcut ran before the "did she ask for something?"
+     * check, so a customer asking for a size we do not stock was handed the
+     * one we do — silently, and she finds out when it will not fit.
+     */
+    public function test_a_size_we_do_not_have_is_never_quietly_swapped_for_one_we_do(): void
+    {
+        $this->enable();
+        $p = $this->product('Adjustable Band', 600, ['has_variants' => true]);
+        ProductVariant::create(['product_id' => $p->id, 'sku' => 'AB-16', 'attributes' => ['size' => '16'], 'price' => 600, 'stock_quantity' => 5, 'is_active' => true]);
+
+        $result = $this->orders()->chooseItem($p->slug, 'size 18');
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('variant_unavailable', $result['reason']);
+        $this->assertSame('size 18', $result['asked_for']);
+        $this->assertTrue($this->orders()->cart()->isEmpty());
+
+        // Asking with no preference on a one-option piece still just works.
+        $this->assertTrue($this->orders()->chooseItem($p->slug)['ok']);
+    }
+
+    public function test_a_piece_with_no_price_is_never_sold_for_nothing(): void
+    {
+        $this->enable();
+        $p = $this->product('Mystery Piece', 0);
+
+        $result = $this->orders()->chooseItem($p->slug);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('no_price', $result['reason']);
+        $this->assertTrue($this->orders()->cart()->isEmpty());
+    }
+
+    /**
+     * Assigned coupons are matched on the phone, so pricing a basket against a
+     * number the customer has not otherwise proved any connection to would let
+     * anyone read a stranger's private offer out of the summary.
+     */
+    public function test_a_stranger_s_number_alone_does_not_price_the_basket(): void
+    {
+        $this->enable();
+        $this->orders()->chooseItem($this->product('Pearl Ring', 900)->slug);
+
+        $this->orders()->setDetails(['phone' => '01711100022']);
+        $this->assertNull(session('checkout_phone:chat'));
+
+        // With the rest of her details, it is her order and it prices normally.
+        $this->orders()->setDetails($this->details());
+        $this->assertSame('01711100022', session('checkout_phone:chat'));
+    }
+
+    public function test_a_gift_ordered_in_chat_travels_as_a_gift(): void
+    {
+        $this->enable();
+        $p = $this->product('Pearl Ring', 900);
+
+        $this->orders()->nextTurn();
+        $this->orders()->chooseItem($p->slug);
+        $this->orders()->setDetails($this->details(['is_gift' => true, 'card_message' => 'Shubho jonmodin!']));
+        $quote = $this->orders()->quote(forReading: true);
+        $this->orders()->nextTurn();
+        $this->orders()->place($quote['quote_id']);
+
+        $order = Order::firstOrFail();
+        $this->assertTrue((bool) $order->is_gift);
+        $this->assertSame('Shubho jonmodin!', $order->card_message);
+    }
+
     // ── The answers ─────────────────────────────────────────────────────────
 
     public function test_a_bad_phone_or_a_half_written_address_is_refused_and_not_stored(): void
