@@ -233,7 +233,11 @@ class AssistantService
             'messages' => $thread,
             'tools' => $this->tools(auth('customer')->check()),
             'tool_choice' => $allowTools ? 'auto' : 'none',
-            'max_completion_tokens' => 700,
+            // Reasoning tokens come out of this budget, so an answer that has
+            // to read a whole order summary back — in Bangla, which spends
+            // more tokens per sentence — was being squeezed down to a stub
+            // like "Please confirm if you'd like to place the order."
+            'max_completion_tokens' => app(ChatOrder::class)->enabled() ? 1600 : 700,
         ];
         // Only the reasoning families accept this; a classic model 400s on it.
         if (Str::startsWith($model, ['gpt-5', 'o1', 'o3', 'o4']) && ($effort = config('services.openai.reasoning_effort'))) {
