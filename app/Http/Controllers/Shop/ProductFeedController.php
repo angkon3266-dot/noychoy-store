@@ -171,7 +171,7 @@ class ProductFeedController extends Controller
                             'g:id' => meta_content_id($p),
                             'g:item_group_id' => null,
                             'title' => Str::limit($p->name, 150, ''),
-                            'description' => Str::limit(strip_tags($p->description ?: $p->short_description ?: $p->name), 4900, ''),
+                            'description' => $this->plainDescription($p),
                             'link' => route('product.show', $p),
                             'g:image_link' => $this->absUrl($primary->url),
                             'g:additional_image_link' => $images->where('id', '!=', $primary->id)->take(10)
@@ -285,6 +285,29 @@ class ProductFeedController extends Controller
         }
 
         fwrite($out, $trailingXml."</item>\n");
+    }
+
+    /**
+     * A product description as plain prose.
+     *
+     * Descriptions are authored in Markdown and the storefront renders it, but
+     * Google shows this field verbatim — so "## Design" and "**Rose Gold**"
+     * would reach the shopper with the punctuation still attached. Structure is
+     * kept (headings become their own line, bullets stay bullets); only the
+     * syntax goes.
+     */
+    protected function plainDescription(Product $product): string
+    {
+        $text = strip_tags($product->description ?: $product->short_description ?: $product->name);
+
+        $text = preg_replace('/^[ \t]{0,3}#{1,6}[ \t]+/m', '', $text);       // ## Heading
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $text);        // [text](url)
+        $text = preg_replace('/(\*\*|__)(.+?)\1/s', '$2', $text);            // **bold**
+        $text = preg_replace('/^[ \t]{0,3}[-*+][ \t]+/m', '• ', $text);      // - bullet
+        $text = str_replace('`', '', $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+
+        return Str::limit(trim($text), 4900, '');
     }
 
     /** One element, escaped so a stray & or < in a title cannot break the feed. */

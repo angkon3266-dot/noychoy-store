@@ -242,6 +242,35 @@ class GoogleFeedTest extends TestCase
         $this->assertNotContains('prod-'.$product->id.'-var-'.$free->id, $ids);
     }
 
+    /**
+     * Descriptions are authored in Markdown and rendered by the storefront, but
+     * Google prints this field verbatim — every one of the 147 live items would
+     * otherwise reach a shopper with "##" and "**" still attached.
+     */
+    public function test_markdown_is_flattened_out_of_the_description(): void
+    {
+        $this->product('Marked Up Ring', ['description' => implode("\n", [
+            '**Turquoise & Rose — two soft colours.**',
+            '',
+            '## Design',
+            '',
+            '- Hand-set stones, [see the guide](https://noychoy.com/guide).',
+            '- Rhodium plated.',
+        ])]);
+
+        $description = $this->items()[0]['description'];
+
+        $this->assertStringNotContainsString('**', $description);
+        $this->assertStringNotContainsString('## ', $description);
+        $this->assertStringNotContainsString('](', $description);
+
+        // The words survive — only the syntax goes.
+        $this->assertStringContainsString('Turquoise & Rose — two soft colours.', $description);
+        $this->assertStringContainsString('Design', $description);
+        $this->assertStringContainsString('see the guide', $description);
+        $this->assertStringContainsString('• Rhodium plated.', $description);
+    }
+
     public function test_a_product_with_no_image_is_skipped(): void
     {
         $withImage = $this->product('Photographed Ring');
