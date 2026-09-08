@@ -21,6 +21,7 @@ export function CartProvider({ children }) {
     const [gift, setGift] = useState(null);
     const [couponNotice, setCouponNotice] = useState(null);
     const [freeShipping, setFreeShipping] = useState(false);
+    const [deliverySavedText, setDeliverySavedText] = useState('');
     const [drawer, setDrawer] = useState(false);
     const [toast, setToast] = useState(null);
     const busyRef = useRef(false);
@@ -44,7 +45,7 @@ export function CartProvider({ children }) {
 
     const apply = useCallback((data) => {
         setCount(data.count);
-        setSavedText(data.discount > 0 ? (data.discount_text || '') : '');
+        setSavedText(data.saved > 0 ? (data.saved_text || '') : '');
         setItems(data.items || []);
         setSubtotalText(data.subtotal_text || '');
         setDiscountLines(data.discount_lines || []);
@@ -52,6 +53,7 @@ export function CartProvider({ children }) {
         setGift(data.gift || null);
         setCouponNotice(data.coupon_notice || null);
         setFreeShipping(!!data.free_shipping);
+        setDeliverySavedText(data.delivery_saved_text || '');
     }, []);
 
     const showToast = useCallback((msg) => {
@@ -131,7 +133,7 @@ export function CartProvider({ children }) {
 
     return (
         <CartContext.Provider value={{
-            count, savedText, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping,
+            count, savedText, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText,
             drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, remove, refresh,
         }}>
             {children}

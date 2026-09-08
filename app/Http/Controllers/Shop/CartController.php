@@ -87,6 +87,9 @@ class CartController extends Controller
                 'ship_inside_text' => money((int) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka'))),
                 'ship_outside_text' => money((int) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka'))),
                 'free_shipping' => $cart->hasFreeShipping(),
+                // Free delivery is a saving, so say how much it is worth
+                // rather than only that it is free.
+                'delivery_saved_text' => $cart->deliverySaving() > 0 ? money($cart->deliverySaving()) : null,
                 'discount_lines' => collect($cart->discountLines())
                     ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
                 'free_shipping_offer' => $cart->hasFreeShippingOffer(),
@@ -201,6 +204,12 @@ class CartController extends Controller
             'subtotal_text' => money($this->cart->subtotal()),
             'discount' => $this->cart->discount(),
             'discount_text' => money($this->cart->discount()),
+            // What the customer has saved all in, free delivery included —
+            // the header badge's number. Kept apart from `discount`, which is
+            // what actually comes off the total.
+            'saved' => $this->cart->totalSaved(),
+            'saved_text' => money($this->cart->totalSaved()),
+            'delivery_saved_text' => $this->cart->deliverySaving() > 0 ? money($this->cart->deliverySaving()) : null,
             'discount_lines' => collect($this->cart->discountLines())
                 ->map(fn ($l) => ['label' => $l['label'], 'amount_text' => money($l['amount'])])->values(),
             'hints' => $this->cart->offerHints(),

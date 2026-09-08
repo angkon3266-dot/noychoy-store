@@ -960,6 +960,39 @@ class CartService
         return max(0, $this->subtotal() - $this->discount() + $this->shipping($insideDhaka));
     }
 
+    /**
+     * What free delivery is worth on this cart.
+     *
+     * The zone is not known until checkout, so this is the LOWER of the two
+     * rates: a saving quoted to a customer should be one she is certain to
+     * get, never the best case. Inside Dhaka ৳80 / outside ৳90 means free
+     * delivery is worth "at least ৳80".
+     */
+    public function deliveryRate(): float
+    {
+        $inside = (float) Setting::get('shipping_inside', config('store.shipping.inside_dhaka'));
+        $outside = (float) Setting::get('shipping_outside', config('store.shipping.outside_dhaka'));
+
+        return round(max(0.0, min($inside, $outside)), 2);
+    }
+
+    /** The delivery charge this cart is not paying — 0 when it still would. */
+    public function deliverySaving(): float
+    {
+        return $this->isEmpty() || ! $this->hasFreeShipping() ? 0.0 : $this->deliveryRate();
+    }
+
+    /**
+     * Everything the cart has saved, for display only: money off the pieces
+     * PLUS the delivery charge once delivery is free. Deliberately separate
+     * from discount(), which is money that comes off the order total —
+     * delivery is a line of its own, and adding it there would bill wrong.
+     */
+    public function totalSaved(): float
+    {
+        return round($this->discount() + $this->deliverySaving(), 2);
+    }
+
     protected function lineKey(int $productId, ?int $variantId): string
     {
         return $productId.':'.($variantId ?? '0');

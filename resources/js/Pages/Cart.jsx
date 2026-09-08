@@ -7,30 +7,43 @@ import GiftLadderBar from '../Shared/GiftLadderBar';
 import Icon from '../Shared/Icons';
 import { t } from '../Shared/i18n';
 
-// Full cart page. Mutations go through Inertia (server redirects back to /cart
-// with fresh props + flash), with optimistic qty display while in flight.
+// Full cart page. Mutations go through Inertia (the server redirects back to
+// /cart with fresh props + flash) but never re-mount the page: `preserveState`
+// keeps this component alive so the totals update in place instead of the
+// whole cart blinking away and coming back.
 export default function Cart({ items, summary, coupon, giftBar, freeBar, offersPanel, memberUsage, memberNudge, suggestions, cartUrls }) {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
     const [code, setCode] = useState('');
     const [busyKey, setBusyKey] = useState(null);
+    // Keys hidden the moment Remove is tapped. The server is still the source
+    // of truth — this only spares the customer a second of watching a row she
+    // has already dismissed.
+    const [dropped, setDropped] = useState([]);
+    const undrop = (key) => setDropped((d) => d.filter((k) => k !== key));
 
     const updateQty = (key, qty) => {
         setBusyKey(key);
         router.patch(cartUrls.update, { key, qty }, {
             preserveScroll: true,
+            preserveState: true,
             onFinish: () => setBusyKey(null),
         });
     };
 
     const removeItem = (key) => {
         setBusyKey(key);
+        setDropped((d) => [...d, key]);
         router.delete(cartUrls.remove, {
             data: { key },
             preserveScroll: true,
-            onFinish: () => setBusyKey(null),
+            preserveState: true,
+            onFinish: () => { setBusyKey(null); undrop(key); },
+            onError: () => undrop(key),
         });
     };
+
+    const visibleItems = items.filter((i) => !dropped.includes(i.key));
 
     const applyCoupon = (e) => {
         e.preventDefault();
@@ -38,7 +51,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
         router.post(cartUrls.couponApply, { code }, { preserveScroll: true, onSuccess: () => setCode('') });
     };
 
-    if (!items.length) {
+    if (!visibleItems.length) {
         return (
             <div className="mx-auto max-w-5xl px-4 py-8">
                 <h1 className="font-display text-3xl font-semibold mb-6">Your cart</h1>
@@ -90,7 +103,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
 
             <div className="grid lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-4">
-                    {items.map((item) => (
+                    {visibleItems.map((item) => (
                         <div key={item.key} className={`card p-4 flex gap-4 items-center transition-opacity ${busyKey === item.key ? 'opacity-60' : ''}`}>
                             <div className="w-20 h-20 rounded-lg bg-gold-100 overflow-hidden shrink-0">
                                 {item.image && <img src={item.image} className="w-full h-full object-cover" alt="" />}
@@ -145,7 +158,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                             <dt className="text-ink-700/70">Delivery</dt>
                             <dd className="text-ink-700/70 text-right">
                                 {summary.free_shipping
-                                    ? <span className="text-success-700 font-medium">Free</span>
+                                    ? <span className="text-success-700 font-medium">Free{summary.delivery_saved_text ? <span className="font-normal"> — {summary.delivery_saved_text}+ saved</span> : ''}</span>
                                     : <>{summary.ship_inside_text} inside Dhaka<br /><span className="text-xs">{summary.ship_outside_text} outside</span></>}
                             </dd>
                         </div>

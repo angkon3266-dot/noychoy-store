@@ -12,7 +12,7 @@ import { t } from '../i18n';
 export default function MiniCart() {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
-    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, remove, cartTrigger } = useCart();
+    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText, remove, cartTrigger } = useCart();
     const panelRef = useRef(null);
 
     useEffect(() => {
@@ -88,7 +88,7 @@ export default function MiniCart() {
                             <div key={d.label} className="flex justify-between text-sm text-success-700"><span>{d.label}</span><span>−{d.amount_text}</span></div>
                         ))}
                         {freeShipping && (
-                            <div className="flex justify-between text-sm text-success-700"><span>Free delivery</span><Icon name="check" className="w-4 h-4" /></div>
+                            <div className="flex justify-between text-sm text-success-700"><span>Free delivery</span><span className="inline-flex items-center gap-1">{deliverySavedText ? `−${deliverySavedText}+` : ''}<Icon name="check" className="w-4 h-4" /></span></div>
                         )}
                         {hints.map((h) => (
                             <div key={h} className="rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{h}</div>

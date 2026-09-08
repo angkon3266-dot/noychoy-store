@@ -25,10 +25,17 @@ class OccasionsTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * The default phone counts up rather than rolling a die: it used to be
+     * `random_int(1, 9)`, which collided with the explicit 0171110000N numbers
+     * the tests below use and failed the whole suite roughly one run in nine.
+     */
+    protected int $phoneSeq = 100;
+
     protected function customer(array $attrs = []): Customer
     {
         return Customer::create(array_merge([
-            'name' => 'Rima Sultana', 'phone' => '0171110000'.random_int(1, 9), 'password' => 'secret123',
+            'name' => 'Rima Sultana', 'phone' => '017111'.str_pad((string) $this->phoneSeq++, 5, '0', STR_PAD_LEFT), 'password' => 'secret123',
         ], $attrs));
     }
 

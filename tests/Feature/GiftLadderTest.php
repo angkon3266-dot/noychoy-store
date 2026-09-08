@@ -115,6 +115,37 @@ class GiftLadderTest extends TestCase
         $this->assertSame(5, $p['next']['n']);
     }
 
+    /**
+     * Free delivery is money the customer keeps, so every "saved" figure
+     * counts it — valued at the LOWER of the two zone rates, because the zone
+     * is not known until checkout and an overstated saving is a broken promise.
+     */
+    public function test_free_delivery_counts_towards_what_the_cart_has_saved(): void
+    {
+        $this->enableLadder();
+        Setting::put('shipping_inside', 80);
+        Setting::put('shipping_outside', 90);
+
+        // Two pieces: the money rungs only, delivery still charged.
+        $two = $this->cartOfRings(2);
+        $this->assertFalse($two->hasFreeShipping());
+        $this->assertSame(0.0, $two->deliverySaving());
+        $this->assertSame($two->discount(), $two->totalSaved());
+
+        // Three: the delivery rung opens, and ৳80 joins the saving.
+        $three = $this->cartOfRings(3);
+        $this->assertTrue($three->hasFreeShipping());
+        $this->assertSame(80.0, $three->deliverySaving());
+        $this->assertSame(round($three->discount() + 80, 2), $three->totalSaved());
+
+        // The ladder's own line says the larger number too…
+        $this->assertSame(money($three->discount() + 80), $three->giftProgress()['saved_text']);
+
+        // …while the order total is untouched: delivery is its own line, and
+        // counting it as a discount would bill the customer ৳80 short.
+        $this->assertSame(round($three->subtotal() - $three->discount(), 2), round($three->total(false), 2));
+    }
+
     public function test_the_ninth_piece_frees_the_cheapest_gift_unit(): void
     {
         $cheap = $this->product('Cheap gift', 500);

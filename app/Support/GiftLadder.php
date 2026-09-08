@@ -377,7 +377,10 @@ class GiftLadder
             ], $tiers),
             'next' => $next,
             'summary' => implode(' · ', array_map(fn ($t) => $t['label'], $unlocked)),
-            'saved_text' => $r['value'] > 0 ? money($r['value']) : null,
+            // Free delivery is money the customer keeps, so it counts towards
+            // what the ladder has saved her — valued at the lower zone rate.
+            'saved_text' => ($saved = $r['value'] + ($r['free_delivery'] ? $cart->deliveryRate() : 0.0)) > 0
+                ? money($saved) : null,
             'free_delivery' => $r['free_delivery'],
             'gift' => [
                 'pick_needed' => $r['gift_pending'],

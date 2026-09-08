@@ -46,12 +46,15 @@ document.addEventListener('alpine:init', () => {
         items: [],
         subtotalText: '',
         discountLines: [],
-        // Seeded by the layout so the phone header's "saved" badge is right
-        // on first paint, before any cart fetch.
-        discountText: window.__cartSavedText || '',
-        discount: Number(window.__cartSaved || 0),
+        discountText: '',
+        discount: 0,
+        // Everything saved, free delivery included. Seeded by the layout so the
+        // phone header's badge is right on first paint, before any cart fetch.
+        savedText: window.__cartSavedText || '',
+        saved: Number(window.__cartSaved || 0),
         hints: [],
         freeShipping: false,
+        deliverySavedText: '',
         drawer: false,
         toastMsg: '',
         toastShow: false,
@@ -65,8 +68,11 @@ document.addEventListener('alpine:init', () => {
             this.discountLines = data.discount_lines || [];
             this.discountText = data.discount_text || '';
             this.discount = data.discount || 0;
+            this.savedText = data.saved_text || '';
+            this.saved = data.saved || 0;
             this.hints = data.hints || [];
             this.freeShipping = !!data.free_shipping;
+            this.deliverySavedText = data.delivery_saved_text || '';
             this.gift = data.gift || null;
             // The header strip's line, kept in step after every cart change
             // (Blade pages render the rung track once, server-side).

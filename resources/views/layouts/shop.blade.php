@@ -28,7 +28,7 @@
         <link rel="stylesheet" href="{{ $fontCss }}">
     @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @php $cartSavedSeed = ($cartCount ?? 0) > 0 ? (float) app(\App\Services\CartService::class)->discount() : 0.0; @endphp
+    @php $cartSavedSeed = ($cartCount ?? 0) > 0 ? (float) app(\App\Services\CartService::class)->totalSaved() : 0.0; @endphp
     <script>window.__cartCount = {{ $cartCount ?? 0 }}; window.__cartSaved = {{ json_encode($cartSavedSeed) }}; window.__cartSavedText = {{ json_encode($cartSavedSeed > 0 ? money($cartSavedSeed) : '') }};</script>
     {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}
 
@@ -201,13 +201,13 @@
 
                 {{-- Phone only: what the cart has saved so far, centred as a badge that
                      opens the cart. Wins the centre slot over the optional centre image. --}}
-                <a href="{{ route('cart') }}" x-data x-show="$store.cart.discount > 0" x-cloak
+                <a href="{{ route('cart') }}" x-data x-show="$store.cart.saved > 0" x-cloak
                    class="md:hidden absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-gold-600 text-white text-[11px] font-semibold px-2.5 py-1 shadow-sm whitespace-nowrap">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
-                    <span x-text="$store.cart.discountText + ' {{ \App\Support\Locale::isBangla() ? 'সাশ্রয়' : 'saved' }}'"></span>
+                    <span x-text="$store.cart.savedText + ' {{ \App\Support\Locale::isBangla() ? 'সাশ্রয়' : 'saved' }}'"></span>
                 </a>
                 @if($headerCenter)
-                    <a href="{{ theme('header_center_link') ?: route('home') }}" x-data x-show="!($store.cart.discount > 0)" class="md:hidden absolute left-1/2 -translate-x-1/2">
+                    <a href="{{ theme('header_center_link') ?: route('home') }}" x-data x-show="!($store.cart.saved > 0)" class="md:hidden absolute left-1/2 -translate-x-1/2">
                         <img src="{{ $headerCenter }}" alt="" height="{{ $centerH }}" decoding="async" class="logo-center w-auto">
                     </a>
                 @endif
@@ -640,7 +640,8 @@
                     <div class="flex justify-between text-sm text-green-700"><span x-text="d.label"></span><span x-text="'−' + d.amount_text"></span></div>
                 </template>
                 <div class="flex justify-between text-sm text-green-700" x-show="$store.cart.freeShipping">
-                    <span>Free delivery</span><span>✓</span>
+                    <span>Free delivery</span>
+                    <span x-text="($store.cart.deliverySavedText ? '−' + $store.cart.deliverySavedText + '+ ' : '') + '✓'"></span>
                 </div>
 
                 {{-- Almost-there nudges --}}
