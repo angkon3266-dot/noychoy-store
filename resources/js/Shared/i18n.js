@@ -65,10 +65,15 @@ export function t(lang, key, vars = {}) {
 }
 
 // "Free delivery" → "ফ্রি ডেলিভারি", "৳50 off" → "৳50 ছাড়", "2% off" → "2% ছাড়".
+// The bare forms are the stepper's own captions ("Delivery", "Gift"), which
+// sit under an icon that already says which reward it is — so they translate
+// to the shortest word that fits a 50px cell.
 export function rewardLabel(lang, label) {
     if (lang !== 'bn' || !label) return label;
     if (/^free delivery/i.test(label)) return 'ফ্রি ডেলিভারি';
     if (/^free gift/i.test(label)) return 'ফ্রি গিফট';
+    if (/^delivery$/i.test(label)) return 'ফ্রি';
+    if (/^gift$/i.test(label)) return 'গিফট';
 
     return label.replace(/\s+off$/i, ' ছাড়');
 }

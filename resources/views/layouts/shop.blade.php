@@ -393,6 +393,11 @@
                 @php
                     $ladderTiers = $ladderStrip['tiers'];
                     $ladderNext = $ladderStrip['next'];
+                    // The stepper caption. "Delivery" / "Gift" sit under an icon that
+                    // already says which reward it is, so Bangla gets the short word.
+                    $ladderShort = fn ($t) => \App\Support\Locale::isBangla()
+                        ? match ($t['type']) { 'free_delivery' => 'ফ্রি', 'free_gift' => 'গিফট', default => $t['short'] }
+                        : $t['short'];
                     $ladderMsg = ($ladderStrip['gift']['pick_needed'] ?? false)
                         ? 'A free gift is waiting — pick one in your cart'
                         : (! $ladderNext
@@ -407,13 +412,17 @@
                         <span class="sm:hidden font-medium" lang="bn">প্রতি পিসেই রিওয়ার্ড</span>
                         <span class="hidden sm:inline" x-data x-text="$store.cart.ladderMessage || @js($ladderMsg)">{{ $ladderMsg }}</span>
                     </span>
-                    <span class="flex basis-full items-center justify-between sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
+                    {{-- Equal-width cells, not justify-between: the captions below are
+                         different widths ("2%" vs "৳100") and would set uneven gaps. --}}
+                    <span class="flex basis-full items-center sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
                         @foreach($ladderTiers as $i => $tier)
                             @php $edge = $i < 5 || $loop->last; @endphp
-                            @if($i === 5 && count($ladderTiers) > 6)<span class="sm:hidden text-[10px] text-ink-500 px-0.5">…</span>@endif
-                            <span class="{{ $edge ? 'flex' : 'hidden sm:flex' }} flex-col items-center" title="{{ $tier['threshold'] }}: {{ $tier['label'] }}">
+                            @if($i === 5 && count($ladderTiers) > 6)<span class="sm:hidden flex-none w-3 self-start pt-1 text-center text-[10px] leading-none text-ink-500">…</span>@endif
+                            <span class="{{ $edge ? 'flex' : 'hidden sm:flex' }} flex-1 basis-0 flex-col items-center" title="{{ $tier['threshold'] }}: {{ $tier['label'] }}">
                                 <span class="grid h-5 w-5 place-items-center rounded-full border text-[9px] font-semibold {{ $tier['unlocked'] ? 'bg-gold-700 border-gold-700 text-white' : (($ladderNext['n'] ?? 0) === $tier['n'] ? 'bg-white border-gold-600 text-gold-700 ring-2 ring-gold-200' : 'bg-white border-gold-300 text-gold-500') }}">{{ $tier['type'] === 'free_gift' ? '🎁' : ($tier['type'] === 'free_delivery' ? '🚚' : $tier['threshold']) }}</span>
-                                <span class="hidden md:block text-[8px] leading-none mt-0.5 {{ $tier['unlocked'] ? 'text-gold-700 font-semibold' : 'text-ink-500' }}">{{ $tier['short'] }}</span>
+                                {{-- What each rung is worth, on every screen: a rung with
+                                     no number under it is a circle to guess at. --}}
+                                <span class="mt-0.5 block whitespace-nowrap text-[9px] leading-none md:text-[8px] {{ $tier['unlocked'] ? 'text-gold-700 font-semibold' : 'text-ink-500' }}">{{ $ladderShort($tier) }}</span>
                             </span>
                         @endforeach
                     </span>

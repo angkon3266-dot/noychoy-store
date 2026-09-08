@@ -26,7 +26,9 @@ export default function LadderStrip() {
         const el = trackRef.current;
         if (!el || typeof ResizeObserver === 'undefined') return undefined;
         const measure = () => {
-            const room = Math.floor(el.clientWidth / 30);
+            // 34px per cell: the circle is 20, the caption under it ("৳100") is
+            // the wider of the two, and this leaves a little air between cells.
+            const room = Math.floor(el.clientWidth / 34);
             const cap = window.matchMedia('(max-width: 639px)').matches ? 7 : 99;   // 5 rungs + … + last
             setFit(Math.max(3, Math.min(room, cap)));
         };
@@ -66,17 +68,24 @@ export default function LadderStrip() {
                 <span className="sm:hidden font-medium" lang="bn">প্রতি পিসেই রিওয়ার্ড</span>
                 <span className="hidden sm:inline" lang={lang}>{message}</span>
             </span>
-            <span ref={trackRef} className="flex basis-full items-center justify-between sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
+            {/* Equal-width cells rather than justify-between spacing: the captions
+                below are different widths ("2%" vs "৳100"), and letting them set
+                the gaps makes the row look shuffled. */}
+            <span ref={trackRef} className="flex basis-full items-center sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
                 {visible.map((tier, i) => tier === null ? (
-                    <span key="gap" className="text-[10px] text-ink-500 px-0.5">…</span>
+                    /* self-start + pt-1 keeps the gap on the circles' line; centred in
+                       the row it would float between the circles and the captions. */
+                    <span key="gap" className="flex-none w-3 self-start pt-1 text-center text-[10px] leading-none text-ink-500">…</span>
                 ) : (
-                    <span key={tier.n} className="flex flex-col items-center" title={`${tier.threshold}: ${tier.label}`}>
+                    <span key={tier.n} className="flex flex-1 basis-0 flex-col items-center" title={`${tier.threshold}: ${tier.label}`}>
                         <span className={`grid h-5 w-5 place-items-center rounded-full border text-[9px] font-semibold ${tier.unlocked
                             ? 'bg-gold-700 border-gold-700 text-white'
                             : next?.n === tier.n ? 'bg-white border-gold-600 text-gold-700 ring-2 ring-gold-200' : 'bg-white border-gold-300 text-gold-500'}`}>
                             {tier.type === 'free_gift' ? <Icon name="gift" className="w-2.5 h-2.5" strokeWidth={2.2} /> : tier.type === 'free_delivery' ? <Icon name="truck" className="w-2.5 h-2.5" strokeWidth={2.2} /> : tier.threshold}
                         </span>
-                        <span className={`hidden md:block text-[8px] leading-none mt-0.5 ${tier.unlocked ? 'text-gold-700 font-semibold' : 'text-ink-500'}`}>{rewardLabel(lang, tier.short)}</span>
+                        {/* What each rung is worth, on every screen: a rung with no
+                            number under it is a circle the customer has to guess at. */}
+                        <span className={`mt-0.5 block whitespace-nowrap text-[9px] leading-none md:text-[8px] ${tier.unlocked ? 'text-gold-700 font-semibold' : 'text-ink-500'}`} lang={lang}>{rewardLabel(lang, tier.short)}</span>
                     </span>
                 ))}
             </span>
