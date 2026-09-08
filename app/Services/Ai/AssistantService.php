@@ -394,7 +394,7 @@ class AssistantService
                 (int) ($args['quantity'] ?? 1),
             ),
             'set_order_details' => $orders->setDetails($args),
-            'review_order' => $orders->quote(),
+            'review_order' => $orders->quote(forReading: true),
             'place_order' => $orders->place((string) ($args['quote_id'] ?? '')),
         };
     }
@@ -688,7 +688,7 @@ class AssistantService
             ."Work in this order, one or two questions per message, never a form dump:\n"
             ."1. choose_item with their link or the exact product name. If it comes back asking for an option (size, colour), show the options and ask.\n"
             ."2. Ask for, and record with set_order_details as they answer: {$questions}. Ask whether the address is inside Dhaka city — never assume, it changes the delivery charge. Keep their address in their own words.\n"
-            ."3. When nothing is missing, use review_order and read the WHOLE summary back: the piece and option, quantity, each saving, the delivery charge, the total, cash on delivery, and the delivery address and phone. Then ask them to confirm.\n"
+            ."3. The moment nothing is missing, call review_order in that SAME message and read the WHOLE summary out: the piece and option, quantity, each saving, the delivery charge, the total, cash on delivery, and the delivery address and phone. Then ask them to confirm. Never announce a summary you have not sent — \"I'll send the summary now\" and then silence leaves the customer waiting; send it.\n"
             ."4. Only when they clearly agree — \"ok\", \"confirm\", \"হ্যাঁ\", \"korun\", \"nibo\" — call place_order with the quote_id from that summary. A hesitant or conditional answer is not agreement: ask again. You cannot read the summary and place the order in the same message: the customer has to answer it first, and place_order will refuse until they have.\n"
             ."5. Then give them the order number, the total, and that our team will confirm by phone.\n"
             ."HARD RULES: never state a price, a discount, a delivery charge or a total that a tool did not just return to you — not from memory, not from the chat history, not calculated by you. Never invent an order number. If a tool refuses (stale quote, too large, daily limit, sold out), tell the customer plainly what it said and offer the WhatsApp link — do not retry it and do not work around it. If they want to change something after the order is placed, tell them to call or WhatsApp us: you cannot change an order.";

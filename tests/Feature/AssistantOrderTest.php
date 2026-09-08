@@ -79,8 +79,8 @@ class AssistantOrderTest extends TestCase
         $this->orders()->nextTurn();                 // she says "I want this one"
         $this->orders()->chooseItem($p->slug);
         $this->orders()->setDetails($this->details($override));
-        $quote = $this->orders()->quote();           // the summary is read to her
-        $this->orders()->nextTurn();                 // she answers it: "ok, confirm"
+        $quote = $this->orders()->quote(forReading: true);   // the summary is read to her
+        $this->orders()->nextTurn();                          // she answers: "ok, confirm"
 
         return $quote;
     }
@@ -292,7 +292,7 @@ class AssistantOrderTest extends TestCase
         $this->orders()->nextTurn();
         $this->orders()->chooseItem($p->slug);
         $this->orders()->setDetails($this->details());
-        $quote = $this->orders()->quote();
+        $quote = $this->orders()->quote(forReading: true);
 
         // Same message, straight to placing it.
         $rushed = $this->orders()->place($quote['quote_id']);
@@ -304,6 +304,34 @@ class AssistantOrderTest extends TestCase
         $this->orders()->nextTurn();
         $this->assertTrue($this->orders()->place($quote['quote_id'])['ok']);
         $this->assertSame(1, Order::count());
+    }
+
+    /**
+     * Recording an answer needs the running total, so the tools that do it
+     * return one — but a total the assistant worked out for itself is not a
+     * total the customer was shown. Only the explicit read-back arms an order.
+     */
+    public function test_a_total_calculated_while_taking_answers_does_not_arm_an_order(): void
+    {
+        $this->enable();
+        $this->orders()->nextTurn();
+        $this->orders()->chooseItem($this->product('Pearl Ring', 900)->slug);
+
+        // set_order_details answers with the running total, but never says it
+        // out loud — so its quote_id cannot be ordered against, even a turn later.
+        $running = $this->orders()->setDetails($this->details())['order'];
+        $this->orders()->nextTurn();
+
+        $result = $this->orders()->place($running['quote_id']);
+        $this->assertFalse($result['ok']);
+        $this->assertSame('not_confirmed_yet', $result['reason']);
+        $this->assertSame(0, Order::count());
+
+        // Read it out, let her answer, and the same id now works.
+        $read = $this->orders()->quote(forReading: true);
+        $this->assertSame($running['quote_id'], $read['quote_id']);
+        $this->orders()->nextTurn();
+        $this->assertTrue($this->orders()->place($read['quote_id'])['ok']);
     }
 
     public function test_an_order_can_only_be_placed_against_the_quote_the_customer_agreed_to(): void
@@ -323,7 +351,7 @@ class AssistantOrderTest extends TestCase
 
         // The changed order has to be read back and agreed to again — then it
         // goes through.
-        $fresh = $this->orders()->quote();
+        $fresh = $this->orders()->quote(forReading: true);
         $this->orders()->nextTurn();
         $this->assertTrue($this->orders()->place($fresh['quote_id'])['ok']);
         $this->assertSame(1, Order::count());

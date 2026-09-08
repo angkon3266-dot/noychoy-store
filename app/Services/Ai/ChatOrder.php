@@ -418,7 +418,12 @@ class ChatOrder
      * same cascade the cart page uses, so a chat order and a website order for
      * the same basket cost exactly the same.
      */
-    public function quote(): array
+    /**
+     * @param  bool  $forReading  true only when this is the summary the
+     *                            assistant is about to read to the customer —
+     *                            see the turn stamp below.
+     */
+    public function quote(bool $forReading = false): array
     {
         $cart = $this->cart();
         if ($cart->isEmpty()) {
@@ -461,13 +466,16 @@ class ChatOrder
 
         $quote['quote_id'] = $this->quoteId($quote);
 
-        // Remember when this exact total was first put in front of the
-        // customer, so place() can tell "she has seen it" from "I have only
-        // just worked it out".
-        $seen = (array) session(self::KEY.'_quoted', []);
-        if (! isset($seen[$quote['quote_id']])) {
-            $seen[$quote['quote_id']] = $this->turn();
-            session([self::KEY.'_quoted' => array_slice($seen, -10, null, true)]);
+        // Only the explicit read-back counts as putting a total in front of
+        // the customer. Every other caller — recording an answer, choosing a
+        // piece — needs the figures too, but stamping them there would mean an
+        // order could be placed off a total nobody ever asked to be read out.
+        if ($forReading) {
+            $seen = (array) session(self::KEY.'_quoted', []);
+            if (! isset($seen[$quote['quote_id']])) {
+                $seen[$quote['quote_id']] = $this->turn();
+                session([self::KEY.'_quoted' => array_slice($seen, -10, null, true)]);
+            }
         }
 
         return $quote;
@@ -500,7 +508,7 @@ class ChatOrder
             'order' => $quote,
             'still_needed' => $quote['missing'] ?? [],
             'note' => ($quote['ready'] ?? false)
-                ? 'Read the whole summary back to the customer — pieces, total, delivery charge, cash on delivery, and the address — then ask them to confirm in their own words. Only after they say yes, call place_order with this quote_id.'
+                ? 'Everything is answered. Call review_order now, in THIS message, and read the whole summary out — pieces, savings, delivery charge, total, cash on delivery and the address — then ask them to confirm. Never say you will send a summary later; send it now.'
                 : 'Ask the customer for the next missing answer, one or two at a time, in their language. Do not call place_order yet.',
         ];
     }
