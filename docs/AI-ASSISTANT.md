@@ -84,20 +84,29 @@ a price, a discount or a total**. Every figure comes from a second cart
 so a chat order costs exactly what the website would charge, ladder rungs and
 member pricing included.
 
-Four guards, none of which depend on the model behaving:
+Seven guards, none of which depends on the model behaving:
 
 | Guard | What it stops |
 |---|---|
 | A second cart under its own session keys | An order sweeping up items she was still deciding about, and the chat disturbing her real basket |
-| `quote_id` — a hash of basket, zone, phone and total | Placing anything other than the exact order she was quoted; any change invalidates it |
+| `quote_id` — a hash of basket, zone, total and the whole delivery block | Placing anything other than the exact order she was quoted; changing the quantity or the address voids the yes |
+| Only `review_order` stamps a quote as shown | Ordering off a total the assistant worked out for itself and never read out |
 | The quote must have been issued on an **earlier** message | The model quoting and ordering in one breath, so the first she hears of the total is the confirmation |
-| The order number is written into the draft | A second parcel from a repeated tool call or a replayed transcript |
+| Her last message must actually be a yes (`saidYes()`) | "koto porbe?", "ভাবছি" and "amar husband ke jigges kori" counting as consent |
+| Order number in the draft, plus a content twin check (same phone, same money, ten minutes) | A second parcel from a repeated tool call or a replayed transcript |
+| `expected_total` inside PlaceOrder's transaction | Writing a figure she never saw, when a line reprices under the row lock |
 
-Plus a ceiling on the order value, a per-customer daily cap, and the owner's
-off switch — all in System Config. Orders taken this way are stamped
-`source = 'chat'`, so they are visible as such in the admin and countable for
-the cap. Validation mirrors `CheckoutController@store`; if the form changes,
-change `ChatOrder::fields()` too.
+Plus a ceiling on the order value, a per-customer daily cap, an IP-keyed cap
+(the other two are keyed on things the customer controls), and the owner's off
+switch. Orders taken this way are stamped `source = 'chat'` and wear an "AI
+chat" badge in the admin list, so they can be checked before they are booked
+with the courier. Validation mirrors `CheckoutController@store`; if the form
+changes, change `ChatOrder::fields()` too. No email is collected on purpose —
+it would point the shop's mailer at any address the model was given.
+
+**Worth building next:** above a value threshold, return a one-tap confirm
+link to the real checkout instead of placing directly. Today such orders are
+refused outright by the ceiling, which is safe but loses the sale.
 
 Pinned by `tests/Feature/AssistantOrderTest.php`.
 
