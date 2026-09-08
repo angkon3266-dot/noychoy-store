@@ -142,6 +142,21 @@ class PlaceOrder
             $pointsRedeemed = $this->cart->redeemablePoints();
             $pointsDiscount = $this->cart->pointsDiscount();
 
+            // A caller may pass the total the customer actually agreed to (the
+            // chat assistant does). validateLines() above can reprice a line
+            // between the quote and this moment, and an order written at a
+            // number nobody was shown is what the rider ends up arguing about
+            // on the doorstep. Bounce it instead, inside the transaction.
+            if (isset($data['expected_total'])) {
+                $wouldBe = round(max(0, $subtotal - $discount + $shipping), 2);
+                if (abs($wouldBe - round((float) $data['expected_total'], 2)) >= 0.01) {
+                    throw new CheckoutException(
+                        'The price changed while we were talking — it is '.money($wouldBe).' now, not '
+                        .money((float) $data['expected_total']).'. Please confirm the new total before ordering.'
+                    );
+                }
+            }
+
             // Personalized offer applied to this order (marked redeemed below).
             //
             // Only when it actually paid out: customerOffer() resolves the best

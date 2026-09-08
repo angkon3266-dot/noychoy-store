@@ -207,6 +207,11 @@
                             </td>
                         @endif
                         <td class="px-4 py-3">
+                            {{-- An order the AI assistant took, called out so it can be
+                                 checked before it is booked with the courier. --}}
+                            @if($order->source === 'chat')
+                                <span class="badge bg-gold-600 text-white text-[10px] mr-1" title="Taken by the AI assistant in chat">AI chat</span>
+                            @endif
                             @if($order->source_channel)
                                 <span class="badge {{ \App\Support\TrafficSource::badgeClass($order->source_channel) }} text-[10px]"
                                       title="{{ $order->source_campaign ? 'Campaign: '.$order->source_campaign : ($order->source_referrer ?: '') }}">

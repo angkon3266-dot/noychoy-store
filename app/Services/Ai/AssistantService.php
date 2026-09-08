@@ -157,10 +157,12 @@ class AssistantService
             $rounds = self::ORDER_TOOL_ROUNDS;
         }
 
+        $orderBefore = $orders->enabled() ? $orders->state()['order_number'] : null;
+
         for ($round = 0; $round <= $rounds; $round++) {
             $res = $this->complete($thread, $round < $rounds);
             if (! $res['ok']) {
-                return $this->failure($res['error']);
+                return $this->failure($res['error'], $orderBefore);
             }
 
             $message = $res['message'];
@@ -190,11 +192,35 @@ class AssistantService
             }
         }
 
-        return $this->failure('too many tool rounds');
+        return $this->failure('too many tool rounds', $orderBefore);
     }
 
-    protected function failure(string $why): array
+    /**
+     * The apology shown when OpenAI is unreachable — unless an order was
+     * placed while answering this message.
+     *
+     * That case is the dangerous one: the write has already happened, and
+     * telling the customer "sorry, I can't answer right now" invites her to
+     * order the same thing again. The number comes from the session, not the
+     * model, so it is true even when nothing else in the turn is.
+     */
+    protected function failure(string $why, ?string $orderBefore = null): array
     {
+        $placed = app(ChatOrder::class)->enabled() ? app(ChatOrder::class)->state()['order_number'] : null;
+
+        if ($placed && $placed !== $orderBefore) {
+            $phone = Setting::get('store_phone', config('store.phone'));
+
+            return [
+                'ok' => true,
+                'reply' => \App\Support\Locale::isBangla()
+                    ? "আপনার অর্ডারটি হয়ে গেছে — অর্ডার নম্বর {$placed}। ক্যাশ অন ডেলিভারি, আমাদের টিম শীঘ্রই ফোনে কনফার্ম করবে।".($phone ? " প্রয়োজনে কল করুন {$phone}।" : '')
+                    : "Your order is placed — order number {$placed}. It is cash on delivery, and our team will confirm by phone shortly.".($phone ? " Call us on {$phone} if you need anything." : ''),
+                'products' => [],
+                'error' => $why,
+            ];
+        }
+
         return ['ok' => false, 'reply' => $this->offlineText(), 'products' => [], 'error' => $why];
     }
 

@@ -369,6 +369,99 @@ class AssistantOrderTest extends TestCase
         $this->assertSame($first['order_number'], $second['order_number']);
     }
 
+    /**
+     * The draft's order number is the first guard against a second parcel, but
+     * a replayed transcript can call choose_item again and wipe it. So the
+     * real guard is the order itself: same customer, same money, moments ago.
+     */
+    public function test_a_replayed_conversation_does_not_send_a_second_parcel(): void
+    {
+        $this->enable();
+        $p = $this->product('Pearl Ring', 900);
+        $this->orders()->place($this->readyToPlace($p)['quote_id']);
+
+        // The whole conversation arrives again — a resent message, a retry.
+        $again = $this->orders()->place($this->readyToPlace($p)['quote_id']);
+
+        $this->assertSame(1, Order::count());
+        $this->assertTrue($again['already_placed']);
+        $this->assertSame(Order::firstOrFail()->order_number, $again['order_number']);
+    }
+
+    public function test_a_price_that_moved_while_they_were_talking_stops_the_order(): void
+    {
+        $this->enable();
+        $p = $this->product('Pearl Ring', 900);
+        $quote = $this->readyToPlace($p);
+
+        // The shop repriced it between the summary and her "yes".
+        $p->update(['price' => 1400]);
+
+        $result = $this->orders()->place($quote['quote_id']);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('checkout_failed', $result['reason']);
+        $this->assertSame(0, Order::count());
+    }
+
+    /**
+     * The innermost net. The quote check above runs before the transaction, so
+     * a total that moves *inside* it — a line repriced under the row lock — is
+     * invisible to everything outside. PlaceOrder refuses to write a figure the
+     * caller did not agree to, because that figure is what the rider will ask
+     * for on the doorstep.
+     */
+    public function test_place_order_refuses_to_write_a_total_nobody_agreed_to(): void
+    {
+        $this->enable();
+        $p = $this->product('Pearl Ring', 900);
+        $cart = \App\Services\CartService::scoped('test');
+        $cart->add($p, null, 1);
+
+        $this->expectException(\App\Exceptions\CheckoutException::class);
+        $this->expectExceptionMessageMatches('/price changed/');
+
+        (new \App\Actions\PlaceOrder($cart))->handle($this->details() + ['expected_total' => 1.0]);
+    }
+
+    public function test_the_assistant_never_denies_an_order_it_has_already_placed(): void
+    {
+        $this->enable();
+        $quote = $this->readyToPlace($this->product('Pearl Ring', 900));
+
+        // The order is written, and then OpenAI falls over before it can say so.
+        $step = 0;
+        Http::fake(function () use (&$step, $quote) {
+            $step++;
+
+            return $step === 1
+                ? Http::response(['choices' => [['message' => ['role' => 'assistant', 'content' => null, 'tool_calls' => [[
+                    'id' => 'c1', 'type' => 'function',
+                    'function' => ['name' => 'place_order', 'arguments' => json_encode(['quote_id' => $quote['quote_id']])],
+                ]]]]]])
+                : Http::response(['error' => ['message' => 'upstream is down']], 500);
+        });
+
+        $res = $this->postJson(route('assistant.chat'), ['messages' => [['role' => 'user', 'content' => 'ji confirm']]])->assertOk();
+
+        $order = Order::firstOrFail();
+        $this->assertSame(1, Order::count());
+        // Not the "sorry, I can't answer" apology — that invites her to order
+        // the same ring a second time.
+        $res->assertJsonPath('ok', true);
+        $this->assertStringContainsString($order->order_number, $res->json('reply'));
+    }
+
+    public function test_a_chat_order_cannot_take_the_whole_shelf(): void
+    {
+        $this->enable();
+        $p = $this->product('Pearl Ring', 900);
+
+        $this->orders()->chooseItem($p->slug, null, 9);
+
+        $this->assertSame(2, (int) $this->orders()->cart()->items()->first()['qty']);
+    }
+
     // ── Limits ──────────────────────────────────────────────────────────────
 
     public function test_an_order_above_the_owners_ceiling_is_handed_to_a_person(): void

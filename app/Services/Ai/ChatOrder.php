@@ -82,7 +82,10 @@ class ChatOrder
             'area' => ['rules' => ['nullable', 'string', 'max:120'], 'ask_en' => 'Area or thana', 'ask_bn' => 'এলাকা বা থানা'],
             'district' => ['rules' => ['nullable', 'string', 'max:120'], 'ask_en' => 'District', 'ask_bn' => 'জেলা'],
             'is_inside_dhaka' => ['rules' => ['required', 'boolean'], 'ask_en' => 'Is the address inside Dhaka city?', 'ask_bn' => 'ঠিকানাটি কি ঢাকার ভিতরে?'],
-            'email' => ['rules' => ['nullable', 'email', 'max:160'], 'ask_en' => 'Email (optional)', 'ask_bn' => 'ইমেইল (ঐচ্ছিক)'],
+            // Deliberately no email. The checkout page offers one, but an
+            // assistant that accepts an arbitrary address is a way to point
+            // the shop's mail server at a stranger; the SMS and the tracking
+            // link do the same job for a chat order.
             'notes' => ['rules' => ['nullable', 'string', 'max:500'], 'ask_en' => 'Anything we should know (optional)', 'ask_bn' => 'কিছু জানানোর থাকলে (ঐচ্ছিক)'],
         ];
     }
@@ -225,7 +228,15 @@ class ChatOrder
             }
         }
 
-        $qty = max(1, min(10, $qty));
+        // A chat order is a conversation, not a wholesale channel. Two of a
+        // piece is a plausible "one for my sister too"; ten is either a
+        // misunderstanding or someone tying up the shelf.
+        $qty = max(1, min(2, $qty));
+
+        if ($product->manage_stock && $chosen === null && $qty > max(1, (int) $product->stock_quantity)) {
+            return ['ok' => false, 'reason' => 'not_enough_stock',
+                'message' => 'There are not that many left. Tell the customer how many we have and ask if that is alright.'];
+        }
 
         // One piece per chat order, replaced rather than added to: an assistant
         // that silently accumulates lines across a long conversation is how a
@@ -234,7 +245,17 @@ class ChatOrder
         $cart->clear();
         $cart->add($product, $chosen, $qty);
 
-        $this->write(['details' => $this->state()['details'], 'order_number' => null]);
+        // Starting a new piece after one has been ordered begins a genuinely
+        // clean draft rather than quietly clearing the anti-duplicate flag —
+        // a replayed transcript must not be able to reopen a placed order and
+        // send the parcel twice. The content guard in place() is the backstop.
+        $state = $this->state();
+        if ($state['order_number']) {
+            session()->forget([self::KEY, self::KEY.'_quoted']);
+            $state['details'] = [];
+        }
+
+        $this->write(['details' => $state['details'], 'order_number' => null]);
 
         return ['ok' => true] + $this->summary();
     }
@@ -547,13 +568,45 @@ class ChatOrder
                 'message' => 'That is as many orders as I can take for one customer today. Give the WhatsApp link so a person can help with another.'];
         }
 
+        // The cap above is keyed on things the customer controls — a phone she
+        // types and a session she can drop. This one is keyed on the
+        // connection, which is the only thing an attacker has to spend to get
+        // more of, and it is what actually bounds a script.
+        if (! \Illuminate\Support\Facades\RateLimiter::attempt(
+            'chat-order-ip:'.request()->ip(),
+            $this->dailyLimit() + 2,
+            fn () => true,
+            (int) now()->diffInSeconds(now()->addDay()),
+        )) {
+            return ['ok' => false, 'reason' => 'daily_limit',
+                'message' => 'I cannot take another order from here today. Give the customer the WhatsApp link so a person can take it.'];
+        }
+
+        // Content-based idempotency, independent of the draft: the same
+        // customer, the same money, a minute ago is the same intent — a
+        // replayed transcript or a retried request, not a second parcel.
+        if ($twin = $this->recentTwin($details['phone'] ?? null, $quote['total_raw'])) {
+            $this->write(['order_number' => $twin->order_number]);
+
+            return ['ok' => true, 'already_placed' => true] + $this->placedPayload($twin);
+        }
+
         try {
-            $order = (new PlaceOrder($cart))->handle($details + ['source' => 'chat']);
+            $order = (new PlaceOrder($cart))->handle($details + [
+                'source' => 'chat',
+                // The total she agreed to, made binding inside the transaction:
+                // validateLines() can reprice a line, and an order written at a
+                // number she never saw is exactly what a rider argues about.
+                'expected_total' => $quote['total_raw'],
+            ]);
         } catch (CheckoutException $e) {
             // Stock ran out or a price moved while they were answering.
             return ['ok' => false, 'reason' => 'checkout_failed', 'message' => $e->getMessage().' Tell the customer plainly and offer to start again.'];
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('[assistant] chat order failed', ['error' => $e::class, 'message' => $e->getMessage()]);
+            // The class only. An exception message here can carry the address
+            // and the phone straight into laravel.log, which is the one place
+            // this feature promises they never go.
+            \Illuminate\Support\Facades\Log::error('[assistant] chat order failed', ['error' => $e::class]);
 
             return ['ok' => false, 'reason' => 'error', 'message' => 'The order could not be saved. Apologise and give the customer the phone and WhatsApp link so a person can take it.'];
         }
@@ -576,6 +629,24 @@ class ChatOrder
         )), -5));
 
         return ['ok' => true] + $this->placedPayload($order);
+    }
+
+    /**
+     * A chat order for the same phone and the same money, moments ago. Almost
+     * always the same intent arriving twice — a resent message, a retried
+     * request, a transcript replayed after a dropped connection.
+     */
+    protected function recentTwin(?string $phone, float $total): ?Order
+    {
+        if (blank($phone)) {
+            return null;
+        }
+
+        return Order::where('source', 'chat')
+            ->where('customer_phone', bd_phone($phone))
+            ->whereBetween('total', [$total - 0.01, $total + 0.01])
+            ->where('created_at', '>=', now()->subMinutes(10))
+            ->latest()->first();
     }
 
     protected function placedPayload(Order $order): array
