@@ -87,7 +87,19 @@
     <textarea id="noy-chat-input" class="noy-chat__input" rows="1" maxlength="{{ \App\Services\Ai\AssistantService::MAX_CHARS }}" placeholder="Ask about a piece, delivery, or your order…" data-noy-input></textarea>
     <button type="submit" class="noy-chat__send" data-noy-send aria-label="Send"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.27 3.13a.5.5 0 01.67-.6L21 12 3.94 21.47a.5.5 0 01-.67-.6L6 12zm0 0h6"/></svg></button>
 </form>
-<p class="noy-chat__foot">AI assistant — prices and order status come from the live store. For anything urgent, call us.</p>
+{{-- Says what it is and, when it can take orders, what it will ask for. A
+     customer typing her home address deserves to know where it is going. --}}
+<p class="noy-chat__foot">
+    @if(app(\App\Services\Ai\ChatOrder::class)->enabled())
+        {{ $bn
+            ? 'AI অ্যাসিস্ট্যান্ট — দাম ও স্টক লাইভ স্টোর থেকে। অর্ডার নিতে নাম, নম্বর ও ঠিকানা জিজ্ঞেস করবে; আপনি নিশ্চিত না করা পর্যন্ত কোনো অর্ডার হবে না।'
+            : 'AI assistant — prices and stock come from the live store. To place an order it will ask for your name, number and address; nothing is ordered until you confirm.' }}
+    @else
+        {{ $bn
+            ? 'AI অ্যাসিস্ট্যান্ট — দাম ও অর্ডারের তথ্য লাইভ স্টোর থেকে। জরুরি কিছু হলে কল করুন।'
+            : 'AI assistant — prices and order status come from the live store. For anything urgent, call us.' }}
+    @endif
+</p>
 <script>
 (function () {
     var root = document.getElementById('noy-chat');

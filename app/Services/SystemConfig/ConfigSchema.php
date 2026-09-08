@@ -158,10 +158,13 @@ class ConfigSchema
 
             'ai' => [
                 'label' => 'AI assistant',
-                'description' => 'The storefront chat assistant (OpenAI). It answers in Bangla or English, searches the live catalogue, and checks an order when the customer gives the order number and phone. The key is stored encrypted.',
+                'description' => 'The storefront chat assistant (OpenAI). It answers in Bangla or English, searches the live catalogue, checks an order when the customer gives the order number and phone, and — when order taking is on below — walks a customer through the checkout questions and places a cash-on-delivery order for them. The key is stored encrypted.',
                 'test' => 'openai',
                 'fields' => [
                     ['key' => 'ai.enabled', 'label' => 'Show the assistant on the storefront', 'type' => 'bool', 'config' => 'services.openai.assistant_enabled', 'env' => 'AI_ASSISTANT_ENABLED'],
+                    ['key' => 'ai.orders_enabled', 'label' => 'Let the assistant take orders (asks the checkout questions, confirms, then places a cash-on-delivery order)', 'type' => 'bool', 'config' => 'services.openai.orders_enabled', 'env' => 'AI_ASSISTANT_ORDERS'],
+                    ['key' => 'ai.orders_per_day', 'label' => 'Most chat orders one visitor may place per day', 'type' => 'number', 'config' => 'services.openai.orders_per_day', 'env' => 'AI_ASSISTANT_ORDERS_PER_DAY'],
+                    ['key' => 'ai.orders_max_total', 'label' => 'Biggest order the assistant may place on its own (৳) — above this it hands over to you', 'type' => 'number', 'config' => 'services.openai.orders_max_total', 'env' => 'AI_ASSISTANT_ORDERS_MAX_TOTAL'],
                     ['key' => 'ai.api_key', 'label' => 'OpenAI API key', 'type' => 'password', 'config' => 'services.openai.key', 'env' => 'OPENAI_API_KEY', 'sensitive' => true],
                     ['key' => 'ai.model', 'label' => 'Model', 'type' => 'text', 'config' => 'services.openai.model', 'env' => 'OPENAI_MODEL'],
                     ['key' => 'ai.greeting', 'label' => 'Greeting (first bubble)', 'type' => 'text', 'config' => 'services.openai.greeting', 'env' => null],

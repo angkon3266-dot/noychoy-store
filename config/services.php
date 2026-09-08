@@ -49,6 +49,16 @@ return [
     // there), so .env is only the fallback for a fresh install.
     'openai' => [
         'assistant_enabled' => env('AI_ASSISTANT_ENABLED', false),
+        // Whether the assistant may take an order end to end (find the piece,
+        // ask the checkout questions, confirm, place it). Cash on delivery
+        // means a real parcel and real courier cost, so the owner can switch
+        // this off without switching off the assistant.
+        'orders_enabled' => env('AI_ASSISTANT_ORDERS', true),
+        // Ceiling on orders one visitor may place through chat in a day, and
+        // the biggest order value the assistant may place unaided. Anything
+        // above the ceiling is handed to a person instead.
+        'orders_per_day' => (int) env('AI_ASSISTANT_ORDERS_PER_DAY', 3),
+        'orders_max_total' => (float) env('AI_ASSISTANT_ORDERS_MAX_TOTAL', 20000),
         'key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-5-mini'),
         'reasoning_effort' => env('OPENAI_REASONING_EFFORT', 'low'),

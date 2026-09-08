@@ -12,6 +12,9 @@ class Order extends Model
 {
     use SoftDeletes;
 
+    /** Where the order was taken. 'web' is the checkout page, 'chat' the AI assistant. */
+    public const SOURCES = ['web', 'chat', 'admin'];
+
     public const STATUSES = [
         'pending' => 'Pending',
         'confirmed' => 'Confirmed',

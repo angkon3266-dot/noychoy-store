@@ -42,8 +42,9 @@ class PlaceOrder
         $this->cart->rememberCheckoutPhone($data['phone']);
 
         $insideDhaka = (bool) ($data['is_inside_dhaka'] ?? false);
+        $source = in_array($data['source'] ?? null, Order::SOURCES, true) ? $data['source'] : 'web';
 
-        $order = DB::transaction(function () use ($data, $insideDhaka) {
+        $order = DB::transaction(function () use ($data, $insideDhaka, $source) {
             // Re-validate every line against live data, holding row locks so two
             // simultaneous checkouts can't both take the last unit. Throws
             // CheckoutException (rolling back) if anything no longer holds.
@@ -216,7 +217,11 @@ class PlaceOrder
                 // existing thank-you-card printer picks it up as-is.
                 'is_gift' => (bool) ($data['is_gift'] ?? false),
                 'card_message' => ($data['is_gift'] ?? false) ? ($data['card_message'] ?? null) : null,
-                'source' => 'web',
+                // 'web' is the checkout page. The chat assistant passes 'chat'
+                // so the owner can see at a glance which orders it took, and so
+                // its daily cap has something to count. Anything unrecognised
+                // falls back rather than writing a junk value.
+                'source' => $source,
             ]);
 
             // The locked products double as the landed-cost snapshot (margin

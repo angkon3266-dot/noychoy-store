@@ -69,6 +69,38 @@ so it sits correctly on both the React and the Blade floating stacks.
 Signed-in members get their name, tier, points and last three orders in the
 prompt, and the `my_orders` tool.
 
+## Taking an order
+
+With **Let the assistant take orders** on (System Config → AI assistant), the
+assistant can carry a customer from "I want this one" to a placed
+cash-on-delivery order. The customer pastes a product link or names the piece;
+the assistant asks the same questions the checkout form asks, reads the whole
+summary back, and places the order only after she agrees.
+
+`App\Services\Ai\ChatOrder` owns this. Four tools — `choose_item`,
+`set_order_details`, `review_order`, `place_order` — and **none of them accepts
+a price, a discount or a total**. Every figure comes from a second cart
+(`CartService::scoped('chat')`) priced by the same cascade the cart page uses,
+so a chat order costs exactly what the website would charge, ladder rungs and
+member pricing included.
+
+Four guards, none of which depend on the model behaving:
+
+| Guard | What it stops |
+|---|---|
+| A second cart under its own session keys | An order sweeping up items she was still deciding about, and the chat disturbing her real basket |
+| `quote_id` — a hash of basket, zone, phone and total | Placing anything other than the exact order she was quoted; any change invalidates it |
+| The quote must have been issued on an **earlier** message | The model quoting and ordering in one breath, so the first she hears of the total is the confirmation |
+| The order number is written into the draft | A second parcel from a repeated tool call or a replayed transcript |
+
+Plus a ceiling on the order value, a per-customer daily cap, and the owner's
+off switch — all in System Config. Orders taken this way are stamped
+`source = 'chat'`, so they are visible as such in the admin and countable for
+the cap. Validation mirrors `CheckoutController@store`; if the form changes,
+change `ChatOrder::fields()` too.
+
+Pinned by `tests/Feature/AssistantOrderTest.php`.
+
 ## The endpoint
 
 `POST /assistant/chat` (web group: session + CSRF) — body

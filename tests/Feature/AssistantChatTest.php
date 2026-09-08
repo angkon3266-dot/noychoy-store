@@ -22,6 +22,13 @@ class AssistantChatTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Every tool a guest is offered, in order. Spelled out rather than
+     * pattern-matched: this list is the assistant's entire power over the
+     * shop, so widening it should never pass silently.
+     */
+    protected const GUEST_TOOLS = ['search_products', 'order_status', 'choose_item', 'set_order_details', 'review_order', 'place_order'];
+
     protected function enable(): void
     {
         config(['services.openai.assistant_enabled' => true, 'services.openai.key' => 'sk-test']);
@@ -127,7 +134,7 @@ class AssistantChatTest extends TestCase
                 && str_contains($system, 'never reply in Latin-letter Banglish')  // Bangla / Banglish → Bangla script
                 && str_contains($system, 'WHAT YOU CANNOT DO')                    // no "I will WhatsApp the team"
                 && ! str_contains($system, '[CONFIRM')   // unresolved owner questions never reach a customer
-                && collect($request['tools'])->pluck('function.name')->all() === ['search_products', 'order_status'];
+                && collect($request['tools'])->pluck('function.name')->all() === self::GUEST_TOOLS;
         });
     }
 
@@ -215,7 +222,7 @@ class AssistantChatTest extends TestCase
             $tools = collect($request['tools'])->pluck('function.name')->all();
 
             return str_contains($system, 'Signed in as Areeba') && str_contains($system, 'Points balance: 250')
-                && $tools === ['my_orders', 'search_products', 'order_status'];
+                && $tools === array_merge(['my_orders'], self::GUEST_TOOLS);
         });
         Http::assertSent(function (ClientRequest $request) {
             $tool = collect($request['messages'])->firstWhere('role', 'tool');
@@ -232,7 +239,7 @@ class AssistantChatTest extends TestCase
 
         $this->ask('where is my order?')->assertOk();
 
-        Http::assertSent(fn (ClientRequest $request) => collect($request['tools'])->pluck('function.name')->all() === ['search_products', 'order_status']
+        Http::assertSent(fn (ClientRequest $request) => collect($request['tools'])->pluck('function.name')->all() === self::GUEST_TOOLS
             && ! str_contains($request['messages'][0]['content'], 'CUSTOMER (signed in'));
     }
 

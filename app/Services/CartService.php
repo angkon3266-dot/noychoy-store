@@ -39,6 +39,32 @@ class CartService
      */
     protected array $memo = [];
 
+    /**
+     * A second, independent cart in the same session, under its own keys.
+     *
+     * The chat assistant builds an order the shopper never put in her basket.
+     * Pricing it through this class — rather than reimplementing the cascade —
+     * is the only way its ladder rungs, quantity offers, member pricing and
+     * free delivery come out identical to the website; giving it separate keys
+     * is the only way doing so cannot disturb, or be disturbed by, whatever she
+     * has already collected in the real cart.
+     *
+     * Safe because every collaborator (GiftLadder, Coupon, Offer,
+     * CouponAutoApply) is handed the cart as an argument rather than resolving
+     * the container singleton — so an instance made here prices itself, and
+     * `new PlaceOrder($scoped)` writes an order from it.
+     */
+    public static function scoped(string $scope): static
+    {
+        $cart = new static;
+        $cart->sessionKey = 'cart:'.$scope;
+        $cart->couponKey = 'cart_coupon:'.$scope;
+        $cart->pointsKey = 'cart_points:'.$scope;
+        $cart->phoneKey = 'checkout_phone:'.$scope;
+
+        return $cart;
+    }
+
     protected function memo(string $key, \Closure $fn)
     {
         return $this->memo[$key] ??= $fn();
