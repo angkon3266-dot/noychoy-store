@@ -42,7 +42,14 @@ class HandleInertiaRequests extends Middleware
                 : (object) [],
 
             // Fresh on every response — the badge must never lag an add-to-cart.
-            'cart' => fn () => ['count' => app(CartService::class)->count()],
+            // saved_text is the total taken off the cart (ladder, offers,
+            // coupon, points); the phone header wears it as a badge.
+            'cart' => function () {
+                $cart = app(CartService::class);
+                $saved = $cart->count() > 0 ? $cart->discount() : 0.0;
+
+                return ['count' => $cart->count(), 'saved_text' => $saved > 0 ? money($saved) : null];
+            },
 
             // The reward ladder's progress (null when the ladder is off) — the
             // always-visible strip under the header reads this on every page.

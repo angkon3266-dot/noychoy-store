@@ -10,6 +10,10 @@ const CartContext = createContext(null);
 export function CartProvider({ children }) {
     const { props } = usePage();
     const [count, setCount] = useState(props.cart?.count ?? 0);
+    // Total taken off the cart (ladder, offers, coupon, points) — the phone
+    // header wears it as a badge. Seeded by the server so it is never blank on
+    // a fresh page, refreshed with every cart payload.
+    const [savedText, setSavedText] = useState(props.cart?.saved_text || '');
     const [items, setItems] = useState([]);
     const [subtotalText, setSubtotalText] = useState('');
     const [discountLines, setDiscountLines] = useState([]);
@@ -29,7 +33,8 @@ export function CartProvider({ children }) {
     // Server-rendered count wins after every Inertia navigation/redirect.
     useEffect(() => {
         if (props.cart?.count !== undefined) setCount(props.cart.count);
-    }, [props.cart?.count]);
+        if (props.cart?.saved_text !== undefined) setSavedText(props.cart.saved_text || '');
+    }, [props.cart?.count, props.cart?.saved_text]);
 
     // Same for the ladder: the strip in the header must never be blank on a
     // fresh page, and the server's snapshot is authoritative after a redirect.
@@ -39,6 +44,7 @@ export function CartProvider({ children }) {
 
     const apply = useCallback((data) => {
         setCount(data.count);
+        setSavedText(data.discount > 0 ? (data.discount_text || '') : '');
         setItems(data.items || []);
         setSubtotalText(data.subtotal_text || '');
         setDiscountLines(data.discount_lines || []);
@@ -125,7 +131,7 @@ export function CartProvider({ children }) {
 
     return (
         <CartContext.Provider value={{
-            count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping,
+            count, savedText, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping,
             drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, remove, refresh,
         }}>
             {children}

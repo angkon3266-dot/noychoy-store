@@ -17,10 +17,10 @@
         'offline' => $assistant->offlineText(),
         // The assistant makes the first move: a small "need anything?" beside
         // the launcher, once per session, never over the checkout form.
-        'teaser' => $bn ? 'কিছু লাগবে? 👋 আমাকে জিজ্ঞেস করুন' : 'Kichu lagbe? 👋 Ask me anything',
+        'teaser' => $bn ? 'কিছু লাগবে? 👋 আমাকে জিজ্ঞেস করুন' : 'Need any help? 👋 Ask me anything',
         'chips' => $bn
             ? ['ডেলিভারি চার্জ কত?', '১,০০০ টাকার নিচে গিফট', 'আমার অর্ডার কোথায়?', 'রিং সাইজ কীভাবে মাপব?']
-            : ['Delivery charge koto?', 'Gift under ৳1,000', 'Track my order', 'Ring size help'],
+            : ['Delivery charge?', 'Gift under ৳1,000', 'Track my order', 'Ring size help'],
     ] : null;
 @endphp
 @if($chatConfig)
@@ -126,6 +126,9 @@
             var clean = u.replace(/[.,;:!?)]+$/, '');
             return '<a href="' + clean + '">' + clean.replace(location.origin, '') + '</a>' + u.slice(clean.length);
         });
+        // The store's WhatsApp is the one off-site link allowed: it is how a
+        // customer reaches a person, so it must be tappable.
+        html = html.replace(/https:\/\/wa\.me\/(\d{6,15})/g, '<a href="https://wa.me/$1" target="_blank" rel="noopener">wa.me/$1</a>');
         return html;
     }
 

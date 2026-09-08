@@ -103,6 +103,7 @@ class AssistantChatTest extends TestCase
     {
         $this->enable();
         Setting::put('store_phone', '01634347164');
+        Setting::put('theme', ['whatsapp_number' => '01634347164']);
         Setting::put('shipping_inside', 70);
         Setting::put('shipping_outside', 130);
         Http::fake(['api.openai.com/*' => Http::response($this->text('Delivery is ৳70 inside Dhaka.'))]);
@@ -122,6 +123,9 @@ class AssistantChatTest extends TestCase
                 && str_contains($system, '৳70 inside Dhaka')
                 && str_contains($system, '01634347164')
                 && str_contains($system, 'cash on delivery')
+                && str_contains($system, 'https://wa.me/8801634347164')        // the tappable way to reach a person
+                && str_contains($system, 'never reply in Latin-letter Banglish')  // Bangla / Banglish → Bangla script
+                && str_contains($system, 'WHAT YOU CANNOT DO')                    // no "I will WhatsApp the team"
                 && ! str_contains($system, '[CONFIRM')   // unresolved owner questions never reach a customer
                 && collect($request['tools'])->pluck('function.name')->all() === ['search_products', 'order_status'];
         });

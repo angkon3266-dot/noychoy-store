@@ -24,11 +24,20 @@
 @endphp
 @if($pixelOn)
     <script>
+        // The fbq stub goes in now so init/PageView/ViewContent queue at once,
+        // but the ~240KB of Pixel JavaScript is fetched only after the page has
+        // loaded (or on the first touch, whichever comes first). It was the
+        // largest download on the home page and competed with the hero image
+        // on the phones most visitors use; the queued events flush unchanged.
         !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
-        document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];
+        var loaded=false,load=function(){if(loaded)return;loaded=true;t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)};
+        var later=function(){setTimeout(load,1200)};
+        if(b.readyState==='complete')later();else f.addEventListener('load',later);
+        ['scroll','touchstart','pointerdown','keydown'].forEach(function(ev){f.addEventListener(ev,load,{once:true,passive:true})});
+        }(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
         window.META_EVENTS = {!! \Illuminate\Support\Js::from($events) !!};
         fbq('init', {!! \Illuminate\Support\Js::from($pixelId) !!}{!! $am ? ', '.\Illuminate\Support\Js::from($am) : '' !!});
         @if($events['PageView'] ?? true)

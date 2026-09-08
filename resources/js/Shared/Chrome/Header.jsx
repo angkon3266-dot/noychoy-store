@@ -13,7 +13,7 @@ export default function Header() {
     const { props } = usePage();
     const chrome = props.chrome || {};
     const { logo = {}, menuIcon = {}, menu = {}, urls = {}, storeName } = chrome;
-    const { count, openDrawer } = useCart();
+    const { count, savedText, openDrawer } = useCart();
     const nav = useMobileNav();
     const [mSearch, setMSearch] = useState(false);
     const [imgOk, setImgOk] = useState(true);
@@ -67,8 +67,15 @@ export default function Header() {
                         )}
                     </SmartLink>
 
-                    {/* Optional centre image (mobile only) */}
-                    {logo.center && (
+                    {/* Phone only: what the cart has saved so far, centred as a badge
+                        that opens the cart. Takes the centre slot over the optional
+                        centre image whenever there is a saving to show. */}
+                    {savedText ? (
+                        <SmartLink href={urls.cart || '/cart'} className="md:hidden absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-gold-600 text-white text-[11px] font-semibold px-2.5 py-1 shadow-sm whitespace-nowrap" aria-label={`${savedText} saved — open cart`} lang={chrome.lang}>
+                            <Icon name="gift" className="w-3 h-3" strokeWidth={2} />
+                            {chrome.lang === 'bn' ? `${savedText} সাশ্রয়` : `${savedText} saved`}
+                        </SmartLink>
+                    ) : logo.center && (
                         <a href={logo.centerLink} className="md:hidden absolute left-1/2 -translate-x-1/2">
                             <img src={logo.center} alt="" height={logo.centerH} decoding="async" className="logo-center w-auto" />
                         </a>

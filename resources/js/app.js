@@ -46,8 +46,10 @@ document.addEventListener('alpine:init', () => {
         items: [],
         subtotalText: '',
         discountLines: [],
-        discountText: '',
-        discount: 0,
+        // Seeded by the layout so the phone header's "saved" badge is right
+        // on first paint, before any cart fetch.
+        discountText: window.__cartSavedText || '',
+        discount: Number(window.__cartSaved || 0),
         hints: [],
         freeShipping: false,
         drawer: false,

@@ -60,7 +60,12 @@ export default function LadderStrip() {
                 <Icon name="gift" className="w-3 h-3" strokeWidth={2} />
                 {t(lang, 'strip.badge')}
             </span>
-            <span className="min-w-0 flex-1 basis-40 truncate" lang={lang}>{message}</span>
+            {/* A phone gets one short Bangla promise and nothing else (the owner's
+                call: "clean thakbe"); the live message is for sm and up. */}
+            <span className="min-w-0 flex-1 basis-40 truncate">
+                <span className="sm:hidden font-medium" lang="bn">প্রতি পিসেই রিওয়ার্ড</span>
+                <span className="hidden sm:inline" lang={lang}>{message}</span>
+            </span>
             <span ref={trackRef} className="flex basis-full items-center justify-between sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
                 {visible.map((tier, i) => tier === null ? (
                     <span key="gap" className="text-[10px] text-ink-500 px-0.5">…</span>
