@@ -113,6 +113,7 @@
         }
     </style>
     @include('partials.meta-pixel')
+    @include('partials.google-tag')
 </head>
 <body class="min-h-screen flex flex-col" data-shop>
     @php

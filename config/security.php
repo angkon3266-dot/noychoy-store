@@ -98,6 +98,12 @@ return [
                 "'unsafe-inline'",              // inline Blade <script> blocks
                 "'unsafe-eval'",                // Alpine's expression evaluator
                 'https://connect.facebook.net', // Meta Pixel (fbevents.js)
+                'https://www.googletagmanager.com', // Google tag (gtag.js)
+                // An Ads conversion is not delivered by gtag.js itself: it
+                // injects a further <script> from one of these. Allowing them
+                // in connect-src alone is not enough, and the block is silent.
+                'https://googleads.g.doubleclick.net',
+                'https://www.googleadservices.com',
             ],
 
             'style-src' => [
@@ -124,10 +130,25 @@ return [
 
             'media-src' => ["'self'", 'data:', 'blob:'],
 
+            // Every host a fired event actually leaves through. gtag.js is
+            // loaded from googletagmanager, but it does NOT report there: GA4
+            // hits go to google-analytics/analytics.google.com, an Ads
+            // conversion to google.com (and the visitor's country domain), and
+            // remarketing to doubleclick. Miss one and the tag loads, the page
+            // looks healthy, and that half of the reporting is silently empty.
             'connect-src' => [
                 "'self'",
                 'https://www.facebook.com',     // Pixel event delivery
                 'https://connect.facebook.net',
+                'https://www.googletagmanager.com',
+                'https://www.google-analytics.com', // GA4 measurement
+                'https://analytics.google.com',
+                'https://stats.g.doubleclick.net',
+                'https://www.google.com',          // Ads conversion ping
+                'https://googleads.g.doubleclick.net', // remarketing audiences
+                'https://ad.doubleclick.net',
+                'https://www.googleadservices.com',
+                'https://www.google.com.bd',       // conversions ping the visitor's country domain
             ],
 
             'frame-src' => [

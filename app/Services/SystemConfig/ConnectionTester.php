@@ -2,8 +2,11 @@
 
 namespace App\Services\SystemConfig;
 
+use App\Services\Google\GoogleTagService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Predis\Client;
 use Symfony\Component\Mailer\Transport;
 
 /**
@@ -36,7 +39,7 @@ class ConnectionTester
         }
     }
 
-    private function val(array $values, string $key, string $configPath = null)
+    private function val(array $values, string $key, ?string $configPath = null)
     {
         $v = $values[$key] ?? null;
 
@@ -86,7 +89,7 @@ class ConnectionTester
         }
 
         if (class_exists('Predis\\Client')) {
-            $client = new \Predis\Client(array_filter(['host' => $host, 'port' => $port, 'password' => $pass ?: null]));
+            $client = new Client(array_filter(['host' => $host, 'port' => $port, 'password' => $pass ?: null]));
             $client->ping();
 
             return ['ok' => true, 'message' => "✅ Redis responded at {$host}:{$port}."];
@@ -102,7 +105,7 @@ class ConnectionTester
         return match ($driver) {
             'sync' => ['ok' => true, 'message' => '✅ Sync driver runs jobs inline (no worker needed).'],
             'redis' => $this->redis($v),
-            'database' => \Illuminate\Support\Facades\Schema::hasTable('jobs')
+            'database' => Schema::hasTable('jobs')
                 ? ['ok' => true, 'message' => '✅ Database queue ready (jobs table present).']
                 : ['ok' => false, 'message' => '❌ jobs table missing — run migrations.'],
             default => ['ok' => false, 'message' => "❌ Unknown queue driver: {$driver}."],
@@ -198,15 +201,43 @@ class ConnectionTester
         };
     }
 
+    /**
+     * No live handshake exists without a full OAuth flow, so this checks the
+     * shapes — which is the check that matters. A malformed ID is accepted by
+     * gtag without complaint and simply records nothing, so the only warning
+     * anyone gets is this one.
+     */
     private function google(array $v): array
     {
-        $ga = $this->val($v, 'google.analytics_id', 'services.google.analytics_id');
+        $ga = $this->val($v, 'google.analytics_id', 'google.analytics_id');
+        $ads = $this->val($v, 'google.ads_id', 'google.ads_id');
+        $label = $this->val($v, 'google.ads_purchase_label', 'google.ads_purchase_label');
 
-        // No server-side handshake without a full OAuth flow — validate presence/shape.
-        if ($ga && ! preg_match('/^G-[A-Z0-9]+$/i', (string) $ga)) {
-            return ['ok' => false, 'message' => '❌ GA4 Measurement ID should look like "G-XXXXXXX".'];
+        if ($ga && ! preg_match(GoogleTagService::ANALYTICS_PATTERN, (string) $ga)) {
+            return ['ok' => false, 'message' => '❌ GA4 Measurement ID should look like "G-XXXXXXXXXX".'];
         }
 
-        return ['ok' => true, 'message' => '✅ Google settings look valid (no live handshake available).'];
+        if ($ads && ! preg_match(GoogleTagService::ADS_PATTERN, (string) $ads)) {
+            return ['ok' => false, 'message' => '❌ Google Ads conversion ID should look like "AW-123456789".'];
+        }
+
+        // Half a conversion setup is the expensive failure: ads run, clicks are
+        // paid for, and the conversion column stays empty because the purchase
+        // has nowhere to go.
+        if ($ads && ! $label) {
+            return ['ok' => false, 'message' => '⚠️ Ads ID is set but the purchase label is empty — no sale will ever be recorded. Copy the label from Google Ads → Tools → Conversions.'];
+        }
+
+        if ($label && ! $ads) {
+            return ['ok' => false, 'message' => '⚠️ A purchase label is set but the Ads conversion ID is empty. Both are needed.'];
+        }
+
+        if (! $ga && ! $ads) {
+            return ['ok' => false, 'message' => '❌ Neither a GA4 ID nor a Google Ads ID is set, so no Google tag is on the site.'];
+        }
+
+        $on = array_filter([$ga ? 'GA4' : null, $ads && $label ? 'Ads conversions' : null]);
+
+        return ['ok' => true, 'message' => '✅ Live on the storefront: '.implode(' + ', $on).'. Confirm with Google Tag Assistant.'];
     }
 }

@@ -3,11 +3,22 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Actions\PlaceOrder;
+use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Customer\AccountController;
 use App\Models\Order;
+use App\Models\Setting;
+use App\Models\Visit;
+use App\Rules\BdPhone;
 use App\Services\CartService;
+use App\Services\LoyaltyService;
+use App\Services\MemberPricingService;
 use App\Services\Meta\MetaTrackingService;
+use App\Services\SteadfastService;
+use App\Support\DeliveryEstimate;
+use App\Support\Referral;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class CheckoutController extends Controller
 {
@@ -25,7 +36,7 @@ class CheckoutController extends Controller
         // Funnel step for the dashboard's conversion report, carrying what the
         // cart was worth at this moment — the same figure the Meta
         // InitiateCheckout below reports, so the two can be reconciled.
-        \App\Models\Visit::record('checkout_start', [
+        Visit::record('checkout_start', [
             'value' => round((float) ($this->cart->subtotal() - $this->cart->discount()), 2),
         ]);
 
@@ -44,10 +55,10 @@ class CheckoutController extends Controller
         $icContext = MetaTrackingService::captureClientContext();
         app()->terminating(fn () => $tracking->initiateCheckout($icContentIds, $icValue, $icCount, $icEventId, $user, $icContext));
 
-        $loyalty = app(\App\Services\LoyaltyService::class);
+        $loyalty = app(LoyaltyService::class);
         $custPoints = (int) ($customer->points ?? 0);
         $appliedPoints = $this->cart->redeemablePoints();
-        $regPct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
+        $regPct = (float) Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
         $discount = $this->cart->discount();
 
         // What signing up is actually worth on THIS cart, in taka. "Get an extra
@@ -57,7 +68,7 @@ class CheckoutController extends Controller
         // — the figure cannot be derived client-side from one percentage.
         $regSaving = 0.0;
         if (! $customer) {
-            $pricing = app(\App\Services\MemberPricingService::class);
+            $pricing = app(MemberPricingService::class);
             if ($pricing->enabled()) {
                 foreach ($this->cart->items() as $line) {
                     $pct = $pricing->percentForLine((int) $line['product_id'], $line['category_id'] ?? null);
@@ -68,7 +79,7 @@ class CheckoutController extends Controller
             }
         }
 
-        return \Inertia\Inertia::render('Checkout', [
+        return Inertia::render('Checkout', [
             'pageTitle' => 'Checkout',
             'items' => $this->cart->items()->map(fn ($i) => [
                 'name' => $i['name'],
@@ -87,8 +98,8 @@ class CheckoutController extends Controller
                 // Client-side shipping math inputs (same rules the server applies).
                 'sub' => (float) ($this->cart->subtotal() - $discount),
                 'rawSubtotal' => (float) $this->cart->subtotal(),
-                'shipInside' => (int) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
-                'shipOutside' => (int) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
+                'shipInside' => (int) Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
+                'shipOutside' => (int) Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
                 'freeThreshold' => free_shipping_threshold(),
             ],
             'prefill' => [
@@ -152,7 +163,7 @@ class CheckoutController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'phone' => ['required', 'string', new \App\Rules\BdPhone],
+            'phone' => ['required', 'string', new BdPhone],
             'email' => ['nullable', 'email', 'max:160'],
             'address' => ['required', 'string', 'max:500'],
             'area' => ['nullable', 'string', 'max:120'],
@@ -175,7 +186,7 @@ class CheckoutController extends Controller
 
         try {
             $order = $placeOrder->handle($data);
-        } catch (\App\Exceptions\CheckoutException $e) {
+        } catch (CheckoutException $e) {
             // Stock ran out / a price changed / a product went away — the cart
             // has been corrected; send the customer back to review it.
             return redirect()->route('cart')->with('error', $e->getMessage());
@@ -209,7 +220,7 @@ class CheckoutController extends Controller
                 ->with('error', 'Please verify with your order number and phone to view this order.');
         }
 
-        return \Inertia\Inertia::render('Confirmation', [
+        return Inertia::render('Confirmation', [
             'pageTitle' => 'Order Confirmed',
             'order' => [
                 'number' => $order->order_number,
@@ -240,6 +251,18 @@ class CheckoutController extends Controller
                     : "prod-{$i->product_id}")->values(),
                 'numItems' => (int) $order->items->sum('quantity'),
                 'eventId' => $order->order_number,
+                // Per-line detail for the Google purchase event. The ids are
+                // the same strings the product feed sends as g:id, which is
+                // what lets Google report revenue per product and re-target the
+                // exact piece someone bought.
+                'items' => $order->items->map(fn ($i) => [
+                    'id' => $i->variant_id
+                        ? "prod-{$i->product_id}-var-{$i->variant_id}"
+                        : "prod-{$i->product_id}",
+                    'name' => $i->name,
+                    'price' => (float) $i->price,
+                    'quantity' => (int) $i->quantity,
+                ])->values(),
             ],
             'trackUrl' => route('track').'?order_number='.$order->order_number,
             // The window the courier will actually hit: Fridays skipped, and
@@ -248,13 +271,13 @@ class CheckoutController extends Controller
             // days later, and "the courier delivers Sun 23" on the 30th reads
             // as broken rather than reassuring. The tracking link is the
             // honest answer at that point.
-            'estimate' => ($est = \App\Support\DeliveryEstimate::for((bool) $order->is_inside_dhaka, $order->created_at))
+            'estimate' => ($est = DeliveryEstimate::for((bool) $order->is_inside_dhaka, $order->created_at))
                 && ($est->to ?? $est->from)->endOfDay()->isFuture() ? [
                     'label' => $est->label(),
                     'zoneText' => $order->is_inside_dhaka ? 'inside Dhaka' : 'outside Dhaka',
                 ] : null,
             // A human rings before the parcel moves — say so, and on what number.
-            'storePhone' => \App\Models\Setting::get('store_phone', config('store.phone')),
+            'storePhone' => Setting::get('store_phone', config('store.phone')),
             // Right after buying is the best moment this shop ever gets to ask
             // for an account — and it was the one moment it did not. PlaceOrder
             // already made a customer row for them; this offers to turn it into
@@ -279,7 +302,7 @@ class CheckoutController extends Controller
             return null;
         }
 
-        $pct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
+        $pct = (float) Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
 
         return [
             'url' => route('order.claim', $order->order_number),
@@ -322,9 +345,9 @@ class CheckoutController extends Controller
         $customer->update(['password' => $data['password']]);
 
         // A guest who arrived on an invite link and now becomes a member.
-        \App\Support\Referral::attach($customer, $request);
+        Referral::attach($customer, $request);
 
-        $loyalty = app(\App\Services\LoyaltyService::class);
+        $loyalty = app(LoyaltyService::class);
         if ($loyalty->enabled() && $loyalty->signupPoints() > 0) {
             $loyalty->award($customer, $loyalty->signupPoints(), 'signup', 'Welcome bonus');
         }
@@ -336,7 +359,7 @@ class CheckoutController extends Controller
             ->with('success', 'Your account is ready — welcome to '.store_name().'.');
     }
 
-    public function track(Request $request, \App\Services\SteadfastService $steadfast)
+    public function track(Request $request, SteadfastService $steadfast)
     {
         $order = null;
         $tracking = null;
@@ -349,11 +372,11 @@ class CheckoutController extends Controller
                 ->first();
 
             if ($order) {
-                $tracking = \App\Http\Controllers\Customer\AccountController::trackingFor($order, $steadfast);
+                $tracking = AccountController::trackingFor($order, $steadfast);
             }
         }
 
-        return \Inertia\Inertia::render('Track', [
+        return Inertia::render('Track', [
             'pageTitle' => 'Track Order',
             'query' => [
                 'order_number' => (string) $request->query('order_number', ''),

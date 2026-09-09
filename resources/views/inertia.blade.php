@@ -114,6 +114,7 @@
         .menu-ico { height: {{ (int) (theme('menu_icon_height') ?: 28) }}px; width: {{ (int) (theme('menu_icon_height') ?: 28) }}px; }
     </style>
     @include('partials.meta-pixel')
+    @include('partials.google-tag')
 </head>
 <body class="min-h-screen" data-shop>
     {{-- @inertia expanded by hand so the crawlable shell can sit INSIDE the

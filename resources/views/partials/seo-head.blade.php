@@ -89,6 +89,12 @@
 <meta name="description" content="{{ $metaDesc }}">
 <meta name="robots" content="{{ $robots }}">
 @if($canonical)<link rel="canonical" href="{{ $canonical }}">@endif
+{{-- Search Console / Merchant Center "HTML tag" verification. Set the token in
+     Admin → System Config → Google; Merchant Center will not show a single
+     product until the domain is proven. --}}
+@if($gsv = app(\App\Services\Google\GoogleTagService::class)->siteVerification())
+<meta name="google-site-verification" content="{{ $gsv }}">
+@endif
 
 {{-- Market targeting. The shop sells only in Bangladesh, in taka, with cash on
      delivery — every signal that says so is one fewer thing Google infers from

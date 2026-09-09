@@ -56,7 +56,8 @@
                            placeholder="{{ $item['has_saved'] ? '•••••••• (saved — leave blank to keep)' : 'Not set' }}">
                 @else
                     <input type="{{ $f['type'] === 'email' ? 'email' : ($f['type'] === 'number' ? 'number' : 'text') }}"
-                           name="values[{{ $f['key'] }}]" value="{{ $item['value'] }}" class="input">
+                           name="values[{{ $f['key'] }}]" value="{{ $item['value'] }}" class="input"
+                           @if(!empty($f['placeholder'])) placeholder="{{ $f['placeholder'] }}" @endif>
                 @endif
 
                 @if($f['env'])<p class="text-[11px] text-ink-700/40 mt-1">Falls back to <code>{{ $f['env'] }}</code> in .env</p>@endif

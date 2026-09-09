@@ -10,6 +10,10 @@ export default function Confirmation({ order, purchase, trackUrl, estimate, stor
 
     // Purchase Pixel — eventID is the order number so Meta dedups it against
     // the server CAPI Purchase (and against a page refresh).
+    //
+    // The fourth argument is Google's alone: the Pixel never sees it. It
+    // carries the per-line breakdown so GA4 can report revenue per product
+    // rather than one lump sum against the order.
     useEffect(() => {
         if (window.track) {
             window.track('Purchase', {
@@ -18,7 +22,7 @@ export default function Confirmation({ order, purchase, trackUrl, estimate, stor
                 content_type: 'product',
                 content_ids: purchase.contentIds,
                 num_items: purchase.numItems,
-            }, { eventID: purchase.eventId });
+            }, { eventID: purchase.eventId }, { items: purchase.items });
         }
     }, [purchase.eventId]);
 

@@ -136,9 +136,14 @@ class ConfigSchema
 
             'google' => [
                 'label' => 'Google',
-                'description' => 'Analytics & OAuth.',
+                'description' => 'Analytics, Google Ads conversions, domain verification & OAuth. The Ads ID and its purchase label are the pair that makes advertising measurable — an ID on its own records nothing.',
+                'test' => 'google',
                 'fields' => [
-                    ['key' => 'google.analytics_id', 'label' => 'GA4 Measurement ID', 'type' => 'text', 'config' => 'services.google.analytics_id', 'env' => 'GOOGLE_ANALYTICS_ID'],
+                    ['key' => 'google.analytics_id', 'label' => 'GA4 Measurement ID', 'type' => 'text', 'config' => 'google.analytics_id', 'env' => 'GOOGLE_ANALYTICS_ID', 'placeholder' => 'G-XXXXXXXXXX'],
+                    ['key' => 'google.ads_id', 'label' => 'Google Ads conversion ID', 'type' => 'text', 'config' => 'google.ads_id', 'env' => 'GOOGLE_ADS_ID', 'placeholder' => 'AW-123456789'],
+                    ['key' => 'google.ads_purchase_label', 'label' => 'Google Ads purchase label', 'type' => 'text', 'config' => 'google.ads_purchase_label', 'env' => 'GOOGLE_ADS_PURCHASE_LABEL', 'placeholder' => 'AbC-D_efGhIjKlM'],
+                    ['key' => 'google.enhanced_conversions', 'label' => 'Enhanced conversions', 'type' => 'bool', 'config' => 'google.enhanced_conversions', 'env' => 'GOOGLE_ENHANCED_CONVERSIONS'],
+                    ['key' => 'google.site_verification', 'label' => 'Site verification token', 'type' => 'text', 'config' => 'google.site_verification', 'env' => 'GOOGLE_SITE_VERIFICATION', 'placeholder' => 'the content= value only'],
                     ['key' => 'google.oauth_client_id', 'label' => 'OAuth Client ID', 'type' => 'text', 'config' => 'services.google.client_id', 'env' => 'GOOGLE_CLIENT_ID'],
                     ['key' => 'google.oauth_client_secret', 'label' => 'OAuth Client Secret', 'type' => 'password', 'config' => 'services.google.client_secret', 'env' => 'GOOGLE_CLIENT_SECRET', 'sensitive' => true],
                 ],
