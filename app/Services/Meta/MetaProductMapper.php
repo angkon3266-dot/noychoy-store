@@ -4,6 +4,7 @@ namespace App\Services\Meta;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
+use Illuminate\Support\Collection;
 
 /**
  * Maps our Product / ProductVariant models to Meta Catalog "product item" data.
@@ -178,9 +179,7 @@ class MetaProductMapper
 
     private function description(Product $product): string
     {
-        $text = strip_tags((string) ($product->description ?: $product->short_description ?: $product->name));
-
-        return $this->truncate(trim($text) ?: $product->name, 5000);
+        return feed_description($product, 5000);
     }
 
     private function brand(Product $product): ?string
@@ -274,7 +273,7 @@ class MetaProductMapper
         return collect($product->colors ?? [])->filter()->first();
     }
 
-    private function attr(\Illuminate\Support\Collection $attrs, array $names): ?string
+    private function attr(Collection $attrs, array $names): ?string
     {
         foreach ($attrs as $key => $value) {
             if (in_array(strtolower((string) $key), $names, true)) {

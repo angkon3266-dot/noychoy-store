@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Category;
+use App\Models\Collection;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Setting;
@@ -9,6 +10,7 @@ use App\Services\MemberPricingService;
 use App\Services\Meta\MetaProductMapper;
 use App\Services\Meta\MetaSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -111,7 +113,7 @@ if (! function_exists('store_time')) {
      * local was stored under yesterday's date — and printing it raw tells the
      * customer their order was placed on the wrong day.
      */
-    function store_time(?\Illuminate\Support\Carbon $at): ?\Illuminate\Support\Carbon
+    function store_time(?Carbon $at): ?Carbon
     {
         return $at?->copy()->setTimezone(config('store.timezone', 'Asia/Dhaka'));
     }
@@ -393,7 +395,7 @@ if (! function_exists('menu_target_url')) {
         }
 
         if (($entry['target'] ?? null) === 'collection' && ($id = (int) ($entry['collection_id'] ?? 0))) {
-            $collection = \App\Models\Collection::find($id);
+            $collection = Collection::find($id);
 
             return $collection ? route('collection.show', $collection->slug) : '#';
         }
@@ -564,20 +566,49 @@ if (! function_exists('image_variant')) {
 
 if (! function_exists('plain_copy')) {
     /**
-     * Strip the light-markdown the storefront renderer understands ("## "
-     * headings, **bold**, *italic*) so the same copy reads clean where only
-     * plain text is wanted — the pre-hydration SEO shell, meta descriptions.
-     * Bullets keep their dash; that reads fine as text.
+     * Strip the light-markdown the storefront renderer understands (headings,
+     * **bold**, *italic*, [links](url), `ticks`) so the same copy reads clean
+     * where only plain text is wanted — the pre-hydration SEO shell, meta
+     * descriptions, catalogue feeds. Bullets keep their dash; that reads fine
+     * as text.
      */
     function plain_copy(?string $text): string
     {
         $text = (string) $text;
-        $text = preg_replace('/^##\s+/m', '', $text);
+        $text = preg_replace('/^[ \t]{0,3}#{1,6}[ \t]+/m', '', $text);
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $text);
         $text = preg_replace('/\*\*([^*]+)\*\*/', '$1', $text);
         $text = preg_replace('/(?<![\w*])\*([^*\n]+)\*(?![\w*])/', '$1', $text);
         $text = preg_replace('/(?<![\w_])_([^_\n]+)_(?![\w_])/', '$1', $text);
+        $text = str_replace('`', '', $text);
 
         return trim($text);
+    }
+}
+
+if (! function_exists('feed_description')) {
+    /**
+     * A product description as plain prose, for a catalogue feed.
+     *
+     * Descriptions are authored in the light-markdown the storefront renders.
+     * Google and Meta both print this field verbatim, so the syntax would reach
+     * the shopper with the words. Structure survives — headings become their
+     * own line, bullets become real ones — and only the punctuation goes.
+     *
+     * Shared by both feeds and the Graph sync so one product reads the same
+     * everywhere it is listed.
+     */
+    function feed_description(Product $product, int $max = 4900): string
+    {
+        $text = plain_copy(strip_tags((string) (
+            $product->description ?: $product->short_description ?: $product->name
+        )));
+
+        $text = preg_replace('/^[ \t]{0,3}[-*+][ \t]+/m', '• ', $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+        $text = trim($text) ?: (string) $product->name;
+
+        return mb_strlen($text) > $max ? rtrim(mb_substr($text, 0, $max)) : $text;
     }
 }
 
