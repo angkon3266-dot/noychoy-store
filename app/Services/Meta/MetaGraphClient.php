@@ -170,15 +170,73 @@ class MetaGraphClient
     /**
      * Send a batch of catalog item mutations.
      *
+     * Callers speak our shape — `retailer_id` beside the method, which is what
+     * every sync state and log is keyed on. `items_batch` wants the identifier
+     * *inside* `data`, under the key `id`, so the translation happens here:
+     * this class owns the wire format, and nothing above it should have to know
+     * that Meta calls the retailer id "id" on this one endpoint.
+     *
+     * Sending the retailer id as a sibling instead is not an error Meta shouts
+     * about. It answers HTTP 200 with
+     * `{"validation_status":[{"errors":[{"message":"Can not find required field id"}]}]}`
+     * and drops the batch — which is how every sync this store ran could report
+     * success while the catalogue went untouched. A response carrying no
+     * handles is a rejection, so it is raised as one.
+     *
      * @param  array<int, array{method:string, retailer_id:string, data?:array}>  $requests
-     * @return array Meta batch handles/validation status.
+     * @return array Meta batch handles.
      * @throws MetaApiException
      */
     public function itemsBatch(string $catalogId, array $requests): array
     {
-        return $this->request('POST', "{$catalogId}/items_batch", [
+        $payload = array_map(function (array $request) {
+            $data = $request['data'] ?? [];
+            $retailerId = $request['retailer_id'] ?? ($data['retailer_id'] ?? null);
+
+            unset($data['retailer_id']);
+            $data['id'] = $retailerId;
+
+            return ['method' => $request['method'], 'data' => $data];
+        }, array_values($requests));
+
+        $response = $this->request('POST', "{$catalogId}/items_batch", [
             'item_type' => 'PRODUCT_ITEM',
-            'requests' => json_encode(array_values($requests)),
+            'requests' => json_encode($payload),
         ]);
+
+        $this->assertBatchAccepted($response, count($payload));
+
+        return $response;
+    }
+
+    /**
+     * A batch Meta refused still comes back 200, so the caller has to look.
+     *
+     * @throws MetaApiException
+     */
+    private function assertBatchAccepted(array $response, int $sent): void
+    {
+        $errors = collect($response['validation_status'] ?? [])
+            ->flatMap(fn ($status) => $status['errors'] ?? [])
+            ->pluck('message')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($errors->isNotEmpty()) {
+            throw new MetaApiException(
+                'Meta rejected the catalogue batch: '.$errors->implode('; '),
+                MetaApiException::VALIDATION,
+                meta: ['validation_status' => $response['validation_status']],
+            );
+        }
+
+        if ($sent > 0 && empty($response['handles'])) {
+            throw new MetaApiException(
+                'Meta returned no batch handles, so none of the '.$sent.' item(s) were queued.',
+                MetaApiException::VALIDATION,
+                meta: ['response' => $response],
+            );
+        }
     }
 }
