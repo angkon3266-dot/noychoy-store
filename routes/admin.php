@@ -252,13 +252,22 @@ Route::middleware('admin')->group(function () {
     Route::delete('reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
 
     // Abandoned carts (lead follow-up)
+    //
+    // A lead is a row that gets deleted, and its URL outlives it: the
+    // notification bell caches an alert pointing at it, the owner bookmarks
+    // it, a second person has it open. Landing on a bare 404 makes a deleted
+    // lead look like a broken screen, so every {cart} route says so plainly
+    // and puts the owner back on the list instead.
+    $leadIsGone = fn () => redirect()->route('admin.abandoned.index')
+        ->with('warning', 'That lead is no longer in the list — it was removed, or the shopper came back and ordered.');
+
     Route::get('abandoned-carts', [AbandonedCartController::class, 'index'])->name('abandoned.index');
     Route::post('abandoned-carts/bulk', [AbandonedCartController::class, 'bulk'])->name('abandoned.bulk');
-    Route::get('abandoned-carts/{cart}', [AbandonedCartController::class, 'show'])->name('abandoned.show');
-    Route::post('abandoned-carts/{cart}/log', [AbandonedCartController::class, 'logContact'])->name('abandoned.log');
-    Route::post('abandoned-carts/{cart}/sms', [AbandonedCartController::class, 'sendSms'])->name('abandoned.sms');
-    Route::patch('abandoned-carts/{cart}/contacted', [AbandonedCartController::class, 'markContacted'])->name('abandoned.contacted');
-    Route::delete('abandoned-carts/{cart}', [AbandonedCartController::class, 'destroy'])->name('abandoned.destroy');
+    Route::get('abandoned-carts/{cart}', [AbandonedCartController::class, 'show'])->name('abandoned.show')->missing($leadIsGone);
+    Route::post('abandoned-carts/{cart}/log', [AbandonedCartController::class, 'logContact'])->name('abandoned.log')->missing($leadIsGone);
+    Route::post('abandoned-carts/{cart}/sms', [AbandonedCartController::class, 'sendSms'])->name('abandoned.sms')->missing($leadIsGone);
+    Route::patch('abandoned-carts/{cart}/contacted', [AbandonedCartController::class, 'markContacted'])->name('abandoned.contacted')->missing($leadIsGone);
+    Route::delete('abandoned-carts/{cart}', [AbandonedCartController::class, 'destroy'])->name('abandoned.destroy')->missing($leadIsGone);
 
     // Coupons
     Route::get('coupons', [CouponController::class, 'index'])->name('coupons.index');

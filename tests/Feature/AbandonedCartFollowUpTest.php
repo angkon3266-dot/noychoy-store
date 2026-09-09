@@ -409,6 +409,60 @@ class AbandonedCartFollowUpTest extends TestCase
         $this->assertNotNull($keep->fresh());
     }
 
+    public function test_bulk_delete_does_not_bounce_the_owner_into_the_lead_it_just_deleted(): void
+    {
+        // Reported as a 404 on delete. The bulk bar is on the list, but back()
+        // goes to the last page the browser actually ASKED the server for —
+        // and leaving a lead page with the browser's own Back button never
+        // asks. So deleting that lead redirected straight into its own 404.
+        $cart = $this->lead();
+        $showUrl = route('admin.abandoned.show', $cart);
+
+        $this->actingAs($this->admin())->get($showUrl)->assertOk();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.abandoned.bulk'), ['action' => 'delete', 'ids' => [$cart->id]])
+            ->assertRedirect(route('admin.abandoned.index'));
+    }
+
+    public function test_bulk_delete_still_returns_to_the_list_the_owner_was_filtering(): void
+    {
+        // The guard must only fire for the deleted rows — a filtered list has
+        // to survive the round trip, or every delete loses the owner's place.
+        $keep = $this->lead(['phone' => '01711111111', 'session_id' => 'sess-a']);
+        $drop = $this->lead(['phone' => '01722222222', 'session_id' => 'sess-b']);
+
+        $filtered = route('admin.abandoned.index', ['filter' => 'open', 'q' => '017']);
+        $this->actingAs($this->admin())->get($filtered)->assertOk();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.abandoned.bulk'), ['action' => 'delete', 'ids' => [$drop->id]])
+            ->assertRedirect($filtered);
+
+        $this->assertNotNull($keep->fresh());
+    }
+
+    public function test_a_lead_that_is_already_gone_explains_itself_instead_of_404ing(): void
+    {
+        // Its URL outlives it: the notification bell caches an alert pointing
+        // at the lead, the owner bookmarks it, a second person has it open.
+        $cart = $this->lead();
+        $showUrl = route('admin.abandoned.show', $cart);
+        $cart->delete();
+
+        foreach ([
+            ['get', $showUrl],
+            ['post', route('admin.abandoned.sms', $cart->id)],
+            ['post', route('admin.abandoned.log', $cart->id)],
+            ['delete', route('admin.abandoned.destroy', $cart->id)],
+        ] as [$verb, $url]) {
+            $this->actingAs($this->admin())
+                ->{$verb}($url, $verb === 'get' ? [] : ['channel' => 'call'])
+                ->assertRedirect(route('admin.abandoned.index'))
+                ->assertSessionHas('warning');
+        }
+    }
+
     public function test_deleting_a_lead_takes_its_follow_up_history_with_it(): void
     {
         $cart = $this->lead();

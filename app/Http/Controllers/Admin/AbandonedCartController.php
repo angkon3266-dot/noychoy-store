@@ -251,10 +251,30 @@ class AbandonedCartController extends Controller
 
     protected function bulkDelete($carts)
     {
-        $count = $carts->count();
-        AbandonedCart::whereIn('id', $carts->pluck('id'))->delete();
+        $ids = $carts->pluck('id');
+        $count = $ids->count();
+        AbandonedCart::whereIn('id', $ids)->delete();
 
-        return back()->with('success', "{$count} lead(s) removed.");
+        return $this->afterDelete($ids)->with('success', "{$count} lead(s) removed.");
+    }
+
+    /**
+     * back(), unless "back" is a lead that no longer exists.
+     *
+     * The bulk bar lives on the list, but url()->previous() is the last page
+     * the browser actually asked the server for — and leaving a lead page with
+     * the browser's own Back button never asks. Deleting that lead then
+     * redirected the owner straight into its 404.
+     */
+    protected function afterDelete($deletedIds)
+    {
+        $path = fn (string $url) => rtrim((string) parse_url($url, PHP_URL_PATH), '/');
+
+        $gone = collect($deletedIds)
+            ->map(fn ($id) => $path(route('admin.abandoned.show', $id)))
+            ->contains($path(url()->previous()));
+
+        return $gone ? redirect()->route('admin.abandoned.index') : back();
     }
 
     public function destroy(AbandonedCart $cart)
