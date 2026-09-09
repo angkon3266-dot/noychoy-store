@@ -58,14 +58,31 @@ function attr(form, name) {
     return value === null ? '' : value;
 }
 
-/** Should this form be handled here at all? */
-function eligible(form) {
+/**
+ * Where a submission is actually going.
+ *
+ * The button that submits gets the last word: formaction / formmethod /
+ * formtarget on it override the form's own attributes. That is how a "Test
+ * connection" button works — one form, and that button aims it at the test
+ * route instead of the save route. Reading the form alone sent those clicks
+ * to save, where they died on the save form's own validation, so the button
+ * looked like it did nothing at all.
+ */
+function submitAttr(form, submitter, name) {
+    const override = submitter ? submitter.getAttribute('form' + name) : null;
+
+    return override === null ? attr(form, name) : override;
+}
+
+/** Should this submission be handled here at all? */
+function eligible(form, submitter) {
     if (form.hasAttribute('data-no-ajax')) return false;
+    if (submitter && submitter.hasAttribute('data-no-ajax')) return false;
     // A GET form is a navigation, not a mutation.
-    if ((attr(form, 'method') || 'get').toLowerCase() !== 'post') return false;
+    if ((submitAttr(form, submitter, 'method') || 'get').toLowerCase() !== 'post') return false;
     // Anything aimed at another window, or expected to produce a download, has
     // to be a real submit — fetch cannot hand the browser a file to save.
-    const target = attr(form, 'target');
+    const target = submitAttr(form, submitter, 'target');
     if (target && target !== '_self') return false;
     if (form.hasAttribute('download')) return false;
 
@@ -123,8 +140,9 @@ function busy(form, on) {
 
 async function handle(e) {
     const form = e.target;
+    const submitter = e.submitter || null;
 
-    if (!(form instanceof HTMLFormElement) || !eligible(form)) {
+    if (!(form instanceof HTMLFormElement) || !eligible(form, submitter)) {
         return;
     }
 
@@ -132,10 +150,12 @@ async function handle(e) {
     busy(form, true);
 
     try {
-        // attr(), not form.action — see the note on attr() above.
-        const res = await fetch(attr(form, 'action') || window.location.href, {
+        // submitAttr(), never form.action — see the notes on both helpers above.
+        const res = await fetch(submitAttr(form, submitter, 'action') || window.location.href, {
             method: 'POST',
-            body: new FormData(form),
+            // The second argument carries the clicked button's own name and
+            // value, which a plain FormData(form) leaves out.
+            body: new FormData(form, submitter),
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
             redirect: 'follow',
             credentials: 'same-origin',
@@ -176,7 +196,7 @@ async function handle(e) {
 document.addEventListener('submit', (e) => {
     const form = e.target;
 
-    if (form instanceof HTMLFormElement && eligible(form)) {
+    if (form instanceof HTMLFormElement && eligible(form, e.submitter || null)) {
         handle(e);
     }
 });

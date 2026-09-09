@@ -34,9 +34,6 @@
     <form action="{{ route('admin.system-config.backups.restore', $backup) }}" method="POST" class="card p-5 space-y-3"
           onsubmit="return confirm('Restore this configuration now?')">
         @csrf
-        <label class="label">Confirm with your admin password</label>
-        <input type="password" name="security_password" class="input" autocomplete="off" required>
-        @error('security_password')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
         <div class="flex gap-2">
             <button class="btn-primary">Restore configuration</button>
             <a href="{{ route('admin.system-config.backups') }}" class="btn-outline">Cancel</a>

@@ -25,11 +25,25 @@
         </div>
     @endif
 
+    @php
+        // What is on screen after a test or a rejected save is what the admin
+        // typed, not what is stored. Field keys contain dots ("google.ads_id"),
+        // so they are read out of old('values') by hand — old('values.google.ads_id')
+        // would look for a nested array that does not exist.
+        $typed = (array) old('values', []);
+    @endphp
+
     <form method="POST" action="{{ route('admin.system-config.save', $key) }}" class="card p-5 space-y-4">
         @csrf
 
         @foreach($fields as $item)
-            @php $f = $item['field']; @endphp
+            @php
+                $f = $item['field'];
+                // Sensitive fields are the exception: a secret is never echoed back.
+                $shown = empty($f['sensitive']) && array_key_exists($f['key'], $typed)
+                    ? $typed[$f['key']]
+                    : $item['value'];
+            @endphp
             <div>
                 <label class="label flex items-center gap-2">
                     {{ $f['label'] }}
@@ -40,23 +54,23 @@
                 @if($f['type'] === 'bool')
                     <label class="flex items-center gap-2 text-sm">
                         <input type="hidden" name="values[{{ $f['key'] }}]" value="0">
-                        <input type="checkbox" name="values[{{ $f['key'] }}]" value="1" @checked(filter_var($item['value'], FILTER_VALIDATE_BOOLEAN))>
+                        <input type="checkbox" name="values[{{ $f['key'] }}]" value="1" @checked(filter_var($shown, FILTER_VALIDATE_BOOLEAN))>
                         Enabled
                     </label>
                 @elseif($f['type'] === 'select')
                     <select name="values[{{ $f['key'] }}]" class="input">
                         @foreach($f['options'] as $opt)
-                            <option value="{{ $opt }}" @selected((string) $item['value'] === $opt)>{{ ucfirst($opt) }}</option>
+                            <option value="{{ $opt }}" @selected((string) $shown === $opt)>{{ ucfirst($opt) }}</option>
                         @endforeach
                     </select>
                 @elseif($f['type'] === 'textarea')
-                    <textarea name="values[{{ $f['key'] }}]" rows="2" class="input">{{ $item['value'] }}</textarea>
+                    <textarea name="values[{{ $f['key'] }}]" rows="2" class="input">{{ $shown }}</textarea>
                 @elseif($f['type'] === 'password')
                     <input type="password" name="values[{{ $f['key'] }}]" class="input" autocomplete="off"
                            placeholder="{{ $item['has_saved'] ? '•••••••• (saved — leave blank to keep)' : 'Not set' }}">
                 @else
                     <input type="{{ $f['type'] === 'email' ? 'email' : ($f['type'] === 'number' ? 'number' : 'text') }}"
-                           name="values[{{ $f['key'] }}]" value="{{ $item['value'] }}" class="input"
+                           name="values[{{ $f['key'] }}]" value="{{ $shown }}" class="input"
                            @if(!empty($f['placeholder'])) placeholder="{{ $f['placeholder'] }}" @endif>
                 @endif
 
@@ -72,14 +86,8 @@
         <div class="pt-3 border-t border-ink-100 space-y-3">
             <div>
                 <label class="label">Change notes <span class="text-ink-700/40">(optional)</span></label>
-                <input name="notes" class="input" placeholder="Why are you changing this?">
+                <input name="notes" value="{{ old('notes') }}" class="input" placeholder="Why are you changing this?">
             </div>
-            <div>
-                <label class="label">Confirm with your admin password</label>
-                <input type="password" name="security_password" class="input" autocomplete="off" placeholder="Required to save">
-                @error('security_password')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
-            </div>
-
             <div class="flex flex-wrap gap-2">
                 <button class="btn-primary">Save changes</button>
                 @if(!empty($section['test']) || !empty($section['env_managed']))

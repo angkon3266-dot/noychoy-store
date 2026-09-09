@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Concerns\ConfirmsAdminPassword;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SystemConfig\SaveConfigRequest;
 use App\Models\ConfigAuditLog;
@@ -19,8 +18,6 @@ use Illuminate\Http\Request;
  */
 class SystemConfigController extends Controller
 {
-    use ConfirmsAdminPassword;
-
     public function __construct(
         private readonly SystemConfigService $config,
         private readonly ConnectionTester $tester,
@@ -51,12 +48,6 @@ class SystemConfigController extends Controller
     {
         abort_unless($this->config->schema()->hasSection($section), 404);
 
-        // Mandatory password confirmation.
-        $confirm = $this->confirmSecurity($request);
-        if (! $confirm['ok']) {
-            return back()->withErrors(['security_password' => $confirm['message']])->withInput();
-        }
-
         $result = $this->config->save($section, (array) $request->input('values', []), $request->input('notes'));
 
         ConfigAuditLog::record('save', [
@@ -66,10 +57,12 @@ class SystemConfigController extends Controller
             'detail' => ['keys' => $result['changed']], // keys only — never values
         ]);
 
-        return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+        return $result['ok']
+            ? back()->with('success', $result['message'])
+            : back()->with('error', $result['message'])->withInput();
     }
 
-    /** Live "Test Connection" for a section (no save, no password needed). */
+    /** Live "Test Connection" for a section — checks only, saves nothing. */
     public function test(Request $request, string $section)
     {
         $def = $this->config->schema()->section($section);
@@ -89,7 +82,17 @@ class SystemConfigController extends Controller
             'message' => $result['message'],
         ]);
 
-        return back()->with('meta_config_test', $result);
+        // A test is a step before saving, not instead of it — so the form comes
+        // back holding what was typed. Secrets are the exception: they are never
+        // echoed into the UI, so say plainly that one has to be typed again.
+        $sensitive = array_column(array_filter($def['fields'], fn ($f) => ! empty($f['sensitive'])), 'key');
+        $keep = array_diff_key($submitted, array_flip($sensitive));
+
+        if (array_intersect_key($submitted, array_flip($sensitive))) {
+            $result['message'] .= ' — the secret you typed was used for this test but is not kept on screen; enter it again to save it.';
+        }
+
+        return back()->with('meta_config_test', $result)->withInput(['values' => $keep]);
     }
 
     /** Audit log page. */

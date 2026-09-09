@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Events\ConfigurationRestored;
-use App\Http\Controllers\Concerns\ConfirmsAdminPassword;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SystemConfig\ImportConfigRequest;
-use App\Http\Requests\SystemConfig\RestoreConfigRequest;
 use App\Models\ConfigAuditLog;
 use App\Models\ConfigBackup;
 use App\Services\SystemConfig\ConfigBackupService;
@@ -19,12 +17,20 @@ use Illuminate\Http\Request;
  */
 class ConfigBackupController extends Controller
 {
-    use ConfirmsAdminPassword;
-
     public function __construct(
         private readonly ConfigBackupService $backups,
         private readonly ConfigSchema $schema,
     ) {}
+
+    /**
+     * Restore and import rewrite the whole configuration store, so the gate is
+     * asserted here rather than left to the admin middleware alone. It used to
+     * ride in on RestoreConfigRequest, which existed only to demand a password.
+     */
+    private function authorizeConfigAccess(): void
+    {
+        abort_unless(request()->user()?->can('system-config.access'), 403);
+    }
 
     public function index()
     {
@@ -54,12 +60,9 @@ class ConfigBackupController extends Controller
         ]);
     }
 
-    public function restore(RestoreConfigRequest $request, ConfigBackup $backup)
+    public function restore(ConfigBackup $backup)
     {
-        $confirm = $this->confirmSecurity($request);
-        if (! $confirm['ok']) {
-            return back()->withErrors(['security_password' => $confirm['message']]);
-        }
+        $this->authorizeConfigAccess();
 
         $result = $this->backups->restore($backup);
         event(new ConfigurationRestored('backup', $result['restored']));
@@ -110,18 +113,12 @@ class ConfigBackupController extends Controller
         ]);
     }
 
-    /** Apply a previewed import (password-confirmed). */
+    /** Apply a previewed import. */
     public function import(Request $request)
     {
-        $request->validate([
-            'payload' => ['required', 'string'],
-            'security_password' => ['required', 'string'],
-        ]);
+        $this->authorizeConfigAccess();
 
-        $confirm = $this->confirmSecurity($request);
-        if (! $confirm['ok']) {
-            return back()->withErrors(['security_password' => $confirm['message']]);
-        }
+        $request->validate(['payload' => ['required', 'string']]);
 
         try {
             $data = $this->backups->decodeImport($request->input('payload'));

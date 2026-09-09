@@ -78,11 +78,13 @@ The live request keeps its existing connection throughout.
 
 - Sensitive values encrypted with `Crypt` (AES-256); password/API-key fields are
   **masked** in the UI (show `•••• saved`, never the value).
-- **Password confirmation** (your admin login password) is required to **save**,
-  **restore** and **import**. Failures are **rate-limited** (5 / 5 min) and
-  **audited**.
 - Super-Admin only — enforced by the `admin` middleware section gate, the
-  `system-config.access` gate/policy, and the Form Requests.
+  `system-config.access` gate/policy, and the Form Requests. That gate is the
+  whole access decision; saving, restoring and importing do **not** ask for the
+  password again, because re-typing the signed-in account's own password added
+  a step to every edit without changing who could make one.
+- Every change is **audited** and **backed up first**, so an unwanted edit is
+  visible in the log and reversible from Backups.
 
 ---
 
@@ -97,9 +99,9 @@ versions**, and **download** the history as CSV.
 
 - A backup is auto-created **before every save, restore and import**; manual
   named backups any time. Each shows date, creator, size and affected modules.
-- **Restore** shows a confirmation + change preview + warning, requires password,
-  auto-backs-up the current state first, then restores and **rebuilds the config
-  cache** (queued job). Nothing is ever lost.
+- **Restore** shows a confirmation + change preview + warning, auto-backs-up the
+  current state first, then restores and **rebuilds the config cache** (queued
+  job). Nothing is ever lost.
 
 ## Import / Export
 
@@ -107,13 +109,14 @@ versions**, and **download** the history as CSV.
   file (readable only by this installation's `APP_KEY`).
 - **Import** validates the schema version (rejects incompatible files with a
   clear message), **previews** the exact changes, auto-backs-up first, then
-  applies on password confirmation.
+  applies on confirmation.
 
 ## Audit Log
 
-Every save / restore / import / export / test / failed-confirmation is recorded
-with who, what (keys only — never secret values), result (success/failure), IP,
-browser and time. Filter by user / action / module / date.
+Every save / restore / import / export / test is recorded with who, what (keys
+only — never secret values), result (success/failure), IP, browser and time.
+Filter by user / action / module / date. `security_failed` rows from the old
+password-confirmation gate are still filterable, so the history stays readable.
 
 ---
 

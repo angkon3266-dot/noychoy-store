@@ -39,10 +39,56 @@ class AdminFormActionClobberTest extends TestCase
     {
         $source = file_get_contents(resource_path('js/admin-ajax.js'));
 
-        $this->assertStringNotContainsString('fetch(form.action', $source,
-            'form.action is shadowed by a field named "action" — read the attribute instead');
-        $this->assertStringContainsString("attr(form, 'action')", $source);
-        $this->assertStringContainsString("attr(form, 'method')", $source);
+        // Comments stripped: the file explains the trap by naming form.action,
+        // and a test that cannot tell the explanation from the mistake is a
+        // test that punishes anyone for documenting it.
+        $this->assertDoesNotMatchRegularExpression(
+            '/\bform\.(?:'.implode('|', self::CLOBBERABLE).')\b/',
+            $this->withoutComments($source),
+            'these form properties are shadowed by a field of the same name — use getAttribute()',
+        );
+        $this->assertStringContainsString('form.getAttribute(name)', $source,
+            'the attribute reader is how every one of those is meant to be read');
+    }
+
+    /** The source with its comments removed, so prose cannot fail a code check. */
+    private function withoutComments(string $source): string
+    {
+        return (string) preg_replace(['#/\*.*?\*/#s', '#//[^\n]*#'], '', $source);
+    }
+
+    /**
+     * A submit button overrides the form with formaction/formmethod/formtarget,
+     * and every "Test connection" button on the config screens is exactly that:
+     * one form, a second button pointing at the test route. The ajax layer read
+     * the form alone, so those clicks posted to save instead, failed the save
+     * form's validation, and looked like a button that did nothing.
+     */
+    public function test_the_ajax_layer_lets_the_clicked_button_redirect_the_submission(): void
+    {
+        $source = file_get_contents(resource_path('js/admin-ajax.js'));
+
+        $this->assertStringContainsString("getAttribute('form' + name)", $source,
+            'formaction/formmethod/formtarget on the submitter have to win over the form');
+        $this->assertStringContainsString("submitAttr(form, submitter, 'action')", $source,
+            'the POST must go where the clicked button aims it');
+        $this->assertStringContainsString('new FormData(form, submitter)', $source,
+            "a plain FormData(form) drops the clicked button's own name and value");
+    }
+
+    /** Every formaction button lives on a form the layer above must respect. */
+    public function test_every_formaction_button_is_on_an_ajax_intercepted_form(): void
+    {
+        $found = 0;
+
+        foreach ($this->adminViews() as $relative => $contents) {
+            foreach ($this->postForms($contents) as $form) {
+                $found += preg_match_all('/\bformaction=/i', $form);
+            }
+        }
+
+        $this->assertGreaterThan(0, $found,
+            'no formaction button was found — either they moved, or postForms() stopped matching');
     }
 
     public function test_no_ajax_intercepted_admin_form_shadows_an_attribute_it_needs(): void

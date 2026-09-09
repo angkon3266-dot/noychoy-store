@@ -35,9 +35,6 @@
           onsubmit="return confirm('Apply this imported configuration now?')">
         @csrf
         <input type="hidden" name="payload" value="{{ $payload }}">
-        <label class="label">Confirm with your admin password</label>
-        <input type="password" name="security_password" class="input" autocomplete="off" required>
-        @error('security_password')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
         <div class="flex gap-2">
             <button class="btn-primary" @disabled(empty($changes))>Apply import</button>
             <a href="{{ route('admin.system-config.backups') }}" class="btn-outline">Cancel</a>
