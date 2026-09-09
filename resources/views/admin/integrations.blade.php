@@ -143,5 +143,13 @@
         <code class="block break-all rounded bg-white border border-ink-100 px-3 py-2 text-xs">{{ route('feed.meta') }}</code>
         <p class="text-xs text-ink-700/50 mt-2">Per-category feed: append <code>?category=slug</code> (e.g. <code>{{ route('feed.meta') }}?category=rings</code>).</p>
     </div>
+
+    {{-- Google Shopping feed --}}
+    <div class="card p-6">
+        <h2 class="font-semibold mb-1">Google Shopping feed</h2>
+        <p class="text-xs text-ink-700/60 mb-3">In <strong>Google Merchant Center → Data sources → Add product source → Add products from a file</strong>, paste this URL and set it to fetch daily. Pick the file option, not the API one — this feed needs no Google Cloud project or service account.</p>
+        <code class="block break-all rounded bg-white border border-ink-100 px-3 py-2 text-xs">{{ route('feed.google') }}</code>
+        <p class="text-xs text-ink-700/50 mt-2">Per-category feed: append <code>?category=slug</code>. The shipping figure comes from your inside-Dhaka delivery charge, so Merchant Center must be set to the same rate or Google flags the mismatch.</p>
+    </div>
 </div>
 @endsection
