@@ -168,6 +168,12 @@
                     'count' => \App\Models\Order::where('status', 'processing')->count(),
                     'title' => 'order(s) being processed',
                 ],
+                // Leads nobody has chased yet. Covered by the (recovered,
+                // contacted) index so this stays a cheap count on every render.
+                'abandoned.index' => [
+                    'count' => \App\Models\AbandonedCart::open()->count(),
+                    'title' => 'abandoned cart(s) waiting for follow-up',
+                ],
             ];
         @endphp
         <nav class="p-3 space-y-1 flex-1 overflow-y-auto min-h-0">

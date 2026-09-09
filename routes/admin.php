@@ -253,6 +253,10 @@ Route::middleware('admin')->group(function () {
 
     // Abandoned carts (lead follow-up)
     Route::get('abandoned-carts', [AbandonedCartController::class, 'index'])->name('abandoned.index');
+    Route::post('abandoned-carts/bulk', [AbandonedCartController::class, 'bulk'])->name('abandoned.bulk');
+    Route::get('abandoned-carts/{cart}', [AbandonedCartController::class, 'show'])->name('abandoned.show');
+    Route::post('abandoned-carts/{cart}/log', [AbandonedCartController::class, 'logContact'])->name('abandoned.log');
+    Route::post('abandoned-carts/{cart}/sms', [AbandonedCartController::class, 'sendSms'])->name('abandoned.sms');
     Route::patch('abandoned-carts/{cart}/contacted', [AbandonedCartController::class, 'markContacted'])->name('abandoned.contacted');
     Route::delete('abandoned-carts/{cart}', [AbandonedCartController::class, 'destroy'])->name('abandoned.destroy');
 

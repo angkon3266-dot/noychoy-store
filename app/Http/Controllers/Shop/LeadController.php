@@ -21,6 +21,12 @@ class LeadController extends Controller
             'phone' => ['required', 'string', new \App\Rules\BdPhone],
             'name' => ['nullable', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:160'],
+            // Everything else she has typed into the form by now. Recovering a
+            // sale by phone used to mean asking for the address a second time,
+            // because a half-filled checkout was discarded unless it completed.
+            'address' => ['nullable', 'string', 'max:1000'],
+            'area' => ['nullable', 'string', 'max:120'],
+            'is_inside_dhaka' => ['nullable', 'boolean'],
         ]);
 
         if ($this->cart->isEmpty()) {
@@ -36,19 +42,41 @@ class LeadController extends Controller
             'name' => $i['name'], 'qty' => $i['qty'], 'price' => $i['price'],
         ])->values()->all();
 
+        $attributes = [
+            // Canonical "01XXXXXXXXX" — the form PlaceOrder stores and
+            // matches on. A raw "+8801…" lead never gets marked recovered.
+            'phone' => bd_phone($data['phone']),
+            'name' => $data['name'] ?? null,
+            // Visits are keyed on this cookie and carts on the session id;
+            // storing it here is what lets a lead say where she came from.
+            'visitor_token' => $request->cookie('visitor_token'),
+            'items' => $items,
+            'subtotal' => $this->cart->subtotal(),
+            'item_count' => $this->cart->count(),
+            'last_step' => 'checkout',
+        ];
+
+        // These four are captured on later blurs than the phone, so a blank
+        // one means "not typed yet", never "cleared". Writing it would let the
+        // name-blur capture wipe the address the previous capture had learned.
+        $partial = [
+            // The checkout form has no email field, so this is normally absent
+            // for a guest; a signed-in member brings one with them.
+            'email' => $data['email'] ?? auth('customer')->user()?->email,
+            'address' => $data['address'] ?? null,
+            'area' => $data['area'] ?? null,
+            'is_inside_dhaka' => $data['is_inside_dhaka'] ?? null,
+        ];
+
+        foreach ($partial as $key => $value) {
+            if (filled($value) || $value === false) {
+                $attributes[$key] = $value;
+            }
+        }
+
         AbandonedCart::updateOrCreate(
             ['session_id' => $request->session()->getId(), 'recovered' => false],
-            [
-                // Canonical "01XXXXXXXXX" — the form PlaceOrder stores and
-                // matches on. A raw "+8801…" lead never gets marked recovered.
-                'phone' => bd_phone($data['phone']),
-                'name' => $data['name'] ?? null,
-                'email' => $data['email'] ?? null,
-                'items' => $items,
-                'subtotal' => $this->cart->subtotal(),
-                'item_count' => $this->cart->count(),
-                'last_step' => 'checkout',
-            ],
+            $attributes,
         );
 
         // Now we know who is checking out, so any coupon waiting for this

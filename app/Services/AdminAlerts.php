@@ -201,7 +201,7 @@ class AdminAlerts
                 "cart.{$c->id}", 'cart', 'warning',
                 'Abandoned cart · '.money($c->subtotal),
                 trim(($c->name ?: 'A visitor').' left '.$c->item_count.' item(s) at '.$c->last_step.'. Nobody has followed up.'),
-                route('admin.abandoned.index'), $c->created_at,
+                route('admin.abandoned.show', $c), $c->created_at,
             ))->all());
     }
 

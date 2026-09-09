@@ -122,7 +122,13 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
         // App\Rules\BdPhone's pattern, applied after canonicalisation.
         if (!/^01[3-9]\d{8}$/.test(phone)) return;
         const name = (form.data.name || '').trim();
-        const key = `${phone}|${name}`;
+        const address = (form.data.address || '').trim();
+        const area = (form.data.area || '').trim();
+        const inDhaka = form.data.is_inside_dhaka === '1';
+        // Every captured field belongs in the key. Leave one out and the
+        // customer who types her phone (lead sent, latch set) and *then* her
+        // address never sends the address — the key would not have changed.
+        const key = `${phone}|${name}|${address}|${area}|${inDhaka}`;
         if (key === leadSent.current || leadBusy.current) return;
         leadBusy.current = true;
         // fetchJson throws on any non-2xx, so a 429 from the endpoint's own
@@ -132,7 +138,14 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
         fetchJson(urls.lead, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, name: name || null, email: null }),
+            // A blank field is sent as null and the server leaves the stored
+            // value alone, so an early name-blur cannot wipe a later address.
+            body: JSON.stringify({
+                phone, name: name || null, email: null,
+                address: address || null,
+                area: area || null,
+                is_inside_dhaka: address || area ? inDhaka : null,
+            }),
         })
             .then((res) => {
                 leadSent.current = key;
@@ -232,12 +245,12 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     </div>
                     <div data-field="address">
                         <label className="label" htmlFor="co-address">Full address *</label>
-                        <textarea {...a11y('address')} value={form.data.address} onChange={(e) => form.setData('address', e.target.value)} rows={2} className="input" required autoComplete="street-address" />
+                        <textarea {...a11y('address')} value={form.data.address} onChange={(e) => form.setData('address', e.target.value)} onBlur={captureLead} rows={2} className="input" required autoComplete="street-address" />
                         {err('address') && <p id="co-address-error" className="text-xs text-danger-600 mt-1">{err('address')}</p>}
                     </div>
                     <div data-field="area">
                         <label className="label" htmlFor="co-area">Area / Thana</label>
-                        <input {...a11y('area')} value={form.data.area} onChange={(e) => form.setData('area', e.target.value)} className="input" autoComplete="address-level2" />
+                        <input {...a11y('area')} value={form.data.area} onChange={(e) => form.setData('area', e.target.value)} onBlur={captureLead} className="input" autoComplete="address-level2" />
                         {err('area') && <p id="co-area-error" className="text-xs text-danger-600 mt-1">{err('area')}</p>}
                     </div>
 

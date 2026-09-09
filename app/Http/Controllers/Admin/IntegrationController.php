@@ -77,6 +77,7 @@ class IntegrationController extends Controller
             'templates' => ['nullable', 'array'],
             'templates.*' => ['nullable', 'string', 'max:600'],
             'whatsapp_order_template' => ['nullable', 'string', 'max:600'],
+            'whatsapp_abandoned_template' => ['nullable', 'string', 'max:600'],
         ]);
 
         $int = Setting::get('integrations', []);
@@ -108,6 +109,9 @@ class IntegrationController extends Controller
 
         // Opening line for the WhatsApp buttons on the orders screens.
         Setting::put('whatsapp_order_template', trim((string) ($data['whatsapp_order_template'] ?? '')) ?: null);
+
+        // And the one on the abandoned-cart screens, which also carries {link}.
+        Setting::put('whatsapp_abandoned_template', trim((string) ($data['whatsapp_abandoned_template'] ?? '')) ?: null);
 
         return back()->with('success', 'Integrations & templates saved.');
     }

@@ -121,6 +121,17 @@
             </p>
             <textarea name="whatsapp_order_template" rows="2" class="input"
                       placeholder="Hello {name}, this is {store} regarding your order {order_number}.">{{ \App\Models\Setting::get('whatsapp_order_template') }}</textarea>
+
+            <h2 class="font-semibold mb-1 mt-6">WhatsApp message — abandoned carts</h2>
+            <p class="text-xs text-ink-700/60 mb-4">
+                Pre-filled when you tap WhatsApp on an abandoned cart. <code>&#123;link&#125;</code> is the signed link that
+                puts her exact cart back on her phone — leave it out and it is appended anyway, because without it the
+                message has nothing to click.
+                Placeholders: <code>&#123;name&#125;</code> <code>&#123;store&#125;</code> <code>&#123;items&#125;</code>
+                <code>&#123;qty&#125;</code> <code>&#123;total&#125;</code> <code>&#123;link&#125;</code>.
+            </p>
+            <textarea name="whatsapp_abandoned_template" rows="3" class="input"
+                      placeholder="{{ \App\Support\AbandonedCartOutreach::WHATSAPP_DEFAULT }}">{{ \App\Models\Setting::get('whatsapp_abandoned_template') }}</textarea>
         </div>
 
         <div class="flex justify-end"><button class="btn-primary">Save integrations</button></div>
