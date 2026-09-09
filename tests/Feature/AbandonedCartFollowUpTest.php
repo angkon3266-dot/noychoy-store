@@ -369,7 +369,7 @@ class AbandonedCartFollowUpTest extends TestCase
             ->map(fn ($phone, $i) => $this->lead(['phone' => $phone, 'session_id' => 'sess-'.$i])->id);
 
         $this->actingAs($this->admin())
-            ->post(route('admin.abandoned.bulk'), ['action' => 'sms', 'ids' => $ids->all()])
+            ->post(route('admin.abandoned.bulk'), ['bulk_action' => 'sms', 'ids' => $ids->all()])
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -383,7 +383,7 @@ class AbandonedCartFollowUpTest extends TestCase
         $cart = $this->lead();
 
         $send = fn () => $this->actingAs($this->admin())
-            ->post(route('admin.abandoned.bulk'), ['action' => 'sms', 'ids' => [$cart->id]]);
+            ->post(route('admin.abandoned.bulk'), ['bulk_action' => 'sms', 'ids' => [$cart->id]]);
 
         $send();
         $second = $send();
@@ -398,12 +398,12 @@ class AbandonedCartFollowUpTest extends TestCase
         $drop = $this->lead(['phone' => '01722222222', 'session_id' => 'sess-b']);
 
         $this->actingAs($this->admin())
-            ->post(route('admin.abandoned.bulk'), ['action' => 'contacted', 'ids' => [$keep->id]])
+            ->post(route('admin.abandoned.bulk'), ['bulk_action' => 'contacted', 'ids' => [$keep->id]])
             ->assertRedirect();
         $this->assertTrue($keep->fresh()->contacted);
 
         $this->actingAs($this->admin())
-            ->post(route('admin.abandoned.bulk'), ['action' => 'delete', 'ids' => [$drop->id]])
+            ->post(route('admin.abandoned.bulk'), ['bulk_action' => 'delete', 'ids' => [$drop->id]])
             ->assertRedirect();
         $this->assertNull($drop->fresh());
         $this->assertNotNull($keep->fresh());
@@ -421,7 +421,7 @@ class AbandonedCartFollowUpTest extends TestCase
         $this->actingAs($this->admin())->get($showUrl)->assertOk();
 
         $this->actingAs($this->admin())
-            ->post(route('admin.abandoned.bulk'), ['action' => 'delete', 'ids' => [$cart->id]])
+            ->post(route('admin.abandoned.bulk'), ['bulk_action' => 'delete', 'ids' => [$cart->id]])
             ->assertRedirect(route('admin.abandoned.index'));
     }
 
@@ -436,7 +436,7 @@ class AbandonedCartFollowUpTest extends TestCase
         $this->actingAs($this->admin())->get($filtered)->assertOk();
 
         $this->actingAs($this->admin())
-            ->post(route('admin.abandoned.bulk'), ['action' => 'delete', 'ids' => [$drop->id]])
+            ->post(route('admin.abandoned.bulk'), ['bulk_action' => 'delete', 'ids' => [$drop->id]])
             ->assertRedirect($filtered);
 
         $this->assertNotNull($keep->fresh());

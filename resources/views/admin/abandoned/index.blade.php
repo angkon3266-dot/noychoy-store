@@ -58,14 +58,18 @@
         <form action="{{ route('admin.abandoned.bulk') }}" method="POST" class="inline"
               onsubmit="return confirm('Text the selected shoppers their cart link? This spends SMS credit. Leads already texted in the last 24 hours are skipped.')">
             @csrf
-            <input type="hidden" name="action" value="sms">
+            {{-- Never name a form field "action": it shadows form.action and the
+                 ajax layer posts to "[object HTMLInputElement]". --}}
+            <input type="hidden" name="bulk_action" value="sms">
             <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
             <button class="btn-primary py-2 text-sm">💬 Send SMS</button>
         </form>
 
         <form action="{{ route('admin.abandoned.bulk') }}" method="POST" class="inline">
             @csrf
-            <input type="hidden" name="action" value="contacted">
+            {{-- Never name a form field "action": it shadows form.action and the
+                 ajax layer posts to "[object HTMLInputElement]". --}}
+            <input type="hidden" name="bulk_action" value="contacted">
             <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
             <button class="btn-outline py-2 text-sm">✓ Mark contacted</button>
         </form>
@@ -73,7 +77,9 @@
         <form action="{{ route('admin.abandoned.bulk') }}" method="POST" class="inline"
               onsubmit="return confirm('Remove the selected lead(s)? This cannot be undone.')">
             @csrf
-            <input type="hidden" name="action" value="delete">
+            {{-- Never name a form field "action": it shadows form.action and the
+                 ajax layer posts to "[object HTMLInputElement]". --}}
+            <input type="hidden" name="bulk_action" value="delete">
             <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
             <button class="btn-outline py-2 text-sm !text-red-700 !border-red-200 hover:!bg-red-50">🗑 Delete</button>
         </form>

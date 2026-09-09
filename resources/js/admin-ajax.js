@@ -41,14 +41,32 @@ function toast(message, kind = 'success') {
     el._timer = setTimeout(() => el.classList.add('opacity-0', 'translate-y-2'), 3200);
 }
 
+/**
+ * Read a form attribute without going through the property of the same name.
+ *
+ * A form exposes its own fields as properties, and a field SHADOWS the
+ * attribute it collides with: one <input name="action"> and `form.action`
+ * stops being the URL and becomes that input element. fetch() then stringifies
+ * it and posts to "/admin/[object HTMLInputElement]" — a 404 that looks like a
+ * broken screen and points nowhere near the real cause. `name="method"`,
+ * `name="target"` and `name="download"` clobber the same way, so nothing here
+ * touches those properties either.
+ */
+function attr(form, name) {
+    const value = form.getAttribute(name);
+
+    return value === null ? '' : value;
+}
+
 /** Should this form be handled here at all? */
 function eligible(form) {
     if (form.hasAttribute('data-no-ajax')) return false;
     // A GET form is a navigation, not a mutation.
-    if ((form.method || 'get').toLowerCase() !== 'post') return false;
+    if ((attr(form, 'method') || 'get').toLowerCase() !== 'post') return false;
     // Anything aimed at another window, or expected to produce a download, has
     // to be a real submit — fetch cannot hand the browser a file to save.
-    if (form.target && form.target !== '_self') return false;
+    const target = attr(form, 'target');
+    if (target && target !== '_self') return false;
     if (form.hasAttribute('download')) return false;
 
     return true;
@@ -114,7 +132,8 @@ async function handle(e) {
     busy(form, true);
 
     try {
-        const res = await fetch(form.action || window.location.href, {
+        // attr(), not form.action — see the note on attr() above.
+        const res = await fetch(attr(form, 'action') || window.location.href, {
             method: 'POST',
             body: new FormData(form),
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },

@@ -182,7 +182,10 @@ class AbandonedCartController extends Controller
     public function bulk(Request $request)
     {
         $data = $request->validate([
-            'action' => ['required', 'string', 'in:sms,contacted,delete'],
+            // Not "action": a field of that name shadows form.action in the
+            // browser, and the admin's ajax layer then posts to
+            // "[object HTMLInputElement]" — a 404 with no obvious cause.
+            'bulk_action' => ['required', 'string', 'in:sms,contacted,delete'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
         ]);
@@ -193,7 +196,7 @@ class AbandonedCartController extends Controller
             return back()->with('warning', 'Nothing selected.');
         }
 
-        return match ($data['action']) {
+        return match ($data['bulk_action']) {
             'sms' => $this->bulkSms($carts, $request->user()?->id),
             'contacted' => $this->bulkContacted($carts, $request->user()?->id),
             default => $this->bulkDelete($carts),
