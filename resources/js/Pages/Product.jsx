@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
@@ -9,8 +9,9 @@ import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
 
 // The React product page — a superset of the Blade "showcase" template:
-// gallery + zoom + videos, conversion buy box (variants, qty tiers, offers),
-// story sections, reviews, FBT bundle, related & recently viewed.
+// swipeable gallery + zoom + videos, conversion buy box (variants, qty tiers,
+// offers, trust list), story sections, reviews, FBT bundle, related &
+// recently viewed.
 export default function Product(props) {
     const { product, pp, vcEventId } = props;
 
@@ -35,15 +36,13 @@ export default function Product(props) {
             <Breadcrumb product={product} />
 
             <div className="grid lg:grid-cols-2 gap-10">
-                <Gallery product={product} img={purchase.img} setImg={purchase.setImg} />
+                <Gallery product={product} img={purchase.img} setImg={purchase.setImg} variantId={purchase.variantId} />
                 <BuyBox {...props} purchase={purchase} />
             </div>
 
             <StorySections sections={product.sections} />
             <Description text={product.description} />
             <Details specs={product.specs} />
-            <PolicyAccordion title="Care" text={props.care} />
-            <PolicyAccordion title="Shipping & returns" text={props.returns} moreUrl={props.refundUrl} moreLabel="Read the full policy" />
             <div className="max-w-3xl mt-6 border-t border-ink-100 pt-4">
                 <ShareButton url={product.url} title={product.name} label="Share" />
             </div>
@@ -156,91 +155,221 @@ function Breadcrumb({ product }) {
     );
 }
 
-/* ── Gallery with zoom lightbox and video thumbs ──────────────────────────── */
-function Gallery({ product, img, setImg }) {
-    const [zoom, setZoom] = useState(false);
-    const [video, setVideo] = useState(null);   // {embed} | {src} | null
+/* ── Gallery: swipeable media track, zoom lightbox, inline video ──────────── */
+const PlayGlyph = ({ className }) => (
+    <svg aria-hidden="true" className={className} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+);
+
+function Gallery({ product, img, setImg, variantId }) {
+    const images = product.images;
+    const videos = product.videos;
+    // One scroll-snap slide per media item, photos first — a phone swipe moves
+    // through all of them instead of needing the thumbnail strip.
+    const slides = useMemo(() => [
+        ...images.map((im) => ({ kind: 'image', ...im })),
+        ...videos.map((v) => ({ kind: 'video', ...v })),
+    ], [images, videos]);
+    const total = slides.length;
+
+    const [zoom, setZoom] = useState(null);         // url in the lightbox | null
+    const [playing, setPlaying] = useState(null);   // slide index whose video is playing
+    const [active, setActive] = useState(0);
+    const track = useRef(null);
+    const raf = useRef(0);
+    const settle = useRef(0);
+    const mounted = useRef(false);
 
     useEffect(() => {
-        const esc = (e) => e.key === 'Escape' && setZoom(false);
+        const esc = (e) => e.key === 'Escape' && setZoom(null);
         window.addEventListener('keydown', esc);
-        return () => window.removeEventListener('keydown', esc);
+        return () => {
+            window.removeEventListener('keydown', esc);
+            if (raf.current) cancelAnimationFrame(raf.current);
+            clearTimeout(settle.current);
+        };
     }, []);
 
-    const current = img || product.images[0]?.url || '';
-    const currentImage = product.images.find((im) => im.url === current) || product.images[0];
+    const current = img || images[0]?.url || '';
+
+    const indexAt = () => {
+        const el = track.current;
+        if (!el || !el.clientWidth) return null;
+        return Math.max(0, Math.min(total - 1, Math.round(el.scrollLeft / el.clientWidth)));
+    };
+
+    const scrollTo = useCallback((i, behavior = 'smooth') => {
+        const el = track.current;
+        if (!el || total === 0) return;
+        const next = Math.max(0, Math.min(total - 1, i));
+        el.scrollTo({ left: next * el.clientWidth, behavior });
+    }, [total]);
+
+    const onScroll = () => {
+        // The counter and thumbs follow the scroll position, throttled to a
+        // frame so a fast flick does not re-render on every pixel.
+        if (!raf.current) {
+            raf.current = requestAnimationFrame(() => {
+                raf.current = 0;
+                const i = indexAt();
+                if (i !== null) setActive(i);
+            });
+        }
+        // Everything else waits for the snap to settle: a smooth scroll from
+        // slide 0 to slide 3 passes 1 and 2, and reporting those as chosen
+        // would re-target the scroll mid-flight. Landing on a photo keeps the
+        // rest of the page in sync; leaving a playing video unmounts it so it
+        // does not keep talking off-screen.
+        clearTimeout(settle.current);
+        settle.current = setTimeout(() => {
+            const i = indexAt();
+            if (i === null) return;
+            const slide = slides[i];
+            if (slide.kind === 'image' && slide.url !== current) setImg(slide.url);
+            if (playing !== null && playing !== i) setPlaying(null);
+        }, 120);
+    };
+
+    // `img` changed from outside (a variant pick): bring that photo into view.
+    // Skipped when the track is already there, so the swipe that set `img`
+    // does not fight its own momentum. Keyed on the variant too: parked on a
+    // video, picking a variant whose photo is already `current` changes no
+    // URL, and the photo would otherwise stay out of view.
+    useEffect(() => {
+        const i = images.findIndex((im) => im.url === current);
+        const behavior = mounted.current ? 'smooth' : 'auto';
+        mounted.current = true;
+        if (i < 0 || indexAt() === null) return;
+        if (indexAt() !== i) scrollTo(i, behavior);
+    }, [current, variantId]);
+
+    // Arrow keys work from anywhere in the gallery — track, paddles or thumbs.
+    const onKey = (e) => {
+        if (e.target.tagName === 'VIDEO') return;   // the player's own seek keys
+        if (e.key === 'ArrowLeft') { e.preventDefault(); scrollTo(active - 1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); scrollTo(active + 1); }
+    };
 
     return (
-        <div>
-            <div className="aspect-square overflow-hidden rounded-2xl bg-gold-100 group relative">
-                {video?.embed && (
-                    <iframe src={`${video.embed}?autoplay=1`} className="absolute inset-0 h-full w-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+        <div onKeyDown={total > 1 ? onKey : undefined}>
+            <div
+                className="aspect-square overflow-hidden rounded-2xl bg-gold-100 group relative focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+                tabIndex={total > 1 ? 0 : undefined}
+            >
+                {total > 0 ? (
+                    <div
+                        ref={track}
+                        onScroll={onScroll}
+                        role="group"
+                        aria-roledescription="carousel"
+                        aria-label="Product media"
+                        className="flex h-full w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain"
+                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
+                    >
+                        {slides.map((s, i) => s.kind === 'image' ? (
+                            <div key={`img-${s.id}`} role="group" aria-roledescription="slide" aria-label={`Photo ${i + 1} of ${total}`} className="relative h-full w-full shrink-0 snap-center">
+                                <img
+                                    src={s.url}
+                                    alt={s.alt || product.name}
+                                    {...(s.thumb ? { srcSet: `${s.thumb} 450w, ${s.url} 1200w`, sizes: '(min-width: 1024px) 50vw, 100vw' } : {})}
+                                    {...(i === 0 ? { fetchPriority: 'high' } : { loading: 'lazy' })}
+                                    decoding="async"
+                                    className="h-full w-full object-cover cursor-zoom-in"
+                                    onClick={() => setZoom(s.url)}
+                                />
+                                <span className="absolute bottom-3 right-3 rounded-full bg-white/80 p-2 text-ink-700 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                                    <Icon name="zoomIn" className="w-4 h-4" />
+                                </span>
+                            </div>
+                        ) : (
+                            // Poster + play button until tapped: a live iframe swallows
+                            // touch events and would kill swiping through the track.
+                            <div key={`vid-${i}`} role="group" aria-roledescription="slide" aria-label={`Video ${i - images.length + 1} of ${total}`} className="relative h-full w-full shrink-0 snap-center bg-ink-900">
+                                {playing === i ? (
+                                    s.embed ? (
+                                        <iframe src={`${s.embed}?autoplay=1`} title={`Video ${i - images.length + 1}`} className="absolute inset-0 h-full w-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                                    ) : (
+                                        <video src={s.src} controls autoPlay playsInline className="absolute inset-0 h-full w-full object-contain bg-black" />
+                                    )
+                                ) : (
+                                    <button type="button" onClick={() => setPlaying(i)} aria-label={`Play video ${i - images.length + 1}`} className="absolute inset-0 grid place-items-center">
+                                        {s.thumb && <img src={s.thumb} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-80" />}
+                                        <span className="relative grid h-14 w-14 place-items-center rounded-full bg-white/90 text-ink-900 shadow">
+                                            <PlayGlyph className="w-6 h-6" />
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex h-full items-center justify-center text-gold-300">No image</div>
                 )}
-                {video?.src && (
-                    <video src={video.src} controls autoPlay playsInline className="absolute inset-0 h-full w-full object-contain bg-black" />
+
+                {total > 1 && active > 0 && (
+                    <button type="button" onClick={() => scrollTo(active - 1)} aria-label="Previous"
+                        className="hidden md:grid place-items-center absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow border border-ink-100 text-lg text-ink-900 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition hover:bg-white">‹</button>
                 )}
-                {!video && (
-                    product.images.length ? (
-                        <>
-                            <img
-                                src={current}
-                                alt={currentImage?.alt || product.name}
-                                {...(currentImage?.thumb ? { srcSet: `${currentImage.thumb} 450w, ${current} 1200w`, sizes: '(min-width: 1024px) 50vw, 100vw' } : {})}
-                                fetchPriority="high"
-                                decoding="async"
-                                className="h-full w-full object-cover cursor-zoom-in transition duration-500 group-hover:scale-105"
-                                onClick={() => setZoom(true)}
-                            />
-                            <span className="absolute bottom-3 right-3 rounded-full bg-white/80 p-2 text-ink-700 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                                <Icon name="zoomIn" className="w-4 h-4" />
-                            </span>
-                        </>
-                    ) : (
-                        <div className="flex h-full items-center justify-center text-gold-300">No image</div>
-                    )
+                {total > 1 && active < total - 1 && (
+                    <button type="button" onClick={() => scrollTo(active + 1)} aria-label="Next"
+                        className="hidden md:grid place-items-center absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow border border-ink-100 text-lg text-ink-900 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition hover:bg-white">›</button>
                 )}
-                {video && (
-                    <button type="button" onClick={() => setVideo(null)} className="absolute top-3 right-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-white/85 text-ink-900 shadow hover:bg-white" title="Back to photos" aria-label="Back to photos">
+
+                {/* Hidden while a video plays: its play/pause control lives in
+                    exactly this corner. */}
+                {total > 1 && playing === null && (
+                    <span className="absolute bottom-3 left-3 z-10 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium tabular-nums text-ink-800 pointer-events-none">
+                        {active + 1} / {total}
+                    </span>
+                )}
+
+                {playing !== null && (
+                    <button type="button" onClick={() => { setPlaying(null); if (images.length) scrollTo(images.length - 1); }} className="absolute top-3 right-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-white/85 text-ink-900 shadow hover:bg-white" title="Back to photos" aria-label="Back to photos">
                         <Icon name="close" className="w-4 h-4" strokeWidth={2} />
                     </button>
                 )}
             </div>
 
             {zoom && (
-                <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4" onClick={() => setZoom(false)}>
-                    <img src={current} alt={product.name} className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
+                <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4" onClick={() => setZoom(null)}>
+                    <img src={zoom} alt={product.name} className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
                     <button type="button" aria-label="Close image" className="absolute top-4 right-4 text-white text-3xl leading-none">×</button>
                 </div>
             )}
 
-            {(product.images.length > 1 || product.videos.length > 0) && (
+            {total > 1 && (
                 <div className="mt-4 grid grid-cols-5 gap-3">
-                    {product.images.map((image) => (
+                    {images.map((image, i) => (
                         <button
                             key={image.id}
-                            onClick={() => { setImg(image.url); setVideo(null); }}
-                            aria-label={`View photo ${product.images.indexOf(image) + 1}`}
-                            className={`aspect-square overflow-hidden rounded-lg bg-gold-100 ring-2 ${current === image.url && !video ? 'ring-gold-500' : 'ring-transparent'}`}
+                            type="button"
+                            onClick={() => scrollTo(i)}
+                            aria-label={`View photo ${i + 1}`}
+                            aria-current={active === i ? 'true' : undefined}
+                            className={`aspect-square overflow-hidden rounded-lg bg-gold-100 ring-2 ${active === i ? 'ring-gold-500' : 'ring-transparent'}`}
                         >
                             <img src={image.thumb || image.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                         </button>
                     ))}
-                    {product.videos.map((v, i) => (
-                        <button
-                            key={i}
-                            type="button"
-                            onClick={() => setVideo(v.embed ? { embed: v.embed } : { src: v.src })}
-                            aria-label={`Play video ${i + 1}`}
-                            className={`relative aspect-square overflow-hidden rounded-lg bg-ink-900 ring-2 hover:ring-gold-500 ${video && (video.embed === v.embed && video.src === v.src) ? 'ring-gold-500' : 'ring-transparent'}`}
-                        >
-                            {v.thumb && <img src={v.thumb} alt="" className="h-full w-full object-cover opacity-80" />}
-                            <span className="absolute inset-0 grid place-items-center">
-                                <span className="bg-white/90 rounded-full w-8 h-8 grid place-items-center">
-                                    <svg aria-hidden="true" className="w-4 h-4 text-ink-900" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    {videos.map((v, j) => {
+                        const i = images.length + j;
+                        return (
+                            <button
+                                key={`v${j}`}
+                                type="button"
+                                onClick={() => scrollTo(i)}
+                                aria-label={`View video ${j + 1}`}
+                                aria-current={active === i ? 'true' : undefined}
+                                className={`relative aspect-square overflow-hidden rounded-lg bg-ink-900 ring-2 hover:ring-gold-500 ${active === i ? 'ring-gold-500' : 'ring-transparent'}`}
+                            >
+                                {v.thumb && <img src={v.thumb} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover opacity-80" />}
+                                <span className="absolute inset-0 grid place-items-center">
+                                    <span className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-ink-900">
+                                        <PlayGlyph className="w-4 h-4" />
+                                    </span>
                                 </span>
-                            </span>
-                        </button>
-                    ))}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
         </div>
@@ -248,17 +377,7 @@ function Gallery({ product, img, setImg }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────────── */
-/** Small solid status chip — the one piece of gold in the buy box. */
-function MemberPill() {
-    return (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold-700 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.08em] text-white">
-            <Icon name="medal" className="w-3 h-3" strokeWidth={2} />
-            Member
-        </span>
-    );
-}
-
-function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBanner, delivery, trustBadges, giftBadge, reviews, loved, lovesCount, ui }) {
+function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, trustBadges, reviews, loved, lovesCount, ui }) {
     const { add } = useCart();
     const preorder = product.preorder;
 
@@ -292,14 +411,20 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
         <div>
             <h1 className="font-display text-3xl font-semibold">{product.name}</h1>
 
-            <a href="#reviews" className="mt-2 flex items-center gap-2 text-sm group">
-                <span className="flex text-gold-500">
-                    {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={!reviews.avg || i > Math.round(reviews.avg)} />)}
-                </span>
-                <span className="text-ink-700/70 group-hover:text-gold-700">
-                    {reviews.count ? `${reviews.avg} · ${reviews.count} review${reviews.count > 1 ? 's' : ''}` : (lovesCount > 0 ? `Loved by ${lovesCount} ${lovesCount === 1 ? 'person' : 'people'}` : 'Be the first to review')}
-                </span>
-            </a>
+            {/* Five grey stars under a heading say "nobody bought this"; with no
+                reviews yet the line is just the invitation. */}
+            {reviews.count > 0 ? (
+                <a href="#reviews" className="mt-2 flex items-center gap-2 text-sm group">
+                    <span className="flex text-gold-500">
+                        {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={i > Math.round(reviews.avg)} />)}
+                    </span>
+                    <span className="text-ink-700/70 group-hover:text-gold-700">
+                        {reviews.avg} · {reviews.count} review{reviews.count > 1 ? 's' : ''}
+                    </span>
+                </a>
+            ) : (
+                <a href="#reviews" className="mt-2 inline-block text-sm text-ink-700/70 hover:text-gold-700">Be the first to review</a>
+            )}
 
             <div className="flex items-center gap-4 flex-wrap">
                 <LoveButton url={product.love_url} loved={loved} count={lovesCount} />
@@ -320,31 +445,6 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
             </div>
 
             {product.short_description && <p className="mt-3 text-[15px] leading-relaxed text-ink-700/80">{product.short_description}</p>}
-
-            {/* One compact line, not a filled banner. The old box cost three
-                lines of vertical space on a phone for two numbers. */}
-            {memberBanner && (
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
-                    <MemberPill />
-                    <span className="text-ink-800">
-                        <strong className="font-semibold">{memberBanner.price_text}</strong>
-                        <span className="text-ink-700/70"> · save {memberBanner.pct}%{memberBanner.savings_text ? ` (${memberBanner.savings_text})` : ''}</span>
-                    </span>
-                    <span className="text-[12px] text-ink-700/70">applied at checkout</span>
-                </div>
-            )}
-
-            {/* Guests: what membership is worth, on the same one line. */}
-            {!ui.isMember && ui.registerPct && (
-                <a href={ui.registerUrl} className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] group">
-                    <MemberPill />
-                    <span className="text-ink-800">
-                        <strong className="font-semibold">{ui.registerPct}% off</strong>
-                        <span className="text-ink-700/70"> this piece for members</span>
-                    </span>
-                    <span className="text-[12px] font-medium text-gold-700 group-hover:underline">Join free</span>
-                </a>
-            )}
 
             {/* Quantity / bundle offer tiers */}
             {offerTiers.length > 0 && (
@@ -438,44 +538,24 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, memberBann
             )}
 
             {/* Trust badges — the vertical promise list beside the buy button */}
-            {(trustBadges?.length > 0 || giftBadge) && (
+            {trustBadges?.length > 0 && (
                 <ul className="mt-6 space-y-2.5">
-                    {(trustBadges || []).map((b, i) => (
+                    {trustBadges.map((b, i) => (
                         <li key={i} className="flex items-center gap-3 text-sm text-ink-800">
                             <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5 shrink-0 text-gold-700" />
                             <span>{b.title}{b.text ? <span className="text-ink-700/70"> — {b.text}</span> : null}</span>
                         </li>
                     ))}
-                    {giftBadge && (
-                        <li className="flex items-center gap-3 text-sm">
-                            <Icon name="gift" className="w-5 h-5 shrink-0 text-gold-700" strokeWidth={2} />
-                            <a href={giftBadge.url} className="font-semibold text-gold-800 hover:underline">{giftBadge.label}</a>
-                        </li>
-                    )}
                 </ul>
-            )}
-
-            {/* Arrival window — the parcel's two dates in one calm box */}
-            {delivery && (
-                <div className="mt-5 rounded-xl bg-gold-100/70 px-4 py-3 flex items-start gap-3">
-                    <Icon name="calendar" className="w-5 h-5 shrink-0 text-ink-800 mt-0.5" />
-                    <div className="text-sm">
-                        <p className="font-medium text-ink-900">Arrives {delivery.from}{delivery.to ? ` – ${delivery.to}` : ''}</p>
-                        {delivery.dispatch && <p className="text-ink-700/70 mt-0.5">Dispatching {delivery.dispatch}</p>}
-                    </div>
-                </div>
             )}
 
             {/* Quantity */}
             <div className="mt-5">
                 <span className="label">Quantity</span>
-                <div className="flex items-center gap-4">
-                    <div className="inline-flex items-center rounded-md border border-ink-100">
-                        <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="px-3 py-2.5">−</button>
-                        <span className="w-10 text-center">{purchase.qty}</span>
-                        <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="px-3 py-2.5">+</button>
-                    </div>
-                    <span className="text-sm text-ink-700/70">Cash on delivery available</span>
+                <div className="inline-flex items-center rounded-md border border-ink-100">
+                    <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="px-3 py-2.5">−</button>
+                    <span className="w-10 text-center">{purchase.qty}</span>
+                    <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="px-3 py-2.5">+</button>
                 </div>
             </div>
 
@@ -550,6 +630,10 @@ function AttributePickers({ purchase }) {
     );
 }
 
+// A real count, shown once it is worth showing: "Loved by 2 people" under a
+// heading reads as a warning, so the label stays "Love" until then.
+const LOVES_SHOWN_FROM = 10;
+
 function LoveButton({ url, loved: initialLoved, count: initialCount }) {
     const [loved, setLoved] = useState(initialLoved);
     const [count, setCount] = useState(initialCount);
@@ -576,7 +660,7 @@ function LoveButton({ url, loved: initialLoved, count: initialCount }) {
     return (
         <button type="button" onClick={toggle} className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-700/70 hover:text-danger-500 transition" aria-pressed={loved} title={loved ? 'Remove from loved' : 'Love this'}>
             <svg className={`w-5 h-5 transition ${loved ? 'text-danger-500' : ''}`} fill={loved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-            <span>{count > 0 ? count : 'Love'}</span>
+            <span>{count >= LOVES_SHOWN_FROM ? `Loved by ${count} people` : (loved ? 'Loved' : 'Love')}</span>
         </button>
     );
 }
@@ -676,24 +760,6 @@ function Details({ specs }) {
                     </div>
                 ))}
             </dl>
-        </section>
-    );
-}
-
-/** Care / Shipping & returns — collapsed accordions, content admin-editable. */
-function PolicyAccordion({ title, text, moreUrl = null, moreLabel = null }) {
-    const [open, setOpen] = useState(false);
-    if (!text) return null;
-    return (
-        <section className="max-w-3xl border-b border-ink-100">
-            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 py-4 text-left">
-                <h2 className="font-display text-xl font-medium">{title}</h2>
-                <Icon name="chevronDown" className={`w-5 h-5 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
-            </button>
-            <div className={`pb-5 text-sm text-ink-700/85 ${open ? '' : 'hidden'}`}>
-                <RichText text={text} />
-                {moreUrl && <Link href={moreUrl} className="text-gold-700 underline">{moreLabel || 'Read more'}</Link>}
-            </div>
         </section>
     );
 }

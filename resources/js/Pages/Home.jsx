@@ -12,9 +12,10 @@ import { t } from '../Shared/i18n';
 // The Meridian Éclat homepage — conversion-first and gift-led.
 //
 // Order is deliberate (mobile-first, every step earns the next scroll):
-//   hero → reassurance → shop by occasion (the gift path) → deals → best
-//   sellers → gift finder by budget → categories → featured edit → how gifting
-//   works → customer love → our promise → new arrivals → admin builder blocks.
+//   hero → reassurance → categories → picked for you → shop by occasion (the
+//   gift path) → deals → membership → best sellers → recently viewed → gift
+//   finder by budget → featured edit → how gifting works (off by default) →
+//   customer love → our promise → new arrivals → admin builder blocks.
 // Every section is admin-toggleable/editable through the same home_content
 // settings the old templates used; copy falls back to sensible defaults.
 export default function Home(props) {
@@ -23,6 +24,7 @@ export default function Home(props) {
         <>
             <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} />
             <FeatureStrip strip={featureStrip} />
+            <CategoryLookbook section={categoriesSection} />
             {/* Per-visitor rows: what they told the gift finder, loved or looked
                 at. Both hide themselves until there is a real signal. */}
             <CardSection section={pickedForYou} eyebrow="Just for you" viewAll="/shop" viewAllLabel="Browse everything" />
@@ -32,7 +34,6 @@ export default function Home(props) {
             <CardSection section={bestSellers} eyebrow="Most loved" viewAll="/best-sellers" viewAllLabel="View all best sellers" />
             <CardSection section={recentlyViewed} eyebrow="Pick up where you left off" viewAll="/shop" viewAllLabel="Keep browsing" tinted />
             <GiftFinder finder={giftFinder} />
-            <CategoryLookbook section={categoriesSection} />
             <Featured featured={featured} />
             <GiftingSteps giftFinder={giftFinder} />
             <ReviewsBand reviews={reviews} />
@@ -387,14 +388,13 @@ function CardSection({ section, eyebrow, viewAll, viewAllLabel, tinted = false }
 
 /* ── Gift finder: budget bands + the gifting promise ────────────────────── */
 function GiftFinder({ finder }) {
-    // Who and what for — remembered by the shop (session, and the account
-    // for members) so "Picked for you", pushes and the assistant can use it.
-    const [who, setWho] = useState(finder?.profile?.for || '');
+    // The occasion — remembered by the shop (session, and the account for
+    // members) so "Picked for you", pushes and the assistant can use it.
     const [occasion, setOccasion] = useState(finder?.profile?.occasion || '');
     if (!finder?.show || !finder.budgets?.length) return null;
 
     const withProfile = (url) => {
-        const extra = ['gift=1', who ? `for=${who}` : null, occasion ? `occasion=${occasion}` : null].filter(Boolean).join('&');
+        const extra = ['gift=1', occasion ? `occasion=${occasion}` : null].filter(Boolean).join('&');
         return url + (url.includes('?') ? '&' : '?') + extra;
     };
     const chip = (active) => `rounded-full px-4 py-1.5 text-xs tracking-wide border transition-colors duration-200 ${active ? 'bg-gold-500 text-ink-900 border-gold-500' : 'border-white/25 text-white/80 hover:border-white hover:text-white'}`;
@@ -405,22 +405,11 @@ function GiftFinder({ finder }) {
                 <p className="uppercase tracking-[0.3em] text-[11px] text-gold-300 mb-3">Gift finder</p>
                 <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl leading-tight">{finder.title}</h2>
                 {finder.text && <p className="mt-4 text-white/60 max-w-xl mx-auto">{finder.text}</p>}
-                {(finder.recipients?.length > 0 || finder.occasions?.length > 0) && (
-                    <div className="mt-8 space-y-3">
-                        {finder.recipients?.length > 0 && (
-                            <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Who is it for?">
-                                {finder.recipients.map(([key, label]) => (
-                                    <button key={key} type="button" onClick={() => setWho(who === key ? '' : key)} className={chip(who === key)} aria-pressed={who === key}>{label}</button>
-                                ))}
-                            </div>
-                        )}
-                        {finder.occasions?.length > 0 && (
-                            <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="What is the occasion?">
-                                {finder.occasions.map(([key, label]) => (
-                                    <button key={key} type="button" onClick={() => setOccasion(occasion === key ? '' : key)} className={chip(occasion === key)} aria-pressed={occasion === key}>{label}</button>
-                                ))}
-                            </div>
-                        )}
+                {finder.occasions?.length > 0 && (
+                    <div className="mt-8 flex flex-wrap justify-center gap-2" role="group" aria-label="What is the occasion?">
+                        {finder.occasions.map(([key, label]) => (
+                            <button key={key} type="button" onClick={() => setOccasion(occasion === key ? '' : key)} className={chip(occasion === key)} aria-pressed={occasion === key}>{label}</button>
+                        ))}
                     </div>
                 )}
                 <p className="mt-7 text-[11px] uppercase tracking-[0.25em] text-white/40">Then pick a budget</p>

@@ -4,7 +4,6 @@ import SmartLink from '../SmartLink';
 import Icon from '../Icons';
 import SearchBox from './SearchBox';
 import NotificationsBell from './NotificationsBell';
-import LadderStrip from './LadderStrip';
 import { useCart } from '../CartContext';
 import { useMobileNav } from './MobileDrawer';
 import { t } from '../i18n';
@@ -134,9 +133,6 @@ export default function Header() {
                         <SearchBox autoFocus onNavigate={() => setMSearch(false)} />
                     </div>
                 )}
-
-                {/* The reward ladder, always in view (sticks with the header). */}
-                <LadderStrip />
             </div>
         </header>
     );

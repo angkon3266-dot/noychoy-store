@@ -5,6 +5,7 @@ import ProductCard from '../Shared/ProductCard';
 import SmartLink from '../Shared/SmartLink';
 import GiftLadderBar from '../Shared/GiftLadderBar';
 import Icon from '../Shared/Icons';
+import MemberPill from '../Shared/MemberPill';
 import { t } from '../Shared/i18n';
 
 // Full cart page. Mutations go through Inertia (the server redirects back to
@@ -167,11 +168,17 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                         </div>
                     </dl>
 
+                    {/* Pill + ONE span holding the sentence: bare text beside an
+                        element child would become its own flex item and wrap on
+                        its own. */}
                     {memberUsage && (
-                        <p className={`mt-2 text-xs ${memberUsage.remaining > 0 ? 'text-success-700' : 'text-ink-700/70'}`}>
-                            {memberUsage.remaining > 0
-                                ? <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount: <strong>{memberUsage.remaining} of {memberUsage.max}</strong> uses left{memberUsage.resets ? ` (resets ${memberUsage.resets})` : ''}.</>
-                                : <><Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Member discount used up for now{memberUsage.resets ? ` — resets ${memberUsage.resets}` : ''}.</>}
+                        <p className={`mt-2 flex items-start gap-1.5 text-xs ${memberUsage.remaining > 0 ? 'text-success-700' : 'text-ink-700/70'}`}>
+                            <MemberPill />
+                            <span className="min-w-0 leading-relaxed">
+                                {memberUsage.remaining > 0
+                                    ? <>Member discount: <strong>{memberUsage.remaining} of {memberUsage.max}</strong> uses left{memberUsage.resets ? ` (resets ${memberUsage.resets})` : ''}.</>
+                                    : <>Member discount used up for now{memberUsage.resets ? ` — resets ${memberUsage.resets}` : ''}.</>}
+                            </span>
                         </p>
                     )}
 
@@ -183,10 +190,12 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                     )}
 
                     {memberNudge && (
-                        <a href={urls.register} className="mt-3 block rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100" lang={props.chrome?.lang}>
-                            <Icon name="diamond" className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gold-700" />
-                            {t(props.chrome?.lang, 'cart.join', { saving: memberNudge.saving_text, pct: memberNudge.pct })}
-                            {props.chrome?.membership?.pointsPer1000 ? t(props.chrome?.lang, 'cart.points', { points: props.chrome.membership.pointsPer1000 }) : ''}.
+                        <a href={urls.register} className="mt-3 flex items-start gap-1.5 rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100" lang={props.chrome?.lang}>
+                            <MemberPill />
+                            <span className="min-w-0 leading-relaxed">
+                                {t(props.chrome?.lang, 'cart.join', { saving: memberNudge.saving_text, pct: memberNudge.pct })}
+                                {props.chrome?.membership?.pointsPer1000 ? t(props.chrome?.lang, 'cart.points', { points: props.chrome.membership.pointsPer1000 }) : ''}.
+                            </span>
                         </a>
                     )}
 

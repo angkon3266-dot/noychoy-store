@@ -94,8 +94,7 @@ class HomePageData
             ],
             'pickedForYou' => [
                 'show' => (bool) home_content('show_picked_for_you') && $pickedForYou->count() >= 4,
-                'title' => (home_content('picked_for_you_title') ?: 'Picked for you')
-                    .($giftProfile && ($desc = \App\Support\GiftProfile::describe($giftProfile)) !== '' ? ' — '.$desc : ''),
+                'title' => home_content('picked_for_you_title') ?: 'Picked for you',
                 'cards' => ProductCardData::collection($pickedForYou->take(8)),
             ],
             'featureStrip' => [
@@ -127,9 +126,8 @@ class HomePageData
             ],
             'giftFinder' => [
                 'show' => (bool) home_content('show_gift_finder'),
-                // Who and what for — the answers ride on the budget links and
-                // are remembered (GiftProfile), so the shop never asks twice.
-                'recipients' => collect(\App\Support\GiftProfile::RECIPIENTS)->map(fn ($label, $key) => [$key, $label])->values(),
+                // What for — the answer rides on the budget links and is
+                // remembered (GiftProfile), so the shop never asks twice.
                 'occasions' => collect(\App\Support\GiftProfile::OCCASIONS)->map(fn ($o, $key) => [$key, $o[0]])->values(),
                 'profile' => $giftProfile ? ['for' => $giftProfile['for'] ?? null, 'occasion' => $giftProfile['occasion'] ?? null] : null,
                 'title' => home_content('gift_finder_title') ?: 'Shopping for someone?',
@@ -146,9 +144,13 @@ class HomePageData
                 'promises' => collect(home_content('gift_promises') ?? [])
                     ->filter(fn ($p) => filled($p['title'] ?? null))->take(3)->values()
                     ->map(fn ($p) => ['icon' => $p['icon'] ?? null, 'title' => $p['title'], 'text' => $p['text'] ?? null]),
-                'steps' => collect(home_content('gifting_steps') ?? [])
-                    ->filter(fn ($p) => filled($p['title'] ?? null))->take(4)->values()
-                    ->map(fn ($p) => ['title' => $p['title'], 'text' => $p['text'] ?? null]),
+                // The steps band is off until the owner switches it on; an
+                // empty list is how the page knows not to render it.
+                'steps' => home_content('show_gifting_steps')
+                    ? collect(home_content('gifting_steps') ?? [])
+                        ->filter(fn ($p) => filled($p['title'] ?? null))->take(4)->values()
+                        ->map(fn ($p) => ['title' => $p['title'], 'text' => $p['text'] ?? null])
+                    : [],
             ],
             'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
             // Social proof: recent 4–5★ approved reviews, sitewide. Cached like

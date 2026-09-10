@@ -2,17 +2,16 @@
 
 namespace Tests\Feature;
 
-use App\Models\Collection;
 use App\Models\Product;
-use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
- * The redesigned product page: vertical trust-badge list, the arrival box
- * with a dispatch date, the Care / Shipping & returns accordions, and the
- * gift-ladder badge line.
+ * The product page payload after the phone de-clutter: the vertical
+ * trust-badge list beside the buy button stays, while the member pill, the
+ * arrival box, the gift-ladder line and the Care / Shipping & returns
+ * accordions are gone from the page and from the props.
  */
 class PdpContentTest extends TestCase
 {
@@ -31,38 +30,26 @@ class PdpContentTest extends TestCase
         ]);
     }
 
-    public function test_page_carries_badges_accordions_and_dispatch_date(): void
+    public function test_page_carries_the_trust_list_and_none_of_the_removed_blocks(): void
     {
         $this->get(route('product.show', $this->product()))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Product')
-                ->has('trustBadges', 5)   // the config default promise list
-                ->where('trustBadges.0.title', 'Cash on Delivery')
-                ->where('care', theme('pdp_care_text'))
-                ->where('returns', theme('pdp_returns_text'))
-                ->where('refundUrl', route('page.refund'))
-                ->has('delivery.dispatch')
-                ->where('giftBadge', null),
-            );
-    }
-
-    public function test_gift_badge_appears_when_the_ladder_is_live(): void
-    {
-        $gift = Product::create([
-            'name' => 'Gift stud', 'slug' => 'gift-stud', 'status' => 'published',
-            'price' => 500, 'manage_stock' => false, 'in_stock' => true,
-        ]);
-        $collection = Collection::create(['name' => 'Milestone Gifts', 'type' => 'manual', 'is_active' => true]);
-        $collection->products()->attach($gift->id, ['position' => 0]);
-
-        Setting::put('gift_ladder_enabled', true);
-        Setting::put('gift_ladder_gifts_collection_id', $collection->id);
-
-        $this->get(route('product.show', $this->product()))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('giftBadge.url', $collection->url())
-                ->where('giftBadge.label', 'Add more, save more — '.money(50).' off from the 1st piece, free delivery from the 3rd piece, a free gift at the 9th piece'),
+                // The config default promise list, whatever its current wording.
+                ->has('trustBadges', count(config('theme.defaults.trust_badges')))
+                ->where('trustBadges.0.title', config('theme.defaults.trust_badges.0.title'))
+                ->missing('care')
+                ->missing('returns')
+                ->missing('refundUrl')
+                ->missing('delivery')
+                ->missing('giftBadge')
+                ->missing('memberBanner')
+                ->missing('ui.registerPct')
+                // Still read by the offers list and the reviews perk box.
+                ->has('ui.isMember')
+                ->has('ui.registerUrl')
+                ->has('ui.loginUrl'),
             );
     }
 
@@ -82,16 +69,5 @@ class PdpContentTest extends TestCase
 
         preg_match('/<script type="application\/ld\+json">(.+?)<\/script>/s', $html, $ld);
         $this->assertStringNotContainsString('## Design', $ld[1] ?? '## Design');
-    }
-
-    public function test_accordions_hide_when_blanked_in_admin(): void
-    {
-        Setting::put('theme', ['pdp_care_text' => '', 'pdp_returns_text' => '']);
-
-        $this->get(route('product.show', $this->product()))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('care', null)
-                ->where('returns', null),
-            );
     }
 }

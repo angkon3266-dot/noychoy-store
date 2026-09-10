@@ -3,6 +3,7 @@ import { router, useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import { fetchJson, money } from '../Shared/format';
 import Icon, { IconOrGlyph } from '../Shared/Icons';
+import MemberPill from '../Shared/MemberPill';
 import DateField from '../Shared/DateField';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
@@ -429,7 +430,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     {loyalty && <Points loyalty={loyalty} />}
 
                     {registerPct && (
-                        /* The icon and the CTA are the only flex items besides ONE
+                        /* The pill and the CTA are the only flex items besides ONE
                            span holding the whole sentence. Bare text either side of
                            an element child becomes its own anonymous flex item, and
                            with `items-center` each one is then a rigid column that
@@ -438,14 +439,14 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                            that span shrink below its min-content width so the text
                            reflows normally. Same shape as Product.jsx:336. */
                         <div className="mt-3 rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs">
-                            {/* Exactly two flex items — the icon and ONE paragraph
+                            {/* Exactly two flex items — the pill and ONE paragraph
                                 that holds the entire sentence. Nothing here can
                                 fragment. The CTA is a normal block below rather
                                 than a third flex item, because this card is only
                                 ~210px wide on a phone and no arrangement fits the
                                 sentence and a button on one line at that size. */}
                             <div className="flex items-start gap-2">
-                                <Icon name="sparkle" className="w-4 h-4 shrink-0 mt-px text-gold-300" />
+                                <MemberPill />
                                 <p className="min-w-0 leading-relaxed">
                                     {registerPct.saving >= 50 ? (
                                         <>Save <strong className="font-semibold">{registerPct.savingText}</strong> on this order</>

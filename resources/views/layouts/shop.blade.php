@@ -386,50 +386,6 @@
             </div>
             @endif
 
-            {{-- The reward ladder, always in view. Blade pages (landing pages,
-                 legacy home templates) get the static snapshot; the mini-cart
-                 payload refreshes the message after an add-to-cart. --}}
-            @php $ladderStrip = app(\App\Services\CartService::class)->giftProgress(); @endphp
-            @if($ladderStrip)
-                @php
-                    $ladderTiers = $ladderStrip['tiers'];
-                    $ladderNext = $ladderStrip['next'];
-                    // The stepper caption. "Delivery" / "Gift" sit under an icon that
-                    // already says which reward it is, so Bangla gets the short word.
-                    $ladderShort = fn ($t) => \App\Support\Locale::isBangla()
-                        ? match ($t['type']) { 'free_delivery' => 'ফ্রি', 'free_gift' => 'গিফট', default => $t['short'] }
-                        : $t['short'];
-                    $ladderMsg = ($ladderStrip['gift']['pick_needed'] ?? false)
-                        ? 'A free gift is waiting — pick one in your cart'
-                        : (! $ladderNext
-                            ? 'All '.$ladderStrip['count'].' rewards unlocked'.($ladderStrip['saved_text'] ? ' — '.$ladderStrip['saved_text'].' saved' : '')
-                            : ($ladderStrip['tier'] > 0
-                                ? $ladderStrip['summary'].' unlocked — add '.$ladderNext['more'].' more for '.lcfirst($ladderNext['label'])
-                                : 'Add '.$ladderNext['more'].' '.($ladderNext['more'] === 1 ? 'piece' : 'pieces').' to unlock '.lcfirst($ladderNext['label'])));
-                @endphp
-                <a href="{{ route('cart') }}" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gold-200/70 py-1.5 text-[12px] leading-tight text-ink-800" data-ladder-strip>
-                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold-700 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.08em] text-white">Rewards</span>
-                    <span class="min-w-0 flex-1 basis-40 truncate">
-                        <span class="sm:hidden font-medium" lang="bn">প্রতি পিসেই রিওয়ার্ড</span>
-                        <span class="hidden sm:inline" x-data x-text="$store.cart.ladderMessage || @js($ladderMsg)">{{ $ladderMsg }}</span>
-                    </span>
-                    {{-- Equal-width cells, not justify-between: the captions below are
-                         different widths ("2%" vs "৳100") and would set uneven gaps. --}}
-                    <span class="flex basis-full items-center sm:basis-[46%] md:basis-[40%]" aria-hidden="true">
-                        @foreach($ladderTiers as $i => $tier)
-                            @php $edge = $i < 5 || $loop->last; @endphp
-                            @if($i === 5 && count($ladderTiers) > 6)<span class="sm:hidden flex-none w-3 self-start pt-1 text-center text-[10px] leading-none text-ink-500">…</span>@endif
-                            <span class="{{ $edge ? 'flex' : 'hidden sm:flex' }} flex-1 basis-0 flex-col items-center" title="{{ $tier['threshold'] }}: {{ $tier['label'] }}">
-                                <span class="grid h-5 w-5 place-items-center rounded-full border text-[9px] font-semibold {{ $tier['unlocked'] ? 'bg-gold-700 border-gold-700 text-white' : (($ladderNext['n'] ?? 0) === $tier['n'] ? 'bg-white border-gold-600 text-gold-700 ring-2 ring-gold-200' : 'bg-white border-gold-300 text-gold-500') }}">{{ $tier['type'] === 'free_gift' ? '🎁' : ($tier['type'] === 'free_delivery' ? '🚚' : $tier['threshold']) }}</span>
-                                {{-- What each rung is worth, on every screen: a rung with
-                                     no number under it is a circle to guess at. --}}
-                                <span class="mt-0.5 block whitespace-nowrap text-[9px] leading-none md:text-[8px] {{ $tier['unlocked'] ? 'text-gold-700 font-semibold' : 'text-ink-500' }}">{{ $ladderShort($tier) }}</span>
-                            </span>
-                        @endforeach
-                    </span>
-                </a>
-            @endif
-
         </div>
 
     </header>

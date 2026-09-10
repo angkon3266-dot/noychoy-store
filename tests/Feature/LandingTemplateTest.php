@@ -134,9 +134,10 @@ class LandingTemplateTest extends TestCase
             'trust_badges' => config('theme.defaults.trust_badges'),
         ]);
 
-        // The real storefront route, hydration and all.
+        // The real storefront route, hydration and all. The first badge's title,
+        // whatever its current wording, proves the strip itself rendered.
         $response = $this->get('/lp/'.$page->slug)->assertOk();
-        $response->assertSee('Cash on delivery', false);
+        $response->assertSee(config('theme.defaults.trust_badges.0.title'), false);
 
         // The footer trust badges store an icon NAME. The Blade half had no
         // icon renderer, so every landing page an ad pointed at advertised

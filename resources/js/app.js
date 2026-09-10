@@ -59,7 +59,6 @@ document.addEventListener('alpine:init', () => {
         toastMsg: '',
         toastShow: false,
         gift: null,
-        ladderMessage: '',
 
         _apply(data) {
             this.count = data.count;
@@ -74,16 +73,6 @@ document.addEventListener('alpine:init', () => {
             this.freeShipping = !!data.free_shipping;
             this.deliverySavedText = data.delivery_saved_text || '';
             this.gift = data.gift || null;
-            // The header strip's line, kept in step after every cart change
-            // (Blade pages render the rung track once, server-side).
-            const g = this.gift;
-            this.ladderMessage = !g ? '' : g.gift?.pick_needed
-                ? 'A free gift is waiting — pick one in your cart'
-                : !g.next
-                    ? `All ${g.count} rewards unlocked${g.saved_text ? ' — ' + g.saved_text + ' saved' : ''}`
-                    : g.tier > 0
-                        ? `${g.summary} unlocked — add ${g.next.more} more for ${g.next.label.charAt(0).toLowerCase()}${g.next.label.slice(1)}`
-                        : `Add ${g.next.more} ${g.next.more === 1 ? 'piece' : 'pieces'} to unlock ${g.next.label.charAt(0).toLowerCase()}${g.next.label.slice(1)}`;
         },
 
         _adding: false,

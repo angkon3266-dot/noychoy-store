@@ -36,9 +36,6 @@ class ProductPageData
             ? $customer->offers()->live()->get()->filter(fn ($o) => $o->appliesToProduct($product))->values()
             : collect();
 
-        $memberPct = (is_member() && member_pricing()->enabled())
-            ? member_pricing()->percentForProduct($product) : 0;
-
         $loyalty = app(LoyaltyService::class);
 
         $reviews = $product->approvedReviews;
@@ -115,25 +112,10 @@ class ProductPageData
                 'message' => $o->message,
                 'until' => $o->expires_at?->format('d M Y'),
             ]),
-            'memberBanner' => $memberPct > 0 ? [
-                'price_text' => money(member_pricing()->memberPrice($product)),
-                'pct' => rtrim(rtrim(number_format($memberPct, 1), '0'), '.'),
-                'savings_text' => $product->has_variants ? null : money(member_pricing()->savings($product)),
-            ] : null,
-            // The zone is unknown on a product page, so this quotes the
-            // slower nationwide window rather than over-promising. The builder
-            // also skips the days the courier does not work.
-            'delivery' => \App\Support\DeliveryEstimate::for()?->productPageShape(),
             // The vertical badge list beside the buy button. Uncapped here —
             // the footer strip keeps its own take(3) in HandleInertiaRequests.
             'trustBadges' => collect(theme('trust_badges') ?? [])
                 ->filter(fn ($b) => filled($b['title'] ?? null))->take(6)->values(),
-            // Bold "unlock gifts" line + link, when the milestone ladder is on.
-            'giftBadge' => app(\App\Support\GiftLadder::class)->pdpBadge(),
-            // Care / Shipping & returns accordions under the Details table.
-            'care' => theme('pdp_care_text') ?: null,
-            'returns' => theme('pdp_returns_text') ?: null,
-            'refundUrl' => route('page.refund'),
             'reviews' => [
                 'avg' => $product->average_rating,
                 'count' => $count,
@@ -177,15 +159,6 @@ class ProductPageData
                 ] : null,
                 'webPushReady' => app(WebPushService::class)->ready(),
                 'isMember' => (bool) $customer,
-                // Guests: what joining is actually worth on this product.
-                'registerPct' => (function () use ($customer) {
-                    if ($customer) {
-                        return null;
-                    }
-                    $pct = (float) \App\Models\Setting::get('register_offer_percent', config('loyalty.register_discount_percent', 3));
-
-                    return $pct > 0 ? rtrim(rtrim(number_format($pct, 2), '0'), '.') : null;
-                })(),
                 'customerName' => $customer?->name,
                 'loginUrl' => route('customer.login'),
                 'registerUrl' => route('customer.register'),

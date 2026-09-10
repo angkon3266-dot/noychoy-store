@@ -62,7 +62,6 @@ return [
         // the homepage six times with no way to edit any of them.
         'hero_trust' => [
             'Cash on delivery',
-            'Gift message included',
         ],
 
         // Gift finder blurb (the band under the hero CTA).
@@ -75,7 +74,9 @@ return [
             ['icon' => 'cash', 'title' => 'Cash on delivery', 'text' => 'Pay when it arrives'],
         ],
 
-        // "How gifting works" — the four-step band.
+        // "How gifting works" — the four-step band. Off until the owner
+        // switches it on in Admin → Appearance → Homepage content.
+        'show_gifting_steps' => false,
         'gifting_steps' => [
             ['title' => 'Pick a piece', 'text' => 'Browse by occasion, budget or category.'],
             ['title' => 'Tick "This is a gift"', 'text' => 'At checkout — add a card message if you like.'],

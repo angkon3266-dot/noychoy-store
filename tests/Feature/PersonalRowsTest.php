@@ -68,7 +68,7 @@ class PersonalRowsTest extends TestCase
 
         $this->get('/')->assertInertia(fn (Assert $page) => $page
             ->where('pickedForYou.show', true)
-            ->where('pickedForYou.title', 'Picked for you — for her, birthday, under ৳1,000')
+            ->where('pickedForYou.title', 'Picked for you')
             ->has('pickedForYou.cards', 5)
             ->where('giftFinder.profile.for', 'her'));
 

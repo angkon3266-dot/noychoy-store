@@ -123,18 +123,6 @@ return [
         'show_pdp_whatsapp' => true,
         'show_frequently_bought' => true,
 
-        // Product page: the Care and Shipping & returns accordions under the
-        // Details table. Plain text; blank lines make paragraphs, "- " makes
-        // bullets, "## " makes a heading — same light format as descriptions.
-        'pdp_care_text' => "- Keep away from perfume, hairspray and water — put jewelry on last, take it off first.\n"
-            ."- Wipe gently with the dry soft cloth after wearing to keep the plating bright.\n"
-            ."- Store each piece separately in the pouch or box it arrived in, away from sunlight.\n"
-            ."- Avoid wearing during exercise, swimming or sleeping.",
-        'pdp_returns_text' => "- Cash on delivery, anywhere in Bangladesh — pay only when the parcel reaches your hands.\n"
-            ."- 7 days to change your mind: unused, in its original packaging, and we will exchange or refund it.\n"
-            ."- Damaged, defective or wrong item? Message us within 3 days of delivery with a photo and we will make it right.\n"
-            ."- Refunds go out via bKash/Nagad or your original payment method within 7 working days.",
-
         // Printed thank-you card design (Appearance → Cards & print).
         // Sizes in mm unless noted; font scale is a % applied to the size-derived base.
         'card_font' => 'serif',
@@ -159,12 +147,14 @@ return [
         // Trust strip (editable in Appearance → Trust badges). Each: icon, title, text.
         // `icon` is a name from App\Support\StorefrontIcons — these used to be
         // emoji, which read bazaar rather than boutique on a fine-jewelry site.
+        // Bangla by the owner's call (2026-09-10): it converts better with this
+        // audience. The 7-day badge came off to keep the list short; the refund
+        // policy page still carries the 7-day window.
         'trust_badges' => [
-            ['icon' => 'cash', 'title' => 'Cash on Delivery', 'text' => 'Pay when it arrives'],
-            ['icon' => 'truck', 'title' => 'Fast Delivery Across Bangladesh', 'text' => ''],
-            ['icon' => 'tag', 'title' => 'Fair Pricing', 'text' => 'No 10x markups'],
-            ['icon' => 'shieldCheck', 'title' => 'Authentic Quality, Guaranteed', 'text' => ''],
-            ['icon' => 'calendar', 'title' => '7 Days to Change Your Mind', 'text' => ''],
+            ['icon' => 'cash', 'title' => 'ক্যাশ অন ডেলিভারি', 'text' => 'পণ্য হাতে পেয়ে টাকা দিন'],
+            ['icon' => 'truck', 'title' => 'সারা বাংলাদেশে দ্রুত ডেলিভারি', 'text' => ''],
+            ['icon' => 'tag', 'title' => 'ন্যায্য দাম', 'text' => 'কোনো বাড়তি মার্কআপ নেই'],
+            ['icon' => 'shieldCheck', 'title' => 'অথেনটিক কোয়ালিটি গ্যারান্টি', 'text' => 'প্রতিটি পিস হাতে চেক করে পাঠানো হয়'],
         ],
     ],
 
