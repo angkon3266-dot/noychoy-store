@@ -729,10 +729,11 @@ function StorySections({ sections }) {
 }
 
 function Description({ text }) {
-    // Open by default: a jewelry shopper wants the material, the stone and the
-    // measurements before they will hand cash to a courier. Hiding that behind
-    // a tap costs more than the vertical space it saves.
-    const [open, setOpen] = useState(true);
+    // Collapsed by default at the owner's call (2026-09-10): the descriptions
+    // run long, and on a phone they pushed the Details table, reviews and the
+    // bundle far below the fold. The copy stays in the DOM either way, so this
+    // is a tap to open, not content that has to be fetched.
+    const [open, setOpen] = useState(false);
     if (!text) return null;
     return (
         <section className="mt-12 max-w-3xl border-t border-ink-100 pt-8">
