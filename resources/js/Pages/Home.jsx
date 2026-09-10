@@ -27,7 +27,7 @@ export default function Home(props) {
             <CategoryLookbook section={categoriesSection} />
             {/* Per-visitor rows: what they told the gift finder, loved or looked
                 at. Both hide themselves until there is a real signal. */}
-            <CardSection section={pickedForYou} eyebrow="Just for you" viewAll="/shop" viewAllLabel="Browse everything" />
+            <CardSection section={pickedForYou} viewAll="/shop" viewAllLabel="Browse everything" bare />
             <Occasions section={occasions} />
             <Deals deals={deals} />
             <MembershipBand />
@@ -369,16 +369,19 @@ function DealsInner({ deals }) {
 }
 
 /* ── Product grid section (best sellers / new arrivals) ─────────────────── */
-function CardSection({ section, eyebrow, viewAll, viewAllLabel, tinted = false }) {
+// `bare` drops the eyebrow and title so the row is just products. The browse
+// link then shows at every width, because with no heading there is nowhere
+// else for it to live.
+function CardSection({ section, eyebrow, viewAll, viewAllLabel, tinted = false, bare = false }) {
     if (!section?.show || !section.cards?.length) return null;
     return (
         <section className={tinted ? 'bg-gold-50/60 py-16 lg:py-20' : 'py-16 lg:py-20'}>
             <div className="mx-auto max-w-7xl px-4">
-                <Heading eyebrow={eyebrow} title={section.title} action={<SmartLink href={viewAll} className={underlineLink}>{viewAllLabel}</SmartLink>} />
+                {!bare && <Heading eyebrow={eyebrow} title={section.title} action={<SmartLink href={viewAll} className={underlineLink}>{viewAllLabel}</SmartLink>} />}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-5 gap-y-10">
                     {section.cards.map((p) => <ProductCard key={p.id} product={p} />)}
                 </div>
-                <div className="mt-8 text-center sm:hidden">
+                <div className={`mt-8 text-center ${bare ? '' : 'sm:hidden'}`}>
                     <SmartLink href={viewAll} className="inline-flex items-center gap-2 rounded-full border border-ink-900/20 px-6 py-3 text-sm tracking-wide">{viewAllLabel} →</SmartLink>
                 </div>
             </div>

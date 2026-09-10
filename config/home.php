@@ -50,11 +50,15 @@ return [
         // Feature strip (4 reassurance items). Each: icon + title.
         // `icon` is a name from App\Support\StorefrontIcons; an emoji saved
         // before the picker existed still renders, it just looks like an emoji.
+        // Bangla by the owner's call (2026-09-10), same reasoning as the trust
+        // badges in config/theme.php: this audience converts better reading it
+        // in Bangla. This strip sits high on the homepage, so it is the first
+        // trust wording most shoppers see.
         'feature_strip' => [
-            ['icon' => 'truck', 'title' => 'Fastest Shipping Countrywide'],
-            ['icon' => 'check', 'title' => 'Easy Return Policy'],
-            ['icon' => 'diamond', 'title' => 'Premium Quality Product'],
-            ['icon' => 'chat', 'title' => 'Online Support 24/7'],
+            ['icon' => 'truck', 'title' => 'সারা দেশে দ্রুত ডেলিভারি'],
+            ['icon' => 'check', 'title' => 'সহজ রিটার্ন পলিসি'],
+            ['icon' => 'diamond', 'title' => 'প্রিমিয়াম কোয়ালিটি পণ্য'],
+            ['icon' => 'chat', 'title' => '২৪/৭ অনলাইন সাপোর্ট'],
         ],
 
         // Short reassurance line under the hero headline. These used to be
