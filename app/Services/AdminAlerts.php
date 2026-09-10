@@ -340,7 +340,9 @@ class AdminAlerts
                     'integration.courier.unbooked', 'orders', 'urgent',
                     $unbooked.' order(s) still have no courier consignment',
                     'They have been waiting over a day. Either the booking failed or nobody pressed send.',
-                    route('admin.orders.index').'?status=processing', now(),
+                    // Both statuses, because both are counted above — the link
+                    // used to show only the processing half of its own number.
+                    route('admin.orders.index').'?status=processing,booked', now(),
                 );
             }
 

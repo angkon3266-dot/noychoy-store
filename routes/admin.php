@@ -132,6 +132,7 @@ Route::middleware('admin')->group(function () {
     Route::post('orders/cards/messages', [OrderController::class, 'saveCardMessages'])->name('orders.cards.messages');
     Route::get('orders/card-templates', [OrderController::class, 'cardSettings'])->name('orders.card-templates');
     Route::post('orders/card-templates', [OrderController::class, 'saveCardSettings'])->name('orders.card-templates.save');
+    Route::post('orders/quick-filters', [OrderController::class, 'saveQuickFilters'])->name('orders.quick-filters');
     Route::post('orders/bulk-steadfast', [OrderController::class, 'bulkSteadfast'])->name('orders.bulk-steadfast');
     Route::post('orders/merge', [OrderController::class, 'merge'])->name('orders.merge');
     Route::post('orders/bulk-delete', [OrderController::class, 'bulkDelete'])->name('orders.bulk-delete');

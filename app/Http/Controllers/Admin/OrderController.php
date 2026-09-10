@@ -15,29 +15,71 @@ use App\Services\SmsService;
 use App\Services\SteadfastService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
+    /**
+     * How many statuses may be pinned as slicer pills.
+     *
+     * Three, because the pill row shares a line with the search box and the
+     * print buttons — a fourth wraps it onto two lines and the filter stops
+     * being the one-glance thing it exists to be. Everything not pinned is
+     * still one pick away in the dropdown beside it.
+     */
+    public const MAX_QUICK_FILTERS = 3;
+
     public function index(Request $request, SteadfastService $steadfast)
     {
         $trashed = $request->boolean('trashed');
+
+        // Normalised once, up front, because the default-status rule below reads
+        // it too. ?q[] hands back an array, which the LIKE binding would fatal
+        // on. The explicit !== '' tests below (rather than leaning on when()'s
+        // truthiness) are so a search for "0" still counts as a search — it
+        // matches every order here anyway, since phone numbers are normalised
+        // to a leading zero, but the rule should not quietly depend on that.
+        $term = $request->query('q');
+        $term = is_string($term) ? trim($term) : '';
+
+        // The status filter takes a SET, not a single value. The slicer pills
+        // can hand back several at once ("pending,processing") while the
+        // dropdown still hands back one key, and both land here. Unknown keys
+        // are dropped rather than passed to the query, so a stale bookmark
+        // naming a status that no longer exists falls back to the default
+        // below instead of rendering an empty table.
+        $requested = $request->query('status');
+        $requested = collect(is_array($requested) ? $requested : explode(',', (string) $requested))
+            // is_string, not a cast: ?status[][]=x hands back a nested array,
+            // and casting that to a string is a fatal, not a filter.
+            ->map(fn ($s) => is_string($s) ? trim($s) : null)
+            ->filter();
+        $wantsAll = $requested->contains('all');
+
+        $selected = $requested
+            ->filter(fn ($s) => isset(Order::STATUSES[$s]))
+            ->unique()
+            ->values();
 
         // This screen is a work queue, so it opens on the orders that still
         // need packing rather than on everything ever sold. "all" is the
         // explicit escape hatch — an empty value falls back to the default,
         // and a search has to look everywhere or it finds nothing.
-        $status = $request->query('status')
-            ?: (($trashed || filled($request->query('q'))) ? 'all' : 'processing');
-        $statusFilter = $status === 'all' ? null : $status;
+        if ($selected->isEmpty() && ! $wantsAll && ! $trashed && $term === '') {
+            $selected = collect(['processing']);
+        }
+
+        // Shared so the pill counts are scoped by the same search the table is.
+        $search = function ($q) use ($term) {
+            $q->where(fn ($w) => $w->where('order_number', 'like', "%{$term}%")
+                ->orWhere('customer_phone', 'like', "%{$term}%")
+                ->orWhere('customer_name', 'like', "%{$term}%"));
+        };
 
         $orders = Order::query()
             ->when($trashed, fn ($q) => $q->onlyTrashed())
-            ->when($statusFilter, fn ($q, $s) => $q->where('status', $s))
-            ->when($request->query('q'), function ($q, $term) {
-                $q->where(fn ($w) => $w->where('order_number', 'like', "%{$term}%")
-                    ->orWhere('customer_phone', 'like', "%{$term}%")
-                    ->orWhere('customer_name', 'like', "%{$term}%"));
-            })
+            ->when($selected->isNotEmpty(), fn ($q) => $q->whereIn('status', $selected->all()))
+            ->when($term !== '', $search)
             ->withCount('items')
             ->with('shipment')
             ->latest()
@@ -69,10 +111,46 @@ class OrderController extends Controller
         // the fetching.
         $bdCourier = app(BdCourierService::class);
 
+        // Per-status totals for the slicer pills. Scoped to the search box and
+        // the trash view, but deliberately NOT to the status filter itself —
+        // a pill has to keep showing its own total while another pill is the
+        // active one, or the row stops being a dashboard the moment you use it.
+        $statusCounts = Order::query()
+            ->when($trashed, fn ($q) => $q->onlyTrashed())
+            ->when($term !== '', $search)
+            // Aliased "tally", not "total": pluck() on an Eloquent builder runs
+            // the model's casts over the column it reads, and Order casts its
+            // own `total` to decimal:2 — which turned a count of 2 into "2.00"
+            // on the pill.
+            ->selectRaw('status, count(*) as tally')
+            ->groupBy('status')
+            ->pluck('tally', 'status');
+
+        // The statuses pinned to the list as one-click pills. Store-wide and
+        // editable from the pills themselves: the queue the owner lives in is
+        // not the same set of statuses every month, and changing it should not
+        // need a developer.
+        $pinned = Setting::get('admin_order_quick_filters', ['pending', 'processing', 'booked']);
+        $quickFilters = collect(is_array($pinned) ? $pinned : explode(',', is_scalar($pinned) ? (string) $pinned : ''))
+            ->map(fn ($s) => is_string($s) ? trim($s) : null)
+            ->filter(fn ($s) => $s !== null && isset(Order::STATUSES[$s]))
+            ->unique()
+            ->take(self::MAX_QUICK_FILTERS)
+            ->values();
+
         return view('admin.orders.index', [
             'orders' => $orders,
             'statuses' => Order::STATUSES,
-            'status' => $status,
+            // What the dropdown shows. It can only express one value, so a
+            // multi-pill selection reads as "all" there and the pills carry it.
+            'status' => $selected->count() === 1 ? $selected->first() : 'all',
+            'selectedStatuses' => $selected->all(),
+            'statusCounts' => $statusCounts,
+            // The sanitised term, so the search box and the pill links never
+            // have to touch the raw (possibly array) query value.
+            'search' => $term,
+            'quickFilters' => $quickFilters->all(),
+            'maxQuickFilters' => self::MAX_QUICK_FILTERS,
             'orderCounts' => $orderCounts,
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdHistory' => $bdCourier->isConfigured() ? $bdCourier->cachedMany($phones) : [],
@@ -85,6 +163,24 @@ class OrderController extends Controller
             // and this is the screen you book from.
             'courierBalance' => $steadfast->balance(),
         ]);
+    }
+
+    /**
+     * Choose which statuses sit on the orders list as one-click slicer pills.
+     *
+     * An empty submission is a valid answer — it means "no pills, just the
+     * dropdown" — so it is stored rather than falling back to the defaults.
+     */
+    public function saveQuickFilters(Request $request)
+    {
+        $data = $request->validate([
+            'statuses' => ['nullable', 'array', 'max:' . self::MAX_QUICK_FILTERS],
+            'statuses.*' => ['string', Rule::in(array_keys(Order::STATUSES))],
+        ]);
+
+        Setting::put('admin_order_quick_filters', array_values(array_unique($data['statuses'] ?? [])));
+
+        return back()->with('success', 'Quick filters updated.');
     }
 
     public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast)

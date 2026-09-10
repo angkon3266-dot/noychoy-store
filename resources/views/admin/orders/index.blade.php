@@ -41,14 +41,128 @@
         <a href="{{ route('admin.orders.create') }}" class="btn-primary py-2 text-sm inline-block">+ New order (phone / Messenger)</a>
     </div>
 
+    {{-- Status slicer.
+
+         The dropdown can only say one thing at a time, and the owner's day is
+         spent bouncing between the same two or three queues — so those get a
+         pill each, with a live count, one click away. "Multi" changes what a
+         click means: off, a pill REPLACES the filter (the dropdown's
+         behaviour); on, it ADDS to it, which is the only way to watch Pending
+         and Processing side by side. Which statuses get a pill is the owner's
+         call, editable right here. --}}
+    @php
+        // Carried through every pill so a filter click never silently drops
+        // the search term or bounces you out of Trash.
+        $base = array_filter([
+            'q' => $search,
+            'trashed' => $trashed ? 1 : null,
+        ], fn ($v) => filled($v));
+
+        // Anything currently filtered on gets a pill whether it is pinned or
+        // not. Without this, landing on the default Processing queue with
+        // Processing unpinned lit up no pill at all — the row said "All" was
+        // off and named nothing that was on.
+        $pillKeys = $quickFilters;
+        foreach ($selectedStatuses as $active) {
+            if (! in_array($active, $pillKeys, true)) {
+                $pillKeys[] = $active;
+            }
+        }
+
+        // Both destinations are worked out server-side so the pills stay plain
+        // links: the href is the single-select one, and Alpine swaps in the
+        // additive one only while "Multi" is on. Nothing here needs JS to work.
+        $pillHref = function (string $key) use ($base, $selectedStatuses) {
+            $toggled = in_array($key, $selectedStatuses, true)
+                ? array_values(array_diff($selectedStatuses, [$key]))
+                : [...$selectedStatuses, $key];
+
+            return [
+                'single' => route('admin.orders.index', $base + ['status' => $key]),
+                // Untoggling the last pill has to say "all" out loud — an empty
+                // status means "use the default", which would snap back to
+                // Processing instead of clearing.
+                'multi' => route('admin.orders.index', $base + ['status' => $toggled ? implode(',', $toggled) : 'all']),
+            ];
+        };
+        $pillOn = 'border-gold-600 bg-gold-600 text-white shadow-sm';
+        $pillOff = 'border-ink-200 bg-white text-ink-700 hover:border-gold-300 hover:bg-gold-50';
+        $multiSelected = count($selectedStatuses) > 1;
+    @endphp
+    <div class="mb-3 flex flex-wrap items-center gap-2"
+         {{-- Read in init(), inside a try: localStorage THROWS outright when site
+              data is blocked, and an x-data that throws leaves the component
+              dead — which is the one state where the pills must still work. --}}
+         x-data="{ multi: false, init() { try { this.multi = localStorage.getItem('orderStatusMulti') === '1' } catch (e) {} } }">
+
+        @php $allOn = $selectedStatuses === []; @endphp
+        <a href="{{ route('admin.orders.index', $base + ['status' => 'all']) }}"
+           class="rounded-full border px-3.5 py-1.5 text-sm font-medium transition {{ $allOn ? $pillOn : $pillOff }}">
+            All <span class="{{ $allOn ? 'text-white/80' : 'text-ink-700/60' }}">{{ $statusCounts->sum() }}</span>
+        </a>
+
+        @foreach($pillKeys as $key)
+            @php $on = in_array($key, $selectedStatuses, true); $href = $pillHref($key); @endphp
+            <a href="{{ $href['single'] }}" :href="multi ? @js($href['multi']) : @js($href['single'])"
+               class="rounded-full border px-3.5 py-1.5 text-sm font-medium transition {{ $on ? $pillOn : $pillOff }}">
+                {{ $statuses[$key] }}
+                <span class="{{ $on ? 'text-white/80' : 'text-ink-700/60' }}">{{ $statusCounts[$key] ?? 0 }}</span>
+            </a>
+        @endforeach
+
+        <label class="ml-1 inline-flex cursor-pointer select-none items-center gap-1.5 text-xs text-ink-700/60"
+               title="Off: a pill replaces the filter. On: pills add up, so you can watch Pending and Processing together.">
+            <input type="checkbox" x-model="multi"
+                   @change="try { localStorage.setItem('orderStatusMulti', multi ? '1' : '0') } catch (e) {}"
+                   class="rounded border-ink-300">
+            Multi
+        </label>
+
+        <div class="relative" x-data="{ open: false, max: {{ $maxQuickFilters }}, picked: @js($quickFilters) }">
+            <button type="button" @click="open = ! open"
+                    class="text-xs text-ink-700/45 hover:text-gold-700 hover:underline"
+                    title="Choose which statuses appear as pills">✎ Edit pills</button>
+            <div x-show="open" x-cloak @click.outside="open = false"
+                 class="absolute left-0 top-full z-30 mt-2 w-60 rounded-lg border border-ink-200 bg-white p-3 shadow-lg">
+                <p class="mb-2 text-xs text-ink-700/60">Pin up to {{ $maxQuickFilters }} statuses as pills.</p>
+                <form action="{{ route('admin.orders.quick-filters') }}" method="POST">
+                    @csrf
+                    {{-- Held at the cap in the browser as well as on the server:
+                         the server rejects a fourth, but bouncing the owner off
+                         to a validation error to say so is a worse answer than
+                         greying the box out. --}}
+                    @foreach($statuses as $key => $label)
+                        <label class="flex items-center gap-2 py-1 text-sm"
+                               :class="picked.length >= max && ! picked.includes('{{ $key }}') ? 'opacity-40' : ''">
+                            <input type="checkbox" name="statuses[]" value="{{ $key }}" x-model="picked"
+                                   :disabled="picked.length >= max && ! picked.includes('{{ $key }}')"
+                                   class="rounded border-ink-300">
+                            {{ $label }}
+                        </label>
+                    @endforeach
+                    <button class="btn-primary mt-3 w-full py-1.5 text-xs">Save pills</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <form method="GET" class="flex flex-wrap gap-2 mb-4">
-        <input name="q" value="{{ request('q') }}" placeholder="Order #, name or phone…" class="input py-2 w-64">
+        {{-- Without this, searching or changing the status from inside Trash
+             dropped ?trashed and dumped you back into the live list. --}}
+        @if($trashed)<input type="hidden" name="trashed" value="1">@endif
+        <input name="q" value="{{ $search }}" placeholder="Order #, name or phone…" class="input py-2 w-64">
         <select name="status" onchange="submitForm(this.form)" class="input py-2">
+            @if($multiSelected)
+                {{-- The pills can express a set this dropdown cannot. Say so,
+                     rather than letting it read "All statuses" while the table
+                     is showing two. --}}
+                <option value="{{ implode(',', $selectedStatuses) }}" selected>{{ count($selectedStatuses) }} statuses selected</option>
+            @endif
             {{-- "all" is spelled out because an empty value means "use the
                  default", which is Processing — the day's packing queue. --}}
-            <option value="all" @selected($status==='all')>All statuses</option>
+            <option value="all" @selected(! $multiSelected && $status==='all')>All statuses</option>
             @foreach($statuses as $key => $label)
-                <option value="{{ $key }}" @selected($status===$key)>{{ $label }}</option>
+                <option value="{{ $key }}" @selected(! $multiSelected && $status===$key)>{{ $label }}</option>
             @endforeach
         </select>
         <button class="btn-outline">Search</button>
