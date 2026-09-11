@@ -17,10 +17,15 @@ const PARTIAL = {
     preserveScroll: true,
     only: ['products', 'filters', 'sort', 'title', 'pageTitle', 'seoTitle'],
 };
+// How many colour chips stand on the strip before the rest fold away. Five is
+// what fits one line on a phone without the row becoming a scrollbar.
+const COLOURS_ON_SHOW = 5;
+
 export default function Catalog({ title, description = null, products, filters, sort, searchQuery, noResults = null }) {
     const { props, url } = usePage();
     const urls = props.chrome?.urls || {};
     const [showFilters, setShowFilters] = useState(false);
+    const [allColours, setAllColours] = useState(false);
 
     // Search event for Meta Pixel (matches the Blade @push('meta-events')).
     useEffect(() => {
@@ -32,8 +37,24 @@ export default function Catalog({ title, description = null, products, filters, 
         return params;
     }, [url]);   // re-read after every navigation, including filter toggles
 
-    const hasActiveFilters = ['attr', 'cf', 'tags', 'price_range', 'price_min', 'price_max', 'in_stock', 'on_sale', 'category']
+    // `colors` belongs here too: without it, picking a colour and nothing else
+    // left no way back — "Clear all" never appeared.
+    const hasActiveFilters = ['attr', 'cf', 'tags', 'colors', 'price_range', 'price_min', 'price_max', 'in_stock', 'on_sale', 'category']
         .some((k) => [...query.keys()].some((key) => key === k || key.startsWith(k + '[')));
+
+    // The colour group is lifted out of the sidebar and shown as a strip of
+    // chips above the grid — one tap, no checkbox, no scrolling past Category.
+    const colours = filters.find((g) => g.param === 'colors[]') || null;
+    const sidebarGroups = filters.filter((g) => g.param !== 'colors[]');
+
+    // Top five, plus any chosen colour that would otherwise be hidden — a
+    // filter you cannot see is a filter you cannot switch off.
+    const visibleColours = colours
+        ? (allColours
+            ? colours.options
+            : colours.options.filter((o, i) => i < COLOURS_ON_SHOW || o.checked))
+        : [];
+    const hiddenColourCount = colours ? colours.options.length - visibleColours.length : 0;
 
     /** Rebuild the querystring from the checked boxes and navigate. */
     const applyFilters = (param, value, checked) => {
@@ -81,7 +102,7 @@ export default function Catalog({ title, description = null, products, filters, 
                             )}
                         </div>
 
-                        {filters.length ? filters.map((group) => (
+                        {sidebarGroups.length ? sidebarGroups.map((group) => (
                             <div key={group.label} className="border-t border-ink-100 py-3">
                                 <h3 className="text-xs uppercase tracking-wide text-ink-700/70 mb-2">
                                     {group.label}
@@ -116,6 +137,50 @@ export default function Catalog({ title, description = null, products, filters, 
 
                 {/* Products */}
                 <div>
+                    {/* Colour slicer — the one facet people actually shop by, so
+                        it sits on top of the grid as chips rather than inside
+                        the sidebar behind a checkbox. */}
+                    {colours && (
+                        <div className="mb-4 pb-4 border-b border-ink-100" role="group" aria-label="Filter by colour">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {visibleColours.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        aria-pressed={opt.checked}
+                                        onClick={() => applyFilters(colours.param, opt.value, !opt.checked)}
+                                        className={`inline-flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-sm transition ${
+                                            opt.checked
+                                                ? 'border-gold-500 bg-gold-100 text-ink-900 font-medium'
+                                                : 'border-ink-200 hover:border-gold-300 hover:bg-gold-50'
+                                        }`}
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            className="w-5 h-5 rounded-full border border-ink-200 shrink-0"
+                                            style={opt.hex === 'multi'
+                                                ? { background: 'conic-gradient(red,orange,yellow,green,blue,violet,red)' }
+                                                : { background: opt.hex || '#e5e0d8' }}
+                                        />
+                                        <span>{opt.label}</span>
+                                        <span className="text-[11px] text-ink-700/50">{opt.count}</span>
+                                    </button>
+                                ))}
+
+                                {hiddenColourCount > 0 && (
+                                    <button type="button" onClick={() => setAllColours(true)} className="text-sm text-gold-700 hover:underline px-1">
+                                        +{hiddenColourCount} more
+                                    </button>
+                                )}
+                                {allColours && colours.options.length > COLOURS_ON_SHOW && (
+                                    <button type="button" onClick={() => setAllColours(false)} className="text-sm text-gold-700 hover:underline px-1">
+                                        Show less
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex flex-wrap items-center justify-end gap-2 mb-4">
                         <select value={sort} onChange={(e) => applySort(e.target.value)} aria-label="Sort products" className="input py-2 w-auto">
                             <option value="new">Newest</option>

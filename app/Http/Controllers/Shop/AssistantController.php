@@ -4,16 +4,18 @@ namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
 use App\Services\Ai\AssistantService;
+use App\Services\Ai\ConversationLog;
 use Illuminate\Http\Request;
 
 /**
  * The chat widget's one endpoint. The browser keeps the transcript and sends
- * the recent turns each time; nothing is stored server-side, and nothing the
- * customer types is logged.
+ * the recent turns each time; the server now also appends each exchange to
+ * assistant_conversations, so the store can read the questions people ask
+ * (Admin → Chat history). The widget's own `cid` groups the turns.
  */
 class AssistantController extends Controller
 {
-    public function chat(Request $request, AssistantService $assistant)
+    public function chat(Request $request, AssistantService $assistant, ConversationLog $log)
     {
         $data = $request->validate([
             'messages' => ['required', 'array', 'min:1', 'max:'.AssistantService::MAX_TURNS],
@@ -22,6 +24,7 @@ class AssistantController extends Controller
             // long; only the customer's new message is held to MAX_CHARS below.
             'messages.*.content' => ['required', 'string', 'max:'.AssistantService::MAX_TRANSCRIPT_CHARS],
             'page' => ['nullable', 'string', 'max:200'],
+            'cid' => ['nullable', 'string', 'max:64'],
         ]);
 
         $messages = array_values(array_map(
@@ -42,6 +45,10 @@ class AssistantController extends Controller
         }
 
         $result = $assistant->reply($messages, $data['page'] ?? null);
+
+        // Written after the reply, so a slow or failing model never costs the
+        // customer a round trip. record() cannot throw.
+        $log->record($request, (string) ($data['cid'] ?? ''), $last['content'], $result);
 
         return response()->json([
             'ok' => $result['ok'],

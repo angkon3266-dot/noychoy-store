@@ -88,7 +88,7 @@
         <div class="card overflow-hidden"
              x-data="orderAmend({
                 items: {{ Illuminate\Support\Js::from($order->items->map(fn($i) => ['id'=>$i->id,'name'=>$i->name,'price'=>(float)$i->price,'quantity'=>(int)$i->quantity])) }},
-                catalogue: {{ Illuminate\Support\Js::from($catalogue) }},
+                searchUrl: {{ Illuminate\Support\Js::from(route('admin.orders.product-search')) }},
                 newLines: [],
                 shipping: {{ (float) $order->shipping_cost }},
                 discount: {{ (float) $order->discount }},
@@ -175,33 +175,96 @@
                 </template>
 
                 {{-- Products being added. "She rang back and wanted the matching
-                     earrings too" had no answer here before. --}}
+                     earrings too" had no answer here before; neither did a
+                     variable product, which the old picker left out entirely. --}}
                 <template x-for="(line, i) in newLines" :key="'n' + i">
-                    <div class="grid grid-cols-12 gap-2 items-center">
-                        <div class="col-span-6">
-                            <select :name="`new_lines[${i}][product_id]`" x-model.number="line.product_id" class="input py-1 text-sm" required>
-                                <option value="">Choose a product…</option>
-                                <template x-for="p in catalogue" :key="p.id">
-                                    <option :value="p.id" x-text="p.name"></option>
-                                </template>
-                            </select>
-                        </div>
-                        <div class="col-span-3">
-                            <label class="label text-[10px]">Unit price ৳</label>
-                            <input type="number" step="0.01" min="0" :name="`new_lines[${i}][price]`" x-model.number="line.price"
-                                   :placeholder="catalogPrice(line)" class="input py-1 text-sm">
-                        </div>
-                        <div class="col-span-2">
-                            <label class="label text-[10px]">Qty</label>
-                            <input type="number" min="1" :name="`new_lines[${i}][qty]`" x-model.number="line.qty" class="input py-1 text-sm">
-                        </div>
-                        <div class="col-span-1 text-right">
-                            <button type="button" @click="newLines.splice(i, 1)" class="text-red-600 text-xs hover:underline" aria-label="Remove">✕</button>
+                    <div class="rounded-lg border border-ink-100 p-2.5">
+                        <div class="grid grid-cols-12 gap-2 items-start">
+                            <div class="col-span-6">
+                                {{-- Nothing picked yet: search. --}}
+                                <div x-show="!line.product" class="relative">
+                                    <input type="text" :value="query[i] || ''"
+                                           @input="search(i, $event.target.value)"
+                                           placeholder="Search by name, SKU or product ID…"
+                                           autocomplete="off"
+                                           class="input py-1 text-sm">
+                                    <p class="mt-1 text-[11px] text-ink-700/50" x-show="searching[i]">Searching…</p>
+                                    <p class="mt-1 text-[11px] text-ink-700/50"
+                                       x-show="!searching[i] && (query[i] || '').trim().length >= 2 && (results[i] || []).length === 0">
+                                        Nothing matched.
+                                    </p>
+
+                                    <ul x-show="(results[i] || []).length" x-cloak
+                                        class="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-ink-200 bg-white shadow-lg">
+                                        <template x-for="p in (results[i] || [])" :key="p.id">
+                                            <li>
+                                                <button type="button" @click="choose(i, p)"
+                                                        class="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-gold-50">
+                                                    <img :src="p.thumbnail" x-show="p.thumbnail" alt=""
+                                                         class="h-8 w-8 rounded object-cover shrink-0">
+                                                    <span class="min-w-0 flex-1">
+                                                        <span class="block text-sm truncate" x-text="p.name"></span>
+                                                        <span class="block text-[11px] text-ink-700/50">
+                                                            <span x-text="'#' + p.serial"></span>
+                                                            <template x-if="p.sku"><span x-text="' · ' + p.sku"></span></template>
+                                                            <template x-if="p.variants.length">
+                                                                <span x-text="' · ' + p.variants.length + ' option' + (p.variants.length === 1 ? '' : 's')"></span>
+                                                            </template>
+                                                        </span>
+                                                    </span>
+                                                    <span class="text-xs shrink-0" x-text="money(p.price)"></span>
+                                                </button>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+
+                                {{-- Picked. --}}
+                                <div x-show="line.product" x-cloak>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-sm" x-text="line.product?.name"></span>
+                                        <button type="button" @click="clearChoice(i)"
+                                                class="text-[11px] text-gold-700 hover:underline">change</button>
+                                    </div>
+                                    <input type="hidden" :name="`new_lines[${i}][product_id]`" :value="line.product?.id">
+
+                                    {{-- A variable product is only half-chosen until
+                                         the option is too. --}}
+                                    <template x-if="line.product?.variants?.length">
+                                        <div class="mt-1.5">
+                                            <select :name="`new_lines[${i}][variant_id]`" x-model="line.variant_id"
+                                                    class="input py-1 text-sm"
+                                                    :class="needsVariant(line) ? 'border-red-400' : ''">
+                                                <option value="">Choose the option…</option>
+                                                <template x-for="v in line.product.variants" :key="v.id">
+                                                    <option :value="v.id"
+                                                            x-text="v.label + ' · ' + money(v.price) + (v.stock > 0 ? ' · ' + v.stock + ' left' : ' · out of stock')"></option>
+                                                </template>
+                                            </select>
+                                            <p class="mt-1 text-[11px] text-red-600" x-show="needsVariant(line)">
+                                                Pick which one before saving.
+                                            </p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="col-span-3">
+                                <label class="label text-[10px]">Unit price ৳</label>
+                                <input type="number" step="0.01" min="0" :name="`new_lines[${i}][price]`" x-model.number="line.price"
+                                       :placeholder="catalogPrice(line)" class="input py-1 text-sm">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="label text-[10px]">Qty</label>
+                                <input type="number" min="1" :name="`new_lines[${i}][qty]`" x-model.number="line.qty" class="input py-1 text-sm">
+                            </div>
+                            <div class="col-span-1 text-right pt-4">
+                                <button type="button" @click="newLines.splice(i, 1)" class="text-red-600 text-xs hover:underline" aria-label="Remove">✕</button>
+                            </div>
                         </div>
                     </div>
                 </template>
 
-                <button type="button" @click="newLines.push({ product_id: '', qty: 1, price: '' })"
+                <button type="button" @click="newLines.push({ product: null, variant_id: '', qty: 1, price: '' })"
                         class="text-xs text-gold-700 hover:underline">+ Add a product</button>
 
                 <div class="border-t border-ink-100 pt-3 space-y-2">
@@ -229,7 +292,11 @@
                     <div class="flex justify-between"><span>Shipping</span><span x-text="money(shipping)"></span></div>
                     <div class="flex justify-between font-semibold text-sm border-t border-ink-200 pt-1"><span>New total</span><span x-text="money(total())"></span></div>
                 </div>
-                <button class="btn-primary w-full">Save amended amounts</button>
+                {{-- A half-picked line would post a variable product with no
+                     option, taking stock off the parent and losing which one
+                     she actually bought. --}}
+                <button class="btn-primary w-full" :disabled="incomplete()"
+                        x-text="incomplete() ? 'Finish the added line first' : 'Save amended amounts'"></button>
             </form>
         </div>
 

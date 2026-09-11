@@ -93,4 +93,70 @@ class AdminOrderAlertTest extends TestCase
 
         $this->assertSame([$shopper->id], $ids);
     }
+
+    /**
+     * A browser has ONE push endpoint. The owner browses her own shop, so the
+     * row registered as her staff device is the same row the storefront's
+     * "turn off notifications" pointed at — and deleting it stopped every
+     * new-order alert with nothing on screen to say why.
+     */
+    public function test_the_storefront_cannot_unsubscribe_a_staff_device(): void
+    {
+        $staff = $this->subscription('admin');
+
+        $this->postJson('/push/unsubscribe', ['endpoint' => $staff->endpoint])->assertOk();
+
+        $this->assertNotNull($staff->fresh(), 'the staff device was deleted by the shop-side opt-out');
+        $this->assertSame(1, PushSubscription::admins()->count());
+    }
+
+    public function test_a_shopper_can_still_unsubscribe_their_own_device(): void
+    {
+        $shopper = $this->subscription('customer');
+
+        $this->postJson('/push/unsubscribe', ['endpoint' => $shopper->endpoint])->assertOk();
+
+        $this->assertNull($shopper->fresh());
+    }
+
+    // ── What happened to the last alert ──────────────────────────────────────
+
+    public function test_a_sent_alert_is_recorded_so_the_owner_can_see_it_went(): void
+    {
+        Queue::fake();
+        $this->subscription('admin');
+
+        app(NotificationService::class)->alertAdminsNewOrder($this->order());
+
+        $last = Setting::get('admin_order_alert_last');
+        $this->assertSame('20001', $last['order_number']);
+        $this->assertSame(1, $last['devices']);
+        $this->assertNull($last['skipped']);
+    }
+
+    public function test_an_alert_that_went_nowhere_records_why(): void
+    {
+        Queue::fake();
+        // Push is ready and alerts are on, but nobody subscribed — the single
+        // most common reason "I'm not getting alerts", and previously invisible.
+        app(NotificationService::class)->alertAdminsNewOrder($this->order());
+
+        $last = Setting::get('admin_order_alert_last');
+        $this->assertSame(0, $last['devices']);
+        $this->assertSame('no staff device is subscribed', $last['skipped']);
+    }
+
+    public function test_a_paused_alert_says_it_was_paused(): void
+    {
+        Queue::fake();
+        $this->subscription('admin');
+        Setting::put('admin_order_alerts', false);
+
+        app(NotificationService::class)->alertAdminsNewOrder($this->order());
+
+        $this->assertSame(
+            'alerts are switched off store-wide',
+            Setting::get('admin_order_alert_last')['skipped'],
+        );
+    }
 }

@@ -248,10 +248,8 @@ class OrderController extends Controller
             'balance' => $steadfast->balance(),
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
-            // For the "add a product" picker on the amend form.
-            'catalogue' => \App\Models\Product::where('status', 'published')
-                ->where('has_variants', false)
-                ->orderBy('name')->get(['id', 'name', 'price']),
+            // The amend form's "add a product" box searches (admin.orders.product-search)
+            // instead of carrying the whole catalogue in the page.
         ]);
     }
 
@@ -277,6 +275,7 @@ class OrderController extends Controller
             // Products being added to an existing order.
             'new_lines' => ['nullable', 'array', 'max:20'],
             'new_lines.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'new_lines.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'new_lines.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
             'new_lines.*.price' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -286,6 +285,16 @@ class OrderController extends Controller
         // malformed request — but an order with no items is not an order.
         if (empty($data['items'] ?? []) && empty($data['new_lines'] ?? [])) {
             return back()->with('error', 'An order must keep at least one item.');
+        }
+
+        // A variable product without its variation is not a line anybody can
+        // pack: the browser disables the button, but the request is the thing
+        // that has to be true.
+        foreach ($data['new_lines'] ?? [] as $line) {
+            $product = \App\Models\Product::find($line['product_id']);
+            if ($product && $product->variants()->where('is_active', true)->exists() && empty($line['variant_id'])) {
+                return back()->with('error', $product->name.' has options — choose which one before saving.');
+            }
         }
 
         DB::transaction(function () use ($order, $data) {
@@ -351,16 +360,29 @@ class OrderController extends Controller
                     continue;
                 }
 
+                // A variation must belong to the product it was picked under —
+                // the id arrives from the browser, so a mismatched pair would
+                // otherwise take stock off the wrong shelf.
+                $variant = null;
+                if (! empty($line['variant_id'])) {
+                    $variant = \App\Models\ProductVariant::whereKey($line['variant_id'])
+                        ->where('product_id', $product->id)
+                        ->lockForUpdate()->first();
+                }
+
                 $qty = (int) $line['qty'];
                 $price = ($line['price'] ?? null) !== null && $line['price'] !== ''
                     ? round((float) $line['price'], 2)
-                    : (float) $product->price;
+                    : (float) ($variant?->effective_price ?? $product->price);
 
                 $new = $order->items()->create([
                     'product_id' => $product->id,
-                    'variant_id' => null,
+                    'variant_id' => $variant?->id,
                     'name' => $product->name,
-                    'sku' => $product->sku,
+                    'sku' => $variant?->sku ?: $product->sku,
+                    // Shown beside the line name on the order, printed on the
+                    // packing list, and the only record of which one she bought.
+                    'attributes' => $variant?->attributes ?: null,
                     'price' => $price,
                     'cost_price' => $product->cost_price,
                     'transport_cost' => $product->transport_cost,
@@ -372,7 +394,7 @@ class OrderController extends Controller
                     $this->moveStock($new, -$qty);
                 }
 
-                $changes[] = 'added '.$product->name.' ×'.$qty;
+                $changes[] = 'added '.$product->name.($variant ? ' ('.$variant->label.')' : '').' ×'.$qty;
                 $subtotal += $new->subtotal;
             }
 
@@ -403,6 +425,63 @@ class OrderController extends Controller
         });
 
         return back()->with('success', 'Order updated.');
+    }
+
+    /**
+     * Typeahead for the amend form's "add a product" box.
+     *
+     * The picker used to be a <select> holding every published product, which
+     * meant scrolling 110 options to find one — and it silently excluded every
+     * variable product, so "she also wants the ring in size 8" had no answer
+     * here at all. Variants travel with each result so the option is picked in
+     * the same breath as the product.
+     */
+    public function productSearch(Request $request)
+    {
+        $q = trim((string) $request->query('q'));
+
+        // Two characters of text, or a single digit — product #7 is a real
+        // product, and requiring "07" to find it would be a riddle.
+        if ($q === '' || (mb_strlen($q) < 2 && ! ctype_digit($q))) {
+            return response()->json(['results' => []]);
+        }
+
+        $products = \App\Models\Product::query()
+            ->where('status', 'published')
+            ->with(['variants' => fn ($v) => $v->where('is_active', true)->orderBy('id'), 'primaryImage', 'images'])
+            // Digits alone are almost always the owner reading a product ID off
+            // a packing slip, so match the serial exactly as well as the text.
+            ->where(function ($w) use ($q) {
+                $w->where('name', 'like', '%'.$q.'%')
+                  ->orWhere('sku', 'like', '%'.$q.'%');
+                if (ctype_digit($q)) {
+                    $w->orWhere('serial', (int) $q);
+                }
+            })
+            ->orderByRaw('CASE WHEN name LIKE ? THEN 0 ELSE 1 END', [$q.'%'])
+            ->orderBy('name')
+            ->limit(12)
+            ->get();
+
+        return response()->json([
+            'results' => $products->map(fn ($p) => [
+                'id' => $p->id,
+                'serial' => $p->serial,
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'price' => (float) $p->price,
+                'thumbnail' => $p->thumbnail,
+                'stock' => $p->manage_stock ? (int) $p->stock_quantity : null,
+                'has_variants' => (bool) $p->has_variants,
+                'variants' => $p->variants->map(fn ($v) => [
+                    'id' => $v->id,
+                    'label' => $v->label ?: ('Variant #'.$v->id),
+                    'sku' => $v->sku,
+                    'price' => (float) $v->effective_price,
+                    'stock' => (int) $v->stock_quantity,
+                ])->values(),
+            ])->values(),
+        ]);
     }
 
     /**

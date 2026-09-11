@@ -61,7 +61,13 @@ class PushController extends Controller
     {
         $endpoint = (string) $request->input('endpoint');
         if ($endpoint !== '') {
-            PushSubscription::where('endpoint_hash', PushSubscription::hashFor($endpoint))->delete();
+            // ->customers() matters: a browser has ONE push endpoint, so when
+            // the owner used her own store this row was the same row her staff
+            // device was registered as. Turning off shop notifications here
+            // deleted it, and new-order alerts stopped with no sign of why.
+            // Staff devices are turned off from the admin, not from here.
+            PushSubscription::customers()
+                ->where('endpoint_hash', PushSubscription::hashFor($endpoint))->delete();
         }
 
         return response()->json(['ok' => true]);

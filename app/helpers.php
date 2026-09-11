@@ -484,6 +484,8 @@ if (! function_exists('color_hex')) {
             'yellow' => '#facc15', 'mustard' => '#d4a017', 'gold' => '#b6863a',
             'orange' => '#f97316', 'pastel orange' => '#fdba74', 'biscuit' => '#e3c79a', 'beige' => '#e3d5b8', 'cream' => '#f5edda',
             'pink' => '#ec4899', 'purple' => '#7e22ce', 'plum' => '#7e22ce', 'brown' => '#8b5e3c', 'tan' => '#d2b48c',
+            // In use on this catalogue and previously drawing a blank swatch.
+            'turquoise' => '#30b8ad', 'rose' => '#e8828f', 'magenta' => '#c026d3',
             'grey' => '#9ca3af', 'gray' => '#9ca3af', 'silver' => '#c0c0c0', 'charcoal' => '#36454f',
         ];
         if (isset($map[$key])) {

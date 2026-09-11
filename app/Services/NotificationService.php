@@ -157,17 +157,17 @@ class NotificationService
     public function alertAdminsNewOrder(\App\Models\Order $order): int
     {
         if (! \App\Models\Setting::get('admin_order_alerts', true)) {
-            return 0;
+            return $this->recordAlertOutcome($order, 0, 'alerts are switched off store-wide');
         }
 
         $push = app(\App\Services\WebPushService::class);
         if (! $push->ready()) {
-            return 0;
+            return $this->recordAlertOutcome($order, 0, 'web push is off or has no VAPID keys');
         }
 
         $ids = \App\Models\PushSubscription::admins()->pluck('id');
         if ($ids->isEmpty()) {
-            return 0;
+            return $this->recordAlertOutcome($order, 0, 'no staff device is subscribed');
         }
 
         $items = $order->items->sum('quantity');
@@ -185,7 +185,32 @@ class NotificationService
             'tag' => 'order-'.$order->id,
         ]);
 
-        return $ids->count();
+        return $this->recordAlertOutcome($order, $ids->count(), null);
+    }
+
+    /**
+     * Remember what happened to the last new-order alert.
+     *
+     * "I'm not getting alerts" was unanswerable before: the alert left no trace
+     * anywhere, so there was no way to tell a push that was never sent from one
+     * that was sent to a device the owner wasn't looking at. Admin → Orders
+     * reads this back.
+     */
+    protected function recordAlertOutcome(\App\Models\Order $order, int $devices, ?string $skipped): int
+    {
+        try {
+            \App\Models\Setting::put('admin_order_alert_last', [
+                'order_number' => (string) $order->order_number,
+                'order_id' => $order->id,
+                'at' => now()->toIso8601String(),
+                'devices' => $devices,
+                'skipped' => $skipped,
+            ]);
+        } catch (\Throwable $e) {
+            // Bookkeeping must never cost the shop an order alert.
+        }
+
+        return $devices;
     }
 
     /** Push directly to a set of subscription IDs (e.g. stock-watch list). */

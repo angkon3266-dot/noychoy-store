@@ -7,6 +7,10 @@
     $vapid = \App\Models\Setting::get('webpush_public_key');
     $pushReady = (bool) \App\Models\Setting::get('webpush_enabled', false) && filled($vapid);
     $devices = \App\Models\PushSubscription::admins()->latest('last_used_at')->get();
+    // What became of the most recent order's alert — see
+    // NotificationService::recordAlertOutcome().
+    $lastAlert = \App\Models\Setting::get('admin_order_alert_last');
+    $lastAlert = is_array($lastAlert) ? $lastAlert : null;
 @endphp
 
 <div class="card p-5" x-data="adminOrderAlerts({{ Js::from($vapid) }}, {{ $pushReady ? 'true' : 'false' }})" x-cloak>
@@ -64,6 +68,31 @@
         </p>
     @endunless
 
+    {{-- What happened to the last order's alert. Without this, "I'm not getting
+         alerts" cannot be told apart from "the alert went to a device I wasn't
+         looking at" — which is what it usually is. --}}
+    @if($lastAlert)
+        <div class="mt-4 pt-3 border-t border-ink-100 text-xs">
+            @if(($lastAlert['devices'] ?? 0) > 0)
+                <p class="text-green-700">
+                    <strong>Last alert sent</strong> — order {{ $lastAlert['order_number'] ?? '?' }},
+                    {{ \Illuminate\Support\Carbon::parse($lastAlert['at'])->format('d M, g:i a') }},
+                    to {{ $lastAlert['devices'] }} device(s).
+                </p>
+                <p class="text-ink-700/55 mt-0.5">
+                    Only the devices listed below get them. If your phone is not on that list, open this page on
+                    your phone and turn alerts on there too.
+                </p>
+            @else
+                <p class="text-amber-700">
+                    <strong>No alert was sent</strong> for order {{ $lastAlert['order_number'] ?? '?' }}
+                    ({{ \Illuminate\Support\Carbon::parse($lastAlert['at'])->format('d M, g:i a') }})
+                    — {{ $lastAlert['skipped'] ?? 'reason not recorded' }}.
+                </p>
+            @endif
+        </div>
+    @endif
+
     @if($devices->isNotEmpty())
         <div class="mt-4 pt-3 border-t border-ink-100">
             <p class="text-xs text-ink-700/60 mb-2">{{ $devices->count() }} device(s) receiving alerts:</p>
@@ -71,10 +100,21 @@
                 @foreach($devices as $d)
                     <li class="flex justify-between gap-3">
                         <span>{{ $d->label ?: 'Device' }}{{ $d->user?->name ? ' · '.$d->user->name : '' }}</span>
-                        <span class="text-ink-700/45">{{ $d->last_used_at?->diffForHumans() ?? 'never used' }}</span>
+                        {{-- last_used_at only moves on a 2xx from the push
+                             service, so this is delivery, not dispatch. --}}
+                        <span class="text-ink-700/45">
+                            {{ $d->last_used_at ? 'delivered '.$d->last_used_at->diffForHumans() : 'nothing delivered yet' }}
+                        </span>
                     </li>
                 @endforeach
             </ul>
+        </div>
+    @elseif($pushReady)
+        <div class="mt-4 pt-3 border-t border-ink-100">
+            <p class="text-xs text-amber-700">
+                No device is subscribed, so no order alert can arrive anywhere. Press
+                <strong>Turn on alerts here</strong> above — once per device you want alerted, phone included.
+            </p>
         </div>
     @endif
 </div>

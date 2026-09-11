@@ -3,8 +3,10 @@
     Inertia shell and layouts/shop) as a self-mounting island outside #app,
     so it survives Inertia navigations and works on Blade landing pages alike.
     The launcher button lives in the floating stacks; this exposes
-    window.NoyChat.{open,close,toggle} for it. Transcript stays in
-    sessionStorage — nothing is persisted server-side.
+    window.NoyChat.{open,close,toggle} for it. The transcript the widget
+    replays lives in sessionStorage; the server keeps its own copy of each
+    exchange so the store can read what people ask (Admin → Chat history),
+    grouped by the per-session `cid` sent below.
 --}}
 @php
     $assistant = app(\App\Services\Ai\AssistantService::class);
@@ -113,12 +115,27 @@
     var input = root.querySelector('[data-noy-input]');
     var send = root.querySelector('[data-noy-send]');
     var KEY = 'noychat.v1';
+    var CID_KEY = 'noychat.cid';
     var MAX_TURNS = {{ \App\Services\Ai\AssistantService::MAX_TURNS }};
     var msgs = [];
     var busy = false;
 
     try { msgs = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (e) { msgs = []; }
     if (!Array.isArray(msgs)) msgs = [];
+
+    // One id per chat session, so the server can keep a conversation whole
+    // even though only the last few turns are ever sent. Not an identifier for
+    // the person — it dies with the tab, like the transcript it groups.
+    var cid = '';
+    try {
+        cid = sessionStorage.getItem(CID_KEY) || '';
+        if (!cid) {
+            cid = (Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+            sessionStorage.setItem(CID_KEY, cid);
+        }
+    } catch (e) {
+        cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    }
 
     function save() { try { sessionStorage.setItem(KEY, JSON.stringify(msgs.slice(-40))); } catch (e) {} }
     function csrf() {
@@ -221,7 +238,7 @@
             var res = await fetch(cfg.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' },
-                body: JSON.stringify({ messages: payload, page: location.pathname }),
+                body: JSON.stringify({ messages: payload, page: location.pathname, cid: cid }),
             });
             var data = null;
             try { data = await res.json(); } catch (e) {}

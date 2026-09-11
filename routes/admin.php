@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\CollectionController;
 use App\Http\Controllers\Admin\ConfigBackupController;
 use App\Http\Controllers\Admin\ConfigHistoryController;
 use App\Http\Controllers\Admin\ContentTemplateController;
+use App\Http\Controllers\Admin\ConversationController;
 use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -139,7 +140,9 @@ Route::middleware('admin')->group(function () {
     Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
     Route::post('orders/{order}/restore', [OrderController::class, 'restore'])->name('orders.restore')->withTrashed();
     Route::delete('orders/{order}/force', [OrderController::class, 'forceDelete'])->name('orders.force-delete')->withTrashed();
-    // Declared above orders/{order} so "create" is not read as an order id.
+    // Declared above orders/{order} so neither is read as an order id.
+    Route::get('orders/product-search', [OrderController::class, 'productSearch'])
+        ->middleware('throttle:120,1')->name('orders.product-search');
     Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
     Route::post('orders/create', [OrderController::class, 'storeManual'])->name('orders.store-manual');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
@@ -169,6 +172,11 @@ Route::middleware('admin')->group(function () {
     Route::delete('segments/{segment}', [SegmentController::class, 'destroy'])->name('segments.destroy');
 
     // Member notifications hub
+    // What customers ask the storefront assistant.
+    Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
+    Route::get('conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
+    Route::delete('conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
+
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications', [NotificationController::class, 'store'])->name('notifications.store');
     Route::post('notifications/settings', [NotificationController::class, 'settings'])->name('notifications.settings');

@@ -39,6 +39,16 @@ Schedule::job(new VerifyCatalogSync)->dailyAt('03:30')->name('meta-verify-catalo
 // for Development Mode / System User connections (see MetaTokenRefresher).
 Schedule::job(new RefreshMetaToken)->dailyAt('02:45')->name('meta-token-refresh')->withoutOverlapping();
 
+// Assistant transcripts are kept to answer "what are people asking this month",
+// not forever. Six months, pruned nightly.
+Schedule::call(function () {
+    try {
+        app(\App\Services\Ai\ConversationLog::class)->prune(180);
+    } catch (Throwable $e) {
+        report($e);
+    }
+})->dailyAt('04:10')->name('assistant-transcript-prune');
+
 // ── Member notifications ────────────────────────────────────────────────────
 // Batched "new arrivals" announcement — sends one notification for the day's new
 // products (a no-op when there are none). Adjust the time as you like.

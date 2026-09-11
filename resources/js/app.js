@@ -383,15 +383,96 @@ document.addEventListener('alpine:init', () => {
         items: init.items || [],
         // Products being added to an order that already exists — "she rang back
         // and wanted the matching earrings too".
+        //
+        // A line carries the whole chosen product (not just its id), because the
+        // catalogue is no longer shipped with the page: it is searched. Each
+        // line is { product: {...}|null, variant_id: '', qty, price }.
         newLines: init.newLines || [],
-        catalogue: init.catalogue || [],
+        searchUrl: init.searchUrl || '',
         adjustments: init.adjustments || [],
         shipping: init.shipping || 0,
         discount: init.discount || 0,
-        catalogPrice(line) {
-            const p = this.catalogue.find((c) => c.id === line.product_id);
-            return p ? String(p.price) : '';
+
+        // ── Product search ───────────────────────────────────────────────────
+        // One query at a time, keyed by the line being edited. `seq` drops a
+        // slow response that lands after a newer one — otherwise typing
+        // "ring" fast shows the results for "ri".
+        query: {},
+        results: {},
+        searching: {},
+        seq: 0,
+        timer: null,
+
+        search(i, term) {
+            this.query[i] = term;
+            clearTimeout(this.timer);
+
+            // Mirrors the server: two characters of text, or a single digit
+            // (a product ID read off a packing slip).
+            const t = (term || '').trim();
+            if (!t || (t.length < 2 && !/^\d$/.test(t))) {
+                this.results[i] = [];
+                this.searching[i] = false;
+                return;
+            }
+
+            this.searching[i] = true;
+            const mine = ++this.seq;
+            this.timer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`${this.searchUrl}?q=${encodeURIComponent(term.trim())}`, {
+                        headers: { Accept: 'application/json' },
+                    });
+                    const data = await res.json();
+                    if (mine !== this.seq) return;         // a newer keystroke won
+                    this.results[i] = data.results || [];
+                } catch (e) {
+                    this.results[i] = [];
+                } finally {
+                    if (mine === this.seq) this.searching[i] = false;
+                }
+            }, 220);
         },
+
+        choose(i, product) {
+            const line = this.newLines[i];
+            line.product = product;
+            // One variation is no choice at all — pick it rather than making
+            // her confirm it.
+            line.variant_id = product.variants && product.variants.length === 1
+                ? product.variants[0].id
+                : '';
+            this.query[i] = '';
+            this.results[i] = [];
+        },
+
+        clearChoice(i) {
+            this.newLines[i].product = null;
+            this.newLines[i].variant_id = '';
+            this.results[i] = [];
+        },
+
+        /** The variation picked on a line, if any. */
+        chosenVariant(line) {
+            if (!line.product || !line.variant_id) return null;
+            return (line.product.variants || []).find((v) => v.id === Number(line.variant_id)) || null;
+        },
+
+        /** Catalogue price for a line — the variation's when one is picked. */
+        catalogPrice(line) {
+            if (!line.product) return '';
+            const v = this.chosenVariant(line);
+            return String(v ? v.price : line.product.price);
+        },
+
+        /** A variable product with no variation chosen cannot be saved. */
+        needsVariant(line) {
+            return !!line.product && line.product.variants && line.product.variants.length > 0 && !line.variant_id;
+        },
+        incomplete() {
+            return this.newLines.some((l) => !l.product || this.needsVariant(l));
+        },
+
         money(n) {
             return '৳' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         },
@@ -401,10 +482,8 @@ document.addEventListener('alpine:init', () => {
             // Added lines count toward the running total too, otherwise the
             // figure on screen disagrees with the one that gets saved.
             const added = this.newLines.reduce((s, l) => {
-                const c = this.catalogue.find((x) => x.id === l.product_id);
-                const unit = (l.price === '' || l.price === null || l.price === undefined)
-                    ? (c ? Number(c.price) : 0)
-                    : Number(l.price);
+                const typed = l.price !== '' && l.price !== null && l.price !== undefined;
+                const unit = typed ? Number(l.price) : Number(this.catalogPrice(l) || 0);
                 return s + unit * (Number(l.qty) || 0);
             }, 0);
 
