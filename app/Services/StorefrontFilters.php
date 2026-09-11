@@ -285,34 +285,18 @@ class StorefrontFilters
             ];
         }
 
-        // Colours (from the product colour field). The storefront renders these
-        // as a row of swatch chips above the grid rather than as sidebar
-        // checkboxes, showing the first few and folding the rest away — so the
-        // order is by how many products carry the colour, not alphabetical.
-        // Without the tally "Black" (2) outranked "Silver" (31) on the strip.
+        // Colours (from the product colour field) — rendered as swatches in the
+        // filter sidebar, alphabetically, alongside every other facet.
         if ($cfg['colors'] ?? true) {
-            $tally = $products->flatMap(fn ($p) => $p->color_list)
-                ->map(fn ($c) => trim((string) $c))->filter()->countBy();
-
-            if ($tally->isNotEmpty()) {
+            $colors = $products->flatMap(fn ($p) => $p->color_list)
+                ->map(fn ($c) => trim((string) $c))->filter()->unique()->sort()->values();
+            if ($colors->isNotEmpty()) {
                 $sel = array_filter((array) $request->query('colors', []));
-                $options = $tally
-                    ->map(fn ($n, $c) => ['value' => $c, 'count' => $n])
-                    // Commonest first; alphabetical within a tie so the strip
-                    // does not reshuffle itself between two identical renders.
-                    ->sort(fn ($a, $b) => $b['count'] <=> $a['count'] ?: strcmp($a['value'], $b['value']))
-                    ->values()
-                    ->map(fn ($o) => [
-                        'value' => $o['value'],
-                        'label' => $o['value'],
-                        'count' => $o['count'],
-                        'hex' => color_hex($o['value']),
-                        'checked' => in_array($o['value'], $sel, true),
-                    ]);
-
                 $groups[] = [
                     'type' => 'attribute', 'label' => 'Colour', 'param' => 'colors[]', 'is_color' => true,
-                    'options' => $options->all(),
+                    'options' => $colors->map(fn ($c) => [
+                        'value' => $c, 'label' => $c, 'hex' => color_hex($c), 'checked' => in_array($c, $sel, true),
+                    ])->all(),
                 ];
             }
         }
