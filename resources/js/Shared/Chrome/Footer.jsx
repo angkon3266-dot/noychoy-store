@@ -3,13 +3,24 @@ import Icon, { Facebook, IconOrGlyph, Instagram, WhatsApp } from '../Icons';
 import SmartLink from '../SmartLink';
 import { t } from '../i18n';
 
-export default function Footer() {
+// `minimal` strips the footer back to the copyright line. Checkout uses it:
+// once someone is filling in their address, a full site menu under the form is
+// nothing but a set of ways to leave before the order is placed.
+export default function Footer({ minimal = false }) {
     const { props } = usePage();
     const chrome = props.chrome || {};
     const footer = chrome.footer || {};
     const urls = chrome.urls || {};
     const lang = chrome.lang || 'en';
     const setLang = (next) => router.post('/lang', { lang: next }, { preserveScroll: true });
+
+    if (minimal) {
+        return (
+            <footer className="mt-16 bg-ink-900 text-gold-100">
+                <div className="mx-auto max-w-7xl px-4 py-5 text-center text-xs text-gold-100/50">{footer.copyright}</div>
+            </footer>
+        );
+    }
 
     return (
         <footer className="mt-16 bg-ink-900 text-gold-100">

@@ -14,17 +14,17 @@ import { initReveal } from '../reveal';
 
 // Persistent layout: assigned via `Page.layout = (page) => <Layout>{page}</Layout>`
 // so header/drawer/mini-cart state and scroll behaviour survive navigations.
-export default function Layout({ children }) {
+export default function Layout({ children, minimalFooter = false }) {
     return (
         <CartProvider>
             <MobileNavProvider>
-                <Chrome>{children}</Chrome>
+                <Chrome minimalFooter={minimalFooter}>{children}</Chrome>
             </MobileNavProvider>
         </CartProvider>
     );
 }
 
-function Chrome({ children }) {
+function Chrome({ children, minimalFooter }) {
     const { props, url } = usePage();
     const { toast } = useCart();
 
@@ -98,7 +98,7 @@ function Chrome({ children }) {
 
             <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 outline-none">{children}</main>
 
-            <Footer />
+            <Footer minimal={minimalFooter} />
             <FloatingStack />
             <BottomNav />
 

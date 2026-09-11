@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import { fetchJson, money } from '../Shared/format';
-import Icon, { IconOrGlyph } from '../Shared/Icons';
+import Icon from '../Shared/Icons';
 import MemberPill from '../Shared/MemberPill';
-import DateField from '../Shared/DateField';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
 // what "the same number" is — and so "017 1234 5678" is not silently dropped.
@@ -18,7 +17,7 @@ const bdPhone = (v) => {
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
 // loyalty point redemption, and the InitiateCheckout pixel event.
-export default function Checkout({ items, summary, prefill, isMember, loyalty, registerPct, trustBadges, ic, urls, coupon, freeShipping, gift }) {
+export default function Checkout({ items, summary, prefill, loyalty, registerPct, ic, urls, coupon, freeShipping, gift }) {
     const { props } = usePage();
     const chromeUrls = props.chrome?.urls || {};
     const errors = props.errors || {};
@@ -51,6 +50,16 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     const [live, setLive] = useState(null);
     const [code, setCode] = useState('');
     const [couponBusy, setCouponBusy] = useState(false);
+    // The order summary starts folded away — by the time someone is on this
+    // page they have already seen the cart, and the only thing they still need
+    // in front of them is the total, which the fold's own header carries.
+    const [summaryOpen, setSummaryOpen] = useState(false);
+    // A coupon applied or rejected answers back into this card, so never leave
+    // the verdict behind a fold the customer just closed by navigating.
+    const flash = props.flash || {};
+    useEffect(() => {
+        if (flash.success || flash.error) setSummaryOpen(true);
+    }, [flash.success, flash.error]);
 
     // Coupon apply/remove go through Inertia: the server answers with
     // back() → this page re-renders with the new totals + a flash message.
@@ -78,12 +87,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
         notes: '',
         is_gift: false,
         card_message: '',
-        birthday_day: '',
-        birthday_month: '',
-        anniversary_day: '',
-        anniversary_month: '',
     });
-    const [datesOpen, setDatesOpen] = useState(false);
 
     // InitiateCheckout — same event id as the server's CAPI call (dedup).
     useEffect(() => {
@@ -115,6 +119,8 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     const freeShip = live ? live.freeShipping : freeShipping;
     const ship = freeShip ? 0 : (inside ? view.shipInside : view.shipOutside);
     const total = view.sub + ship;
+    // Pieces, not lines: "2 items" for one product bought twice.
+    const itemCount = items.reduce((n, i) => n + i.qty, 0);
 
     // Capture the lead the moment a valid phone is typed — a COD order the
     // customer abandons is still a phone number the team can follow up.
@@ -184,7 +190,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
     };
 
     return (
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mx-auto max-w-2xl px-4 py-8">
             <h1 className="font-display text-3xl font-semibold mb-6">Checkout</h1>
 
             {Object.keys(errors).length > 0 && (
@@ -199,20 +205,14 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                 </div>
             )}
 
-            <form onSubmit={submit} className="grid lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 card p-6 space-y-4">
+            {/* One column, and the submit button sits four fields in: the
+                fastest path to a COD order is name, number, address, thana,
+                place order. Everything that is not needed to get there — the
+                zone, the gift card, the note, the summary itself — lives below
+                the button for whoever wants it. */}
+            <form onSubmit={submit} className="space-y-6">
+                <div className="card p-6 space-y-4">
                     <h2 className="font-display text-xl font-semibold">Delivery details</h2>
-                    {!isMember && (
-                        /* "Faster checkout" undersold it: the real offer is the
-                           member price and the points, so say so here where the
-                           decision is made. */
-                        <p className="text-sm text-ink-700/70">
-                            Have an account? <a href={chromeUrls.login} className="text-gold-700 hover:underline">Log in</a>
-                            {props.chrome?.membership?.pct
-                                ? <> — members get <strong className="text-ink-800">{props.chrome.membership.pct}% off</strong>{props.chrome.membership.pointsPer1000 ? ` and ${props.chrome.membership.pointsPer1000} points per ৳1,000` : ''} on this order.</>
-                                : ' for faster checkout.'}
-                        </p>
-                    )}
 
                     <div className="grid sm:grid-cols-2 gap-4">
                         <div data-field="name">
@@ -226,7 +226,7 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 on this field. */}
                             <label className="label" htmlFor="co-phone">Mobile number *</label>
                             <input
-                                {...a11y('phone', 'phone-help')}
+                                {...a11y('phone')}
                                 type="tel"
                                 value={form.data.phone}
                                 onChange={(e) => form.setData('phone', e.target.value)}
@@ -237,10 +237,6 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                                 autoComplete="tel"
                                 inputMode="numeric"
                             />
-                            <p id="phone-help" className="mt-1 text-[11px] text-ink-700/70">
-                                We save this so we can call you about the order — including if you
-                                do not finish checking out.
-                            </p>
                             {err('phone') && <p id="co-phone-error" className="text-xs text-danger-600 mt-1">{err('phone')}</p>}
                         </div>
                     </div>
@@ -255,20 +251,23 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         {err('area') && <p id="co-area-error" className="text-xs text-danger-600 mt-1">{err('area')}</p>}
                     </div>
 
-                    {freeShip ? (
-                        /* Nothing to choose between when both zones cost ৳0 —
-                           the zone still travels with the order, inferred from
-                           the address above. */
-                        <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3.5 flex items-center gap-3">
-                            <Icon name="sparkle" className="w-6 h-6 text-gold-700 shrink-0" />
-                            <div>
-                                <p className="text-sm font-semibold text-success-800">Free delivery unlocked</p>
-                                <p className="text-xs text-success-700/80 mt-0.5">
-                                    Anywhere in Bangladesh — we cover the courier on this order.
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
+                    {/* The summary below is folded shut, so the button carries
+                        the total — nobody should have to open anything to know
+                        what they are agreeing to pay. */}
+                    <div className="pt-1">
+                        <button type="submit" className="btn-primary w-full" disabled={form.processing}>
+                            {form.processing ? 'Placing order…' : `Place order · ${money(total)}`}
+                        </button>
+                        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-ink-700/70">
+                            <Icon name="cash" className="w-4 h-4 shrink-0" />
+                            <span>Cash on delivery — no advance payment, we call to confirm.</span>
+                        </p>
+                    </div>
+
+                    {/* Free delivery leaves nothing to choose between: the zone
+                        still travels with the order, inferred from the address
+                        above. */}
+                    {!freeShip && (
                     <div data-field="is_inside_dhaka">
                         <span className="label">Delivery zone</span>
                         <div className="flex gap-3" role="radiogroup" aria-label="Delivery zone">
@@ -329,26 +328,6 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                         </div>
                     )}
 
-                    {/* Special dates — optional and collapsed. The first answer
-                        is kept on the customer record, so a returning shopper
-                        is never asked twice; the store then sends a reminder
-                        with gift ideas before the day and a wish on it. */}
-                    <div className={`rounded-xl border p-4 transition-colors ${datesOpen ? 'border-gold-400 bg-gold-50/60' : 'border-ink-100'}`}>
-                        <button type="button" onClick={() => setDatesOpen(!datesOpen)} className="w-full flex items-center justify-between gap-3 text-left text-sm" aria-expanded={datesOpen}>
-                            <span className="inline-flex items-center gap-2"><Icon name="calendar" className="w-4 h-4 text-gold-700 shrink-0" /><span>Want a surprise on your special day? <span className="text-ink-700/60">(optional)</span></span></span>
-                            <span className="text-gold-700 text-xs font-medium whitespace-nowrap">{datesOpen ? 'Hide' : 'Add dates'}</span>
-                        </button>
-                        {datesOpen && (
-                            <div className="mt-3 grid sm:grid-cols-2 gap-3">
-                                <DateField compact label="Birthday" day={form.data.birthday_day} month={form.data.birthday_month}
-                                    onDay={(v) => form.setData('birthday_day', v)} onMonth={(v) => form.setData('birthday_month', v)} />
-                                <DateField compact label="Anniversary" day={form.data.anniversary_day} month={form.data.anniversary_month}
-                                    onDay={(v) => form.setData('anniversary_day', v)} onMonth={(v) => form.setData('anniversary_month', v)} />
-                                <p className="sm:col-span-2 text-[11px] text-ink-700/60">We'll send a little reminder with gift ideas before the day, and a wish on it. Day and month only.</p>
-                            </div>
-                        )}
-                    </div>
-
                     <div data-field="notes">
                         <label className="label" htmlFor="co-notes">Order note (optional)</label>
                         <textarea {...a11y('notes')} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} className="input" />
@@ -356,130 +335,134 @@ export default function Checkout({ items, summary, prefill, isMember, loyalty, r
                     </div>
                 </div>
 
-                <div className="card p-6 h-fit">
-                    <h2 className="font-display text-xl font-semibold mb-4">Your order</h2>
+                {/* Order summary — folded shut on arrival. The header keeps the
+                    only two things that matter at a glance (how many items and
+                    what it comes to); the breakdown, the coupon box and the
+                    offer notices are one tap away for whoever wants them. */}
+                <div className="card overflow-hidden">
+                    <h2>
+                        <button
+                            type="button"
+                            onClick={() => setSummaryOpen((open) => !open)}
+                            aria-expanded={summaryOpen}
+                            aria-controls="order-summary"
+                            className="w-full flex items-center justify-between gap-3 px-6 py-4 text-left"
+                        >
+                            <span className="font-display text-lg font-semibold">
+                                Order summary
+                                <span className="ml-2 font-sans text-xs font-normal text-ink-700/60">
+                                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                                </span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-2">
+                                <span className="font-semibold">{money(total)}</span>
+                                <Icon name="chevronDown" className={`w-4 h-4 text-ink-700/60 transition-transform ${summaryOpen ? 'rotate-180' : ''}`} />
+                            </span>
+                        </button>
+                    </h2>
 
-                    {props.flash?.success && (
-                        <div className="mb-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm">{props.flash.success}</div>
-                    )}
-                    {props.flash?.error && (
-                        <div className="mb-3 rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-3 py-2 text-sm">{props.flash.error}</div>
-                    )}
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {items.map((item, i) => (
-                            <div key={i} className="flex justify-between text-sm gap-2">
-                                <span className="text-ink-700/80">{item.name} <span className="text-ink-700/70">× {item.qty}</span></span>
-                                <span className="font-medium shrink-0">{item.lineText}</span>
+                    {summaryOpen && (
+                        <div id="order-summary" className="border-t border-ink-100 px-6 pt-4 pb-6">
+                            {flash.success && (
+                                <div className="mb-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm">{flash.success}</div>
+                            )}
+                            {flash.error && (
+                                <div className="mb-3 rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-3 py-2 text-sm">{flash.error}</div>
+                            )}
+                            <div className="space-y-3 max-h-64 overflow-y-auto">
+                                {items.map((item, i) => (
+                                    <div key={i} className="flex justify-between text-sm gap-2">
+                                        <span className="text-ink-700/80">{item.name} <span className="text-ink-700/70">× {item.qty}</span></span>
+                                        <span className="font-medium shrink-0">{item.lineText}</span>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                    {/* Coupon — same endpoints as the cart page, so a code entered
-                        here or there behaves identically. */}
-                    <div className="mt-4 pt-4 border-t border-ink-100">
-                        {coupon ? (
-                            <div className="flex items-center justify-between text-sm rounded-md bg-success-50 border border-success-200 px-3 py-2">
-                                <span className="text-success-800 inline-flex items-center gap-1.5"><Icon name="tag" className="w-4 h-4 shrink-0" /><span className="min-w-0">Coupon <strong className="font-mono">{coupon.code}</strong> applied</span></span>
-                                <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-danger-600 hover:underline disabled:opacity-50">Remove</button>
+
+                            {/* Coupon — same endpoints as the cart page, so a code
+                                entered here or there behaves identically. */}
+                            <div className="mt-4 pt-4 border-t border-ink-100">
+                                {coupon ? (
+                                    <div className="flex items-center justify-between text-sm rounded-md bg-success-50 border border-success-200 px-3 py-2">
+                                        <span className="text-success-800 inline-flex items-center gap-1.5"><Icon name="tag" className="w-4 h-4 shrink-0" /><span className="min-w-0">Coupon <strong className="font-mono">{coupon.code}</strong> applied</span></span>
+                                        <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-danger-600 hover:underline disabled:opacity-50">Remove</button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={code}
+                                            onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon(e); }}
+                                            placeholder="Coupon code"
+                                            autoComplete="off"
+                                            className="input py-2 font-mono uppercase"
+                                            aria-label="Coupon code"
+                                        />
+                                        <button type="button" onClick={applyCoupon} disabled={!code.trim() || couponBusy} className="btn-outline whitespace-nowrap disabled:opacity-50">
+                                            {couponBusy ? '…' : 'Apply'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                <input
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon(e); }}
-                                    placeholder="Coupon code"
-                                    autoComplete="off"
-                                    className="input py-2 font-mono uppercase"
-                                    aria-label="Coupon code"
-                                />
-                                <button type="button" onClick={applyCoupon} disabled={!code.trim() || couponBusy} className="btn-outline whitespace-nowrap disabled:opacity-50">
-                                    {couponBusy ? '…' : 'Apply'}
-                                </button>
-                            </div>
-                        )}
-                    </div>
 
-                    <dl className="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
-                        <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{view.subtotalText}</dd></div>
-                        {view.discountLines.length ? view.discountLines.map((line, i) => (
-                            <div key={i} className="flex justify-between text-success-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
-                        )) : (view.discountText && (
-                            <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{view.discountText}</dd></div>
-                        ))}
-                        <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>৳{ship}</dd></div>
-                        <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{money(total)}</dd></div>
-                    </dl>
+                            <dl className="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
+                                <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{view.subtotalText}</dd></div>
+                                {view.discountLines.length ? view.discountLines.map((line, i) => (
+                                    <div key={i} className="flex justify-between text-success-700"><dt>{line.label}</dt><dd>−{line.amount_text}</dd></div>
+                                )) : (view.discountText && (
+                                    <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{view.discountText}</dd></div>
+                                ))}
+                                <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>৳{ship}</dd></div>
+                                <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{money(total)}</dd></div>
+                            </dl>
 
-                    {view.discountText && (
-                        <div className="mt-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm font-medium">
-                            You're saving {view.discountText}{view.discountPct > 0 ? ` (${view.discountPct}% off)` : ''}
-                        </div>
-                    )}
-
-                    {view.hints.map((hint, i) => (
-                        <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
-                    ))}
-
-                    {view.coupon_notice && (
-                        <div className="mt-3 rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
-                            <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
-                            <span>{view.coupon_notice}</span>
-                        </div>
-                    )}
-
-                    {loyalty && <Points loyalty={loyalty} />}
-
-                    {registerPct && (
-                        /* The pill and the CTA are the only flex items besides ONE
-                           span holding the whole sentence. Bare text either side of
-                           an element child becomes its own anonymous flex item, and
-                           with `items-center` each one is then a rigid column that
-                           wraps independently — which is why this row used to read
-                           "Get an" / "2%" / "off — plus…" stacked. `min-w-0` lets
-                           that span shrink below its min-content width so the text
-                           reflows normally. Same shape as Product.jsx:336. */
-                        <div className="mt-3 rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs">
-                            {/* Exactly two flex items — the pill and ONE paragraph
-                                that holds the entire sentence. Nothing here can
-                                fragment. The CTA is a normal block below rather
-                                than a third flex item, because this card is only
-                                ~210px wide on a phone and no arrangement fits the
-                                sentence and a button on one line at that size. */}
-                            <div className="flex items-start gap-2">
-                                <MemberPill />
-                                <p className="min-w-0 leading-relaxed">
-                                    {registerPct.saving >= 50 ? (
-                                        <>Save <strong className="font-semibold">{registerPct.savingText}</strong> on this order</>
-                                    ) : (
-                                        <>Get <strong className="font-semibold">{registerPct.pct}%</strong> off this order</>
-                                    )}
-                                    <span className="text-white/65"> — member price, plus loyalty points on every order.</span>
-                                </p>
-                            </div>
-                            <a href={chromeUrls.register} className="mt-2 inline-flex items-center gap-1 rounded bg-white/10 px-2.5 py-1 font-medium hover:bg-white/20">
-                                Create account <span aria-hidden="true">→</span>
-                            </a>
-                        </div>
-                    )}
-
-                    <div className="mt-4 rounded-md bg-gold-100/60 p-3 text-sm flex items-center gap-2"><Icon name="cash" className="w-5 h-5 shrink-0" /><span><strong>Cash on Delivery</strong> — pay when you receive your order.</span></div>
-                    <button type="submit" className="btn-primary w-full mt-6" disabled={form.processing}>
-                        {form.processing ? 'Placing order…' : 'Place order'}
-                    </button>
-
-                    {trustBadges.length > 0 && (
-                        <div className="mt-4 grid gap-2 text-center text-xs text-ink-700/70" style={{ gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, trustBadges.length))}, minmax(0,1fr))` }}>
-                            {trustBadges.map((b, i) => (
-                                <div key={i} className="rounded-lg bg-gold-100/60 p-3">
-                                    <span className="mx-auto mb-1 flex w-fit text-gold-700"><IconOrGlyph value={b.icon} fallback="shieldCheck" className="w-5 h-5" /></span>
-                                    <span className="font-medium">{b.title}</span>
-                                    {b.text && <><br /><span className="text-[10px] text-ink-700/70">{b.text}</span></>}
+                            {view.discountText && (
+                                <div className="mt-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm font-medium">
+                                    You're saving {view.discountText}{view.discountPct > 0 ? ` (${view.discountPct}% off)` : ''}
                                 </div>
+                            )}
+
+                            {view.hints.map((hint, i) => (
+                                <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                             ))}
+
+                            {view.coupon_notice && (
+                                <div className="mt-3 rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
+                                    <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
+                                    <span>{view.coupon_notice}</span>
+                                </div>
+                            )}
                         </div>
                     )}
-                    <p className="mt-3 text-center text-xs text-ink-700/70">No advance payment needed · We call to confirm every order</p>
                 </div>
+
+                {loyalty && <Points loyalty={loyalty} />}
+
+                {registerPct && (
+                    /* The pill and ONE paragraph holding the whole sentence are
+                       the only flex items. Bare text either side of an element
+                       child becomes its own anonymous flex item, and with
+                       `items-center` each one is then a rigid column that wraps
+                       independently — which is why this row used to read "Get
+                       an" / "2%" / "off — plus…" stacked. `min-w-0` lets that
+                       span shrink below its min-content width so the text
+                       reflows normally. Same shape as Product.jsx:336. */
+                    <div className="rounded-md bg-ink-900 text-white px-3 py-2.5 text-xs">
+                        <div className="flex items-start gap-2">
+                            <MemberPill />
+                            <p className="min-w-0 leading-relaxed">
+                                {registerPct.saving >= 50 ? (
+                                    <>Save <strong className="font-semibold">{registerPct.savingText}</strong> on this order</>
+                                ) : (
+                                    <>Get <strong className="font-semibold">{registerPct.pct}%</strong> off this order</>
+                                )}
+                                <span className="text-white/65"> — member price, plus loyalty points on every order.</span>
+                            </p>
+                        </div>
+                        <a href={chromeUrls.register} className="mt-2 inline-flex items-center gap-1 rounded bg-white/10 px-2.5 py-1 font-medium hover:bg-white/20">
+                            Create account <span aria-hidden="true">→</span>
+                        </a>
+                    </div>
+                )}
             </form>
         </div>
     );
@@ -508,7 +491,7 @@ function Points({ loyalty }) {
     };
 
     return (
-        <div className="mt-3 rounded-md border border-gold-200 bg-gold-50 p-3 text-sm">
+        <div className="rounded-md border border-gold-200 bg-gold-50 p-3 text-sm">
             {loyalty.applied > 0 ? (
                 <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1.5"><Icon name="check" className="w-4 h-4 shrink-0" /><strong>{loyalty.applied}</strong> points redeemed (−{loyalty.appliedDiscountText})</span>
@@ -536,4 +519,4 @@ function Points({ loyalty }) {
     );
 }
 
-Checkout.layout = (page) => <Layout>{page}</Layout>;
+Checkout.layout = (page) => <Layout minimalFooter>{page}</Layout>;

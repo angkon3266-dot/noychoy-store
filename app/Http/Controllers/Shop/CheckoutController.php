@@ -109,7 +109,6 @@ class CheckoutController extends Controller
                 'area' => old('area', $address->area ?? ''),
                 'inside' => (bool) old('is_inside_dhaka', $address->is_inside_dhaka ?? false),
             ],
-            'isMember' => (bool) $customer,
             'loyalty' => ($customer && $loyalty->enabled() && ($custPoints > 0 || $appliedPoints > 0)) ? [
                 'points' => $custPoints,
                 'pointsValueText' => money($loyalty->pointsValue($custPoints)),
@@ -125,8 +124,6 @@ class CheckoutController extends Controller
                 'saving' => round($regSaving, 2),
                 'savingText' => money(round($regSaving, 2)),
             ] : null,
-            'trustBadges' => collect(theme('trust_badges') ?: config('theme.defaults.trust_badges', []))
-                ->filter(fn ($b) => filled($b['title'] ?? null))->take(4)->values(),
             'ic' => [
                 'eventId' => $icEventId,
                 'contentIds' => $icContentIds,
@@ -135,8 +132,8 @@ class CheckoutController extends Controller
             ],
             'coupon' => ($c = $this->cart->coupon()) ? ['code' => $c->code] : null,
             // Free delivery already won: the zone picker is noise at that
-            // point, so the page shows a badge instead (the zone still
-            // travels with the order, inferred from the address).
+            // point, so the page drops it (the zone still travels with the
+            // order, inferred from the address).
             'freeShipping' => $this->cart->hasFreeShipping(),
             'gift' => theme('gift_enabled', true) ? [
                 'title' => theme('gift_title'),
