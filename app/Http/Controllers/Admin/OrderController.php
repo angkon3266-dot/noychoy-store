@@ -94,9 +94,20 @@ class OrderController extends Controller
             ->groupBy('customer_phone')
             ->pluck('c', 'customer_phone');
 
-        // Fulfilment queue: products inside "processing" orders (qty to prepare + product ID/serial).
+        // Fulfilment queue: the pieces inside whatever the list is currently
+        // showing, with the quantity to prepare and the product ID/serial.
+        //
+        // Scoped to the same filter and search as the table rather than pinned
+        // to "processing": the panel sitting beside a list of booked orders had
+        // been answering a question about a different set of orders, and read
+        // as empty whenever the queue she was actually looking at was not the
+        // processing one.
         $processingItems = OrderItem::query()
-            ->whereHas('order', fn ($q) => $q->where('status', 'processing'))
+            ->whereHas('order', function ($q) use ($trashed, $selected, $term, $search) {
+                $q->when($trashed, fn ($b) => $b->onlyTrashed())
+                    ->when($selected->isNotEmpty(), fn ($b) => $b->whereIn('status', $selected->all()))
+                    ->when($term !== '', $search);
+            })
             ->select('product_id', 'name', DB::raw('SUM(quantity) as qty'), DB::raw('COUNT(DISTINCT order_id) as orders'))
             ->groupBy('product_id', 'name')
             ->orderByDesc('qty')
@@ -138,9 +149,28 @@ class OrderController extends Controller
             ->take(self::MAX_QUICK_FILTERS)
             ->values();
 
+        // What this page of the list adds up to. Deliberately the page, not the
+        // whole filter: it is the set she can see and count against, and it
+        // costs no extra query.
+        $pageTotals = [
+            'orders' => $orders->count(),
+            'items' => (int) $orders->sum('items_count'),
+            'value' => (float) $orders->sum('total'),
+        ];
+
+        // Plain-English name for whatever the list is showing, so the
+        // fulfilment panel can say which orders it is counting.
+        $queueLabel = match (true) {
+            $selected->isEmpty() => 'All orders',
+            $selected->count() === 1 => Order::STATUSES[$selected->first()],
+            default => $selected->map(fn ($s) => Order::STATUSES[$s])->implode(' + '),
+        };
+
         return view('admin.orders.index', [
             'orders' => $orders,
             'statuses' => Order::STATUSES,
+            'pageTotals' => $pageTotals,
+            'queueLabel' => $queueLabel,
             // What the dropdown shows. It can only express one value, so a
             // multi-pill selection reads as "all" there and the pills carry it.
             'status' => $selected->count() === 1 ? $selected->first() : 'all',

@@ -229,6 +229,27 @@
 
     <div class="grid xl:grid-cols-[1fr_320px] gap-6 items-start">
     <div class="min-w-0">
+
+    {{-- What the rows below add up to. The page, not the whole filter, so it
+         always reconciles with what she can see and count. --}}
+    <div class="card px-4 py-3 mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <div>
+            <span class="text-ink-700/55">Orders</span>
+            <span class="ml-1.5 font-semibold tabular-nums">{{ number_format($pageTotals['orders']) }}</span>
+        </div>
+        <div>
+            <span class="text-ink-700/55">Items</span>
+            <span class="ml-1.5 font-semibold tabular-nums">{{ number_format($pageTotals['items']) }}</span>
+        </div>
+        <div>
+            <span class="text-ink-700/55">Value</span>
+            <span class="ml-1.5 font-semibold tabular-nums text-gold-700">{{ money($pageTotals['value']) }}</span>
+        </div>
+        <span class="text-xs text-ink-700/45 ml-auto">
+            {{ $queueLabel }}@if($orders->hasPages()) · this page of {{ number_format($orders->total()) }}@endif
+        </span>
+    </div>
+
     <div class="card overflow-x-auto">
         <table class="w-full min-w-[640px] text-sm">
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
@@ -386,13 +407,15 @@
     <div class="mt-6">{{ $orders->links() }}</div>
     </div>
 
-    {{-- Processing fulfilment queue (products to prepare) --}}
+    {{-- Fulfilment queue: the pieces inside whatever the list is showing. --}}
     <aside class="card p-4 xl:sticky xl:top-4">
-        <div class="flex items-center justify-between mb-1">
-            <h2 class="font-semibold">To prepare · Processing</h2>
-            <span class="badge bg-amber-100 text-amber-700 text-[10px]">{{ $processingItems->sum('qty') }} units</span>
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <h2 class="font-semibold">To prepare · {{ $queueLabel }}</h2>
+            <span class="badge bg-amber-100 text-amber-700 text-[10px] shrink-0">{{ $processingItems->sum('qty') }} units</span>
         </div>
-        <p class="text-xs text-ink-700/50 mb-3">Items across all orders currently in <strong>Processing</strong>.</p>
+        <p class="text-xs text-ink-700/50 mb-3">
+            Every piece across the orders this filter is showing{{ $search !== '' ? ', matching your search' : '' }}.
+        </p>
         @forelse($processingItems as $it)
             <div class="flex items-start gap-2.5 py-2 border-b border-ink-50 last:border-0 text-sm">
                 <span class="w-10 h-10 rounded-md bg-ink-100 overflow-hidden shrink-0">
@@ -410,7 +433,7 @@
                 <span class="shrink-0 font-semibold text-gold-700">×{{ $it->qty }}</span>
             </div>
         @empty
-            <p class="text-sm text-ink-700/50">Nothing in processing right now. 🎉</p>
+            <p class="text-sm text-ink-700/50">No pieces to prepare in {{ $queueLabel }}. 🎉</p>
         @endforelse
     </aside>
     </div>
