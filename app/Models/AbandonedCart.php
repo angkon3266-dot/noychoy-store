@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class AbandonedCart extends Model
 {
@@ -30,6 +31,18 @@ class AbandonedCart extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(AbandonedCartContact::class)->latest('id');
+    }
+
+    /**
+     * The order this lead was converted into, if it was converted by hand.
+     *
+     * Only set by the admin "Convert to order" path. A cart that recovered on
+     * its own — the customer came back and checked out — is flagged recovered
+     * with nothing to point at, because only the phone number ties them.
+     */
+    public function recoveredOrder(): HasOne
+    {
+        return $this->hasOne(Order::class);
     }
 
     /** Still worth chasing: no order came, and nobody has tried yet. */

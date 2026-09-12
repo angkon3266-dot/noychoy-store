@@ -9,24 +9,57 @@
      storefront on the customer's behalf — doing that fired the Pixel from her
      own browser and attributed the sale to her session, quietly corrupting the
      ad data on every manual order. --}}
+
+@if($cart)
+    {{-- Converting a chased lead. The form is the review step on purpose: the
+         basket is a snapshot of what the customer saw, and by the time she
+         rings, a piece can be unpublished, a size deactivated or the last one
+         sold. Anything that could not be carried over is said here rather than
+         failing on save. --}}
+    <div class="mb-5 rounded-xl border-2 border-gold-300 bg-gold-50 px-4 py-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-semibold text-sm">
+                Converting {{ $cart->name ?: $cart->phone ?: 'a saved basket' }}&rsquo;s abandoned basket
+            </h2>
+            <a href="{{ route('admin.abandoned.show', $cart) }}" class="text-xs text-gold-700 hover:underline">
+                Back to the lead
+            </a>
+        </div>
+        <p class="mt-1 text-xs text-ink-700/70">
+            {{ money($cart->subtotal) }} · {{ $cart->item_count }} item{{ $cart->item_count == 1 ? '' : 's' }}
+            · saved {{ $cart->updated_at?->diffForHumans() }}.
+            Check it over, then create the order — the lead is marked recovered and linked to it.
+        </p>
+        @if(!empty($prefill['notices']))
+            <ul class="mt-2 space-y-1 text-xs text-warning-800 list-disc list-inside">
+                @foreach($prefill['notices'] as $notice)
+                    <li>{{ $notice }}</li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+@endif
+
 <form method="POST" action="{{ route('admin.orders.store-manual') }}"
-      x-data="manualOrder({{ Js::from($products) }}, {{ $shipInside }}, {{ $shipOutside }})"
+      x-data="manualOrder({{ Js::from($products) }}, {{ $shipInside }}, {{ $shipOutside }}, {{ Js::from($prefill) }})"
       class="grid lg:grid-cols-3 gap-6">
     @csrf
+    @if($cart)<input type="hidden" name="abandoned_cart_id" value="{{ $cart->id }}">@endif
 
     <div class="lg:col-span-2 space-y-6">
         <div class="card p-6">
             <h2 class="font-semibold mb-4">Customer</h2>
             <div class="grid sm:grid-cols-2 gap-4">
-                <div><label class="label">Name *</label><input name="name" value="{{ old('name') }}" class="input" required maxlength="120"></div>
-                <div><label class="label">Phone *</label><input name="phone" value="{{ old('phone') }}" class="input" required placeholder="01XXXXXXXXX"></div>
-                <div class="sm:col-span-2"><label class="label">Email (optional)</label><input type="email" name="email" value="{{ old('email') }}" class="input" maxlength="160"></div>
-                <div class="sm:col-span-2"><label class="label">Address *</label><textarea name="address" rows="2" class="input" required maxlength="500">{{ old('address') }}</textarea></div>
-                <div><label class="label">Area / Thana</label><input name="area" value="{{ old('area') }}" class="input" maxlength="120"></div>
+                @php $pf = $prefill['customer'] ?? []; @endphp
+                <div><label class="label">Name *</label><input name="name" value="{{ old('name', $pf['name'] ?? '') }}" class="input" required maxlength="120"></div>
+                <div><label class="label">Phone *</label><input name="phone" value="{{ old('phone', $pf['phone'] ?? '') }}" class="input" required placeholder="01XXXXXXXXX"></div>
+                <div class="sm:col-span-2"><label class="label">Email (optional)</label><input type="email" name="email" value="{{ old('email', $pf['email'] ?? '') }}" class="input" maxlength="160"></div>
+                <div class="sm:col-span-2"><label class="label">Address *</label><textarea name="address" rows="2" class="input" required maxlength="500">{{ old('address', $pf['address'] ?? '') }}</textarea></div>
+                <div><label class="label">Area / Thana</label><input name="area" value="{{ old('area', $pf['area'] ?? '') }}" class="input" maxlength="120"></div>
                 <div><label class="label">District</label><input name="district" value="{{ old('district') }}" class="input" maxlength="120"></div>
             </div>
             <label class="mt-4 flex items-center gap-2 text-sm">
-                <input type="checkbox" name="is_inside_dhaka" value="1" x-model="inside" @checked(old('is_inside_dhaka'))> Inside Dhaka
+                <input type="checkbox" name="is_inside_dhaka" value="1" x-model="inside" @checked(old('is_inside_dhaka', $pf['is_inside_dhaka'] ?? false))> Inside Dhaka
             </label>
             <div class="mt-4"><label class="label">Note (optional)</label><textarea name="notes" rows="2" class="input" maxlength="500">{{ old('notes') }}</textarea></div>
         </div>
@@ -47,7 +80,15 @@
                                 <option :value="p.id" x-text="p.name + (p.sku ? ' · ' + p.sku : '')"></option>
                             </template>
                         </select>
-                        <p class="mt-1 text-[11px] text-warning-800" x-show="hasVariants(line)">
+                        {{-- A converted line keeps the variation the customer
+                             actually chose. The picker cannot select one, so it
+                             rides along hidden and is shown as a label — losing
+                             it would change what she is selling. --}}
+                        <template x-if="line.variant_id">
+                            <input type="hidden" :name="`lines[${i}][variant_id]`" :value="line.variant_id">
+                        </template>
+                        <p class="mt-1 text-[11px] text-ink-700/60" x-show="line.variation" x-text="line.variation"></p>
+                        <p class="mt-1 text-[11px] text-warning-800" x-show="hasVariants(line) && !line.variant_id">
                             This product has options — set the price by hand, or order it from the storefront so the option is recorded.
                         </p>
                     </div>
@@ -107,13 +148,26 @@
 </form>
 
 <script>
-    function manualOrder(products, shipInside, shipOutside) {
+    function manualOrder(products, shipInside, shipOutside, prefill) {
+        // A converted lead opens with her basket in it; everything else opens
+        // on one blank line, exactly as before.
+        const inside = !!(prefill && prefill.customer && prefill.customer.is_inside_dhaka);
+        const seeded = (prefill && prefill.lines && prefill.lines.length)
+            ? prefill.lines.map((l) => ({
+                product_id: l.product_id,
+                variant_id: l.variant_id || null,
+                variation: l.variation || '',
+                qty: l.qty,
+                price: (l.price === null || l.price === undefined) ? '' : l.price,
+            }))
+            : [{ product_id: '', qty: 1, price: '' }];
+
         return {
             products,
-            inside: false,
-            shipping: shipOutside,
+            inside,
+            shipping: inside ? shipInside : shipOutside,
             discount: 0,
-            lines: [{ product_id: '', qty: 1, price: '' }],
+            lines: seeded,
 
             addLine() { this.lines.push({ product_id: '', qty: 1, price: '' }); },
             find(line) { return this.products.find((p) => p.id === line.product_id) || null; },
@@ -134,6 +188,20 @@
                 // Keep the delivery charge in step with the zone unless it has
                 // been typed over.
                 this.$watch('inside', (v) => { this.shipping = v ? shipInside : shipOutside; });
+
+                // A seeded line's <select> is bound by x-model before the x-for
+                // inside it has rendered any <option>, so the browser has
+                // nothing to select and the row silently posts an empty
+                // product. Re-assert the value once the options exist.
+                this.$nextTick(() => {
+                    this.$el.querySelectorAll('select[name$="[product_id]"]').forEach((el) => {
+                        const at = (el.getAttribute('name') || '').match(/lines\[(\d+)\]/);
+                        const line = at ? this.lines[Number(at[1])] : null;
+                        if (line && line.product_id) {
+                            el.value = line.product_id;
+                        }
+                    });
+                });
             },
         };
     }

@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Exceptions\CheckoutException;
 use App\Jobs\SendOrderPlacedEffects;
+use App\Models\AbandonedCart;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
@@ -144,6 +145,18 @@ class CreateManualOrder
             // behind this sale, and inventing one would be worse than the
             // server-side Purchase reporting the order honestly.
             SendOrderPlacedEffects::dispatch($order->fresh('items'), []);
+
+            // A sale closed on the phone settles the lead exactly as a
+            // storefront checkout does. Without this an order she took by hand
+            // left the basket sitting in the abandoned list, so the follow-up
+            // queue kept chasing customers who had already bought — and the
+            // recovered figure only ever counted the ones who came back alone.
+            //
+            // Phone only: PlaceOrder can also match on the session, and there
+            // is no customer session behind an order taken in the admin.
+            AbandonedCart::where('recovered', false)
+                ->where('phone', $data['phone'])
+                ->update(['recovered' => true]);
 
             return $order;
         });

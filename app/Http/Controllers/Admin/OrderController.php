@@ -487,15 +487,107 @@ class OrderController extends Controller
     /**
      * The form for an order taken over the phone or on Messenger.
      */
-    public function create()
+    public function create(Request $request)
     {
+        // Arriving from "Convert to order" on a lead: the form opens with her
+        // details and basket already in it, so the call is about closing the
+        // sale rather than re-typing what we already captured.
+        $cart = ($id = (int) $request->query('from_cart'))
+            ? \App\Models\AbandonedCart::find($id)
+            : null;
+
         return view('admin.orders.create', [
             'products' => \App\Models\Product::where('status', 'published')
                 ->orderBy('name')
                 ->get(['id', 'name', 'sku', 'price', 'has_variants', 'manage_stock', 'stock_quantity']),
             'shipInside' => (float) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
             'shipOutside' => (float) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
+            'cart' => $cart,
+            'prefill' => $cart ? $this->cartPrefill($cart) : null,
         ]);
+    }
+
+    /**
+     * A lead's snapshot, re-read against the live catalogue and shaped for the
+     * manual order form.
+     *
+     * The snapshot records what the customer saw, which may no longer be true:
+     * a piece can have been unpublished, a size deactivated, the last one sold.
+     * Rather than let the form fail on save, anything that cannot be carried
+     * over is left off and said plainly, so she knows what to discuss before
+     * she rings.
+     *
+     * @return array{customer:array<string,mixed>,lines:array<int,array<string,mixed>>,notices:array<int,string>}
+     */
+    protected function cartPrefill(\App\Models\AbandonedCart $cart): array
+    {
+        $rows = collect($cart->items ?? []);
+
+        $products = \App\Models\Product::with('variants')
+            ->whereIn('id', $rows->pluck('product_id')->filter()->unique()->all())
+            ->get()->keyBy('id');
+
+        $lines = [];
+        $notices = [];
+
+        foreach ($rows as $row) {
+            $name = $row['name'] ?? 'Item';
+            $qty = max(1, (int) ($row['qty'] ?? 1));
+            $product = $products->get($row['product_id'] ?? null);
+
+            if (! $product || $product->status !== 'published') {
+                $notices[] = $name.' is no longer on sale, so it is not on the form.';
+
+                continue;
+            }
+
+            $variantId = null;
+            $variant = null;
+
+            if (! empty($row['variant_id'])) {
+                $variant = $product->variants->firstWhere('id', $row['variant_id']);
+                if ($variant && $variant->is_active) {
+                    $variantId = $variant->id;
+                } else {
+                    $variant = null;
+                    $notices[] = $name.': the option they chose is gone — agree another before saving.';
+                }
+            } elseif ($product->has_variants) {
+                $notices[] = $name.' has options and the basket never recorded one — set the price by hand.';
+            }
+
+            $stock = $variant ? (int) $variant->stock_quantity : (int) $product->stock_quantity;
+            if (($variant || $product->manage_stock) && $stock < $qty) {
+                $notices[] = $name.': only '.max(0, $stock).' left, and the basket has '.$qty.'.';
+            }
+
+            $lines[] = [
+                'product_id' => $product->id,
+                'variant_id' => $variantId,
+                'qty' => $qty,
+                // The price they were shown, not today's — that is the figure
+                // she is ringing to honour. Editable like any other line.
+                'price' => isset($row['price']) ? (float) $row['price'] : '',
+                'variation' => $variant?->label,
+            ];
+        }
+
+        if (empty($lines)) {
+            $notices[] = 'Nothing in this basket can still be sold — add the products by hand.';
+        }
+
+        return [
+            'customer' => [
+                'name' => $cart->name,
+                'phone' => $cart->phone,
+                'email' => $cart->email,
+                'address' => $cart->address,
+                'area' => $cart->area,
+                'is_inside_dhaka' => (bool) $cart->is_inside_dhaka,
+            ],
+            'lines' => $lines,
+            'notices' => $notices,
+        ];
     }
 
     /**
@@ -520,6 +612,7 @@ class OrderController extends Controller
             'shipping_cost' => ['nullable', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'status' => ['nullable', 'in:'.implode(',', array_keys(Order::STATUSES))],
+            'abandoned_cart_id' => ['nullable', 'integer', 'exists:abandoned_carts,id'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'lines.*.variant_id' => ['nullable', 'integer'],
@@ -533,6 +626,16 @@ class OrderController extends Controller
             $order = $creator->handle($data, $data['lines']);
         } catch (\App\Exceptions\CheckoutException $e) {
             return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        // A lead she chased and closed. CreateManualOrder has already flipped
+        // every cart on this phone to recovered; this records which one became
+        // this order, so the lead can be opened from the sale and back again.
+        if ($cartId = $data['abandoned_cart_id'] ?? null) {
+            $order->forceFill(['abandoned_cart_id' => $cartId])->save();
+
+            return redirect()->route('admin.orders.show', $order)
+                ->with('success', 'Order '.$order->order_number.' created, and the lead is marked recovered.');
         }
 
         return redirect()->route('admin.orders.show', $order)

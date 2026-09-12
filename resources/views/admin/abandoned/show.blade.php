@@ -31,12 +31,30 @@
             @csrf
             <button class="btn-outline py-2 text-sm" @disabled(! $smsReady || $cart->recovered)>💬 Send SMS</button>
         </form>
+
+        {{-- She has her on the phone and the customer says yes. This takes the
+             basket straight to the manual order form rather than making her
+             re-type a name, address and six line items that we already hold. --}}
+        @unless($cart->recovered)
+            <a href="{{ route('admin.orders.create', ['from_cart' => $cart->id]) }}"
+               class="btn-primary py-2 text-sm">✓ Convert to order</a>
+        @endunless
     </div>
 </div>
 
 @if($cart->recovered)
-    <div class="card p-4 mt-4 border-green-200 bg-green-50 text-sm text-green-800">
-        This cart was recovered — an order came through on this number after the checkout was abandoned.
+    <div class="card p-4 mt-4 border-green-200 bg-green-50 text-sm text-green-800 flex flex-wrap items-center justify-between gap-3">
+        <span>
+            @if($cart->recoveredOrder)
+                This lead became order {{ $cart->recoveredOrder->order_number }}.
+            @else
+                This cart was recovered — an order came through on this number after the checkout was abandoned.
+            @endif
+        </span>
+        @if($cart->recoveredOrder)
+            <a href="{{ route('admin.orders.show', $cart->recoveredOrder) }}"
+               class="font-medium text-green-900 underline shrink-0">Open the order →</a>
+        @endif
     </div>
 @endif
 

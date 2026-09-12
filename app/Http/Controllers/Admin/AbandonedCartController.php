@@ -47,6 +47,7 @@ class AbandonedCartController extends Controller
                 });
             })
             ->withCount('contacts')
+            ->with('recoveredOrder:id,order_number,abandoned_cart_id')
             ->latest()
             ->paginate(25)
             ->withQueryString();
@@ -66,7 +67,7 @@ class AbandonedCartController extends Controller
 
     public function show(AbandonedCart $cart)
     {
-        $cart->load(['contacts.user']);
+        $cart->load(['contacts.user', 'recoveredOrder']);
 
         return view('admin.abandoned.show', [
             'cart' => $cart,

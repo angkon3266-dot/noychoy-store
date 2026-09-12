@@ -128,6 +128,15 @@
                             @else
                                 <span class="badge bg-amber-100 text-amber-700">Waiting</span>
                             @endif
+                            {{-- Only a lead converted by hand knows its order;
+                                 one that recovered on its own is matched by
+                                 phone alone and has nothing to point at. --}}
+                            @if($cart->recoveredOrder)
+                                <div class="text-[11px] mt-0.5" onclick="event.stopPropagation()">
+                                    <a href="{{ route('admin.orders.show', $cart->recoveredOrder) }}"
+                                       class="text-gold-700 hover:underline">Order {{ $cart->recoveredOrder->order_number }}</a>
+                                </div>
+                            @endif
                             @if($cart->contacts_count)
                                 <div class="text-[11px] text-ink-700/45 mt-0.5">{{ $cart->contacts_count }} follow-up(s)</div>
                             @elseif($cart->sms_reminded_at)

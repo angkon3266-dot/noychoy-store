@@ -42,6 +42,7 @@ class Order extends Model
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'card_message', 'is_gift', 'source', 'stock_restored',
         'source_channel', 'source_campaign', 'source_content', 'source_referrer', 'first_touch_channel', 'landing_path',
+        'abandoned_cart_id',
     ];
 
     protected $casts = [
@@ -126,6 +127,12 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /** The lead this order was converted from, when it was one. */
+    public function abandonedCart(): BelongsTo
+    {
+        return $this->belongsTo(AbandonedCart::class);
     }
 
     public function items(): HasMany
