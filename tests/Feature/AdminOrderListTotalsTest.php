@@ -164,13 +164,13 @@ class AdminOrderListTotalsTest extends TestCase
         $this->assertSame('Her Piece', $queue->first()->name);
     }
 
-    public function test_the_panel_covers_every_status_when_the_list_does(): void
+    public function test_the_panel_covers_every_unfinished_status_when_the_list_does(): void
     {
         $a = $this->product('Piece A');
         $b = $this->product('Piece B');
 
         $this->order('40001', 'booked', $a, 1, 1000);
-        $this->order('40002', 'delivered', $b, 1, 1000);
+        $this->order('40002', 'cancelled', $b, 1, 1000);
 
         $res = $this->actingAs($this->admin())
             ->get('/admin/orders?status=all')
@@ -178,6 +178,55 @@ class AdminOrderListTotalsTest extends TestCase
 
         $this->assertCount(2, $res->viewData('processingItems'));
         $this->assertSame('All orders', $res->viewData('queueLabel'));
+    }
+
+    // ── Delivered parcels are finished work ──────────────────────────────────
+
+    public function test_a_delivered_parcel_is_not_something_left_to_pack(): void
+    {
+        $waiting = $this->product('Waiting Piece');
+        $done = $this->product('Delivered Piece');
+
+        $this->order('40001', 'booked', $waiting, 1, 1000);
+        $this->order('40002', 'delivered', $done, 4, 1000);
+
+        $queue = $this->actingAs($this->admin())
+            ->get('/admin/orders?status=all')
+            ->assertOk()
+            ->viewData('processingItems');
+
+        $this->assertCount(1, $queue);
+        $this->assertSame('Waiting Piece', $queue->first()->name);
+        $this->assertSame(1, (int) $queue->sum('qty'), 'the four delivered pieces are not waiting on anyone');
+    }
+
+    public function test_the_delivered_filter_shows_an_empty_queue_rather_than_finished_work(): void
+    {
+        $done = $this->product('Delivered Piece');
+        $this->order('40001', 'delivered', $done, 2, 1000);
+
+        $res = $this->actingAs($this->admin())
+            ->get('/admin/orders?status=delivered')
+            ->assertOk();
+
+        // The order is still in the table — only the "to prepare" panel treats
+        // it as finished.
+        $this->assertSame(1, $res->viewData('pageTotals')['orders']);
+        $this->assertCount(0, $res->viewData('processingItems'));
+    }
+
+    public function test_a_partly_delivered_parcel_still_needs_settling(): void
+    {
+        $part = $this->product('Part Returned Piece');
+        $this->order('40001', 'partially_delivered', $part, 2, 1000);
+
+        $queue = $this->actingAs($this->admin())
+            ->get('/admin/orders?status=all')
+            ->assertOk()
+            ->viewData('processingItems');
+
+        $this->assertCount(1, $queue);
+        $this->assertSame(2, (int) $queue->first()->qty);
     }
 
     public function test_a_trashed_order_is_not_in_the_prepare_queue(): void

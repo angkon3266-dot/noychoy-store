@@ -414,7 +414,8 @@
             <span class="badge bg-amber-100 text-amber-700 text-[10px] shrink-0">{{ $processingItems->sum('qty') }} units</span>
         </div>
         <p class="text-xs text-ink-700/50 mb-3">
-            Every piece across the orders this filter is showing{{ $search !== '' ? ', matching your search' : '' }}.
+            Still to pack across the orders this filter is showing{{ $search !== '' ? ', matching your search' : '' }} —
+            delivered parcels left out.
         </p>
         @forelse($processingItems as $it)
             <div class="flex items-start gap-2.5 py-2 border-b border-ink-50 last:border-0 text-sm">
@@ -433,7 +434,13 @@
                 <span class="shrink-0 font-semibold text-gold-700">×{{ $it->qty }}</span>
             </div>
         @empty
-            <p class="text-sm text-ink-700/50">No pieces to prepare in {{ $queueLabel }}. 🎉</p>
+            <p class="text-sm text-ink-700/50">
+                @if($queueLabel === 'Delivered')
+                    Every parcel here is delivered — nothing left to pack. 🎉
+                @else
+                    Nothing left to pack in {{ $queueLabel }}. 🎉
+                @endif
+            </p>
         @endforelse
     </aside>
     </div>

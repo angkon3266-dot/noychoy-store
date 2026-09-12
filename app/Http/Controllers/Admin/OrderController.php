@@ -106,7 +106,15 @@ class OrderController extends Controller
             ->whereHas('order', function ($q) use ($trashed, $selected, $term, $search) {
                 $q->when($trashed, fn ($b) => $b->onlyTrashed())
                     ->when($selected->isNotEmpty(), fn ($b) => $b->whereIn('status', $selected->all()))
-                    ->when($term !== '', $search);
+                    ->when($term !== '', $search)
+                    // A delivered parcel is not work waiting to be done, so its
+                    // pieces never belong in a "to prepare" count — most
+                    // visibly on the All view, where months of finished sales
+                    // would otherwise swamp the handful still to pack.
+                    // `partially_delivered` is deliberately NOT excluded: part
+                    // of that parcel came back and somebody still has to
+                    // settle it.
+                    ->where('status', '!=', 'delivered');
             })
             ->select('product_id', 'name', DB::raw('SUM(quantity) as qty'), DB::raw('COUNT(DISTINCT order_id) as orders'))
             ->groupBy('product_id', 'name')
