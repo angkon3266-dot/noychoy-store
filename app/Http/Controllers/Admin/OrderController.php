@@ -185,7 +185,7 @@ class OrderController extends Controller
 
     public function show(Order $order, CustomerInsight $insight, SteadfastService $steadfast)
     {
-        $order->load('items', 'history', 'shipment', 'customer');
+        $order->load('items.product.images', 'items.variant.image', 'history', 'shipment', 'customer');
 
         // Best-effort live Steadfast status refresh for this order's consignment.
         //
@@ -205,7 +205,7 @@ class OrderController extends Controller
                     // A settled courier outcome moves the order with it.
                     if (app(TransitionOrderStatus::class)
                         ->applyCourierStatus($order, $status['delivery_status'], 'Courier sync')) {
-                        $order->refresh()->load('items', 'history', 'shipment', 'customer');
+                        $order->refresh()->load('items.product.images', 'items.variant.image', 'history', 'shipment', 'customer');
                     }
                 }
             } catch (\Throwable $e) {

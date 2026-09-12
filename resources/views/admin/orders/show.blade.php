@@ -121,12 +121,28 @@
                 <table class="w-full text-sm">
                     <tbody class="divide-y divide-ink-100">
                         @foreach($order->items as $item)
+                            @php
+                                // Prefer the exact variation's photo, same as the packing label,
+                                // so the picture matches the colour/size actually ordered.
+                                $itemImg = $item->variant?->image?->url ?? $item->product?->thumbnail;
+                            @endphp
                             <tr>
-                                <td class="px-5 py-3">{{ $item->name }}
-                                    @if($item->attributes)<span class="text-xs text-ink-700/50">({{ collect($item->attributes)->implode(', ') }})</span>@endif
-                                    <div class="text-xs text-ink-700/40">
-                                        @if($item->product)Product ID #{{ $item->product->serial }}@endif
-                                        @if($item->sku) · SKU {{ $item->sku }}@endif
+                                <td class="px-5 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded bg-gold-100 overflow-hidden shrink-0">
+                                            @if($itemImg)
+                                                <img src="{{ $itemImg }}" loading="lazy" alt=""
+                                                     class="w-full h-full object-cover">
+                                            @endif
+                                        </div>
+                                        <div>
+                                            {{ $item->name }}
+                                            @if($item->attributes)<span class="text-xs text-ink-700/50">({{ collect($item->attributes)->implode(', ') }})</span>@endif
+                                            <div class="text-xs text-ink-700/40">
+                                                @if($item->product)Product ID #{{ $item->product->serial }}@endif
+                                                @if($item->sku) · SKU {{ $item->sku }}@endif
+                                            </div>
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="px-5 py-3 text-ink-700/70">{{ money($item->price) }} × {{ $item->quantity }}</td>
