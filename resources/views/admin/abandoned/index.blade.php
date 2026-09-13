@@ -33,6 +33,9 @@
 @endunless
 
 <div class="flex flex-wrap items-center gap-2 mb-4">
+    <a href="{{ route('admin.abandoned.anonymous') }}" class="btn-outline py-2 text-sm">
+        Carts with no contact details →
+    </a>
     <form method="GET" class="flex flex-wrap gap-2">
         @if($filter)<input type="hidden" name="filter" value="{{ $filter }}">@endif
         <input name="q" value="{{ $q }}" placeholder="Name or phone…" class="input py-2 w-56">

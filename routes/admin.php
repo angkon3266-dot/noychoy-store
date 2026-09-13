@@ -280,7 +280,10 @@ Route::middleware('admin')->group(function () {
 
     Route::get('abandoned-carts', [AbandonedCartController::class, 'index'])->name('abandoned.index');
     Route::post('abandoned-carts/bulk', [AbandonedCartController::class, 'bulk'])->name('abandoned.bulk');
-    Route::get('abandoned-carts/{cart}', [AbandonedCartController::class, 'show'])->name('abandoned.show')->missing($leadIsGone);
+    // Before the {cart} route, and {cart} only ever matches digits — a literal
+    // segment registered after a greedy placeholder never gets a look in.
+    Route::get('abandoned-carts/anonymous', [AbandonedCartController::class, 'anonymous'])->name('abandoned.anonymous');
+    Route::get('abandoned-carts/{cart}', [AbandonedCartController::class, 'show'])->name('abandoned.show')->whereNumber('cart')->missing($leadIsGone);
     Route::post('abandoned-carts/{cart}/log', [AbandonedCartController::class, 'logContact'])->name('abandoned.log')->missing($leadIsGone);
     Route::post('abandoned-carts/{cart}/sms', [AbandonedCartController::class, 'sendSms'])->name('abandoned.sms')->missing($leadIsGone);
     Route::patch('abandoned-carts/{cart}/contacted', [AbandonedCartController::class, 'markContacted'])->name('abandoned.contacted')->missing($leadIsGone);

@@ -36,6 +36,12 @@ class TrafficSource
         'sms' => ['label' => 'SMS', 'color' => 'amber'],
         'push' => ['label' => 'Push notification', 'color' => 'violet'],
         'referral' => ['label' => 'Other website', 'color' => 'amber'],
+        // Not a traffic source — nobody arrives this way. CreateManualOrder
+        // stamps it on an order taken by hand, and without an entry here
+        // label() fell through to 'Direct', so the dashboard showed two
+        // rows both called Direct: real visitors, and staff-typed orders
+        // with zero visitors behind them.
+        'admin' => ['label' => 'Added by staff', 'color' => 'ink'],
     ];
 
     /** Referrer host fragment → channel. Checked as substrings, longest first. */

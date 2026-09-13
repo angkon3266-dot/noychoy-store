@@ -358,7 +358,10 @@
              "we could not name this", so leaving it closed answers nothing. --}}
         <div class="card p-5">
             <h2 class="font-semibold mb-1">Where visitors come from</h2>
-            <p class="text-xs text-ink-700/55 mb-3">Visitors and what each channel earned — {{ $per }}. Tap a row for the detail.</p>
+            <p class="text-xs text-ink-700/55 mb-3">
+                Visitors and what each channel earned — {{ $per }}. Tap a row for the detail.
+                Each step below is counted as a share of the step before it.
+            </p>
             @forelse($deep['sources'] as $s)
                 @php $hasDetail = ! empty($s['sites']) || ! empty($s['campaigns']); @endphp
                 <div class="py-2 border-b border-ink-100 last:border-0" x-data="{ open: false }">
@@ -379,6 +382,30 @@
                         <span>{{ $s['orders'] }} order{{ $s['orders'] === 1 ? '' : 's' }}{{ $s['rate'] !== null ? ' · '.$s['rate'].'% convert' : '' }}</span>
                         <span class="font-medium text-ink-700/80">{{ money($s['revenue']) }}</span>
                     </div>
+
+                    {{-- Where this channel's people stopped. Each percentage is
+                         of the step above it, not of all visitors: "8 reached
+                         checkout, 2 ordered" is the sentence that says whether
+                         the traffic is wrong or the checkout is. --}}
+                    <div class="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-md bg-ink-100 text-center">
+                        @foreach([
+                            ['Cart', $s['carted'], $s['carted_rate']],
+                            ['Checkout', $s['checkout'], $s['checkout_rate']],
+                            ['Ordered', $s['orders'], $s['order_rate']],
+                        ] as [$stepLabel, $stepCount, $stepRate])
+                            <div class="bg-white px-1 py-1.5">
+                                <div class="text-[10px] uppercase tracking-wide text-ink-700/45">{{ $stepLabel }}</div>
+                                <div class="text-sm font-semibold {{ $stepCount ? '' : 'text-ink-700/30' }}">{{ number_format($stepCount) }}</div>
+                                <div class="text-[10px] text-ink-700/45">{{ $stepRate !== null ? $stepRate.'%' : '—' }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if($s['visitors'] === 0 && $s['orders'] > 0)
+                        <p class="mt-1 text-[11px] text-ink-700/45">
+                            No visits behind these — orders typed in by hand, so there is no funnel to measure.
+                        </p>
+                    @endif
                     @if($hasDetail)
                         <div x-show="open" x-cloak x-collapse class="mt-2 pl-1 border-l-2 border-ink-100 space-y-1">
                             @foreach($s['sites'] as $site)

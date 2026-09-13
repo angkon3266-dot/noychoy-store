@@ -381,6 +381,17 @@ class DashboardAnalytics
                 ->selectRaw("COALESCE(NULLIF(source_channel, ''), 'direct') as channel, COUNT(*) as orders, SUM(total) as revenue")
                 ->groupBy('channel')->get()->keyBy('channel');
 
+            // The two steps between arriving and ordering. Without them a
+            // channel that sends 900 visitors and no orders looks identical
+            // whether nobody wanted the jewellery or everybody balked at the
+            // checkout — and those call for opposite fixes.
+            $step = fn (string $event) => $range->constrain(Visit::where('event', $event))
+                ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, COUNT(DISTINCT visitor_token) as c")
+                ->groupBy('channel')->pluck('c', 'channel');
+
+            $carted = $step('cart_add');
+            $checkout = $step('checkout_start');
+
             // The referring sites behind each channel, biggest first.
             $sites = $range->constrain(Visit::query())
                 ->whereNotNull('referrer_host')->where('referrer_host', '!=', '')
@@ -402,19 +413,31 @@ class DashboardAnalytics
                 ->values()->all();
 
             return $visitors->keys()->merge($sales->keys())->unique()
-                ->map(function ($channel) use ($visitors, $sales, $sites, $campaigns, $top) {
+                ->map(function ($channel) use ($visitors, $sales, $sites, $campaigns, $top, $carted, $checkout) {
                     $v = (int) ($visitors[$channel] ?? 0);
                     $row = $sales[$channel] ?? null;
                     $orders = (int) ($row->orders ?? 0);
+                    $addedToCart = (int) ($carted[$channel] ?? 0);
+                    $startedCheckout = (int) ($checkout[$channel] ?? 0);
+
+                    // Share of the people who got this far, not of all visitors:
+                    // "1 in 4 who reached checkout ordered" is the sentence that
+                    // tells the owner where the leak is.
+                    $of = fn (int $part, int $whole) => $whole > 0 ? round($part / $whole * 100, 1) : null;
 
                     return [
                         'channel' => $channel,
                         'label' => \App\Support\TrafficSource::label($channel),
                         'visitors' => $v,
+                        'carted' => $addedToCart,
+                        'checkout' => $startedCheckout,
                         'orders' => $orders,
                         'revenue' => round((float) ($row->revenue ?? 0), 2),
                         // Conversion is only meaningful when we saw the visits.
-                        'rate' => $v > 0 ? round($orders / $v * 100, 1) : null,
+                        'rate' => $of($orders, $v),
+                        'carted_rate' => $of($addedToCart, $v),
+                        'checkout_rate' => $of($startedCheckout, $addedToCart),
+                        'order_rate' => $of($orders, $startedCheckout),
                         'sites' => $top($sites, $channel, 'referrer_host'),
                         'campaigns' => $top($campaigns, $channel, 'campaign'),
                     ];

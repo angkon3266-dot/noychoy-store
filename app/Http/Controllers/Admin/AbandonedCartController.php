@@ -9,9 +9,11 @@ use App\Models\AbandonedCartContact;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Visit;
+use App\Services\AnonymousCartInsight;
 use App\Services\CustomerInsight;
 use App\Services\SmsService;
 use App\Support\AbandonedCartOutreach;
+use App\Support\DateRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -62,6 +64,23 @@ class AbandonedCartController extends Controller
             'recoveredValue' => (float) AbandonedCart::where('recovered', true)
                 ->where('updated_at', '>=', now()->subDays(30))->sum('subtotal'),
             'smsReady' => app(SmsService::class)->isEnabled(),
+        ]);
+    }
+
+    /**
+     * The carts nobody can chase: filled, then left without a phone number.
+     *
+     * The list screen above is everyone who typed a contact detail. This is the
+     * much larger group who did not — no name to call, but their behaviour is
+     * the clearest evidence the store has of which pieces get picked up and put
+     * back down, and where the buying stops.
+     */
+    public function anonymous(Request $request, AnonymousCartInsight $insight)
+    {
+        $range = DateRange::fromRequest($request);
+
+        return view('admin.abandoned.anonymous', $insight->report($range) + [
+            'range' => $range,
         ]);
     }
 
