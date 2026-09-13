@@ -183,8 +183,18 @@
     </table>
 </div>
 
-<p class="mt-4 text-[11px] text-ink-700/45">
-    A shopper counts as “no contact” when no lead was captured against her browser. Leads captured before
-    9 September 2026 were stored without that reference, so a small number of early callers may appear here too.
-</p>
+<div class="mt-4 space-y-1 text-[11px] text-ink-700/45">
+    <p>
+        A shopper counts as “no contact” when no lead was captured against her browser. Leads captured before
+        9 September 2026 were stored without that reference, so a small number of early callers may appear here too.
+    </p>
+    @if($summary['automated'])
+        <p>
+            {{ number_format($summary['automated']) }} session(s) were left out of every figure above: they added to the
+            cart more than {{ \App\Services\AnonymousCartInsight::ADD_CEILING }} times, or added without ever loading a
+            page. Those are scripts, not shoppers, and counting them put pieces at the top of the list that no person
+            had reached for.
+        </p>
+    @endif
+</div>
 @endsection

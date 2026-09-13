@@ -47,6 +47,14 @@ class AnonymousCartInsightTest extends TestCase
     /** A browser that added to the cart, and optionally opened the checkout. */
     protected function browse(string $token, ?Product $product, float $value, bool $checkout = false, string $source = 'direct'): void
     {
+        // A real shopper reaches the add-to-cart button through the site. The
+        // report throws away sessions that never loaded a page, so a fixture
+        // without this is testing the bot filter, not the feature.
+        Visit::firstOrCreate(
+            ['visitor_token' => $token, 'event' => 'product'],
+            ['path' => '/product/x', 'source' => $source],
+        );
+
         if ($product) {
             Visit::create([
                 'visitor_token' => $token, 'event' => 'cart_add', 'path' => '/cart',
@@ -144,6 +152,7 @@ class AnonymousCartInsightTest extends TestCase
 
         // A row from before the value column existed. Null is not zero, and
         // summing it as zero would report a real basket as nothing.
+        Visit::create(['visitor_token' => 'tok-3', 'event' => 'product', 'path' => '/product/x']);
         Visit::create(['visitor_token' => 'tok-3', 'event' => 'cart_add', 'path' => '/cart',
             'product_id' => $p->id, 'value' => null]);
 
@@ -267,6 +276,42 @@ class AnonymousCartInsightTest extends TestCase
             ->assertOk();
 
         $this->assertSame('/admin/abandoned-carts/anonymous', route('admin.abandoned.anonymous', absolute: false));
+    }
+
+    // ── Sessions that are not people ───────────────────────────────────────
+
+    public function test_a_script_hammering_add_to_cart_is_left_out_and_declared(): void
+    {
+        // Found live: one browser fired eighty-odd adds for the same ring,
+        // never opened the checkout, and took the top of "most wanted" with it.
+        $p = $this->product();
+        $this->browse('tok-human', $p, 1500);
+
+        Visit::create(['visitor_token' => 'tok-bot', 'event' => 'product', 'path' => '/product/x']);
+        for ($i = 0; $i <= AnonymousCartInsight::ADD_CEILING; $i++) {
+            Visit::create(['visitor_token' => 'tok-bot', 'event' => 'cart_add', 'path' => '/cart',
+                'product_id' => $p->id, 'value' => 1500]);
+        }
+
+        $report = $this->report();
+
+        $this->assertSame(1, $report['summary']['sessions'], 'the person, not the script');
+        $this->assertSame(1, $report['summary']['automated'], 'and it says how many it removed');
+        $this->assertSame(1, $report['products']->firstWhere('id', $p->id)['sessions']);
+    }
+
+    public function test_an_add_from_a_browser_that_never_loaded_a_page_is_left_out(): void
+    {
+        $p = $this->product();
+
+        // No page or product view anywhere — it never came through the site.
+        Visit::create(['visitor_token' => 'tok-script', 'event' => 'cart_add', 'path' => '/cart',
+            'product_id' => $p->id, 'value' => 1500]);
+
+        $report = $this->report();
+
+        $this->assertSame(0, $report['summary']['sessions']);
+        $this->assertSame(1, $report['summary']['automated']);
     }
 
     public function test_the_period_buttons_change_the_window(): void

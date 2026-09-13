@@ -28,6 +28,17 @@ class AnonymousCartInsight
     /** Sessions to list. The aggregate counts are over the whole window. */
     public const PAGE = 40;
 
+    /**
+     * More adds than this from one browser and it is not a person shopping.
+     *
+     * Found in the live data: one token fired eighty-odd cart_adds for the same
+     * ring and never once opened the checkout, and it was dragging that piece
+     * to the top of "most wanted". A number had to be picked; this one is well
+     * clear of anything a real basket reaches, and the screen says out loud how
+     * many sessions it removed so the judgement stays the reader's.
+     */
+    public const ADD_CEILING = 25;
+
     public function report(DateRange $range, int $limit = self::PAGE): array
     {
         $summary = $this->summary($range);
@@ -56,6 +67,39 @@ class AnonymousCartInsight
         });
     }
 
+    /**
+     * Drop the browsers that are not shopping.
+     *
+     * Two rules, both from what the live data actually looks like: a session
+     * that added to the cart more times than any basket needs, and a session
+     * that added to the cart having never loaded a page — a real shopper
+     * reaches the button through the site, a script does not.
+     */
+    protected function human($query, DateRange $range)
+    {
+        return $query->whereNotIn('visitor_token', function ($sub) use ($range) {
+            $sub->select('visitor_token')->from('visits');
+            $range->constrain($sub);
+            $sub->groupBy('visitor_token')
+                ->havingRaw("SUM(CASE WHEN event = 'cart_add' THEN 1 ELSE 0 END) > ?", [self::ADD_CEILING])
+                ->orHavingRaw("SUM(CASE WHEN event IN ('page', 'product') THEN 1 ELSE 0 END) = 0");
+        });
+    }
+
+    /** How many sessions the rules above removed, so nothing is hidden. */
+    protected function automated(DateRange $range): int
+    {
+        return $this->anonymous(
+            $range->constrain(Visit::query())->where('event', 'cart_add')
+        )->whereIn('visitor_token', function ($sub) use ($range) {
+            $sub->select('visitor_token')->from('visits');
+            $range->constrain($sub);
+            $sub->groupBy('visitor_token')
+                ->havingRaw("SUM(CASE WHEN event = 'cart_add' THEN 1 ELSE 0 END) > ?", [self::ADD_CEILING])
+                ->orHavingRaw("SUM(CASE WHEN event IN ('page', 'product') THEN 1 ELSE 0 END) = 0");
+        })->distinct()->count('visitor_token');
+    }
+
     /** Tokens that reached the checkout page, as a subquery rather than a list. */
     protected function reachedCheckout($query, DateRange $range)
     {
@@ -67,22 +111,22 @@ class AnonymousCartInsight
 
     protected function summary(DateRange $range): array
     {
-        $sessions = $this->anonymous(
+        $sessions = $this->human($this->anonymous(
             $range->constrain(Visit::query())->whereIn('event', ['cart_add', 'checkout_start'])
-        )->distinct()->count('visitor_token');
+        ), $range)->distinct()->count('visitor_token');
 
-        $checkout = $this->anonymous(
+        $checkout = $this->human($this->anonymous(
             $range->constrain(Visit::query())->where('event', 'checkout_start')
-        )->distinct()->count('visitor_token');
+        ), $range)->distinct()->count('visitor_token');
 
         // Money is summed over cart_add events, so one shopper who added three
         // pieces carries three pieces' worth — the same convention the funnel
         // panel uses. Rows recorded before the value column existed are null,
         // and null is not zero, so they are counted and declared rather than
         // quietly summed away.
-        $value = $this->anonymous(
+        $value = $this->human($this->anonymous(
             $range->constrain(Visit::query())->where('event', 'cart_add')
-        )->selectRaw('SUM(value) as total, SUM(CASE WHEN value IS NULL THEN 1 ELSE 0 END) as unmeasured')->first();
+        ), $range)->selectRaw('SUM(value) as total, SUM(CASE WHEN value IS NULL THEN 1 ELSE 0 END) as unmeasured')->first();
 
         return [
             'sessions' => $sessions,
@@ -92,6 +136,7 @@ class AnonymousCartInsight
             'unmeasured' => (int) ($value->unmeasured ?? 0),
             // For the "and this many did leave a number" comparison.
             'leads' => $range->constrain(AbandonedCart::query())->count(),
+            'automated' => $this->automated($range),
         ];
     }
 
@@ -104,9 +149,9 @@ class AnonymousCartInsight
      */
     protected function products(DateRange $range): Collection
     {
-        $rows = $this->anonymous(
+        $rows = $this->human($this->anonymous(
             $range->constrain(Visit::query())->where('event', 'cart_add')->whereNotNull('product_id')
-        )
+        ), $range)
             ->selectRaw('product_id, COUNT(*) as adds, COUNT(DISTINCT visitor_token) as sessions, SUM(value) as value')
             ->groupBy('product_id')->orderByDesc('sessions')->orderByDesc('adds')->take(25)->get();
 
@@ -118,9 +163,9 @@ class AnonymousCartInsight
         // "picked up 12 times, reached checkout twice" is a different problem
         // from "picked up 12 times, 11 reached checkout".
         $reached = $this->reachedCheckout(
-            $this->anonymous(
+            $this->human($this->anonymous(
                 $range->constrain(Visit::query())->where('event', 'cart_add')->whereNotNull('product_id')
-            ),
+            ), $range),
             $range,
         )->selectRaw('product_id, COUNT(DISTINCT visitor_token) as sessions')
             ->groupBy('product_id')->pluck('sessions', 'product_id');
@@ -163,9 +208,9 @@ class AnonymousCartInsight
     /** One row per anonymous session, newest first. */
     protected function sessions(DateRange $range, int $limit): Collection
     {
-        $rows = $this->anonymous(
+        $rows = $this->human($this->anonymous(
             $range->constrain(Visit::query())->whereIn('event', ['cart_add', 'checkout_start'])
-        )
+        ), $range)
             ->selectRaw(
                 'visitor_token,'
                 .' SUM(CASE WHEN event = \'cart_add\' THEN 1 ELSE 0 END) as adds,'
@@ -314,10 +359,10 @@ class AnonymousCartInsight
         if ($threshold !== null) {
             // Baskets that would have paid postage, counted at the checkout
             // moment because that is when the fee becomes visible.
-            $under = $this->anonymous(
+            $under = $this->human($this->anonymous(
                 $range->constrain(Visit::query())->where('event', 'checkout_start')
                     ->whereNotNull('value')->where('value', '>', 0)->where('value', '<', $threshold)
-            )->distinct()->count('visitor_token');
+            ), $range)->distinct()->count('visitor_token');
 
             $out[] = [
                 'label' => 'Reached checkout under '.money($threshold),

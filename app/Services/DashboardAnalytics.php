@@ -373,9 +373,22 @@ class DashboardAnalytics
     public function trafficSources(DateRange $range, int $limit = 8): \Illuminate\Support\Collection
     {
         return collect($this->remember('src.'.$range->cacheKey().'.'.$limit, function () use ($range, $limit) {
-            $visitors = $range->constrain(Visit::query())
-                ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, COUNT(DISTINCT visitor_token) as c")
-                ->groupBy('channel')->pluck('c', 'channel');
+            // Which channel each visitor belongs to, resolved once for the
+            // window and then used for every step below.
+            //
+            // The source on a row is whatever the request looked like at that
+            // moment, which is why this cannot be grouped straight off the
+            // events: an add-to-cart is a same-site POST with no campaign and
+            // an internal referrer, so EVERY cart_add and checkout_start on
+            // this store records 'direct'. Grouped naively, Facebook Ads shows
+            // thousands of visitors and zero carts while Direct collects the
+            // lot. Counting a visitor once, under the channel that first named
+            // itself, also stops one person being counted under both the ad
+            // that brought them and the direct hits that followed.
+            $channelOf = $this->visitorChannels($range);
+
+            $visitors = $range->constrain(Visit::query())->distinct()->pluck('visitor_token')
+                ->countBy(fn ($token) => $channelOf[$token] ?? 'direct');
 
             $sales = $range->constrain($this->sold())
                 ->selectRaw("COALESCE(NULLIF(source_channel, ''), 'direct') as channel, COUNT(*) as orders, SUM(total) as revenue")
@@ -386,8 +399,8 @@ class DashboardAnalytics
             // whether nobody wanted the jewellery or everybody balked at the
             // checkout — and those call for opposite fixes.
             $step = fn (string $event) => $range->constrain(Visit::where('event', $event))
-                ->selectRaw("COALESCE(NULLIF(source, ''), 'direct') as channel, COUNT(DISTINCT visitor_token) as c")
-                ->groupBy('channel')->pluck('c', 'channel');
+                ->distinct()->pluck('visitor_token')
+                ->countBy(fn ($token) => $channelOf[$token] ?? 'direct');
 
             $carted = $step('cart_add');
             $checkout = $step('checkout_start');
@@ -445,6 +458,28 @@ class DashboardAnalytics
                 ->sortByDesc(fn ($r) => [$r['revenue'], $r['visitors']])
                 ->take($limit)->values()->all();
         }, $range->cacheSeconds()));
+    }
+
+    /**
+     * visitor_token → the channel that brought them, for one window.
+     *
+     * First touch that named itself, matching how an order is attributed in
+     * Visit::attributionFor(): a direct hit partway through a session must not
+     * erase the ad click that started it. Anyone with no named touch at all is
+     * genuinely direct and is left out of the map.
+     *
+     * @return \Illuminate\Support\Collection<string, string>
+     */
+    protected function visitorChannels(DateRange $range): \Illuminate\Support\Collection
+    {
+        return $range->constrain(Visit::query())
+            ->whereNotNull('source')->where('source', '!=', '')->where('source', '!=', 'direct')
+            ->selectRaw('visitor_token, source, MIN(created_at) as seen')
+            ->groupBy('visitor_token', 'source')
+            ->orderBy('seen')
+            ->get()
+            ->groupBy('visitor_token')
+            ->map(fn ($rows) => $rows->first()->source);
     }
 
     /**
