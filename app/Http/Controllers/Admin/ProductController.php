@@ -20,10 +20,16 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * The product list as the filters in the URL describe it.
+     *
+     * Shared with the CSV export, so "export" means exactly the list the admin
+     * is looking at — the search, the category, the status — and not silently
+     * the whole catalogue.
+     */
+    private function filtered(Request $request)
     {
-        $products = Product::query()
-            ->with('primaryImage', 'category', 'categories')
+        return Product::query()
             ->search($request->query('q'))
             ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
             ->when($request->query('type') === 'simple', fn ($q) => $q->where('has_variants', false))
@@ -37,6 +43,12 @@ class ProductController extends Controller
                 ->where('custom_value', 'like', "%{$c}%")
                 ->orWhere('custom_label', 'like', "%{$c}%")
                 ->orWhere('custom_fields', 'like', "%{$c}%")));
+    }
+
+    public function index(Request $request)
+    {
+        $products = $this->filtered($request)
+            ->with('primaryImage', 'category', 'categories');
 
         // Sort: newest (default), product ID (serial), name, price, stock.
         $products = match ($request->query('sort')) {
@@ -63,6 +75,128 @@ class ProductController extends Controller
         $bulkCategories = Category::orderBy('name')->get(['id', 'name']);
 
         return view('admin.products.index', compact('products', 'allTags', 'bulkCategories'));
+    }
+
+    /**
+     * This one product's details as a CSV.
+     *
+     * Same columns as the catalogue export, one row long — for sending a piece
+     * to a photographer, a marketplace listing, or a courier who wants the
+     * weight and the price in writing.
+     */
+    public function exportOne(Product $product)
+    {
+        return $this->productCsv(
+            Product::whereKey($product->id)->with(self::EXPORT_RELATIONS),
+            Str::slug($product->name).'-details',
+        );
+    }
+
+    /** The product list the admin is looking at, as a CSV. */
+    public function export(Request $request)
+    {
+        return $this->productCsv(
+            $this->filtered($request)->with(self::EXPORT_RELATIONS)->orderBy('name'),
+            'products',
+        );
+    }
+
+    private const EXPORT_RELATIONS = ['category', 'categories', 'images', 'variants', 'approvedReviews'];
+
+    /**
+     * Write products out as a CSV.
+     *
+     * The first eleven columns are exactly what the importer reads, in its
+     * order, so an exported file can be edited in Excel and imported straight
+     * back. Everything after them is detail the importer ignores.
+     */
+    private function productCsv($query, string $name)
+    {
+        $filename = Str::slug(store_name()).'-'.$name.'-'.now()->format('Y-m-d').'.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ];
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM, so Excel reads Bangla correctly
+
+            fputcsv($out, [
+                // The importer's columns, in the importer's order.
+                'name', 'product_id', 'price', 'sku', 'category', 'stock', 'status',
+                'short_description', 'description', 'meta_description', 'tags',
+                // Detail the importer ignores.
+                'id', 'slug', 'compare_at_price', 'cost_price', 'transport_cost', 'weight',
+                'all_categories', 'colors', 'type', 'variants', 'featured', 'bestseller',
+                'preorder', 'custom_fields', 'images', 'videos', 'views', 'loves',
+                'reviews', 'average_rating', 'url', 'created_at', 'updated_at',
+            ]);
+
+            // Chunked: a catalogue export must not hold every product, its
+            // images and its variants in memory at once on a shared host.
+            $query->chunk(200, function ($products) use ($out) {
+                foreach ($products as $p) {
+                    fputcsv($out, [
+                        $p->name,
+                        $p->serial,
+                        $this->plainDecimal($p->price),
+                        $p->sku,
+                        $p->category?->name,
+                        $p->manage_stock ? $p->stock_quantity : '',
+                        $p->status,
+                        $p->short_description,
+                        $p->description,
+                        $p->meta_description,
+                        $p->tags,
+                        $p->id,
+                        $p->slug,
+                        $this->plainDecimal($p->compare_at_price),
+                        $this->plainDecimal($p->cost_price),
+                        $this->plainDecimal($p->transport_cost),
+                        $this->plainDecimal($p->weight),
+                        $p->categories->pluck('name')->join(', '),
+                        collect($p->colors ?? [])->join(', '),
+                        $p->has_variants ? 'variable' : 'simple',
+                        // A variant that inherits the product's price has none
+                        // of its own, so the piece is left out rather than
+                        // written as a dash with nothing after it.
+                        $p->variants->map(fn ($v) => collect([
+                            collect($v->attributes ?? [])->map(fn ($val, $key) => "$key: $val")->join(' / '),
+                            $this->plainDecimal($v->price),
+                            'stock '.$v->stock_quantity,
+                            $v->sku,
+                        ])->filter(fn ($part) => filled($part))->join(' — '))->join(' | '),
+                        $p->is_featured ? 'yes' : '',
+                        $p->is_bestseller ? 'yes' : '',
+                        $p->is_preorder ? 'yes' : '',
+                        collect($p->customFieldList())
+                            ->map(fn ($f) => ($f['label'] ?? '').': '.($f['value'] ?? ''))->join(' | '),
+                        $p->images->pluck('url')->join(' | '),
+                        collect($p->video_urls ?? [])->join(' | '),
+                        $p->views,
+                        $p->loves_count,
+                        $p->approvedReviews->count(),
+                        $p->average_rating,
+                        route('product.show', $p),
+                        store_time($p->created_at)?->format('Y-m-d H:i'),
+                        store_time($p->updated_at)?->format('Y-m-d H:i'),
+                    ]);
+                }
+            });
+
+            fclose($out);
+        }, $filename, $headers);
+    }
+
+    /**
+     * A price as digits Excel will not reformat, and blank where there is no
+     * number — an empty cell reads better than a column of 0.00.
+     */
+    private function plainDecimal($value): string
+    {
+        return $value === null || $value === '' ? '' : number_format((float) $value, 2, '.', '');
     }
 
     public function importForm()

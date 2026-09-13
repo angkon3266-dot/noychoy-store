@@ -45,6 +45,9 @@
         <button class="btn-outline">Filter</button>
     </form>
     <div class="flex gap-2">
+        {{-- Carries the filters, so this exports the list actually on screen --}}
+        <a href="{{ route('admin.products.export', request()->query()) }}" class="btn-outline"
+           title="Download these products as a CSV — opens in Excel">Export CSV</a>
         <a href="{{ route('admin.products.import') }}" class="btn-outline">Import CSV</a>
         <a href="{{ route('admin.products.create') }}" class="btn-primary">+ Add product</a>
     </div>

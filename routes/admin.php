@@ -65,6 +65,9 @@ Route::middleware('admin')->group(function () {
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
     Route::get('products/import', [ProductController::class, 'importForm'])->name('products.import');
     Route::post('products/import', [ProductController::class, 'import'])->name('products.import.store');
+    // Above `products/{product}/…` so "export" is never read as a slug.
+    Route::get('products/export', [ProductController::class, 'export'])->name('products.export');
+    Route::get('products/{product}/export', [ProductController::class, 'exportOne'])->name('products.export-one');
     Route::post('products', [ProductController::class, 'store'])->name('products.store');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
