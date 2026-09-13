@@ -34,6 +34,12 @@
         <span class="text-ink-700/50 text-sm shrink-0" x-text="open ? '− Close' : '+ Add reviews'"></span>
     </button>
 
+    <p class="text-xs text-ink-700/50 mt-2">
+        Have the whole backlog in a spreadsheet already?
+        <a href="{{ route('admin.reviews.import') }}" class="text-gold-700 underline">Import a CSV</a> —
+        many products at once, each row with its own date.
+    </p>
+
     <form action="{{ route('admin.reviews.store') }}" method="POST" enctype="multipart/form-data" class="mt-4" x-show="open" x-cloak>
         @csrf
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

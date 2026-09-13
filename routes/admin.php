@@ -258,6 +258,9 @@ Route::middleware('admin')->group(function () {
     // Reviews (moderation, and writing down what arrived in Messenger)
     Route::get('reviews', [ReviewController::class, 'index'])->name('reviews.index');
     Route::post('reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    // Declared above `reviews/{review}` so "import" is never read as an id.
+    Route::get('reviews/import', [ReviewController::class, 'importForm'])->name('reviews.import');
+    Route::post('reviews/import', [ReviewController::class, 'import'])->name('reviews.import.store');
     Route::patch('reviews/{review}/status', [ReviewController::class, 'updateStatus'])->name('reviews.status');
     Route::patch('reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
     Route::delete('reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
