@@ -255,9 +255,11 @@ Route::middleware('admin')->group(function () {
     Route::post('purchase-orders-fetch-image', [PurchaseOrderController::class, 'fetchImage'])->name('purchase-orders.fetch-image');
     Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-orders.destroy');
 
-    // Reviews (moderation)
+    // Reviews (moderation, and writing down what arrived in Messenger)
     Route::get('reviews', [ReviewController::class, 'index'])->name('reviews.index');
+    Route::post('reviews', [ReviewController::class, 'store'])->name('reviews.store');
     Route::patch('reviews/{review}/status', [ReviewController::class, 'updateStatus'])->name('reviews.status');
+    Route::patch('reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
     Route::delete('reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
 
     // Abandoned carts (lead follow-up)

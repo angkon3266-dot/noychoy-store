@@ -124,7 +124,7 @@ class ProductPageData
                     'rating' => (int) $r->rating,
                     'author' => $r->author_name,
                     'verified' => (bool) $r->is_verified_buyer,
-                    'date' => $r->created_at->format('d M Y'),
+                    'date' => store_time($r->created_at)->format('d M Y'),
                     'title' => $r->title,
                     'body' => $r->body,
                     'photos' => $r->photo_urls ?: [],

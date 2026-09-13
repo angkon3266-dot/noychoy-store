@@ -1350,6 +1350,34 @@ document.addEventListener('alpine:init', () => {
         get json() { return JSON.stringify(this.items); },
     }));
 
+    // ── Admin: typing in a batch of reviews that arrived in Messenger ────────
+    //
+    // Rows are keyed by a made-up id rather than their position, so adding or
+    // removing one never re-labels the file input a row already holds.
+    window.Alpine.data('reviewBatch', (oldRows, today) => {
+        let seq = 0;
+        const blank = () => ({
+            id: 'r' + (seq++), author_name: '', reviewed_on: today, rating: '5',
+            phone: '', title: '', body: '', is_verified_buyer: false,
+        });
+
+        return {
+            open: false,
+            rows: (oldRows || []).length
+                ? oldRows.map((r) => Object.assign(blank(), r, {
+                    rating: String(r.rating || 5),
+                    is_verified_buyer: r.is_verified_buyer === '1' || r.is_verified_buyer === true,
+                }))
+                : [blank()],
+            // A batch is usually one conversation's worth of messages, so a new
+            // row starts on the date the row above it carries.
+            addRow() {
+                const last = this.rows[this.rows.length - 1];
+                this.rows.push(Object.assign(blank(), { reviewed_on: last ? last.reviewed_on : today }));
+            },
+        };
+    });
+
     // ── Admin: homepage section/block builder ───────────────────────────────
     window.Alpine.data('homeBuilder', (init) => ({
         blocks: (init && init.blocks) || [],
