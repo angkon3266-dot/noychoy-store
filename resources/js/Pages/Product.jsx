@@ -729,11 +729,11 @@ function StorySections({ sections }) {
 }
 
 function Description({ text }) {
-    // Collapsed by default at the owner's call (2026-09-10): the descriptions
-    // run long, and on a phone they pushed the Details table, reviews and the
-    // bundle far below the fold. The copy stays in the DOM either way, so this
-    // is a tap to open, not content that has to be fetched.
-    const [open, setOpen] = useState(false);
+    // Open by default at the owner's call (2026-09-14), reversing the collapse
+    // of 2026-09-10: shoppers were missing the copy entirely rather than being
+    // helped by the shorter page. The toggle stays, so it can still be folded
+    // away once read.
+    const [open, setOpen] = useState(true);
     if (!text) return null;
     return (
         <section className="mt-12 max-w-3xl border-t border-ink-100 pt-8">
