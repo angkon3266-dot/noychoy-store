@@ -25,8 +25,9 @@ class ConversationLog
      * @param  string  $uid       the widget's per-session conversation id
      * @param  string  $question  the customer's message
      * @param  array   $result    AssistantService::reply()'s return value
+     * @param  bool    $closed    whether this exchange closed the chat
      */
-    public function record(Request $request, string $uid, string $question, array $result): ?AssistantConversation
+    public function record(Request $request, string $uid, string $question, array $result, bool $closed = false): ?AssistantConversation
     {
         try {
             $uid = substr(trim($uid), 0, 64);
@@ -47,6 +48,8 @@ class ConversationLog
                 'ua' => $conversation->ua ?: substr((string) $request->userAgent(), 0, 255),
                 'last_message_at' => now(),
                 'had_failure' => $conversation->had_failure || ! $ok,
+                // Stamped once: the moment the guard stopped answering here.
+                'blocked_at' => $conversation->blocked_at ?: ($closed ? now() : null),
             ]);
             $conversation->save();
 

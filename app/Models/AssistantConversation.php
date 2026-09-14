@@ -14,13 +14,14 @@ class AssistantConversation extends Model
 {
     protected $fillable = [
         'uid', 'customer_id', 'visitor_token', 'first_page', 'last_page', 'ua',
-        'message_count', 'had_failure', 'last_message_at',
+        'message_count', 'had_failure', 'last_message_at', 'blocked_at',
     ];
 
     protected $casts = [
         'message_count' => 'integer',
         'had_failure' => 'boolean',
         'last_message_at' => 'datetime',
+        'blocked_at' => 'datetime',
     ];
 
     public function messages(): HasMany

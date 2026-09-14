@@ -170,6 +170,7 @@ class ConfigSchema
                     ['key' => 'ai.orders_enabled', 'label' => 'Let the assistant take orders (asks the checkout questions, confirms, then places a cash-on-delivery order)', 'type' => 'bool', 'config' => 'services.openai.orders_enabled', 'env' => 'AI_ASSISTANT_ORDERS'],
                     ['key' => 'ai.orders_per_day', 'label' => 'Most chat orders one visitor may place per day', 'type' => 'number', 'config' => 'services.openai.orders_per_day', 'env' => 'AI_ASSISTANT_ORDERS_PER_DAY'],
                     ['key' => 'ai.orders_max_total', 'label' => 'Biggest order the assistant may place on its own (৳) — above this it hands over to you', 'type' => 'number', 'config' => 'services.openai.orders_max_total', 'env' => 'AI_ASSISTANT_ORDERS_MAX_TOTAL'],
+                    ['key' => 'ai.junk_limit', 'label' => 'Close the chat after this many unanswerable messages in a row (gibberish or off-topic; 0 never closes it)', 'type' => 'number', 'config' => 'services.openai.junk_limit', 'env' => 'AI_ASSISTANT_JUNK_LIMIT'],
                     ['key' => 'ai.api_key', 'label' => 'OpenAI API key', 'type' => 'password', 'config' => 'services.openai.key', 'env' => 'OPENAI_API_KEY', 'sensitive' => true],
                     ['key' => 'ai.model', 'label' => 'Model', 'type' => 'text', 'config' => 'services.openai.model', 'env' => 'OPENAI_MODEL'],
                     ['key' => 'ai.greeting', 'label' => 'Greeting (first bubble)', 'type' => 'text', 'config' => 'services.openai.greeting', 'env' => null],

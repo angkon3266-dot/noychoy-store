@@ -35,13 +35,14 @@ class AssistantChatHistoryTest extends TestCase
         return app(ConversationLog::class);
     }
 
-    private function record(string $uid, string $question, string $reply, bool $ok = true, array $products = []): void
+    private function record(string $uid, string $question, string $reply, bool $ok = true, array $products = [], bool $closed = false): void
     {
         $this->log()->record(
             Request::create('/assistant/chat', 'POST', ['page' => '/shop']),
             $uid,
             $question,
             ['ok' => $ok, 'reply' => $reply, 'products' => $products],
+            $closed,
         );
     }
 
@@ -175,6 +176,33 @@ class AssistantChatHistoryTest extends TestCase
 
         $this->assertStringContainsString('Hard question', $html);
         $this->assertStringNotContainsString('Fine question', $html);
+    }
+
+    public function test_the_closed_as_junk_filter_separates_the_sessions_that_asked_nothing(): void
+    {
+        $this->record('ok1', 'Do you have gold hoops?', 'We do, Madam.');
+        $this->record('junk1', 'Xxxxxxxx', 'I can only help with jewelry.', closed: true);
+
+        $html = $this->actingAs($this->admin())->get('/admin/conversations?filter=blocked')
+            ->assertOk()->getContent();
+
+        $this->assertStringContainsString('Xxxxxxxx', $html);
+        $this->assertStringContainsString('closed as junk', $html);
+        $this->assertStringNotContainsString('Do you have gold hoops?', $html);
+    }
+
+    public function test_a_chat_is_stamped_closed_only_once(): void
+    {
+        $this->record('junk1', 'Lll', 'nudge');
+        $this->assertNull(AssistantConversation::firstWhere('uid', 'junk1')->blocked_at);
+
+        $this->record('junk1', 'Xxxxxxxx', 'closed', closed: true);
+        $stamped = AssistantConversation::firstWhere('uid', 'junk1')->blocked_at;
+        $this->assertNotNull($stamped);
+
+        $this->travel(5)->minutes();
+        $this->record('junk1', 'Ooooo', 'closed', closed: true);
+        $this->assertTrue($stamped->equalTo(AssistantConversation::firstWhere('uid', 'junk1')->blocked_at));
     }
 
     public function test_the_transcript_page_shows_both_sides(): void

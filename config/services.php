@@ -59,6 +59,10 @@ return [
         // above the ceiling is handed to a person instead.
         'orders_per_day' => (int) env('AI_ASSISTANT_ORDERS_PER_DAY', 3),
         'orders_max_total' => (float) env('AI_ASSISTANT_ORDERS_MAX_TOTAL', 20000),
+        // Unanswerable messages in a row before the chat closes itself for
+        // that browser session — gibberish, or anything the model flags as
+        // off the shop's business. 0 switches the guard off entirely.
+        'junk_limit' => (int) env('AI_ASSISTANT_JUNK_LIMIT', 3),
         'key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-5-mini'),
         'reasoning_effort' => env('OPENAI_REASONING_EFFORT', 'low'),

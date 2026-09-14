@@ -116,9 +116,12 @@
     var send = root.querySelector('[data-noy-send]');
     var KEY = 'noychat.v1';
     var CID_KEY = 'noychat.cid';
+    var SHUT_KEY = 'noychat.shut';
     var MAX_TURNS = {{ \App\Services\Ai\AssistantService::MAX_TURNS }};
     var msgs = [];
     var busy = false;
+    var shut = false;
+    try { shut = sessionStorage.getItem(SHUT_KEY) === '1'; } catch (e) {}
 
     try { msgs = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (e) { msgs = []; }
     if (!Array.isArray(msgs)) msgs = [];
@@ -138,6 +141,20 @@
     }
 
     function save() { try { sessionStorage.setItem(KEY, JSON.stringify(msgs.slice(-40))); } catch (e) {} }
+
+    // The server has closed this chat. Lock the box rather than let her keep
+    // typing into a conversation that will not answer, and remember it so a
+    // reload does not hand her a working-looking chat that is not.
+    function shutDown() {
+        shut = true;
+        try { sessionStorage.setItem(SHUT_KEY, '1'); } catch (e) {}
+        input.value = '';
+        input.disabled = true;
+        send.disabled = true;
+        chips.hidden = true;
+        input.placeholder = {!! json_encode($bn ? 'এই চ্যাটটি বন্ধ' : 'This chat is closed') !!};
+    }
+
     function csrf() {
         var m = document.querySelector('meta[name="csrf-token"]');
         return (m && m.getAttribute('content')) || cfg.csrf;
@@ -222,7 +239,7 @@
 
     async function ask(text) {
         text = String(text || '').trim();
-        if (!text || busy) return;
+        if (!text || busy || shut) return;
         busy = true;
         send.disabled = true;
         input.value = '';
@@ -260,15 +277,16 @@
                 save();
                 bubble('assistant', data.reply);
                 cards(data.products);
+                if (data.blocked) shutDown();
             }
         } catch (e) {
             t.remove();
             bubble('assistant', cfg.offline, 'noy-chat__msg--err');
         }
         busy = false;
-        send.disabled = false;
+        send.disabled = shut;
         scroll();
-        input.focus();
+        if (!shut) input.focus();
     }
 
     form.addEventListener('submit', function (e) { e.preventDefault(); ask(input.value); });
@@ -286,7 +304,8 @@
         hideTeaser();
         root.hidden = false;
         renderAll();
-        setTimeout(function () { input.focus(); }, 50);
+        if (shut) shutDown();
+        setTimeout(function () { if (!shut) input.focus(); }, 50);
         document.querySelectorAll('[data-noy-chat-launcher]').forEach(function (b) { b.setAttribute('aria-expanded', 'true'); });
     }
     function close() {
@@ -318,7 +337,7 @@
         clearTimeout(teaseTimer);
     }
     function showTeaser() {
-        if (!teaser || !root.hidden || msgs.length || /^\/checkout/.test(location.pathname)) return;
+        if (!teaser || shut || !root.hidden || msgs.length || /^\/checkout/.test(location.pathname)) return;
         try { if (sessionStorage.getItem(TEASED)) return; } catch (e) {}
         if (!placeTeaser()) return;
         try { sessionStorage.setItem(TEASED, '1'); } catch (e) {}

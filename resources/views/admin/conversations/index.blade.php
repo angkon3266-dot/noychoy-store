@@ -8,7 +8,7 @@
     are actually looking for — and which questions the assistant could not answer.
 </p>
 
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
     <div class="card p-4">
         <p class="text-xs uppercase tracking-wide text-ink-700/50">Conversations</p>
         <p class="text-2xl font-semibold mt-1">{{ number_format($totals['all']) }}</p>
@@ -21,6 +21,11 @@
         <p class="text-xs uppercase tracking-wide text-ink-700/50">Assistant couldn’t answer</p>
         <p class="text-2xl font-semibold mt-1 {{ $totals['failed'] ? 'text-amber-700' : '' }}">{{ number_format($totals['failed']) }}</p>
     </div>
+    <div class="card p-4">
+        <p class="text-xs uppercase tracking-wide text-ink-700/50">Closed as junk</p>
+        <p class="text-2xl font-semibold mt-1">{{ number_format($totals['blocked']) }}</p>
+        <p class="text-xs text-ink-700/45 mt-0.5">Sessions that never asked anything answerable.</p>
+    </div>
 </div>
 
 <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -31,7 +36,7 @@
         @if($q)<a href="{{ route('admin.conversations.index', ['filter' => $filter ?: null]) }}" class="btn-outline py-2 text-sm">Clear</a>@endif
     </form>
     <div class="ml-auto flex flex-wrap gap-2">
-        @foreach(['' => 'All', 'failed' => 'Couldn’t answer', 'members' => 'Members'] as $key => $label)
+        @foreach(['' => 'All', 'failed' => 'Couldn’t answer', 'blocked' => 'Closed as junk', 'members' => 'Members'] as $key => $label)
             <a href="{{ route('admin.conversations.index', array_filter(['filter' => $key ?: null, 'q' => $q ?: null])) }}"
                class="px-3 py-1.5 rounded-full text-sm {{ (string) $filter === (string) $key ? 'bg-ink-800 text-white' : 'bg-ink-100 text-ink-700' }}">{{ $label }}</a>
         @endforeach
@@ -67,6 +72,9 @@
                             </a>
                             @if($c->had_failure)
                                 <span class="badge bg-amber-100 text-amber-800 ml-1">couldn’t answer</span>
+                            @endif
+                            @if($c->blocked_at)
+                                <span class="badge bg-ink-100 text-ink-700 ml-1" title="The assistant stopped answering this session on {{ $c->blocked_at->format('j M, g:ia') }}">closed as junk</span>
                             @endif
                             @if($c->last_page)
                                 <div class="text-xs text-ink-700/40">from {{ $c->last_page }}</div>

@@ -29,6 +29,7 @@ class ConversationController extends Controller
                 fn ($m) => $m->where('content', 'like', '%'.$q.'%'),
             ))
             ->when($filter === 'failed', fn ($b) => $b->where('had_failure', true))
+            ->when($filter === 'blocked', fn ($b) => $b->whereNotNull('blocked_at'))
             ->when($filter === 'members', fn ($b) => $b->whereNotNull('customer_id'))
             ->orderByDesc('last_message_at')
             ->paginate(25)
@@ -52,6 +53,7 @@ class ConversationController extends Controller
             'totals' => [
                 'all' => AssistantConversation::count(),
                 'failed' => AssistantConversation::where('had_failure', true)->count(),
+                'blocked' => AssistantConversation::whereNotNull('blocked_at')->count(),
                 'week' => AssistantConversation::where('last_message_at', '>=', now()->subDays(7))->count(),
             ],
         ]);
