@@ -204,4 +204,41 @@ class AdminReviewImportTest extends TestCase
 
         $this->assertSame(0, Review::count());
     }
+
+    public function test_a_row_dated_after_today_is_held_back_and_reported(): void
+    {
+        // A month-first sheet is the way this goes wrong: 09/10/2026 written
+        // for 10 September reads day first here and becomes 9 October. Dated
+        // ahead, it sorts above every real review on the product page, so the
+        // row is handed back with the reason rather than published.
+        $this->product('Kundan Set', 'kundan-set');
+        $ahead = now(config('store.timezone'))->addMonths(2)->format('d/m/Y');
+
+        $this->importCsv(<<<CSV
+        product,name,rating,date,review
+        Kundan Set,Munia,5,$ahead,Khub shundor
+        Kundan Set,Rima,5,12/08/2026,Valo laglo
+        CSV)->assertSessionHas('import_errors');
+
+        // The sound row still lands; only the impossible one is held back.
+        $this->assertSame(1, Review::count());
+        $this->assertSame('Rima', Review::firstOrFail()->author_name);
+        $this->assertStringContainsString('dated after today', implode(' ', session('import_errors')));
+    }
+
+    public function test_a_blank_date_still_means_today_rather_than_being_held_back(): void
+    {
+        $this->product('Kundan Set', 'kundan-set');
+
+        $this->importCsv(<<<'CSV'
+        product,name,rating,date,review
+        Kundan Set,Munia,5,,Khub shundor
+        CSV);
+
+        $this->assertSame(1, Review::count());
+        $this->assertSame(
+            now(config('store.timezone'))->toDateString(),
+            store_time(Review::firstOrFail()->created_at)->toDateString(),
+        );
+    }
 }

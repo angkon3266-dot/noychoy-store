@@ -196,7 +196,7 @@
                     </div>
                     <div>
                         <label class="label">Date shown</label>
-                        <input type="date" name="reviewed_on" value="{{ store_time($review->created_at)->format('Y-m-d') }}" class="input">
+                        <input type="date" name="reviewed_on" value="{{ store_time($review->created_at)->format('Y-m-d') }}" max="{{ $today }}" class="input">
                     </div>
                     <div>
                         <label class="label">Rating</label>

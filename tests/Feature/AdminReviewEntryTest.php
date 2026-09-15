@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -167,5 +168,58 @@ class AdminReviewEntryTest extends TestCase
         $this->assertSame('Shayla Rahman', $review->author_name);
         $this->assertSame('approved', $review->status);
         $this->assertSame('02 Aug 2026', store_time($review->created_at)->format('d M Y'));
+    }
+
+    public function test_a_review_cannot_be_dated_in_the_future(): void
+    {
+        // A future date is never a real one — nobody has written the review
+        // yet. It also sorts above every genuine review, so one slip puts a
+        // review dated next winter at the top of the product page.
+        $product = $this->product();
+        $ahead = now(config('store.timezone'))->addMonth()->toDateString();
+
+        $this->addReviews($product, [
+            ['author_name' => 'Shayla Rahman', 'rating' => 5, 'reviewed_on' => $ahead],
+        ])->assertSessionHasErrors('reviews.r0.reviewed_on');
+
+        $this->assertSame(0, Review::count());
+    }
+
+    public function test_correcting_a_review_cannot_push_its_date_into_the_future(): void
+    {
+        $product = $this->product();
+        $review = Review::create([
+            'product_id' => $product->id, 'author_name' => 'Shayla',
+            'rating' => 4, 'body' => 'Valo', 'status' => 'approved',
+        ]);
+        $review->created_at = Carbon::parse('2026-08-02 12:00:00');
+        $review->save();
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.reviews.update', $review), [
+                'product_id' => $product->id,
+                'author_name' => 'Shayla',
+                'rating' => 4,
+                'body' => 'Valo',
+                'reviewed_on' => now(config('store.timezone'))->addMonth()->toDateString(),
+                'status' => 'approved',
+            ])->assertSessionHasErrors('reviewed_on');
+
+        // Refused means unchanged, not half-applied.
+        $this->assertSame('02 Aug 2026', store_time($review->refresh()->created_at)->format('d M Y'));
+    }
+
+    public function test_today_is_measured_in_dhaka_so_a_morning_entry_is_not_refused(): void
+    {
+        // 2am in Dhaka is still yesterday on a UTC server. Measuring "today"
+        // there would refuse the owner the one date they most want to type.
+        $this->travelTo(Carbon::parse('2026-09-16 20:30:00', 'UTC')); // 02:30 on the 17th in Dhaka
+        $product = $this->product();
+
+        $this->addReviews($product, [
+            ['author_name' => 'Shayla Rahman', 'rating' => 5, 'reviewed_on' => '2026-09-17'],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('17 Sep 2026', store_time(Review::firstOrFail()->created_at)->format('d M Y'));
     }
 }

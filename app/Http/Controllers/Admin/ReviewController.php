@@ -63,13 +63,14 @@ class ReviewController extends Controller
             'reviews.*.rating' => ['required', 'integer', 'min:1', 'max:5'],
             'reviews.*.title' => ['nullable', 'string', 'max:150'],
             'reviews.*.body' => ['nullable', 'string', 'max:2000'],
-            'reviews.*.reviewed_on' => ['nullable', 'date'],
+            'reviews.*.reviewed_on' => ['nullable', 'date', 'before_or_equal:'.$this->storeToday()],
             'reviews.*.is_verified_buyer' => ['nullable', 'boolean'],
             'reviews.*.photos' => ['nullable', 'array', 'max:4'],
             'reviews.*.photos.*' => ['image', 'max:5120'],
         ], [
             'reviews.required' => 'Fill in at least one review — a name and what the customer wrote.',
             'reviews.*.author_name.required' => 'Every review needs the customer’s name.',
+            'reviews.*.reviewed_on.before_or_equal' => 'A review cannot be dated in the future — check the date you typed.',
         ]);
 
         $productId = (int) $data['product_id'];
@@ -165,7 +166,7 @@ class ReviewController extends Controller
 
         $status = $request->input('status');
         $created = 0;
-        $reasons = ['no_product' => 0, 'no_name' => 0, 'bad_rating' => 0, 'bad_date' => 0, 'duplicate' => 0];
+        $reasons = ['no_product' => 0, 'no_name' => 0, 'bad_rating' => 0, 'bad_date' => 0, 'future_date' => 0, 'duplicate' => 0];
         $unknownProducts = [];
         $seconds = [];
 
@@ -211,6 +212,17 @@ class ReviewController extends Controller
                 continue;
             }
             $at ??= now();
+
+            // A date after today is a date that was misread, not one a customer
+            // wrote. A month-first sheet is the usual cause: 09/10/2026 meaning
+            // 9 October reads day-first here and lands months ahead, where it
+            // sits at the top of the product page dated next winter. The row is
+            // handed back rather than published into the future.
+            if ($at->isFuture()) {
+                $reasons['future_date']++;
+
+                continue;
+            }
 
             // Re-importing a corrected sheet should not double the reviews, so
             // the same person's same words on the same piece land once.
@@ -266,6 +278,10 @@ class ReviewController extends Controller
         }
         if ($reasons['bad_date']) {
             $notes[] = $reasons['bad_date'].' row(s) had a date that could not be read. Use YYYY-MM-DD (day first for 01/09/2026).';
+        }
+        if ($reasons['future_date']) {
+            $notes[] = $reasons['future_date'].' row(s) were dated after today and were left out.'
+                .' Slash dates are read day first, so write 10/09/2026 for 10 September — not 09/10/2026.';
         }
         if ($reasons['duplicate']) {
             $notes[] = $reasons['duplicate'].' row(s) were already in the store and were left alone.';
@@ -444,9 +460,11 @@ class ReviewController extends Controller
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
             'title' => ['nullable', 'string', 'max:150'],
             'body' => ['nullable', 'string', 'max:2000'],
-            'reviewed_on' => ['nullable', 'date'],
+            'reviewed_on' => ['nullable', 'date', 'before_or_equal:'.$this->storeToday()],
             'status' => ['required', 'in:'.implode(',', array_keys(Review::STATUSES))],
             'is_verified_buyer' => ['nullable', 'boolean'],
+        ], [
+            'reviewed_on.before_or_equal' => 'A review cannot be dated in the future — check the date you typed.',
         ]);
 
         $wasApproved = $review->status === 'approved';
@@ -514,6 +532,18 @@ class ReviewController extends Controller
         }
 
         return Carbon::parse($date.' '.($time ?: now($tz)->format('H:i:s')), $tz)->utc();
+    }
+
+    /**
+     * Today's date in the shop's own timezone.
+     *
+     * The server keeps UTC, so between midnight and 6am in Dhaka "today" on
+     * the server is still yesterday — and a review the owner dates today would
+     * be refused as being in the future.
+     */
+    private function storeToday(): string
+    {
+        return now(config('store.timezone', 'Asia/Dhaka'))->toDateString();
     }
 
     /** Verified = this phone has an order containing this product. */
