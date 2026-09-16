@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\Storefront\PdpPoints;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -143,6 +144,7 @@ class CategoryController extends Controller
             'google_category' => ['nullable', 'string', 'max:120'],
             'meta_title' => ['nullable', 'string', 'max:200'],
             'meta_description' => ['nullable', 'string', 'max:300'],
+            ...PdpPoints::rules(),
         ]);
         $data['is_active'] = $request->boolean('is_active');
         $data['is_preorder'] = $request->boolean('is_preorder');
@@ -150,6 +152,12 @@ class CategoryController extends Controller
         $data['google_category'] = $data['google_category'] ?: null;
         $data['parent_id'] = $data['parent_id'] ?: null;
         unset($data['image']); // handled by caller
+
+        // Only the full form carries the editor; anything else leaves the list alone.
+        unset($data['pdp_points'], $data['pdp_points_custom']);
+        if ($request->has('pdp_points_custom')) {
+            $data['pdp_points'] = PdpPoints::fromRequest($request->only('pdp_points', 'pdp_points_custom'));
+        }
 
         return $data;
     }

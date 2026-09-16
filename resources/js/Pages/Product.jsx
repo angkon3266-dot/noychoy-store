@@ -377,7 +377,7 @@ function Gallery({ product, img, setImg, variantId }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────────── */
-function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, trustBadges, reviews, loved, lovesCount, ui }) {
+function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, reviews, loved, lovesCount, ui }) {
     const { add } = useCart();
     const preorder = product.preorder;
 
@@ -537,16 +537,19 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, trustBadge
                 </div>
             )}
 
-            {/* Trust badges — the vertical promise list beside the buy button */}
-            {trustBadges?.length > 0 && (
-                <ul className="mt-6 space-y-2.5">
-                    {trustBadges.map((b, i) => (
-                        <li key={i} className="flex items-center gap-3 text-sm text-ink-800">
-                            <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5 shrink-0 text-gold-700" />
-                            <span>{b.title}{b.text ? <span className="text-ink-700/70"> — {b.text}</span> : null}</span>
-                        </li>
-                    ))}
-                </ul>
+            {/* "Why buy from us" — product, else category, else store-wide list */}
+            {pdpPoints?.items?.length > 0 && (
+                <div className="mt-6">
+                    {pdpPoints.heading && <p className="mb-3 text-[15px] font-semibold text-ink-900">{pdpPoints.heading}</p>}
+                    <ul className="space-y-2.5">
+                        {pdpPoints.items.map((b, i) => (
+                            <li key={i} className="flex items-start gap-3 text-sm leading-snug text-ink-800">
+                                <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5 shrink-0 text-gold-700" />
+                                <span className="pt-px">{b.title}{b.text ? <span className="text-ink-700/70"> — {b.text}</span> : null}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
             {/* Quantity */}

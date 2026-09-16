@@ -1134,10 +1134,19 @@
         </div>
     </div>
 
+    {{-- Product page points --}}
+    <div class="card p-6" x-show="tab==='branding'">
+        <h2 class="font-semibold mb-1">Product page points</h2>
+        <p class="text-xs text-ink-700/60 mb-4">The “why buy from us” list beside the buy button on every product page. A category or a single product can replace it with its own list (edit the category or product). Remove every point to hide the list.</p>
+        <label class="label">Heading</label>
+        <input name="pdp_points_heading" value="{{ $theme['pdp_points_heading'] ?? '' }}" class="input mb-4" maxlength="80" placeholder="কেন আমাদের থেকে কিনবেন?">
+        @include('admin.partials.pdp-points-editor', ['points' => $theme['pdp_points'] ?? [], 'scope' => 'store'])
+    </div>
+
     {{-- Trust badges --}}
     <div class="card p-6" x-show="tab==='branding'" x-data="{ badges: @js(array_values($theme['trust_badges'] ?? config('theme.defaults.trust_badges', []))) }">
         <h2 class="font-semibold mb-1">Trust badges</h2>
-        <p class="text-xs text-ink-700/60 mb-4">The reassurance strip shown on product &amp; checkout pages. Add, remove or reorder freely — each badge has an icon, a title and an optional line of text.</p>
+        <p class="text-xs text-ink-700/60 mb-4">The reassurance strip shown in the footer and on the ad landing pages (the product page uses <strong>Product page points</strong> above). Add, remove or reorder freely — each badge has an icon, a title and an optional line of text.</p>
         <div class="space-y-3">
             <template x-for="(b, i) in badges" :key="i">
                 <div class="flex gap-2 items-start">

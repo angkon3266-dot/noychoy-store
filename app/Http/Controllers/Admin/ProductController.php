@@ -11,6 +11,7 @@ use App\Services\ImageOptimizer;
 use App\Services\NotificationService;
 use App\Services\StockAlertService;
 use App\Services\WatermarkService;
+use App\Support\Storefront\PdpPoints;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -1072,6 +1073,7 @@ class ProductController extends Controller
             'category_id' => ['nullable', 'exists:categories,id'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['integer', 'exists:categories,id'],
+            ...PdpPoints::rules(),
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'product_type' => ['nullable', 'in:simple,variable'],
@@ -1217,6 +1219,12 @@ class ProductController extends Controller
         }
         $validated['_category_ids'] = $catIds;          // consumed by syncCategories
         unset($validated['category_ids']);
+
+        // Only the full form carries the "why buy" editor; anything else leaves the list alone.
+        unset($validated['pdp_points'], $validated['pdp_points_custom']);
+        if ($request->has('pdp_points_custom')) {
+            $validated['pdp_points'] = PdpPoints::fromRequest($request->only('pdp_points', 'pdp_points_custom'));
+        }
 
         // Slug: sanitise whatever was typed into a clean, unique slug so editing it
         // never fails on odd characters or a collision with another product.

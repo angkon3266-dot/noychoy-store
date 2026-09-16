@@ -37,8 +37,8 @@ class PdpContentTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Product')
                 // The config default promise list, whatever its current wording.
-                ->has('trustBadges', count(config('theme.defaults.trust_badges')))
-                ->where('trustBadges.0.title', config('theme.defaults.trust_badges.0.title'))
+                ->has('pdpPoints.items', count(config('theme.defaults.pdp_points')))
+                ->where('pdpPoints.items.0.title', config('theme.defaults.pdp_points.0.title'))
                 ->missing('care')
                 ->missing('returns')
                 ->missing('refundUrl')

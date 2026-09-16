@@ -156,6 +156,23 @@ return [
             ['icon' => 'tag', 'title' => 'ন্যায্য দাম', 'text' => 'কোনো বাড়তি মার্কআপ নেই'],
             ['icon' => 'shieldCheck', 'title' => 'অথেনটিক কোয়ালিটি গ্যারান্টি', 'text' => 'প্রতিটি পিস হাতে চেক করে পাঠানো হয়'],
         ],
+
+        // The product page's own list beside the buy button (Appearance →
+        // Product page points), overridable per category and per product —
+        // see App\Support\Storefront\PdpPoints. Owner's wording, 2026-09-16.
+        // The return promise is the check-at-the-door one: open it in front
+        // of the rider, hand it back for the delivery charge only.
+        'pdp_points_heading' => 'কেন আমাদের থেকে কিনবেন?',
+        'pdp_points' => [
+            ['icon' => 'diamond', 'title' => 'আসল 3A ও 5A গ্রেডের কিউবিক জিরকোনিয়া', 'text' => 'বাজারের সস্তা প্লাস্টিক পাথর নয়'],
+            ['icon' => 'tag', 'title' => 'গ্রেড অনুযায়ী ন্যায্য দাম', 'text' => 'সাথে সূক্ষ্ম, ইউনিক ডিজাইন'],
+            ['icon' => 'shieldCheck', 'title' => 'পাথর খুলে পড়ার ভয় নেই', 'text' => 'প্রতিটি পাথর ক্লো সেটিং-এ যত্ন করে হাতে বসানো'],
+            ['icon' => 'sparkle', 'title' => 'রং সহজে কালো হয় না', 'text' => 'যত্নে রাখলে দীর্ঘদিন উজ্জ্বল থাকে'],
+            ['icon' => 'cash', 'title' => 'ক্যাশ অন ডেলিভারি', 'text' => 'রাইডারের সামনে খুলে দেখুন, পছন্দ না হলে শুধু ডেলিভারি চার্জ দিয়ে ফেরত দিন'],
+            ['icon' => 'trackBox', 'title' => 'ড্যামেজ হলে আমাদের খরচে নতুন পিস', 'text' => 'প্রতিটি পিস চেক করে পাঠানো হয়'],
+            ['icon' => 'gift', 'title' => 'উপহারের জন্য প্রস্তুত', 'text' => 'সুন্দর বক্সে প্যাক করে পাঠানো হয়'],
+            ['icon' => 'truck', 'title' => 'সারা বাংলাদেশে দ্রুত ডেলিভারি', 'text' => ''],
+        ],
     ],
 
     // Homepage templates (brand-inspired presets). Each maps to a Blade view.

@@ -11,7 +11,7 @@ class Category extends Model
 {
     protected $fillable = [
         'name', 'slug', 'parent_id', 'description', 'image', 'product_template', 'google_category',
-        'position', 'is_active', 'is_preorder', 'meta_title', 'meta_description',
+        'position', 'is_active', 'is_preorder', 'meta_title', 'meta_description', 'pdp_points',
     ];
 
     /**
@@ -39,6 +39,7 @@ class Category extends Model
         'is_active' => 'boolean',
         'is_preorder' => 'boolean',
         'position' => 'integer',
+        'pdp_points' => 'array',
     ];
 
     protected static function booted(): void

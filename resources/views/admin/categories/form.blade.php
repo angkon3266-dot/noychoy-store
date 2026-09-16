@@ -35,6 +35,16 @@
                 <div><label class="label">SEO title</label><input name="meta_title" value="{{ old('meta_title', $category->meta_title) }}" class="input"></div>
                 <div><label class="label">SEO description</label><input name="meta_description" value="{{ old('meta_description', $category->meta_description) }}" class="input"></div>
             </div>
+
+            <div class="border-t border-ink-100 pt-4">
+                <h2 class="font-semibold">Product page points</h2>
+                <p class="text-xs text-ink-700/60 mb-3">The “why buy from us” list beside the buy button, for every product in this category. A product can still set its own.</p>
+                @include('admin.partials.pdp-points-editor', [
+                    'points' => old('pdp_points_custom') !== null ? (old('pdp_points_custom') ? old('pdp_points') : null) : $category->pdp_points,
+                    'inherited' => \App\Support\Storefront\PdpPoints::inheritedForCategory($category),
+                    'inheritsFrom' => $category->parent ? 'the parent category, or the store-wide list' : 'the store-wide list (Appearance)',
+                ])
+            </div>
         </div>
 
         <div class="card p-5 h-fit space-y-4">

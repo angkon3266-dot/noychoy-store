@@ -112,6 +112,12 @@ class AppearanceController extends Controller
             'menu_icon_height' => ['nullable', 'integer', 'min:16', 'max:80'],
             // Editable trust strip
             'trust_badges' => ['nullable', 'array'],
+            // Product page "why buy" list (store-wide; categories/products can override)
+            'pdp_points_heading' => ['nullable', 'string', 'max:80'],
+            'pdp_points' => ['nullable', 'array', 'max:'.\App\Support\Storefront\PdpPoints::MAX],
+            'pdp_points.*.icon' => ['nullable', 'string', 'max:24'],
+            'pdp_points.*.title' => ['nullable', 'string', 'max:80'],
+            'pdp_points.*.text' => ['nullable', 'string', 'max:140'],
             'trust_badges.*.icon' => ['nullable', 'string', 'max:24'],
             'trust_badges.*.title' => ['nullable', 'string', 'max:40'],
             'trust_badges.*.text' => ['nullable', 'string', 'max:60'],
@@ -440,6 +446,14 @@ class AppearanceController extends Controller
                 ])
                 ->filter(fn ($b) => $b['title'] !== '')
                 ->values()->all();
+        }
+
+        // Product page points. The editor always posts its heading field, so
+        // its presence says the card was on the page — an empty list then
+        // means "show nothing", not "field missing".
+        if ($request->has('pdp_points_heading')) {
+            $current['pdp_points_heading'] = trim((string) $request->input('pdp_points_heading'));
+            $current['pdp_points'] = \App\Support\Storefront\PdpPoints::clean($data['pdp_points'] ?? []);
         }
 
         // Announcement messages: one per line -> array

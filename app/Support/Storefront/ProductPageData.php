@@ -112,10 +112,10 @@ class ProductPageData
                 'message' => $o->message,
                 'until' => $o->expires_at?->format('d M Y'),
             ]),
-            // The vertical badge list beside the buy button. Uncapped here —
-            // the footer strip keeps its own take(3) in HandleInertiaRequests.
-            'trustBadges' => collect(theme('trust_badges') ?? [])
-                ->filter(fn ($b) => filled($b['title'] ?? null))->take(6)->values(),
+            // The "why buy from us" list beside the buy button: the product's
+            // own, else its category's, else the store-wide one. The footer
+            // strip still reads theme.trust_badges in HandleInertiaRequests.
+            'pdpPoints' => PdpPoints::for($product),
             'reviews' => [
                 'avg' => $product->average_rating,
                 'count' => $count,

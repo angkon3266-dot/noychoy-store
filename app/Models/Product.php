@@ -27,7 +27,7 @@ class Product extends Model
         'quantity_offers', 'upsell_ids', 'cross_sell_ids',
         'is_preorder', 'preorder_release_date', 'preorder_note', 'tags', 'colors',
         'custom_label', 'custom_value', 'custom_show', 'custom_fields', 'loves_count',
-        'is_bestseller', 'video_urls', 'content_sections',
+        'is_bestseller', 'video_urls', 'content_sections', 'pdp_points',
     ];
 
     protected $casts = [
@@ -55,6 +55,7 @@ class Product extends Model
         'is_bestseller' => 'boolean',
         'video_urls' => 'array',
         'content_sections' => 'array',
+        'pdp_points' => 'array',
         'announced_at' => 'datetime',
         'preorder_announced_at' => 'datetime',
     ];

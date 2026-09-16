@@ -407,6 +407,17 @@
                 </div>
             </div>
 
+            <!-- "Why buy from us" points beside the buy button -->
+            <div class="card p-6">
+                <h2 class="font-semibold">Product page points</h2>
+                <p class="text-xs text-ink-700/60 mb-3">The “why buy from us” list beside the buy button. Leave it inheriting unless this piece needs different promises.</p>
+                @include('admin.partials.pdp-points-editor', [
+                    'points' => old('pdp_points_custom') !== null ? (old('pdp_points_custom') ? old('pdp_points') : null) : $product->pdp_points,
+                    'inherited' => \App\Support\Storefront\PdpPoints::inheritedFor($product->exists ? $product : null),
+                    'inheritsFrom' => 'its category, or the store-wide list if the category has none',
+                ])
+            </div>
+
             <!-- Story sections (editorial image + text blocks shown on the product page) -->
             <div class="card p-6 space-y-4"
                  x-data="sectionBuilder(@js($product->content_sections ?? []), {
