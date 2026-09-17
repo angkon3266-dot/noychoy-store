@@ -4,6 +4,7 @@ import Layout from '../Shared/Chrome/Layout';
 import { fetchJson, money } from '../Shared/format';
 import Icon from '../Shared/Icons';
 import MemberPill from '../Shared/MemberPill';
+import { useCart } from '../Shared/CartContext';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
 // what "the same number" is — and so "017 1234 5678" is not silently dropped.
@@ -54,6 +55,27 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     // page they have already seen the cart, and the only thing they still need
     // in front of them is the total, which the fold's own header carries.
     const [summaryOpen, setSummaryOpen] = useState(false);
+
+    // Taking a piece out without leaving the checkout (owner, 2026-09-17).
+    // The line goes through the same remove the mini-cart uses, so the header
+    // count follows; then only the props that depend on the basket are
+    // re-read. A partial reload tells the server this is the same checkout, so
+    // it records no second checkout start and sends Meta no second
+    // InitiateCheckout. Removing the last piece sends her back to the cart,
+    // because the checkout redirects an empty basket there.
+    const { remove: removeFromCart } = useCart();
+    const [removing, setRemoving] = useState(null);
+    const removeItem = async (key) => {
+        if (!key || removing) return;
+        setRemoving(key);
+        await removeFromCart(key);
+        router.reload({
+            only: ['items', 'summary', 'coupon', 'freeShipping', 'gift', 'loyalty', 'cart', 'ladder', 'flash', 'errors'],
+            preserveScroll: true,
+            onSuccess: () => setLive(null),
+            onFinish: () => setRemoving(null),
+        });
+    };
     // A coupon applied or rejected answers back into this card, so never leave
     // the verdict behind a fold the customer just closed by navigating.
     const flash = props.flash || {};
@@ -371,8 +393,17 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                             )}
                             <div className="space-y-3 max-h-64 overflow-y-auto">
                                 {items.map((item, i) => (
-                                    <div key={i} className="flex justify-between text-sm gap-2">
-                                        <span className="text-ink-700/80">{item.name} <span className="text-ink-700/70">× {item.qty}</span></span>
+                                    <div key={item.key || i} className={`flex items-start justify-between text-sm gap-2 ${removing === item.key ? 'opacity-50' : ''}`}>
+                                        <span className="min-w-0 text-ink-700/80">
+                                            {item.name} <span className="text-ink-700/70">× {item.qty}</span>
+                                            {item.key && (
+                                                <button type="button" onClick={() => removeItem(item.key)} disabled={!!removing}
+                                                        aria-label={`Remove ${item.name}`}
+                                                        className="ml-2 inline-flex items-center gap-1 text-xs text-danger-600 hover:underline disabled:opacity-50 align-baseline">
+                                                    <Icon name="close" className="w-3 h-3 shrink-0" />{removing === item.key ? 'Removing…' : 'Remove'}
+                                                </button>
+                                            )}
+                                        </span>
                                         <span className="font-medium shrink-0">{item.lineText}</span>
                                     </div>
                                 ))}

@@ -146,6 +146,11 @@ Route::middleware('admin')->group(function () {
     // Declared above orders/{order} so neither is read as an order id.
     Route::get('orders/product-search', [OrderController::class, 'productSearch'])
         ->middleware('throttle:120,1')->name('orders.product-search');
+    // The manual order form's customer picker, and the coupons waiting for a number.
+    Route::get('orders/customer-search', [OrderController::class, 'customerSearch'])
+        ->middleware('throttle:120,1')->name('orders.customer-search');
+    Route::get('orders/coupon-lookup', [OrderController::class, 'couponLookup'])
+        ->middleware('throttle:120,1')->name('orders.coupon-lookup');
     Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
     Route::post('orders/create', [OrderController::class, 'storeManual'])->name('orders.store-manual');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');

@@ -24,11 +24,19 @@ class CheckoutController extends Controller
 {
     public function __construct(protected CartService $cart) {}
 
-    public function show(MetaTrackingService $tracking)
+    public function show(Request $request, MetaTrackingService $tracking)
     {
         if ($this->cart->isEmpty()) {
             return redirect()->route('cart')->with('error', 'Your cart is empty.');
         }
+
+        // A partial reload is this page refreshing its own totals — after a
+        // piece is removed from the order summary (owner, 2026-09-17). She is
+        // still on the same checkout, so it is not a second checkout start:
+        // recording one would double the funnel step, and a fresh
+        // InitiateCheckout with a new event id would reach Meta with no browser
+        // twin, because the mounted page does not fire its Pixel again.
+        $refreshing = $request->hasHeader('X-Inertia-Partial-Data');
 
         $customer = auth('customer')->user();
         $address = $customer?->defaultAddress;
@@ -36,9 +44,11 @@ class CheckoutController extends Controller
         // Funnel step for the dashboard's conversion report, carrying what the
         // cart was worth at this moment — the same figure the Meta
         // InitiateCheckout below reports, so the two can be reconciled.
-        Visit::record('checkout_start', [
-            'value' => round((float) ($this->cart->subtotal() - $this->cart->discount()), 2),
-        ]);
+        if (! $refreshing) {
+            Visit::record('checkout_start', [
+                'value' => round((float) ($this->cart->subtotal() - $this->cart->discount()), 2),
+            ]);
+        }
 
         // InitiateCheckout — server-side (CAPI) + shared event id for the browser
         // Pixel. content_ids match the catalog retailer_id.
@@ -53,7 +63,9 @@ class CheckoutController extends Controller
         // terminate-time read would be a different snapshot.
         $icCount = (int) $this->cart->count();
         $icContext = MetaTrackingService::captureClientContext();
-        app()->terminating(fn () => $tracking->initiateCheckout($icContentIds, $icValue, $icCount, $icEventId, $user, $icContext));
+        if (! $refreshing) {
+            app()->terminating(fn () => $tracking->initiateCheckout($icContentIds, $icValue, $icCount, $icEventId, $user, $icContext));
+        }
 
         $loyalty = app(LoyaltyService::class);
         $custPoints = (int) ($customer->points ?? 0);
@@ -82,6 +94,8 @@ class CheckoutController extends Controller
         return Inertia::render('Checkout', [
             'pageTitle' => 'Checkout',
             'items' => $this->cart->items()->map(fn ($i) => [
+                // The cart line key, so the summary can remove this line.
+                'key' => $i['key'],
                 'name' => $i['name'],
                 'qty' => $i['qty'],
                 'lineText' => money($i['price'] * $i['qty']),

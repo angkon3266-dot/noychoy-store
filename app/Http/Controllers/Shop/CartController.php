@@ -445,7 +445,7 @@ class CartController extends Controller
         $phone = $this->cart->checkoutPhone();
 
         if ($coupon->reservedForSomeoneElse($phone)) {
-            return back()->with('error', 'This code was issued to a different customer.');
+            return back()->with('error', 'This code is for a different phone number.');
         }
 
         // Per-customer cap (best-effort here; re-checked under a lock at checkout).

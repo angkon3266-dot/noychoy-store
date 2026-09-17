@@ -72,7 +72,7 @@
 <div class="card overflow-x-auto">
     <table class="w-full min-w-[720px] text-sm">
         <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
-            <tr><th class="px-3 py-3 w-8"></th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Orders</th><th class="px-4 py-3">Spent</th><th class="px-4 py-3">Points</th><th class="px-4 py-3">Last order</th><th class="px-4 py-3">Type</th></tr>
+            <tr><th class="px-3 py-3 w-8"></th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Orders</th><th class="px-4 py-3">Spent</th><th class="px-4 py-3">Points</th><th class="px-4 py-3">Last order</th><th class="px-4 py-3">Type</th><th class="px-4 py-3"><span class="sr-only">Actions</span></th></tr>
         </thead>
         <tbody class="divide-y divide-ink-100">
             @forelse($customers as $c)
@@ -90,9 +90,19 @@
                         @if($c->total_orders > 1)<span class="badge bg-violet-100 text-violet-700 text-[10px]">🔁 Repeat</span>@endif
                         @if($c->password)<span class="badge bg-gold-100 text-gold-800 text-[10px]">Member</span>@else<span class="badge bg-ink-100 text-ink-600 text-[10px]">Guest</span>@endif
                     </td>
+                    {{-- A repeat buyer on the phone, straight into the order form
+                         with her details filled in (owner, 2026-09-17: "add
+                         option so I can create new order from customer list").
+                         The click stops here so the row does not also open the
+                         customer page underneath it. Blacklisted customers keep
+                         the button; the form warns before anything is saved. --}}
+                    <td class="px-4 py-3 text-right">
+                        <a href="{{ route('admin.orders.create', ['customer' => $c->id]) }}" onclick="event.stopPropagation()"
+                           class="btn-outline py-1 text-xs whitespace-nowrap">+ New order</a>
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No customers found.</td></tr>
+                <tr><td colspan="8" class="px-4 py-10 text-center text-ink-700/50">No customers found.</td></tr>
             @endforelse
         </tbody>
     </table>

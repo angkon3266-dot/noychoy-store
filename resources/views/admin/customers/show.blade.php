@@ -3,7 +3,13 @@
 @section('heading', 'Customer · '.$customer->name)
 
 @section('content')
-<a href="{{ route('admin.customers.index') }}" class="text-sm text-gold-700 hover:underline">← All customers</a>
+<div class="flex flex-wrap items-center justify-between gap-3">
+    <a href="{{ route('admin.customers.index') }}" class="text-sm text-gold-700 hover:underline">← All customers</a>
+
+    {{-- The manual order form, opened with this customer's name, number and
+         last delivery details already in it (owner, 2026-09-17). --}}
+    <a href="{{ route('admin.orders.create', ['customer' => $customer->id]) }}" class="btn-primary py-2 text-sm">+ New order</a>
+</div>
 
 <div class="grid lg:grid-cols-3 gap-6 mt-4">
     <div class="lg:col-span-2 space-y-6">

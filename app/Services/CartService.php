@@ -795,7 +795,7 @@ class CartService
         }
 
         if ($coupon->reservedForSomeoneElse($this->checkoutPhone())) {
-            return 'Code '.$coupon->code.' belongs to a different account.';
+            return 'Code '.$coupon->code.' is for a different phone number.';
         }
 
         // She typed a code but an assigned one is worth more, so the total moved

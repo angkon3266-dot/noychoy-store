@@ -118,11 +118,51 @@ class Coupon extends Model
      */
     public function reservedForSomeoneElse(?string $phone): bool
     {
-        if (blank($this->reserved_for_phone) || blank($phone)) {
+        if (blank($phone)) {
             return false;
         }
 
-        return bd_phone($phone) !== bd_phone($this->reserved_for_phone);
+        if (filled($this->reserved_for_phone) && bd_phone($phone) !== bd_phone($this->reserved_for_phone)) {
+            return true;
+        }
+
+        // A coupon given a list of phone numbers belongs to those numbers, typed
+        // or applied (owner, 2026-09-17: "whenever that phone number is used,
+        // the customer gets the coupon against that number"). Before, the list
+        // only decided who it applied itself to, and anyone told the code
+        // could still type it.
+        return ($this->audience ?? 'all') === 'phones'
+            && ! $this->recipients()->where('phone', bd_phone($phone))->exists();
+    }
+
+    /**
+     * The coupons waiting for this phone number that could still be spent.
+     *
+     * "Waiting for" means named for it: on a phone list, or reserved for it.
+     * Used where an order is taken for a known number outside the storefront
+     * cart — the admin's manual order form — so a coupon the owner gave a
+     * customer is not forgotten when the order comes in by phone.
+     *
+     * @return \Illuminate\Support\Collection<int, static>
+     */
+    public static function assignedTo(?string $phone): \Illuminate\Support\Collection
+    {
+        if (blank($phone) || ($phone = bd_phone($phone)) === '') {
+            return collect();
+        }
+
+        return static::query()
+            ->where('is_active', true)
+            ->where(fn ($w) => $w->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
+            ->where(fn ($w) => $w->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit'))
+            ->where(fn ($w) => $w->where('reserved_for_phone', $phone)
+                ->orWhere(fn ($l) => $l->where('audience', 'phones')
+                    ->whereHas('recipients', fn ($r) => $r->where('phone', $phone))))
+            ->orderByDesc('id')
+            ->get()
+            ->reject(fn (self $coupon) => $coupon->customerLimitReached($phone))
+            ->values();
     }
 
     /**

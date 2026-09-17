@@ -93,6 +93,28 @@ class CouponAutoApplyTest extends TestCase
         $this->assertSame(200.0, $cart->couponDiscount());
     }
 
+    /**
+     * One coupon per customer is exactly what typing numbers into a coupon
+     * invites, so an old personal coupon must not fall out of reach behind a
+     * cap on how many automatic coupons are considered.
+     */
+    public function test_an_old_personal_coupon_still_finds_its_phone_behind_many_newer_ones(): void
+    {
+        $old = $this->coupon(['code' => 'OLDFRIEND', 'audience' => 'phones', 'type' => 'fixed', 'value' => 150]);
+        CouponRecipient::create(['coupon_id' => $old->id, 'phone' => '01712345678']);
+
+        for ($i = 1; $i <= 60; $i++) {
+            $newer = $this->coupon(['code' => 'EACH'.$i, 'audience' => 'phones', 'type' => 'fixed', 'value' => 100]);
+            CouponRecipient::create(['coupon_id' => $newer->id, 'phone' => '0191100'.str_pad((string) $i, 4, '0', STR_PAD_LEFT)]);
+        }
+
+        $cart = $this->cartWith($this->product(['price' => 2000]));
+        $cart->rememberCheckoutPhone('01712345678');
+
+        $this->assertSame('OLDFRIEND', $cart->coupon()?->code);
+        $this->assertSame(150.0, $cart->couponDiscount());
+    }
+
     public function test_someone_elses_assigned_coupon_does_not_apply(): void
     {
         $coupon = $this->coupon(['audience' => 'phones']);

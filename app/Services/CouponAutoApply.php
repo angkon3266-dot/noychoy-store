@@ -36,7 +36,7 @@ class CouponAutoApply
         $best = null;
         $bestValue = 0.0;
 
-        foreach ($this->candidates() as $coupon) {
+        foreach ($this->candidates()->merge($this->listedFor($phone))->unique('id') as $coupon) {
             if (! $coupon->audienceIncludes($phone)) {
                 continue;
             }
@@ -70,12 +70,41 @@ class CouponAutoApply
      */
     protected function candidates(): \Illuminate\Support\Collection
     {
-        return $this->candidates ??= Coupon::autoApplying()->orderByDesc('id')->take(50)->get();
+        return $this->candidates ??= Coupon::autoApplying()
+            ->where('audience', '!=', 'phones')
+            ->orderByDesc('id')->take(50)->get();
+    }
+
+    /**
+     * Phone-list coupons naming this number, looked up by the number itself.
+     *
+     * Kept out of the capped list above: once the owner can type numbers into
+     * a coupon (2026-09-17) she may well make one per customer, and a cap of
+     * the newest fifty would quietly stop the older ones applying themselves
+     * while their codes still worked when typed. Nothing personal is looked up
+     * before a phone is known.
+     *
+     * @var array<string, \Illuminate\Support\Collection>
+     */
+    protected array $listed = [];
+
+    protected function listedFor(?string $phone): \Illuminate\Support\Collection
+    {
+        if (blank($phone) || ($phone = bd_phone($phone)) === '') {
+            return collect();
+        }
+
+        return $this->listed[$phone] ??= Coupon::autoApplying()
+            ->where('audience', 'phones')
+            ->whereHas('recipients', fn ($r) => $r->where('phone', $phone))
+            ->orderByDesc('id')
+            ->get();
     }
 
     /** Drop the memo — for tests and for long-running console work. */
     public function flush(): void
     {
         $this->candidates = null;
+        $this->listed = [];
     }
 }

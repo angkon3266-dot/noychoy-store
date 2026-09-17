@@ -5,10 +5,19 @@
 @section('content')
 @php $c = $editing; @endphp
 <div class="grid lg:grid-cols-3 gap-6">
+    {{-- listed: saving makes this a phone list (numbers in the box, or a list
+         too long to show). clearing: it was a list and the box is now empty,
+         so saving makes it a plain typed code. The phone box and the
+         auto-apply block both read these, so they cannot disagree. --}}
     <div class="card p-6 h-fit lg:sticky lg:top-20"
          x-data="{ scope: '{{ old('applies_to', $c->applies_to ?? 'all') }}', type: '{{ old('type', $c->type ?? 'fixed') }}',
                    auto: {{ old('auto_apply', $c->auto_apply ?? false) ? 'true' : 'false' }},
-                   audience: '{{ old('audience', $c->audience ?? 'all') }}' }">
+                   audience: '{{ old('audience', $c->audience ?? 'all') }}',
+                   hasPhones: {{ filled(old('recipient_phones', $phoneBox['text'])) ? 'true' : 'false' }},
+                   bigList: {{ $phoneBox['append'] ? 'true' : 'false' }},
+                   wasList: {{ $c?->audience === 'phones' ? 'true' : 'false' }},
+                   get listed() { return this.hasPhones || this.bigList },
+                   get clearing() { return this.wasList && ! this.listed } }">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold">{{ $editing ? 'Edit coupon' : 'New coupon' }}</h2>
             @if($editing)<a href="{{ route('admin.coupons.index') }}" class="text-xs text-ink-700/60 hover:underline">+ New instead</a>@endif
@@ -29,6 +38,42 @@
                     </select>
                 </div>
                 <div><label class="label">Value *</label><input name="value" type="number" step="0.01" value="{{ old('value', $c->value ?? '') }}" class="input" required></div>
+            </div>
+
+            {{-- Who the coupon is for, by phone number. Owner, 2026-09-17: "add
+                 option to add phone number in the Coupon — so whenever that
+                 phone number is used, the customer will get the coupon applied
+                 against that number."
+
+                 The list itself was not new — coupon_recipients dates from
+                 1 Sep — but it hid behind "Apply automatically", then "A list
+                 of phone numbers", then a save, and only then a panel at the
+                 foot of the page. None of the 14 coupons in production had ever
+                 used it. So the numbers sit here, next to the discount they
+                 unlock, and filling the box is the whole instruction.
+
+                 Up to CouponController::PHONE_BOX_LIMIT numbers are written out
+                 and the box IS the list: a number deleted here is removed. A
+                 longer list is not written out and the box only adds to it, so
+                 a save can never wipe numbers nobody could see. The hidden mode
+                 tells the controller which of the two this page showed. --}}
+            <div>
+                <label for="recipient_phones" class="label">Customer phone numbers</label>
+                @if($phoneBox['append'])
+                    <p class="text-xs text-ink-700/70 mb-1">{{ number_format($phoneBox['count']) }} numbers on the list — manage them in the list below</p>
+                @endif
+                <textarea id="recipient_phones" name="recipient_phones" rows="3" x-ref="phoneBox"
+                          @input="hasPhones = $event.target.value.trim() !== ''"
+                          class="input font-mono text-xs"
+                          @if($phoneBox['append']) placeholder="More numbers to add to the list" @else placeholder="01712345678&#10;01812345678, 01912345678" @endif>{{ old('recipient_phones', $phoneBox['text']) }}</textarea>
+                <input type="hidden" name="recipient_phones_mode" value="{{ $phoneBox['append'] ? 'append' : 'sync' }}">
+                <p class="text-[11px] text-ink-700/50 mt-1">
+                    @if($phoneBox['append'])
+                        Numbers typed here are added to the list; nothing is removed. One per line or separated by commas.
+                    @else
+                        Only these numbers can use this coupon, and it applies itself at checkout as soon as one of them is entered — no code to type. One per line or separated by commas. Leave empty for a normal code anyone can type.
+                    @endif
+                </p>
             </div>
 
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="free_shipping" value="1" @checked(old('free_shipping', $c->free_shipping ?? false))> Also grant free shipping</label>
@@ -71,18 +116,38 @@
             </div>
 
             {{-- Applies itself, and to whom. A coupon left as "typed only"
-                 behaves exactly as it always has. --}}
+                 behaves exactly as it always has.
+
+                 A phone list answers both questions, so while it is one the
+                 switch shows on and the audience select steps aside — disabled,
+                 so a stale choice is not even submitted (the controller decides
+                 from the box regardless). An emptied list becomes a typed code,
+                 never an every-order one, and the block says that instead of
+                 offering choices the save would overrule. --}}
             <div class="rounded-lg border border-ink-100 p-3 space-y-3">
                 <label class="flex items-center gap-2 text-sm font-medium">
-                    <input type="checkbox" name="auto_apply" value="1" x-model="auto"
+                    <input type="checkbox" name="auto_apply" value="1"
+                           :checked="listed || (auto && ! clearing)" :disabled="listed || clearing"
+                           @change="auto = $event.target.checked"
                            @checked(old('auto_apply', $c->auto_apply ?? false))>
                     Apply automatically — no code to type
                 </label>
 
-                <div x-show="auto" x-cloak class="space-y-3">
+                <p x-show="listed" x-cloak class="text-[11px] text-ink-700/50">
+                    @if($phoneBox['append'])
+                        Applies itself to the {{ number_format($phoneBox['count']) }} numbers on the list below — and only they can use the code.
+                    @else
+                        Applies itself to the numbers above — and only they can use the code.
+                    @endif
+                </p>
+                <p x-show="clearing" x-cloak class="text-[11px] text-amber-700">
+                    The phone box is empty, so saving makes this a normal code anyone can type — it stops being a phone list.
+                </p>
+
+                <div x-show="auto && ! listed && ! clearing" x-cloak class="space-y-3">
                     <div>
                         <label class="label">Who gets it</label>
-                        <select name="audience" x-model="audience" class="input">
+                        <select name="audience" x-model="audience" :disabled="listed || clearing" class="input">
                             @foreach(\App\Models\Coupon::AUDIENCES as $key => $label)
                                 <option value="{{ $key }}" @selected(old('audience', $c->audience ?? 'all') === $key)>{{ $label }}</option>
                             @endforeach
@@ -109,7 +174,9 @@
                     </div>
 
                     <p x-show="audience === 'phones'" x-cloak class="text-[11px] text-ink-700/50">
-                        @if($editing) Add the numbers in the list below. @else Save the coupon first, then add the numbers. @endif
+                        Put the numbers in
+                        <button type="button" class="text-gold-700 underline" @click="$refs.phoneBox.focus()">Customer phone numbers</button>
+                        above. For a saved customer group or everyone who has bought before, save and add them from the list that opens below.
                     </p>
                     <p x-show="audience === 'all'" x-cloak class="text-[11px] text-amber-700">
                         Every order gets this. Set a total usage limit or an expiry unless you mean it to run forever.
@@ -130,7 +197,10 @@
             <tbody class="divide-y divide-ink-100">
                 @forelse($coupons as $cp)
                     <tr class="{{ $editing && $editing->id === $cp->id ? 'bg-gold-50' : '' }}">
-                        <td class="px-4 py-3 font-medium">{{ $cp->code }}@if($cp->free_shipping)<span class="ml-1 badge bg-blue-100 text-blue-700 text-[10px]">+ship</span>@endif @if($cp->auto_apply)<span class="ml-1 badge bg-gold-100 text-gold-800 text-[10px]" title="{{ \App\Models\Coupon::AUDIENCES[$cp->audience] ?? 'Every order' }}">auto</span>@endif</td>
+                        {{-- A phone list is the one audience worth reading off the
+                             list at a glance: it decides who may use the code at
+                             all, not only who gets it applied. --}}
+                        <td class="px-4 py-3 font-medium">{{ $cp->code }}@if($cp->free_shipping)<span class="ml-1 badge bg-blue-100 text-blue-700 text-[10px]">+ship</span>@endif @if($cp->audience === 'phones')<span class="ml-1 badge bg-gold-100 text-gold-800 text-[10px] whitespace-nowrap" title="Only these numbers can use it, and it applies itself for them at checkout">📱 {{ number_format($cp->recipients_count) }} {{ \Illuminate\Support\Str::plural('number', $cp->recipients_count) }}</span>@elseif($cp->auto_apply)<span class="ml-1 badge bg-gold-100 text-gold-800 text-[10px]" title="{{ \App\Models\Coupon::AUDIENCES[$cp->audience] ?? 'Every order' }}">auto</span>@endif</td>
                         <td class="px-4 py-3">{{ $cp->type=='percent' ? rtrim(rtrim(number_format($cp->value,2),'0'),'.').'%' : money($cp->value) }}@if($cp->min_order)<span class="text-xs text-ink-700/50"> (min {{ money($cp->min_order) }})</span>@endif</td>
                         <td class="px-4 py-3 text-xs text-ink-700/70">
                             @switch($cp->applies_to)
@@ -156,7 +226,10 @@
 <div class="mt-6">{{ $coupons->links() }}</div>
 
 {{-- Who an auto-applying coupon is waiting for. Only while editing one: the
-     list belongs to a coupon that exists. --}}
+     list belongs to a coupon that exists. Numbers can be typed straight into
+     the form's "Customer phone numbers" box as well; this stays for the bulk
+     ways in (a saved group, every past buyer) and for lists too long to show
+     in the box. --}}
 @if($editing && $editing->audience === 'phones')
     <div class="card p-6 mt-6">
         <h2 class="font-semibold mb-1">Who gets {{ $editing->code }}</h2>
@@ -217,7 +290,7 @@
                 </div>
                 <div class="mt-3">{{ $recipients->appends(['edit' => $editing->id])->links() }}</div>
             @else
-                <p class="text-sm text-ink-700/50">Nobody yet — this coupon will not apply to anyone until you add a number.</p>
+                <p class="text-sm text-ink-700/50">Nobody yet — until a number is added, this coupon applies to nobody and nobody can use its code.</p>
             @endif
         </div>
     </div>

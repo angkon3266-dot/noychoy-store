@@ -569,6 +569,18 @@ class OrderController extends Controller
             ? \App\Models\AbandonedCart::find($id)
             : null;
 
+        // Arriving from a customer's row or page (owner, 2026-09-17: "add
+        // option so I can create new order from customer list"). A repeat
+        // buyer ringing to order again should not have her name, number and
+        // address re-typed off the customer page in the next tab — the shop
+        // already holds all three.
+        //
+        // A lead wins when both are given: its basket is the more specific
+        // thing she came to close, and the lead's own customer details ride
+        // along with it. Anything that is not a plain id — "abc", ?customer[]=,
+        // a customer since deleted — opens the blank form, as a bare link would.
+        $customer = $cart ? null : $this->customerById($request->query('customer'));
+
         return view('admin.orders.create', [
             'products' => \App\Models\Product::where('status', 'published')
                 ->orderBy('name')
@@ -576,8 +588,224 @@ class OrderController extends Controller
             'shipInside' => (float) \App\Models\Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
             'shipOutside' => (float) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
             'cart' => $cart,
-            'prefill' => $cart ? $this->cartPrefill($cart) : null,
+            'customer' => $customer,
+            'prefill' => $cart ? $this->cartPrefill($cart) : ($customer ? $this->customerPrefill($customer) : null),
+            'restored' => $this->restoredManualInput($request),
         ]);
+    }
+
+    /** A customer named by a plain numeric id, from a query string or a posted field. */
+    protected function customerById(mixed $raw): ?Customer
+    {
+        return is_int($raw) || (is_string($raw) && ctype_digit($raw))
+            ? Customer::find((int) $raw)
+            : null;
+    }
+
+    /**
+     * A known customer's details, shaped like a lead's for the manual order form.
+     *
+     * `picked` is what the form shows about who the order is for — where the
+     * address came from, and whether they are blacklisted — the same card the
+     * customer search on the form hands back, so a customer opened from the
+     * list and one picked by name arrive identically.
+     *
+     * @return array{customer:array<string,mixed>,lines:array<int,mixed>,notices:array<int,string>,picked:array<string,mixed>}
+     */
+    protected function customerPrefill(Customer $customer): array
+    {
+        $card = $this->customerCards(collect([$customer]))->first();
+
+        return [
+            'customer' => \Illuminate\Support\Arr::only($card, ['name', 'phone', 'email', 'address', 'area', 'district', 'is_inside_dhaka']),
+            'lines' => [],
+            'notices' => [],
+            'picked' => $card,
+        ];
+    }
+
+    /**
+     * Customers, each with the delivery details a new order for them starts from.
+     *
+     * The customers table holds no address, so the details come from the best
+     * place that does: the default address she saved in her account (the one
+     * checkout offers her), else wherever her most recent order went, else the
+     * newest address she saved without marking one default. Each is a guess
+     * about where THIS parcel goes, so the card says which it used and the form
+     * asks for a check before saving (owner, 2026-09-17).
+     *
+     * The name, number and email are always the customer's own, never the
+     * saved address's recipient: the order is matched to a customer by phone,
+     * and a gift address in her book must not file the sale under the friend.
+     *
+     * Three queries however many customers — this answers a search box as she
+     * types, so one query per result is not an option.
+     *
+     * @param  \Illuminate\Support\Collection<int, Customer>  $customers
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    protected function customerCards(\Illuminate\Support\Collection $customers): \Illuminate\Support\Collection
+    {
+        $ids = $customers->pluck('id')->all();
+
+        // The whole address book of every customer at once: a handful of rows
+        // each, defaults first, newest first.
+        $books = \App\Models\Address::whereIn('customer_id', $ids)
+            ->orderByDesc('is_default')->orderByDesc('id')
+            ->get()->groupBy('customer_id');
+
+        // The newest order with an address, for each customer without a
+        // default — found by a subselect rather than one query per customer.
+        // Newest by when it was placed, not by id: imported history can carry
+        // a later id than an order taken since.
+        $withoutDefault = array_values(array_filter($ids, fn ($id) => ! $books->get($id)?->first()?->is_default));
+        $lastOrders = $withoutDefault === [] ? collect() : Order::whereKey(
+            Customer::whereKey($withoutDefault)
+                ->select('id')
+                ->addSelect(['last_order_id' => Order::select('id')
+                    ->whereColumn('orders.customer_id', 'customers.id')
+                    ->whereNotNull('shipping_address')->where('shipping_address', '!=', '')
+                    ->latest()->latest('id')
+                    ->limit(1)])
+                ->get()->pluck('last_order_id')->filter()->all()
+        )->get()->keyBy('customer_id');
+
+        return $customers->map(function (Customer $customer) use ($books, $lastOrders) {
+            $book = $books->get($customer->id, collect());
+            $saved = $book->first(fn ($a) => $a->is_default);
+            $lastOrder = $saved ? null : $lastOrders->get($customer->id);
+            $saved ??= $lastOrder ? null : $book->first();
+
+            $delivery = ['address' => null, 'area' => null, 'district' => null, 'is_inside_dhaka' => false];
+
+            if ($saved) {
+                $delivery = [
+                    'address' => $saved->address,
+                    'area' => $saved->area,
+                    'district' => $saved->district,
+                    'is_inside_dhaka' => (bool) $saved->is_inside_dhaka,
+                ];
+                $label = filled($saved->label) ? ' “'.$saved->label.'”' : '';
+                $source = 'Delivery details from '.($saved->is_default ? 'their default saved address' : 'the address they saved')
+                    .$label.' — check them before saving.';
+            } elseif ($lastOrder) {
+                $delivery = [
+                    'address' => $lastOrder->shipping_address,
+                    'area' => $lastOrder->area,
+                    'district' => $lastOrder->district,
+                    'is_inside_dhaka' => (bool) $lastOrder->is_inside_dhaka,
+                ];
+                $placed = store_time($lastOrder->created_at);
+                $source = 'Delivery details from their last order on '
+                    .$placed->format($placed->isSameYear(store_time(now())) ? 'j M' : 'j M Y')
+                    .' — check them before saving.';
+            } else {
+                $source = 'No saved address or past order to copy delivery details from — type them in.';
+            }
+
+            return [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'email' => $customer->email,
+                'total_orders' => (int) $customer->total_orders,
+                'blacklisted' => (bool) $customer->blacklisted,
+            ] + $delivery + ['source' => $source];
+        });
+    }
+
+    /**
+     * Existing customers by name or number, for the picker on the manual order form.
+     *
+     * Owner, 2026-09-17: "when creating a new order, I need to be able to select
+     * existing customer data from name". The customer list's New order button
+     * covers starting from the list; this covers the form she already has open
+     * with someone on the phone. Reachable by anyone who can take orders — staff
+     * included, who cannot open the customer list itself.
+     *
+     * A number is matched however it was typed or pasted: "+880 1712-345678" is
+     * stored as 01712345678, so the digits are normalised before they are
+     * compared, and a part of a number still finds it.
+     */
+    public function customerSearch(Request $request)
+    {
+        $term = $request->query('q');
+        $term = is_string($term) ? trim($term) : '';
+
+        if (mb_strlen($term) < 2) {
+            return response()->json(['customers' => []]);
+        }
+
+        // Only a term that could be a phone number is tried as one: "Nadia 017"
+        // is a name, and matching every number containing 017 is noise.
+        $digits = preg_match('/^[\d\s()+\-.]+$/', $term) ? bd_phone($term) : '';
+
+        $found = Customer::query()
+            ->where(function ($w) use ($term, $digits) {
+                $w->where('name', 'like', '%'.$term.'%');
+                if ($digits !== '') {
+                    $w->orWhere('phone', 'like', '%'.$digits.'%');
+                }
+            })
+            // The people most likely to be ringing again come first.
+            ->orderByDesc('last_order_at')->orderByDesc('id')
+            ->limit(8)
+            ->get();
+
+        return response()->json(['customers' => $this->customerCards($found)->values()]);
+    }
+
+    /**
+     * What the form was holding when a save bounced, for the fields Alpine owns.
+     *
+     * The name and address boxes read old() in Blade and always came back. The
+     * product lines, delivery charge, discount and zone did not: Alpine's
+     * x-model writes its own state over the value attribute, so a bounced save
+     * reopened on one blank line with the charge reset from the zone. Rare
+     * while the only refusals were a mistyped number or a sold-out piece; a
+     * coupon the server turns down (owner, 2026-09-17) makes a bounce routine,
+     * and re-adding six lines because a code was for another number is not a
+     * form anyone would keep using.
+     *
+     * The customer picked on the form rides along too, so a bounced save still
+     * says whose address it is and still warns about a blacklisted buyer.
+     *
+     * @return array{lines:array<int,array<string,mixed>>,shipping:?float,discount:float,inside:bool,coupon:string,picked:?array<string,mixed>}|null
+     */
+    protected function restoredManualInput(Request $request): ?array
+    {
+        if (! $request->hasSession() || ! $request->session()->hasOldInput()) {
+            return null;
+        }
+
+        $number = fn ($v) => is_numeric($v) ? (float) $v : null;
+
+        $lines = collect($request->old('lines', []))
+            ->filter(fn ($l) => is_array($l))
+            ->map(fn ($l) => [
+                'product_id' => is_numeric($l['product_id'] ?? null) ? (int) $l['product_id'] : '',
+                'variant_id' => is_numeric($l['variant_id'] ?? null) ? (int) $l['variant_id'] : null,
+                'qty' => max(1, (int) ($l['qty'] ?? 1)),
+                'price' => $number($l['price'] ?? null) ?? '',
+            ])
+            ->values();
+
+        // The option label is display only; the id is what is posted again.
+        $labels = \App\Models\ProductVariant::whereIn('id', $lines->pluck('variant_id')->filter()->all())
+            ->get()->mapWithKeys(fn ($v) => [$v->id => $v->label]);
+
+        $coupon = $request->old('coupon_code');
+        $picked = $this->customerById($request->old('picked_customer'));
+
+        return [
+            'lines' => $lines->map(fn ($l) => $l + ['variation' => $l['variant_id'] ? ($labels[$l['variant_id']] ?? '') : ''])->all(),
+            'shipping' => $number($request->old('shipping_cost')),
+            'discount' => $number($request->old('discount')) ?? 0.0,
+            // An unticked box is simply absent from the old input.
+            'inside' => (bool) $request->old('is_inside_dhaka'),
+            'coupon' => is_string($coupon) ? $coupon : '',
+            'picked' => $picked ? $this->customerCards(collect([$picked]))->first() : null,
+        ];
     }
 
     /**
@@ -691,6 +919,10 @@ class OrderController extends Controller
             'lines.*.variant_id' => ['nullable', 'integer'],
             'lines.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
             'lines.*.price' => ['nullable', 'numeric', 'min:0'],
+            // Checked, priced and spent inside CreateManualOrder's transaction,
+            // under the same row lock checkout takes — a refusal comes back as
+            // an error on this field, with the reason in plain words.
+            'coupon_code' => ['nullable', 'string', 'max:50'],
         ]);
 
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
@@ -713,6 +945,72 @@ class OrderController extends Controller
 
         return redirect()->route('admin.orders.show', $order)
             ->with('success', 'Order '.$order->order_number.' created.');
+    }
+
+    /**
+     * The coupons waiting for a phone number, for the manual order form.
+     *
+     * The owner gives coupons to numbers (owner, 2026-09-17: "whenever that
+     * phone number is used, the customer gets the coupon applied against that
+     * number"). The storefront applies them at checkout by itself; an order she
+     * takes on the phone has no cart to do that, so without this the coupon she
+     * promised is forgotten exactly when the customer rings to use it. The form
+     * asks as soon as it has a number and offers what comes back — it never
+     * applies anything here, and saving re-checks the code under a row lock.
+     *
+     * Only ever advisory: the form carries on as normal if this fails.
+     */
+    public function couponLookup(Request $request)
+    {
+        $phone = $request->query('phone');
+
+        return response()->json([
+            'coupons' => \App\Models\Coupon::assignedTo(is_string($phone) ? $phone : null)
+                ->map(fn (\App\Models\Coupon $coupon) => [
+                    'code' => $coupon->code,
+                    'label' => $coupon->label,
+                    'summary' => $this->couponSummary($coupon),
+                    // Enough for the form to estimate the saving on the lines
+                    // in front of it. It only does so for a whole-order coupon;
+                    // a scoped one depends on categories and sale prices the
+                    // form does not hold, so it is worked out on save.
+                    'type' => $coupon->type,
+                    'value' => (float) $coupon->value,
+                    'applies_to' => $coupon->applies_to ?: 'all',
+                    'exclude_sale_items' => (bool) $coupon->exclude_sale_items,
+                    'free_shipping' => (bool) $coupon->free_shipping,
+                    'min_order' => $coupon->min_order !== null ? (float) $coupon->min_order : null,
+                ])
+                ->values(),
+        ]);
+    }
+
+    /** A coupon in a few words: "৳200 off + free delivery · on selected products · min order ৳1,000". */
+    protected function couponSummary(\App\Models\Coupon $coupon): string
+    {
+        $value = (float) $coupon->value;
+
+        $saving = match (true) {
+            $value <= 0 => '',
+            $coupon->type === 'percent' => rtrim(rtrim(number_format($value, 2), '0'), '.').'% off',
+            default => money($value).' off',
+        };
+
+        if ($coupon->free_shipping) {
+            $saving = $saving === '' ? 'Free delivery' : $saving.' + free delivery';
+        }
+
+        return collect([
+            $saving,
+            match ($coupon->applies_to) {
+                'products' => 'on selected products',
+                'categories' => 'on selected categories',
+                default => null,
+            },
+            $coupon->exclude_sale_items ? 'not on sale items' : null,
+            (float) $coupon->min_order > 0 ? 'min order '.money($coupon->min_order) : null,
+            $coupon->min_qty ? 'min '.$coupon->min_qty.' pieces' : null,
+        ])->filter()->implode(' · ');
     }
 
     /**
