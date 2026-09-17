@@ -1350,6 +1350,50 @@ document.addEventListener('alpine:init', () => {
         get json() { return JSON.stringify(this.items); },
     }));
 
+    // ── Admin: find a product and open its reviews ──────────────────────────
+    //
+    // Filters the page's own product list as the owner types — every word has
+    // to appear in the name, SKU or "#ID", the same all-words rule the server
+    // search applies when Enter is pressed instead. Arrow keys move, Enter
+    // opens the highlighted product, and with nothing highlighted Enter just
+    // submits the form for the server's fuller search.
+    window.Alpine.data('reviewProductPicker', (products, baseUrl, initial) => ({
+        products: products || [],
+        q: initial || '',
+        open: false,
+        active: -1,
+        get results() {
+            const words = this.q.toLowerCase().replace(/#/g, ' ').split(/[\s,]+/).filter(Boolean);
+            if (!words.length) return [];
+            return this.products
+                .filter((p) => {
+                    const hay = [p.name, p.sku || '', p.serial ? String(p.serial) : ''].join(' ').toLowerCase();
+                    return words.every((w) => hay.includes(w));
+                })
+                .slice(0, 12);
+        },
+        urlFor(p) {
+            return baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'product=' + encodeURIComponent(p.id);
+        },
+        move(step) {
+            const n = this.results.length;
+            if (!n) return;
+            this.open = true;
+            this.active = this.active < 0
+                ? (step > 0 ? 0 : n - 1)
+                : (this.active + step + n) % n;
+            // The list scrolls; Enter must never open a row the owner cannot see.
+            this.$nextTick(() => this.$root.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }));
+        },
+        choose(e) {
+            const pick = this.results[this.active];
+            if (this.open && pick) {
+                e.preventDefault();
+                window.location.href = this.urlFor(pick);
+            }
+        },
+    }));
+
     // ── Admin: typing in a batch of reviews that arrived in Messenger ────────
     //
     // Rows are keyed by a made-up id rather than their position, so adding or

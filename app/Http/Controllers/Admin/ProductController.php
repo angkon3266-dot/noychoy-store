@@ -398,6 +398,8 @@ class ProductController extends Controller
             'categories' => Category::orderBy('name')->get(),
             'allProducts' => Product::with('primaryImage')->where('id', '!=', $product->id)->orderBy('name')->get(['id', 'name']),
             'contentTemplates' => ContentTemplate::orderBy('name')->get(['id', 'name', 'sections']),
+            // For the "Reviews" door at the top of the page.
+            'reviewCounts' => $product->reviews()->selectRaw('status, COUNT(*) as n')->groupBy('status')->pluck('n', 'status'),
         ]);
     }
 

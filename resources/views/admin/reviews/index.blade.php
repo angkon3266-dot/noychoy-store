@@ -10,9 +10,137 @@
     // Reviews are written in Dhaka time; the column is UTC. Every date on this
     // screen goes through store_time() so the day shown is the day meant.
     $today = store_time(now())->format('Y-m-d');
-    $lastProduct = (int) (old('product_id') ?: session('last_product_id'));
+    $lastProduct = (int) (old('product_id') ?: session('last_product_id') ?: $product?->id);
+    // Every link on this screen keeps the product it is looking at.
+    $scoped = fn (array $extra = []) => route('admin.reviews.index', array_filter(
+        array_merge(['product' => $product?->id], $extra),
+        fn ($v) => $v !== null && $v !== '',
+    ));
 @endphp
 
+{{-- Find a product, open its reviews --}}
+<div class="card p-5 mb-4">
+    <form action="{{ route('admin.reviews.index') }}" method="GET" class="relative"
+          x-data="reviewProductPicker(@js($picker), @js(route('admin.reviews.index')), @js($term))"
+          @click.outside="open = false">
+        <label for="review-product-search" class="label">Find a product to see its reviews</label>
+        <div class="flex gap-2">
+            <input id="review-product-search" type="search" name="q" x-model="q" autocomplete="off"
+                   @focus="open = true" @input="open = true; active = -1"
+                   @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)"
+                   @keydown.enter="choose($event)" @keydown.escape.prevent="open = false"
+                   class="input flex-1" placeholder="Product name, SKU or #ID — e.g. kundan, #12"
+                   role="combobox" aria-autocomplete="list" aria-controls="review-product-results"
+                   :aria-expanded="open && results.length > 0">
+            <button class="btn-outline">Search</button>
+            @if($product || $term !== '')
+                <a href="{{ route('admin.reviews.index') }}" class="btn-outline" title="Back to every review">Clear</a>
+            @endif
+        </div>
+
+        <ul id="review-product-results" role="listbox" x-show="open && results.length" x-cloak
+            class="absolute z-20 left-0 right-0 mt-1 max-h-80 overflow-y-auto rounded-lg border border-ink-100 bg-white shadow-lg">
+            <template x-for="(p, i) in results" :key="p.id">
+                <li role="option" :aria-selected="i === active">
+                    <a :href="urlFor(p)" @mouseenter="active = i"
+                       class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                       :class="i === active ? 'bg-ink-50' : ''">
+                        <span class="min-w-0 truncate">
+                            <span x-text="p.name"></span>
+                            <span class="text-xs text-ink-700/40" x-show="p.serial" x-text="'#' + p.serial"></span>
+                        </span>
+                        <span class="shrink-0 text-xs text-ink-700/60">
+                            <span x-text="p.total + (p.total === 1 ? ' review' : ' reviews')"></span>
+                            <span x-show="p.pending" class="ml-1 badge bg-amber-100 text-amber-700 text-[10px]" x-text="p.pending + ' pending'"></span>
+                        </span>
+                    </a>
+                </li>
+            </template>
+        </ul>
+    </form>
+</div>
+
+@if($matches !== null)
+    {{-- The search matched several products (or none) — pick one --}}
+    <div class="card p-5 mb-6">
+        @if($matches->isEmpty())
+            <p class="text-sm text-ink-700/70">No product matches “{{ $term }}”. Try fewer words, or the Product ID.</p>
+        @else
+            <p class="text-sm text-ink-700/70 mb-3">
+                {{ $matches->count() }} products match “{{ $term }}”{{ $matches->count() >= 30 ? ' (showing the first 30)' : '' }} — pick one to see its reviews.
+            </p>
+            <div class="divide-y divide-ink-100">
+                @foreach($matches as $m)
+                    <a href="{{ route('admin.reviews.index', ['product' => $m->id]) }}"
+                       class="flex items-center gap-3 py-2.5 hover:bg-ink-50 -mx-2 px-2 rounded">
+                        @if($m->primaryImage)
+                            <img src="{{ image_variant($m->primaryImage->url) ?: $m->primaryImage->url }}" alt="" class="w-10 h-10 rounded object-cover border border-ink-100 shrink-0">
+                        @else
+                            <span class="w-10 h-10 rounded bg-ink-100 shrink-0"></span>
+                        @endif
+                        <span class="flex-1 min-w-0">
+                            <span class="block text-sm font-medium break-words">{{ $m->name }}@if($m->trashed()) <span class="text-xs text-red-600">(deleted)</span>@endif</span>
+                            <span class="block text-xs text-ink-700/50">#{{ $m->serial }}{{ $m->sku ? ' · '.$m->sku : '' }}</span>
+                        </span>
+                        <span class="text-xs text-ink-700/60 shrink-0 text-right">
+                            {{ $m->reviews_count }} {{ $m->reviews_count === 1 ? 'review' : 'reviews' }}
+                            @if($m->pending_count)<span class="ml-1 badge bg-amber-100 text-amber-700 text-[10px]">{{ $m->pending_count }} pending</span>@endif
+                        </span>
+                    </a>
+                @endforeach
+            </div>
+        @endif
+    </div>
+@endif
+
+@if($product)
+    {{-- The product being looked at, and what shoppers see of its rating --}}
+    <div class="card p-5 mb-4" x-data>
+        <div class="flex flex-wrap items-start gap-4">
+            @if($product->primaryImage)
+                <img src="{{ image_variant($product->primaryImage->url) ?: $product->primaryImage->url }}" alt="" class="w-16 h-16 rounded-lg object-cover border border-ink-100 shrink-0">
+            @endif
+            <div class="flex-1 min-w-[200px]">
+                <p class="font-semibold">{{ $product->name }}</p>
+                <p class="text-xs text-ink-700/50 mt-0.5">
+                    Product ID #{{ $product->serial }}{{ $product->sku ? ' · SKU '.$product->sku : '' }}
+                    @if($product->trashed()) · <span class="text-red-600">deleted product</span>@endif
+                </p>
+                <p class="text-sm mt-2">
+                    @if($summary['avg'])
+                        <span class="text-gold-500">{{ str_repeat('★', (int) round($summary['avg'])) }}<span class="text-ink-200">{{ str_repeat('★', 5 - (int) round($summary['avg'])) }}</span></span>
+                        <span class="font-medium">{{ number_format($summary['avg'], 1) }}</span>
+                        <span class="text-ink-700/60">from {{ $summary['total'] }} approved {{ $summary['total'] === 1 ? 'review' : 'reviews' }} — what shoppers see</span>
+                    @else
+                        <span class="text-ink-700/60">No approved reviews yet — shoppers see no rating on this piece.</span>
+                    @endif
+                </p>
+            </div>
+            @if($summary['total'])
+                <div class="w-full sm:w-56 space-y-1">
+                    @foreach($summary['dist'] as $stars => $n)
+                        <div class="flex items-center gap-2 text-xs text-ink-700/60">
+                            <span class="w-6 shrink-0">{{ $stars }}★</span>
+                            <span class="flex-1 h-1.5 rounded-full bg-ink-100 overflow-hidden">
+                                <span class="block h-full bg-gold-500" style="width: {{ $summary['total'] ? round($n / $summary['total'] * 100) : 0 }}%"></span>
+                            </span>
+                            <span class="w-6 shrink-0 text-right">{{ $n }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+        <div class="flex flex-wrap gap-2 mt-4">
+            @unless($product->trashed())
+                <button type="button" class="btn-primary text-sm py-1.5" @click="$dispatch('open-review-batch')">+ Add reviews to this product</button>
+                <a href="{{ route('admin.products.edit', $product) }}" class="btn-outline text-sm py-1.5">Edit product</a>
+                <a href="{{ route('product.show', $product) }}" target="_blank" rel="noopener" class="btn-outline text-sm py-1.5">View on site ↗</a>
+            @endunless
+        </div>
+    </div>
+@endif
+
+@if($matches === null)
 @php
     // Rows come back keyed by the id Alpine gave them, so a failed submit
     // re-opens the same batch with the same fields filled in.
@@ -22,7 +150,8 @@
 {{-- Writing down the reviews that arrived in Messenger or WhatsApp --}}
 <div class="card p-5 mb-6"
      x-data="reviewBatch(@js($oldRows), @js($today))"
-     x-init="if ({{ $errors->any() || session('last_product_id') ? 'true' : 'false' }}) open = true">
+     x-init="if ({{ $errors->any() || session('last_product_id') ? 'true' : 'false' }}) open = true"
+     @open-review-batch.window="open = true; $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'start' }))">
     <button type="button" @click="open = !open" class="flex w-full items-center justify-between gap-3 text-left">
         <span>
             <span class="font-semibold">Add reviews yourself</span>
@@ -135,12 +264,12 @@
 
 <div class="flex flex-wrap gap-2 mb-4">
     @foreach(['pending' => 'Pending', 'approved' => 'Approved', 'hidden' => 'Hidden'] as $key => $label)
-        <a href="{{ route('admin.reviews.index', ['status' => $key]) }}"
+        <a href="{{ $scoped(['status' => $key]) }}"
            class="px-3 py-1.5 rounded-full text-sm {{ $current === $key ? 'bg-ink-800 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200' }}">
             {{ $label }} <span class="opacity-60">({{ $counts[$key] }})</span>
         </a>
     @endforeach
-    <a href="{{ route('admin.reviews.index', ['status' => 'all']) }}" class="px-3 py-1.5 rounded-full text-sm {{ $current === 'all' ? 'bg-ink-800 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200' }}">All</a>
+    <a href="{{ $scoped(['status' => 'all']) }}" class="px-3 py-1.5 rounded-full text-sm {{ $current === 'all' ? 'bg-ink-800 text-white' : 'bg-ink-100 text-ink-700 hover:bg-ink-200' }}">All</a>
 </div>
 
 <div class="space-y-3">
@@ -185,6 +314,11 @@
                     <div class="sm:col-span-2">
                         <label class="label">Product</label>
                         <select name="product_id" class="input" required>
+                            {{-- A deleted product is not in the list; without its own option the
+                                 browser would submit the first product and move the review there. --}}
+                            @unless($products->contains('id', (int) $review->product_id))
+                                <option value="{{ $review->product_id }}" selected>{{ $product && $product->id === (int) $review->product_id ? $product->name : 'Deleted product' }} (deleted — keeps it where it is)</option>
+                            @endunless
                             @foreach($products as $p)
                                 <option value="{{ $p->id }}" @selected((int) $review->product_id === $p->id)>{{ $p->name }}</option>
                             @endforeach
@@ -240,9 +374,16 @@
             </form>
         </div>
     @empty
-        <div class="card p-10 text-center text-ink-700/50">No reviews here.</div>
+        <div class="card p-10 text-center text-ink-700/50">
+            @if($product)
+                No {{ $current !== 'all' ? strtolower($statuses[$current] ?? $current).' ' : '' }}reviews for {{ $product->name }} yet.
+            @else
+                No reviews here.
+            @endif
+        </div>
     @endforelse
 </div>
 
 <div class="mt-6">{{ $reviews->links() }}</div>
+@endif
 @endsection

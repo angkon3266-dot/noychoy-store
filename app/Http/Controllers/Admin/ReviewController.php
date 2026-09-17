@@ -13,27 +13,168 @@ use Illuminate\Support\Carbon;
 
 class ReviewController extends Controller
 {
+    /**
+     * The review queue — store-wide, or one product's worth.
+     *
+     * With five hundred reviews across the catalogue, a single paginated list
+     * newest-first is no way to find what one piece has been told. So the
+     * screen takes a product search: a search that lands on one product opens
+     * that product's reviews, a search that matches several lists them with
+     * their counts to pick from, and `?product=` is a stable link other
+     * screens can point at.
+     */
     public function index(Request $request)
     {
-        $status = $request->query('status', 'pending');
+        // Query values can arrive as arrays from a hand-edited URL; casting one
+        // to a string is a 500, so anything that is not a plain string is
+        // treated as absent.
+        $q = $request->query('q');
+        $term = is_string($q) ? trim($q) : '';
+        $statusParam = $request->query('status');
+        $statusParam = is_string($statusParam) ? $statusParam : null;
+        $productParam = $request->query('product');
+        $product = is_string($productParam) && ctype_digit($productParam)
+            ? Product::withTrashed()->with('primaryImage')->find((int) $productParam)
+            : null;
 
-        $reviews = Review::with('product')
-            ->when(in_array($status, array_keys(Review::STATUSES)), fn ($q) => $q->where('status', $status))
+        $matches = null;
+        if (! $product && $term !== '') {
+            $matches = $this->findProducts($term);
+
+            // One match is an answer, not a choice.
+            if ($matches->count() === 1) {
+                return redirect()->route('admin.reviews.index', array_filter([
+                    'product' => $matches->first()->id,
+                    'status' => $statusParam,
+                ]));
+            }
+        }
+
+        // One product's reviews open on all of them — its approved reviews are
+        // usually the ones the owner came to see. The store-wide queue keeps
+        // opening on what is waiting for moderation.
+        $status = $statusParam ?? ($product ? 'all' : 'pending');
+
+        $scope = fn () => Review::query()
+            ->when($product, fn ($q) => $q->where('product_id', $product->id));
+
+        $reviews = $scope()
+            ->with('product')
+            ->when(in_array($status, array_keys(Review::STATUSES), true), fn ($q) => $q->where('status', $status))
             ->latest()
             ->paginate(20)
             ->withQueryString();
+
+        $byStatus = $scope()->selectRaw('status, COUNT(*) as n')->groupBy('status')->pluck('n', 'status');
 
         return view('admin.reviews.index', [
             'reviews' => $reviews,
             'statuses' => Review::STATUSES,
             'current' => $status,
+            'term' => $term,
+            'product' => $product,
+            'matches' => $matches,
+            'summary' => $product ? $this->ratingSummary($product) : null,
             'products' => Product::orderBy('name')->get(['id', 'name']),
-            'counts' => [
-                'pending' => Review::where('status', 'pending')->count(),
-                'approved' => Review::where('status', 'approved')->count(),
-                'hidden' => Review::where('status', 'hidden')->count(),
-            ],
+            'picker' => $this->pickerIndex(),
+            'counts' => collect(array_keys(Review::STATUSES))
+                ->mapWithKeys(fn ($s) => [$s => (int) ($byStatus[$s] ?? 0)])
+                ->all(),
         ]);
+    }
+
+    /**
+     * Products matching what the owner typed, best match first.
+     *
+     * A number is read as the Product ID the admin shows everywhere (#12), so
+     * typing it off a courier label finds the piece — deleted pieces included,
+     * since their reviews outlive them — or as a numeric SKU. It never falls
+     * through to the word search: "12" once landed on the one product whose
+     * description mentions "a set of 12 bangles", as if that were the answer.
+     * Words go through the same search the storefront uses, loosening to
+     * "any word" before giving up.
+     */
+    private function findProducts(string $term)
+    {
+        $withCounts = fn ($q) => $q->with('primaryImage')->withCount([
+            'reviews',
+            'reviews as pending_count' => fn ($r) => $r->where('status', 'pending'),
+            'reviews as approved_count' => fn ($r) => $r->where('status', 'approved'),
+        ]);
+
+        $number = ltrim($term, '#');
+        if ($number === '') {
+            return collect(); // a lone "#" would match every colour code in every description
+        }
+        if (ctype_digit($number)) {
+            return $withCounts(Product::withTrashed()->where(fn ($q) => $q
+                ->where('serial', (int) $number)
+                ->orWhere('sku', $number)))
+                ->orderBy('name')
+                ->get();
+        }
+
+        foreach ([false, true] as $loose) {
+            $query = $loose ? Product::searchLoosely($term) : Product::search($term);
+            $found = $withCounts(\App\Support\ProductSearch::orderByRelevance($query, $term))
+                ->orderBy('name')
+                ->limit(30)
+                ->get();
+
+            if ($found->isNotEmpty()) {
+                return $found;
+            }
+        }
+
+        return collect();
+    }
+
+    /** What the product page shows shoppers: approved reviews only. */
+    private function ratingSummary(Product $product): array
+    {
+        $byRating = Review::where('product_id', $product->id)
+            ->where('status', 'approved')
+            ->selectRaw('rating, COUNT(*) as n')
+            ->groupBy('rating')
+            ->pluck('n', 'rating');
+
+        $total = (int) $byRating->sum();
+
+        return [
+            'avg' => $total ? round($byRating->reduce(fn ($sum, $n, $r) => $sum + $r * $n, 0) / $total, 1) : null,
+            'total' => $total,
+            'dist' => collect([5, 4, 3, 2, 1])->mapWithKeys(fn ($r) => [$r => (int) ($byRating[$r] ?? 0)])->all(),
+        ];
+    }
+
+    /**
+     * Every live product, light enough to filter as the owner types.
+     *
+     * A hundred-odd names with their counts is a few kilobytes — cheaper than
+     * a round trip per keystroke, and the list opens instantly.
+     */
+    private function pickerIndex(): array
+    {
+        $counts = Review::selectRaw('product_id, status, COUNT(*) as n')
+            ->groupBy('product_id', 'status')
+            ->get()
+            ->groupBy('product_id');
+
+        return Product::orderBy('name')->get(['id', 'name', 'serial', 'sku'])
+            ->map(function ($p) use ($counts) {
+                $rows = $counts->get($p->id, collect());
+
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'serial' => $p->serial,
+                    'sku' => $p->sku,
+                    'total' => (int) $rows->sum('n'),
+                    'pending' => (int) ($rows->firstWhere('status', 'pending')->n ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

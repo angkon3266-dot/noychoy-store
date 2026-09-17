@@ -6,7 +6,17 @@
 @if($product->exists)
     <div class="flex items-center justify-between gap-3 mb-3">
         <p class="text-sm text-ink-700/50">Product ID <span class="font-semibold text-ink-700">#{{ $product->serial }}</span>@if($product->sku) · SKU {{ $product->sku }}@endif</p>
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            @php
+                // Block form on purpose: Blade's one-line php directive, in a file
+                // that also uses the block form, swallows everything after it.
+                $reviewTotal = (int) collect($reviewCounts ?? [])->sum();
+            @endphp
+            <a href="{{ route('admin.reviews.index', ['product' => $product->id]) }}" class="btn-outline text-sm py-1.5 inline-flex items-center gap-1.5"
+               title="Read, add, edit and moderate this product's reviews">
+                Reviews <span class="text-ink-700/50">({{ $reviewTotal }})</span>
+                @if((int) ($reviewCounts['pending'] ?? 0))<span class="badge bg-amber-100 text-amber-700 text-[10px]">{{ (int) $reviewCounts['pending'] }} pending</span>@endif
+            </a>
             <a href="{{ route('admin.products.export-one', $product) }}" class="btn-outline text-sm py-1.5 inline-flex items-center gap-1.5"
                title="This product's details as a CSV — opens in Excel">
                 Export details
