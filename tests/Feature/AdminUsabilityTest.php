@@ -72,7 +72,12 @@ class AdminUsabilityTest extends TestCase
         );
     }
 
-    public function test_a_booked_parcel_cannot_have_its_address_changed_underneath_it(): void
+    /**
+     * Reversed at the owner's request (2026-09-17): a booked order can be
+     * corrected, and the page then offers "Book again with courier" to send
+     * the new details. Refusing the edit left no way to fix a wrong address.
+     */
+    public function test_a_booked_parcel_can_be_corrected_with_a_courier_warning(): void
     {
         $order = $this->order();
         $order->shipment()->create([
@@ -84,11 +89,10 @@ class AdminUsabilityTest extends TestCase
                 'customer_name' => 'Someone Else',
                 'customer_phone' => '01860988859',
                 'shipping_address' => 'A different address entirely',
-            ])->assertRedirect();
+            ])->assertRedirect()
+            ->assertSessionHas('warning');
 
-        // The courier holds its own copy; letting these drift apart is worse
-        // than refusing the edit.
-        $this->assertSame('Wrong address', $order->fresh()->shipping_address);
+        $this->assertSame('A different address entirely', $order->fresh()->shipping_address);
     }
 
     public function test_a_bad_phone_number_is_refused(): void

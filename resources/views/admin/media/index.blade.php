@@ -215,17 +215,17 @@ document.addEventListener('alpine:init', () => {
                     <input type="hidden" name="quality" :value="quality">
                     <button class="btn-primary text-sm py-2" :disabled="!sel.length">Reduce size</button>
                 </form>
-                <form action="{{ route('admin.media.convert') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Convert ' + sel.length + ' selected file(s) to WebP? Originals (JPG/PNG) are replaced and products/pages using them are repointed automatically. Already-WebP, SVG and video files are skipped.')">
+                <form action="{{ route('admin.media.convert') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } if (! confirm('Convert ' + sel.length + ' selected file(s) to WebP? Originals (JPG/PNG) are replaced and products/pages using them are repointed automatically. Already-WebP, SVG and video files are skipped.')) $event.preventDefault()">
                     @csrf
                     <template x-for="p in sel" :key="p"><input type="hidden" name="paths[]" :value="p"></template>
                     <button class="btn-outline text-sm py-2" :disabled="!sel.length">Convert to WebP</button>
                 </form>
-                <form action="{{ route('admin.media.watermark') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Add the watermark to ' + sel.length + ' selected image(s)? This is baked into the file and cannot be undone. Set it up in “Watermark settings” above first.')">
+                <form action="{{ route('admin.media.watermark') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } if (! confirm('Add the watermark to ' + sel.length + ' selected image(s)? This is baked into the file and cannot be undone. Set it up in “Watermark settings” above first.')) $event.preventDefault()">
                     @csrf
                     <template x-for="p in sel" :key="p"><input type="hidden" name="paths[]" :value="p"></template>
                     <button class="btn-outline text-sm py-2" :disabled="!sel.length">Watermark</button>
                 </form>
-                <form action="{{ route('admin.media.destroy') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } return confirm('Delete ' + sel.length + ' file(s)? Files used by products will be removed from those galleries.')">
+                <form action="{{ route('admin.media.destroy') }}" method="POST" @submit="if(!sel.length){ $event.preventDefault(); alert('Select files first.'); return; } if (! confirm('Delete ' + sel.length + ' file(s)? Files used by products will be removed from those galleries.')) $event.preventDefault()">
                     @csrf @method('DELETE')
                     <template x-for="p in sel" :key="p"><input type="hidden" name="paths[]" :value="p"></template>
                     <button class="btn-outline text-sm py-2 text-red-600" :disabled="!sel.length">Delete</button>

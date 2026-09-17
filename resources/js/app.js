@@ -223,6 +223,47 @@ document.addEventListener('alpine:init', () => {
 
         // Drawing box, in viewBox units. The SVG scales to its container.
         W: 1000, H: 300, padL: 46, padR: 16, padT: 14, padB: 30,
+        narrow: false,
+
+        // Owner's call, 17 Sep 2026 (dashboard compacted for phones): the chart
+        // used a fixed 1000×300 viewBox inside a fixed-height box. On a 375px
+        // phone that scaled every label down to about 3px and left a band of
+        // empty card above and below the lines. Now the plot box is measured
+        // and the viewBox matches it, so one unit is one CSS pixel — text stays
+        // a readable size at any width — with a shorter chart under 640px.
+        // Re-measured on resize, debounced; a ResizeObserver also catches the
+        // sidebar collapsing, which changes the width without a window resize.
+        init() {
+            const measure = () => {
+                const box = this.$refs.plot || this.$el;
+                const w = Math.round(box.clientWidth || 0);
+                // Hidden (0 wide) or unchanged: nothing to redraw.
+                if (w < 120 || w === this.W) return;
+                this.narrow = w < 640;
+                this.padL = this.narrow ? 34 : 46;
+                this.padB = this.narrow ? 24 : 30;
+                this.H = this.narrow ? 200 : 280;
+                this.W = w;
+            };
+
+            this.$nextTick(measure);
+
+            let timer = null;
+            const later = () => {
+                clearTimeout(timer);
+                timer = setTimeout(measure, 150);
+            };
+            if ('ResizeObserver' in window) {
+                this._resize = new ResizeObserver(later);
+                this._resize.observe(this.$el);
+            } else {
+                window.addEventListener('resize', later);
+            }
+        },
+
+        destroy() {
+            if (this._resize) this._resize.disconnect();
+        },
 
         toggle(key) {
             // Never let the last line be switched off — an empty chart looks broken.
@@ -265,11 +306,12 @@ document.addEventListener('alpine:init', () => {
 
         svg() {
             if (!this.rows.length) {
-                return '<p class="text-sm text-ink-700/50 py-10 text-center">No traffic recorded in this period yet.</p>';
+                return '<p class="text-sm text-ink-700/50 py-8 text-center">No traffic recorded in this period yet.</p>';
             }
 
             const max = this.niceMax();
             const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+            const font = this.narrow ? 10 : 11;
             let out = '';
 
             // Horizontal grid + value axis.
@@ -277,14 +319,23 @@ document.addEventListener('alpine:init', () => {
                 const v = (max / 4) * g;
                 const yy = this.y(v);
                 out += `<line x1="${this.padL}" y1="${yy}" x2="${this.W - this.padR}" y2="${yy}" stroke="#e8e6e1" stroke-width="1"/>`;
-                out += `<text x="${this.padL - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="#9c9890">${v >= 1000 ? (v / 1000) + 'k' : v}</text>`;
+                out += `<text x="${this.padL - 6}" y="${yy + 4}" text-anchor="end" font-size="${font}" fill="#9c9890">${v >= 1000 ? (v / 1000) + 'k' : v}</text>`;
             }
 
-            // Date axis — thinned so the labels never collide.
-            const every = Math.max(1, Math.ceil(this.rows.length / 8));
+            // Date axis — thinned so the labels never collide. How many fit is
+            // worked out from the real width ("07 Sep" needs ~52px on a phone),
+            // capped at ten so a chart that was never measured stays sparse.
+            // The last date is always drawn, right-aligned so it cannot run off
+            // the edge, and the thinned label nearest it is dropped rather than
+            // allowed to overlap it.
+            const span = this.W - this.padL - this.padR;
+            const last = this.rows.length - 1;
+            const fit = Math.max(2, Math.min(10, Math.floor(span / (this.narrow ? 52 : 60))));
+            const every = Math.max(1, Math.ceil(this.rows.length / fit));
             this.rows.forEach((r, i) => {
-                if (i % every && i !== this.rows.length - 1) return;
-                out += `<text x="${this.x(i)}" y="${this.H - 8}" text-anchor="middle" font-size="11" fill="#9c9890">${esc(r.label.split('–')[0])}</text>`;
+                if (i !== last && (i % every || last - i < every)) return;
+                const anchor = last > 0 && i === last ? 'end' : 'middle';
+                out += `<text x="${this.x(i)}" y="${this.H - 8}" text-anchor="${anchor}" font-size="${font}" fill="#9c9890">${esc(r.label.split('–')[0])}</text>`;
             });
 
             // The guide under the cursor, drawn before the lines so it sits behind.
@@ -293,12 +344,14 @@ document.addEventListener('alpine:init', () => {
                 out += `<line x1="${hx}" y1="${this.padT}" x2="${hx}" y2="${this.H - this.padB}" stroke="#c9a227" stroke-width="1" stroke-dasharray="3 3"/>`;
             }
 
+            // Dots only when they can be told apart (about 14px between points
+            // — thirty days fit on a desktop, not on a phone), plus always on hover.
+            const gap = last > 0 ? span / last : Infinity;
             for (const s of this.active()) {
                 const pts = this.rows.map((r, i) => `${this.x(i)},${this.y(r[s.key])}`).join(' ');
-                out += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+                out += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${this.narrow ? 2 : 2.5}" stroke-linejoin="round" stroke-linecap="round"/>`;
 
-                // Dots only when they can be told apart, plus always on hover.
-                if (this.rows.length <= 32) {
+                if (gap >= 14) {
                     this.rows.forEach((r, i) => {
                         out += `<circle cx="${this.x(i)}" cy="${this.y(r[s.key])}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;
                     });
@@ -307,7 +360,7 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            return `<svg viewBox="0 0 ${this.W} ${this.H}" class="w-full h-56 sm:h-64" role="img" aria-label="Traffic and conversion over time">${out}</svg>`;
+            return `<svg viewBox="0 0 ${this.W} ${this.H}" class="block w-full h-auto" role="img" aria-label="Traffic and conversion over time">${out}</svg>`;
         },
 
         /** Snap the cursor to the nearest point. */
@@ -331,7 +384,9 @@ document.addEventListener('alpine:init', () => {
         /** Keep the tooltip inside the card, flipping it before it runs off. */
         tooltipStyle() {
             const pct = (this._ratio || 0.5) * 100;
-            const flip = pct > 60;
+            // A phone-width card is barely wider than the tooltip itself, so it
+            // flips at the midpoint rather than 60% or it spills past the edge.
+            const flip = pct > (this.narrow ? 50 : 60);
             return `top:8px; ${flip ? 'right' : 'left'}:${flip ? 100 - pct : pct}%; margin-${flip ? 'right' : 'left'}:10px;`;
         },
     }));

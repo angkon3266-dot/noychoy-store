@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\Meta\MetaTrackingService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -140,11 +141,14 @@ class CreateManualOrder
                 'created_by' => auth()->user()?->name ?? 'Admin',
             ]);
 
-            // The customer still gets their confirmation SMS and invoice. The
-            // client context is empty on purpose: there is no browser session
-            // behind this sale, and inventing one would be worse than the
-            // server-side Purchase reporting the order honestly.
-            SendOrderPlacedEffects::dispatch($order->fresh('items'), []);
+            // The customer still gets their confirmation SMS and invoice. There
+            // is no browser session behind this sale, and inventing one would
+            // be worse than the server-side Purchase reporting the order
+            // honestly — so the context says exactly that. An empty array used
+            // to stand in for it, and the Purchase quietly fell back to the
+            // queue worker's own request: 127.0.0.1, user agent "Symfony",
+            // reported to Meta as a website visit (2026-09-17 audit).
+            SendOrderPlacedEffects::dispatch($order->fresh('items'), MetaTrackingService::noBrowserContext());
 
             // A sale closed on the phone settles the lead exactly as a
             // storefront checkout does. Without this an order she took by hand

@@ -37,15 +37,18 @@
         Carts with no contact details →
     </a>
     <form method="GET" class="flex flex-wrap gap-2">
-        @if($filter)<input type="hidden" name="filter" value="{{ $filter }}">@endif
+        <input type="hidden" name="filter" value="{{ $filter }}">
         <input name="q" value="{{ $q }}" placeholder="Name or phone…" class="input py-2 w-56">
         <button class="btn-outline py-2 text-sm">Search</button>
         @if($q)<a href="{{ route('admin.abandoned.index', ['filter' => $filter]) }}" class="btn-outline py-2 text-sm">Clear</a>@endif
     </form>
     <div class="ml-auto flex flex-wrap gap-2">
-        @foreach(['' => 'All', 'open' => 'Not contacted', 'contacted' => 'Contacted', 'recovered' => 'Recovered'] as $key => $label)
-            <a href="{{ route('admin.abandoned.index', array_filter(['filter' => $key ?: null, 'q' => $q ?: null])) }}"
-               class="px-3 py-1.5 rounded-full text-sm {{ (string) $filter === (string) $key ? 'bg-ink-800 text-white' : 'bg-ink-100 text-ink-700' }}">{{ $label }}</a>
+        {{-- Every pill names its filter, "All" included: the bare URL is the
+             Abandoned default now, so an All link without filter=all would
+             quietly land back on Abandoned. --}}
+        @foreach($filters as $key => $label)
+            <a href="{{ route('admin.abandoned.index', array_filter(['filter' => $key, 'q' => $q ?: null])) }}"
+               class="px-3 py-1.5 rounded-full text-sm {{ $filter === $key ? 'bg-ink-800 text-white' : 'bg-ink-100 text-ink-700' }}">{{ $label }}</a>
         @endforeach
     </div>
 </div>
@@ -172,7 +175,12 @@
                     </tr>
                 @empty
                     <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">
-                        {{ $q ? 'No leads match that search.' : 'No abandoned carts captured yet.' }}
+                        @if($filter === 'all')
+                            {{ $q ? 'No leads match that search.' : 'No abandoned carts captured yet.' }}
+                        @else
+                            {{ $q ? 'No leads under “'.$filters[$filter].'” match that search.' : 'Nothing under “'.$filters[$filter].'” right now.' }}
+                            <a href="{{ route('admin.abandoned.index', array_filter(['filter' => 'all', 'q' => $q ?: null])) }}" class="text-gold-700 hover:underline">Look in All →</a>
+                        @endif
                     </td></tr>
                 @endforelse
             </tbody>

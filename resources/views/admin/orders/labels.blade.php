@@ -94,7 +94,7 @@
 
                 @if($order->notes)<div class="note">📝 {{ \Illuminate\Support\Str::limit($order->notes, 90) }}</div>@endif
 
-                <div class="tracking">Inv {{ $order->order_number }} · {{ $order->shipment->tracking_code ?: $order->shipment->consignment_id }}</div>
+                <div class="tracking">Inv {{ $order->shipment->bookedInvoice() }} · {{ $order->shipment->tracking_code ?: $order->shipment->consignment_id }}</div>
             </div>
         @endforeach
     </div>

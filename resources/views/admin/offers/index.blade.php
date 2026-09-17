@@ -20,8 +20,10 @@
         <strong>stays unlocked</strong> as the cart grows — at 4 pieces the customer holds rungs 1 to 4 at once.
         Four reward types: <strong>৳ off</strong>, <strong>% off</strong> what is paid, <strong>free delivery</strong>, and a
         <strong>free gift</strong> (the customer adds a piece from the gifts collection and the cheapest one goes to ৳0;
-        a gift never counts as a paid piece). The storefront shows the ladder in the cart and mini-cart and a one-line
-        promise on every product page. Build the gifts collection under
+        a gift never counts as a paid piece). The storefront shows the ladder in the cart and mini-cart, and quotes the
+        reward before anything is added: on the product page price, in a ladder row under Add to cart, on product cards,
+        and in the Frequently bought together prices — always worked out from the rungs saved here and what is already
+        in the shopper's cart. Build the gifts collection under
         <a href="{{ route('admin.collections.index') }}" class="text-gold-700 underline">Products → Collections</a> first.
     </p>
     <form action="{{ route('admin.offers.gift-ladder') }}" method="POST">

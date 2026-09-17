@@ -88,33 +88,49 @@ class CartService
     public function add(Product $product, ?ProductVariant $variant, int $qty = 1): void
     {
         $qty = max(1, $qty);
-        $key = $this->lineKey($product->id, $variant?->id);
+        $key = static::lineKey($product->id, $variant?->id);
         $items = session($this->sessionKey, []);
-
-        $price = $variant?->effective_price ?? (float) $product->price;
 
         if (isset($items[$key])) {
             $items[$key]['qty'] += $qty;
         } else {
-            $items[$key] = [
-                'key' => $key,
-                'product_id' => $product->id,
-                'variant_id' => $variant?->id,
-                'name' => $product->name,
-                'slug' => $product->slug,
-                'sku' => $variant?->sku ?? $product->sku,
-                'price' => $price,
-                'qty' => $qty,
-                'attributes' => $variant?->attributes ?? [],
-                'image' => $product->thumbnail,
-                'offers' => $product->offerTiers(),
-                'category_id' => $product->category_id,
-                'on_sale' => $product->is_on_sale,
-            ];
+            $items[$key] = static::lineFor($product, $variant, $qty);
         }
 
         session([$this->sessionKey => $items]);
         $this->forgetMemo();
+    }
+
+    /**
+     * The cart line add() would write for this product, variant and quantity.
+     *
+     * Public, static and clear of the session since 17 Sep 2026, so the
+     * reward-ladder quote on the product page and in Frequently bought together
+     * prices a hypothetical piece exactly as the cart will price the real one —
+     * the variant's own price where it has one, the product's otherwise. Two
+     * copies of that rule would drift, and the first sign would be a product
+     * page promising a saving the cart does not give.
+     *
+     * @return array{key:string, product_id:int, variant_id:?int, name:string, slug:string, sku:?string,
+     *               price:float, qty:int, attributes:array, image:?string, offers:array, category_id:?int, on_sale:bool}
+     */
+    public static function lineFor(Product $product, ?ProductVariant $variant, int $qty = 1): array
+    {
+        return [
+            'key' => static::lineKey($product->id, $variant?->id),
+            'product_id' => $product->id,
+            'variant_id' => $variant?->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'sku' => $variant?->sku ?? $product->sku,
+            'price' => $variant?->effective_price ?? (float) $product->price,
+            'qty' => max(1, $qty),
+            'attributes' => $variant?->attributes ?? [],
+            'image' => $product->thumbnail,
+            'offers' => $product->offerTiers(),
+            'category_id' => $product->category_id,
+            'on_sale' => $product->is_on_sale,
+        ];
     }
 
     /** Overwrite a line's snapshotted unit price (checkout re-validation). */
@@ -1019,7 +1035,7 @@ class CartService
         return round($this->discount() + $this->deliverySaving(), 2);
     }
 
-    protected function lineKey(int $productId, ?int $variantId): string
+    protected static function lineKey(int $productId, ?int $variantId): string
     {
         return $productId.':'.($variantId ?? '0');
     }

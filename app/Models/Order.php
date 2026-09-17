@@ -145,14 +145,155 @@ class Order extends Model
         return $this->hasMany(OrderStatusHistory::class)->latest();
     }
 
+    /**
+     * The CURRENT consignment: the newest booking.
+     *
+     * Since an order can be booked with the courier again (owner's call,
+     * 2026-09-17), "the order's shipment" means the latest one — every older
+     * row is marked superseded at the moment the newer one is created, so the
+     * newest is also the only one not superseded. Everything that reads this
+     * relation (the status lock, the tallies, labels, tracking) therefore sees
+     * one consignment per order, never the replaced ones.
+     */
     public function shipment(): HasOne
     {
         return $this->hasOne(Shipment::class)->latestOfMany();
     }
 
+    /** Every consignment ever booked for this order, replaced ones included. */
     public function shipments(): HasMany
     {
         return $this->hasMany(Shipment::class);
+    }
+
+    /**
+     * The invoice the next Steadfast booking of this order has to carry.
+     *
+     * Steadfast refuses an invoice it has seen before, so the first booking
+     * keeps the plain order number (what every booking before 2026-09-17 used,
+     * and what the owner searches the Steadfast panel by) and the Nth goes as
+     * "<order number>-N".
+     *
+     * Only a deliberate re-booking asks for this — a first booking always goes
+     * under the plain order number, so that Steadfast's refusal of a repeated
+     * invoice stops a second parcel when two requests race to book one order.
+     *
+     * $taken lists invoices Steadfast has refused as already used although no
+     * shipment here carries them (a consignment made by hand in the Steadfast
+     * panel, or an attempt that timed out after Steadfast had booked it), so a
+     * re-booking can move past them instead of being refused forever.
+     *
+     * @param  list<string>  $taken
+     */
+    public function nextCourierInvoice(array $taken = []): string
+    {
+        $count = $this->shipments()->count();
+        $used = array_merge($this->shipments()->pluck('invoice')->filter()->all(), $taken);
+
+        if ($count === 0 && ! in_array((string) $this->order_number, $used, true)) {
+            return (string) $this->order_number;
+        }
+
+        $n = max(2, $count + 1);
+
+        while (in_array($this->order_number.'-'.$n, $used, true)) {
+            $n++;
+        }
+
+        return $this->order_number.'-'.$n;
+    }
+
+    /**
+     * The order a courier invoice belongs to — "10023" or a re-booking's
+     * "10023-2". The exact order number wins, so an old order number that
+     * itself contains a dash is never misread as a re-booking.
+     */
+    public static function forCourierInvoice(string $invoice): ?self
+    {
+        $invoice = trim($invoice);
+
+        if ($invoice === '') {
+            return null;
+        }
+
+        $exact = static::where('order_number', $invoice)->first();
+
+        if ($exact || ! preg_match('/^(.+)-(\d+)$/', $invoice, $m)) {
+            return $exact;
+        }
+
+        return static::where('order_number', $m[1])->first();
+    }
+
+    /**
+     * The replaced consignment the courier delivered AFTER it was replaced, if
+     * any — the parcel this customer actually received.
+     *
+     * Once there is one, the newer consignment was never needed, and its
+     * cancellation at Steadfast (the owner tidying up, or the courier giving up
+     * on a parcel nobody handed over) must not cancel the order: that would put
+     * delivered stock back on the shelf, refund the points the customer spent
+     * and text them that their order was cancelled.
+     */
+    public function replacedConsignmentDelivered(): ?Shipment
+    {
+        return $this->shipments()->whereNotNull('delivered_after_superseded_at')->latest('id')->first();
+    }
+
+    /** Statuses an order KEEPS when it is booked again — see isAwaitingLabel(). */
+    protected const LABEL_AFTER_REBOOK_STATUSES = ['shipped', 'delivered', 'partially_delivered'];
+
+    /** Raw Steadfast states that mean "registered, not yet picked up". */
+    protected const JUST_BOOKED_COURIER_STATES = ['in_review', 'unknown', ''];
+
+    /**
+     * Whether this order has a parcel on the shelf that still needs its label.
+     *
+     * Normally that is exactly the "booked" status. But booking an order again
+     * (2026-09-17) keeps a shipped or delivered order's status, so its new
+     * parcel would otherwise never be printable. Such an order also counts
+     * while its current consignment replaced an earlier one and Steadfast still
+     * has it as just booked — unless an earlier consignment was delivered after
+     * being replaced, in which case the new one is the unused parcel the owner
+     * has been told to cancel, not one to stick a label on.
+     *
+     * scopeAwaitingLabel() is the same rule for the label sheet's query; keep
+     * the two together.
+     */
+    public function isAwaitingLabel(): bool
+    {
+        $current = $this->shipment;
+
+        if (! $current?->consignment_id) {
+            return false;
+        }
+
+        if ($this->status === 'booked') {
+            return true;
+        }
+
+        if (! in_array($this->status, self::LABEL_AFTER_REBOOK_STATUSES, true)
+            || ! in_array(strtolower((string) $current->status), self::JUST_BOOKED_COURIER_STATES, true)) {
+            return false;
+        }
+
+        $shipments = $this->relationLoaded('shipments') ? $this->shipments : $this->shipments()->get();
+
+        return $shipments->contains(fn (Shipment $s) => $s->isSuperseded())
+            && ! $shipments->contains(fn (Shipment $s) => $s->delivered_after_superseded_at !== null);
+    }
+
+    /** The label sheet's query for isAwaitingLabel(). */
+    public function scopeAwaitingLabel($query)
+    {
+        return $query
+            ->whereHas('shipment', fn ($s) => $s->whereNotNull('consignment_id'))
+            ->where(fn ($q) => $q->where('status', 'booked')->orWhere(fn ($rebooked) => $rebooked
+                ->whereIn('status', self::LABEL_AFTER_REBOOK_STATUSES)
+                ->whereHas('shipment', fn ($s) => $s->where(fn ($st) => $st->whereNull('status')
+                    ->orWhereIn('status', self::JUST_BOOKED_COURIER_STATES)))
+                ->whereHas('shipments', fn ($s) => $s->whereNotNull('superseded_at'))
+                ->whereDoesntHave('shipments', fn ($s) => $s->whereNotNull('delivered_after_superseded_at'))));
     }
 
     public function scopeStatus($query, ?string $status)

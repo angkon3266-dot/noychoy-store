@@ -196,6 +196,12 @@ async function handle(e) {
 document.addEventListener('submit', (e) => {
     const form = e.target;
 
+    // An inline onsubmit="return confirm(…)" that was answered Cancel has
+    // already prevented the default by the time the event bubbles up here.
+    // Without this check the form was posted in the background anyway — so
+    // pressing Cancel on a delete still deleted.
+    if (e.defaultPrevented) return;
+
     if (form instanceof HTMLFormElement && eligible(form, e.submitter || null)) {
         handle(e);
     }

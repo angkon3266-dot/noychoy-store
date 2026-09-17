@@ -360,6 +360,150 @@ class GiftLadderTest extends TestCase
         $this->assertStringNotContainsString('gift', app(GiftLadder::class)->pdpBadge()['label']);
     }
 
+    /**
+     * The product page and Frequently bought together quote the ladder before
+     * anything is added (17 Sep 2026). A quote is the real solver run on a
+     * copy of the cart with the pieces merged in as add() would merge them —
+     * and the cart itself must come out of it untouched.
+     */
+    public function test_a_quote_solves_a_copy_of_the_cart_and_leaves_the_cart_alone(): void
+    {
+        $this->enableLadder(tiers: [
+            ['threshold' => 1, 'type' => 'flat', 'value' => 50],
+            ['threshold' => 2, 'type' => 'flat', 'value' => 60],
+            ['threshold' => 3, 'type' => 'flat', 'value' => 70],
+        ]);
+        $cart = $this->cartOfRings(1);
+        $ring = Product::findOrFail($cart->items()->first()['product_id']);
+        $items = $cart->items()->all();
+        $ladder = app(GiftLadder::class);
+
+        // Two new pieces climb rungs 2 and 3 on top of the ring already in.
+        $quote = $ladder->quote($cart, [CartService::lineFor($this->product('Bangle', 800), null, 2)]);
+        $this->assertSame(130.0, $quote['saving']);
+        $this->assertSame(['৳60 off', '৳70 off'], $quote['opened']);
+        $this->assertSame(1, $quote['paid_units_before']);
+        $this->assertSame(3, $quote['paid_units_after']);
+
+        // One more of the same ring merges into its line rather than a new one.
+        $this->assertSame(60.0, $ladder->quote($cart, [CartService::lineFor($ring, null, 1)])['saving']);
+
+        $this->assertSame($items, $cart->items()->all());
+        $this->assertSame(1, $cart->count());
+        $this->assertSame(50.0, $cart->discount());
+
+        // A lone flat rung bigger than the piece gives the piece away, no more.
+        $this->enableLadder(tiers: [['threshold' => 1, 'type' => 'flat', 'value' => 500]]);
+        $cart->clear();
+        $this->assertSame(300.0, app(GiftLadder::class)->quote($cart, [CartService::lineFor($this->product('Charm', 300), null, 1)])['saving']);
+
+        // And with the ladder off there is nothing to quote.
+        Setting::put('gift_ladder_enabled', false);
+        app()->forgetInstance(GiftLadder::class);
+        $this->assertNull(app(GiftLadder::class)->quote($cart, [CartService::lineFor($ring, null, 1)]));
+    }
+
+    public function test_a_quoted_gift_piece_goes_free_and_does_not_climb(): void
+    {
+        $gift = $this->product('Gift stud', 500);
+        $this->enableLadder($this->collection('Free gifts', [$gift]), [
+            ['threshold' => 1, 'type' => 'flat', 'value' => 50],
+            ['threshold' => 2, 'type' => 'free_gift', 'value' => null],
+            ['threshold' => 3, 'type' => 'flat', 'value' => 70],
+        ]);
+        $cart = $this->cartOfRings(2);
+        $ladder = app(GiftLadder::class);
+
+        // The stud goes to ৳0 and is not the third paid piece, so rung 3 stays shut.
+        $one = $ladder->quote($cart, [CartService::lineFor($gift, null, 1)]);
+        $this->assertSame(500.0, $one['saving']);
+        $this->assertSame([], $one['opened']);
+        $this->assertFalse($one['gift_unlocked']);
+        $this->assertSame(2, $one['paid_units_after']);
+
+        // A second stud is paid for, and that one climbs.
+        $two = $ladder->quote($cart, [CartService::lineFor($gift, null, 2)]);
+        $this->assertSame(570.0, $two['saving']);
+        $this->assertSame(['৳70 off'], $two['opened']);
+
+        $this->assertSame(2, $cart->count());
+        $this->assertSame(50.0, $cart->giftDiscount());
+    }
+
+    public function test_a_quote_opens_the_gift_rung_only_with_a_populated_gifts_collection(): void
+    {
+        $tiers = [
+            ['threshold' => 1, 'type' => 'flat', 'value' => 50],
+            ['threshold' => 2, 'type' => 'free_gift', 'value' => null],
+        ];
+        $ring = $this->product('Ring', 1000);
+        $cart = app(CartService::class);
+
+        $this->enableLadder($this->collection('Free gifts', [$this->product('Gift stud', 500)]), $tiers);
+        $quote = app(GiftLadder::class)->quote($cart, [CartService::lineFor($ring, null, 2)]);
+        $this->assertTrue($quote['gift_unlocked']);
+        $this->assertSame(['৳50 off', 'Free gift'], $quote['opened']);
+
+        $this->enableLadder(tiers: $tiers);
+        $quote = app(GiftLadder::class)->quote($cart, [CartService::lineFor($ring, null, 2)]);
+        $this->assertFalse($quote['gift_unlocked']);
+        $this->assertSame(['৳50 off'], $quote['opened']);
+    }
+
+    /**
+     * Product cards promise "+ Free gift" from the shared ladder payload. A
+     * gifts collection that is set but holds nothing published still has a
+     * name and a link, yet the solver never hands a piece out of it — so the
+     * payload says in so many words whether a gift can really be given.
+     */
+    public function test_the_ladder_payload_says_whether_a_free_gift_can_really_be_given(): void
+    {
+        $tiers = [
+            ['threshold' => 1, 'type' => 'flat', 'value' => 50],
+            ['threshold' => 2, 'type' => 'free_gift', 'value' => null],
+        ];
+        $cart = app(CartService::class);
+        $draft = $this->product('Withdrawn stud', 500);
+        $draft->update(['status' => 'draft']);
+
+        $this->enableLadder($this->collection('Free gifts', [$draft]), $tiers);
+        $gift = app(GiftLadder::class)->progressFor($cart)['gift'];
+        $this->assertSame('Free gifts', $gift['collection']['name']);
+        $this->assertFalse($gift['available']);
+
+        $this->enableLadder($this->collection('More gifts', [$this->product('Gift stud', 500)]), $tiers);
+        $this->assertTrue(app(GiftLadder::class)->progressFor($cart)['gift']['available']);
+
+        // No gift rung, nothing to give, whatever the collection holds.
+        $this->enableLadder($this->collection('Spare gifts', [$this->product('Spare stud', 500)]), [$tiers[0]]);
+        $this->assertFalse(app(GiftLadder::class)->progressFor($cart)['gift']['available']);
+    }
+
+    /**
+     * The signature the product page compares its ladder quote against. A free
+     * gift piece is not a paid unit, so `units` cannot see it come or go; the
+     * signature must.
+     */
+    public function test_the_ladder_payload_signature_moves_with_a_free_gift_the_paid_count_cannot_see(): void
+    {
+        $gift = $this->product('Gift stud', 500);
+        $this->enableLadder($this->collection('Free gifts', [$gift]), [
+            ['threshold' => 1, 'type' => 'flat', 'value' => 50],
+            ['threshold' => 2, 'type' => 'free_gift', 'value' => null],
+        ]);
+        $cart = $this->cartOfRings(2);
+        $before = $cart->giftProgress();
+
+        $cart->add($gift, null, 1);
+        $after = $cart->giftProgress();
+        $this->assertSame($before['units'], $after['units']);
+        $this->assertNotSame($before['signature'], $after['signature']);
+
+        // The same cart again is the same signature.
+        $cart->remove(CartService::lineFor($gift, null, 1)['key']);
+        $this->assertSame($before['signature'], $cart->giftProgress()['signature']);
+    }
+
     public function test_apply_copy_refuses_rows_without_a_matching_slug(): void
     {
         $product = $this->product('Ring A', 1000);

@@ -692,10 +692,17 @@ if (! function_exists('meta_content_id')) {
 }
 
 if (! function_exists('youtube_id')) {
-    /** Extract the 11-char video id from any YouTube URL form, or null. */
+    /**
+     * Extract the 11-char video id from any YouTube URL form, or null.
+     *
+     * youtube.com/live/ID is what YouTube's share button gives for a live
+     * stream or its recording. Missed here, video_meta() typed it as a file
+     * with the watch page as its source, which no <video> can play and the
+     * product page's CSP refuses to load anyway.
+     */
     function youtube_id(string $url): ?string
     {
-        if (preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|v/))([A-Za-z0-9_-]{11})~', $url, $m)) {
+        if (preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/|v/))([A-Za-z0-9_-]{11})~', $url, $m)) {
             return $m[1];
         }
         if (preg_match('~^[A-Za-z0-9_-]{11}$~', trim($url))) {

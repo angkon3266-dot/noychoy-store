@@ -45,6 +45,20 @@ class AbandonedCart extends Model
         return $this->hasOne(Order::class);
     }
 
+    /**
+     * Carts that never became an order — contacted or not.
+     *
+     * `recovered` is flipped by PlaceOrder (same phone or session), by
+     * CreateManualOrder (same phone) and by the SMS job when it finds a later
+     * order on that number. It is a phone/session match, not proof that this
+     * exact basket was bought, but it is what "abandoned" means everywhere
+     * else in the admin.
+     */
+    public function scopeAbandoned(Builder $query): Builder
+    {
+        return $query->where('recovered', false);
+    }
+
     /** Still worth chasing: no order came, and nobody has tried yet. */
     public function scopeOpen(Builder $query): Builder
     {

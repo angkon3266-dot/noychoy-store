@@ -22,7 +22,9 @@ use Illuminate\Support\Facades\URL;
  * buyer's redirect to the confirmation page.
  *
  * $clientContext is the browser snapshot (IP, UA, _fbc/_fbp, URL, time) taken
- * during the checkout request; the worker has no request to read it from.
+ * during the checkout request; the worker has no request to read it from. An
+ * order with no browser behind it (CreateManualOrder) passes
+ * MetaTrackingService::noBrowserContext(), or nothing at all.
  */
 class SendOrderPlacedEffects implements ShouldQueue
 {
@@ -84,7 +86,17 @@ class SendOrderPlacedEffects implements ShouldQueue
             $once = Cache::add($key, true, now()->addDay());
 
             if ($once) {
-                $result = $capi->purchase($order, $order->order_number, $this->clientContext ?: null);
+                // An empty context means there was no browser to capture — an
+                // order typed into the admin. It used to become null here,
+                // which told send() to read the live request: inside this
+                // worker, a console stub that reported every such order as a
+                // website visit from 127.0.0.1 using "Symfony". Now it is said
+                // out loud, and Meta gets a phone_call Purchase instead.
+                $context = $this->clientContext ?: MetaTrackingService::noBrowserContext(
+                    $order->created_at?->getTimestamp(),
+                );
+
+                $result = $capi->purchase($order, $order->order_number, $context);
 
                 // send() never throws — it returns ok:false. Claiming the guard
                 // before knowing that would mean a single failed POST silently

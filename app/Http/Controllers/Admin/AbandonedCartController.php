@@ -27,12 +27,37 @@ use Illuminate\Support\Facades\DB;
  */
 class AbandonedCartController extends Controller
 {
+    /**
+     * The list opens on carts that never became an order.
+     *
+     * "All" used to be the landing view, which buried the carts still worth a
+     * call under every checkout that had since been completed — the owner
+     * asked for the abandoned ones only, by default (2026-09-17). "All" is
+     * still one click away, and has to say so out loud (`filter=all`): an
+     * absent filter now means the default, exactly as `status=all` does on
+     * the orders list.
+     */
+    public const FILTERS = [
+        'abandoned' => 'Abandoned',
+        'open' => 'Not contacted',
+        'contacted' => 'Contacted',
+        'recovered' => 'Recovered',
+        'all' => 'All',
+    ];
+
+    public const DEFAULT_FILTER = 'abandoned';
+
     public function index(Request $request)
     {
+        // Read with is_string rather than a cast: ?filter[]= and ?q[]= were
+        // both 500s — an array reached a string cast here or in the view.
         $filter = $request->query('filter');
-        $q = trim((string) $request->query('q'));
+        $filter = is_string($filter) && isset(self::FILTERS[$filter]) ? $filter : self::DEFAULT_FILTER;
+        $q = $request->query('q');
+        $q = is_string($q) ? trim($q) : '';
 
         $carts = AbandonedCart::query()
+            ->when($filter === 'abandoned', fn ($b) => $b->abandoned())
             ->when($filter === 'open', fn ($b) => $b->open())
             ->when($filter === 'contacted', fn ($b) => $b->where('contacted', true)->where('recovered', false))
             ->when($filter === 'recovered', fn ($b) => $b->where('recovered', true))
@@ -52,15 +77,19 @@ class AbandonedCartController extends Controller
             ->with('recoveredOrder:id,order_number,abandoned_cart_id')
             ->latest()
             ->paginate(25)
-            ->withQueryString();
+            ->withQueryString()
+            // Named on every page link, the default included, so page 2 of the
+            // Abandoned list can never be read as a different filter.
+            ->appends(['filter' => $filter]);
 
         return view('admin.abandoned.index', [
             'carts' => $carts,
             'filter' => $filter,
+            'filters' => self::FILTERS,
             'q' => $q,
             'openCount' => AbandonedCart::open()->count(),
             // What is sitting on the table: everything nobody has recovered.
-            'atRisk' => (float) AbandonedCart::where('recovered', false)->sum('subtotal'),
+            'atRisk' => (float) AbandonedCart::abandoned()->sum('subtotal'),
             'recoveredValue' => (float) AbandonedCart::where('recovered', true)
                 ->where('updated_at', '>=', now()->subDays(30))->sum('subtotal'),
             'smsReady' => app(SmsService::class)->isEnabled(),

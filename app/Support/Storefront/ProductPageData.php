@@ -41,6 +41,9 @@ class ProductPageData
         $reviews = $product->approvedReviews;
         $count = (int) $product->review_count;
 
+        // Frequently bought together: this piece first, then up to three more.
+        $fbtProducts = collect([$product])->merge($crossSells)->take(4);
+
         return [
             'product' => [
                 'id' => $product->id,
@@ -132,8 +135,12 @@ class ProductPageData
                 'perk' => $loyalty->enabled() ? $loyalty->reviewPoints() : 0,
                 'photoPerk' => $loyalty->enabled() ? $loyalty->reviewPhotoBonus() : 0,
             ],
+            // The reward ladder quoted for this piece against the cart as it
+            // stands (17 Sep 2026), so the page can put the saving on the price
+            // and in a ladder row under Add to cart. Null when the ladder is off.
+            'ladderQuote' => LadderQuoteData::product($product),
             'fbt' => theme('show_frequently_bought') && $crossSells->isNotEmpty() ? [
-                'items' => collect([$product])->merge($crossSells)->take(4)->map(fn ($p) => [
+                'items' => $fbtProducts->map(fn ($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
                     'url' => route('product.show', $p),
@@ -145,6 +152,9 @@ class ProductPageData
                     'has_variants' => (bool) $p->has_variants,
                 ])->values(),
                 'add_many_url' => route('cart.add-many'),
+                // What the ladder takes off each combination of ticked tiles,
+                // so the bundle total is the price the cart will charge.
+                'ladder' => LadderQuoteData::fbt($fbtProducts),
             ] : null,
             'related' => ProductCardData::collection($related),
             'recentlyViewed' => ProductCardData::collection($recentlyViewed),

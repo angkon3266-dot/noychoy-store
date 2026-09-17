@@ -16,6 +16,82 @@
         </div>
     </div>
 @endif
+@php
+    // "Book again with courier" (owner's call, 2026-09-17). The confirmation
+    // spells out exactly what will be sent — the order as it is NOW — and that
+    // the earlier consignment stays live at Steadfast until she cancels it
+    // there, because a forgotten one can be charged as a second delivery.
+    $currentShipment = $order->shipment;
+    $rebookConfirm = null;
+    // The consignment being replaced was prepaid (COD 0) and this one would
+    // collect money — usually because a cancellation reset a paid order to
+    // unpaid. The server refuses that unless the form ticks confirm_cod.
+    $codNeedsConfirm = false;
+    if ($currentShipment?->consignment_id && $courierNow) {
+        $codNeedsConfirm = $currentShipment->cod_amount !== null
+            && (float) $currentShipment->cod_amount == 0.0
+            && (float) $courierNow['cod_amount'] > 0;
+        $rebookConfirm = (in_array($order->status, ['delivered', 'partially_delivered'], true)
+                ? '⚠ This order is marked '.strtoupper($statuses[$order->status] ?? $order->status).".\n"
+                    ."Booking again sends a SECOND parcel with its own COD and delivery charge, and whatever Steadfast "
+                    ."reports for the new consignment — a cancellation included — will drive this order's status from now on.\n\n"
+                : '')
+            .($codNeedsConfirm
+                ? '⚠ Consignment #'.$currentShipment->consignment_id.' was booked as PREPAID (COD '.money(0).'). '
+                    .'This one asks the rider to collect '.money($courierNow['cod_amount']).".\n\n"
+                : '')
+            ."Book this order with Steadfast again?\n\n"
+            ."A new consignment will be created from the order as it is NOW:\n"
+            .'• COD: '.money($courierNow['cod_amount'])."\n"
+            .'• Name: '.$courierNow['recipient_name']."\n"
+            .'• Phone: '.$courierNow['recipient_phone']."\n"
+            .'• Address: '.$courierNow['recipient_address']."\n\n"
+            .'The earlier consignment #'.$currentShipment->consignment_id.' is NOT cancelled at Steadfast by this. '
+            .'If that parcel should not go out, cancel it in the Steadfast panel — otherwise the delivery may be charged twice.';
+    }
+@endphp
+@if(! empty($courierDrift))
+    {{-- Editing a booked order is allowed, and Steadfast keeps its own copy.
+         This says precisely what the parcel still carries the old version of. --}}
+    <div id="courier-drift" class="mb-4 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <p class="font-semibold text-amber-900">⚠️ Out of date with the courier</p>
+                <p class="mt-0.5 text-amber-900/80">
+                    This order changed after consignment <strong>#{{ $currentShipment->consignment_id }}</strong> was booked.
+                    Steadfast still has the old details, and the parcel goes out with them unless you book it again.
+                </p>
+                <ul class="mt-2 space-y-1 text-amber-900/90">
+                    @foreach($courierDrift as $drift)
+                        <li class="break-words">
+                            <span class="font-medium">{{ $drift['label'] }}:</span>
+                            @if($drift['booked'] !== null)
+                                <span class="line-through decoration-amber-700/60">{{ $drift['booked'] !== '' ? $drift['booked'] : '(blank)' }}</span>
+                                → <span>{{ $drift['now'] !== '' ? $drift['now'] : '(blank)' }}</span>
+                            @else
+                                {{ $drift['now'] }}
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            @if($rebookConfirm)
+                <form action="{{ route('admin.orders.steadfast.rebook', $order) }}" method="POST" class="shrink-0" data-no-ajax
+                      onsubmit="return confirm({{ \Illuminate\Support\Js::from($rebookConfirm) }})">
+                    @csrf
+                    <input type="hidden" name="replaces" value="{{ $currentShipment->id }}">
+                    <button class="btn-primary text-sm py-1.5">↻ Book again with courier</button>
+                    @if($codNeedsConfirm)
+                        <label class="mt-1.5 flex max-w-xs items-start gap-1.5 text-xs text-amber-900">
+                            <input type="checkbox" name="confirm_cod" value="1" required class="mt-0.5">
+                            <span>Collect {{ money($courierNow['cod_amount']) }} on delivery — #{{ $currentShipment->consignment_id }} was booked as prepaid (COD {{ money(0) }})</span>
+                        </label>
+                    @endif
+                </form>
+            @endif
+        </div>
+    </div>
+@endif
 <div class="flex flex-wrap items-center justify-between gap-3">
     <a href="{{ route('admin.orders.index') }}" class="text-sm text-gold-700 hover:underline">← Back to orders</a>
     @php
@@ -352,13 +428,12 @@
                     <p class="mt-1 text-xs text-ink-700/50">{{ $order->is_inside_dhaka ? 'Inside Dhaka' : 'Outside Dhaka' }}</p>
                     @if($order->notes)<p class="mt-2 rounded bg-gold-100/60 p-2 text-xs">Note: {{ $order->notes }}</p>@endif
 
+                    <button type="button" @click="edit = true" class="mt-3 text-xs text-gold-700 hover:underline">✎ Correct these details</button>
                     @if($order->shipment?->consignment_id)
-                        <p class="mt-3 text-xs text-ink-700/50">
-                            Booked with the courier — cancel the consignment before changing the address,
-                            or the parcel and the order would disagree.
+                        <p class="mt-1 text-xs text-ink-700/50">
+                            Booked with the courier — a correction here is not sent to Steadfast until you use
+                            <strong>Book again with courier</strong>.
                         </p>
-                    @else
-                        <button type="button" @click="edit = true" class="mt-3 text-xs text-gold-700 hover:underline">✎ Correct these details</button>
                     @endif
                 </div>
 
@@ -609,11 +684,12 @@
                     <p>Delivery status: <span class="badge {{ $deliveryBadge }} capitalize">{{ str_replace('_', ' ', $order->shipment->status) }}</span></p>
                     <p class="text-ink-700/70">Consignment: <strong>{{ $order->shipment->consignment_id }}</strong></p>
                     <p class="text-ink-700/70">Tracking: <strong>{{ $order->shipment->tracking_code }}</strong></p>
+                    <p class="text-ink-700/70">Invoice: <strong>{{ $order->shipment->bookedInvoice() }}</strong> · COD {{ money($order->shipment->cod_amount) }}</p>
                     @if(!empty($resp['note']) || !empty($resp['delivery_note']))<p class="text-xs text-ink-700/60">Courier note: {{ $resp['note'] ?? $resp['delivery_note'] }}</p>@endif
                 </div>
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <form action="{{ route('admin.orders.steadfast.refresh', $order) }}" method="POST">@csrf<button class="btn-outline w-full">Refresh status</button></form>
-                    @if($order->status === 'booked')
+                    @if($order->isAwaitingLabel())
                         <a href="{{ route('admin.orders.labels', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">🖨 Print label</a>
                     @else
                         <span class="btn-outline w-full text-center opacity-50 cursor-not-allowed"
@@ -621,6 +697,49 @@
                     @endif
                     <a href="{{ route('admin.orders.cards', ['ids' => $order->id]) }}" target="_blank" class="btn-outline w-full text-center">💌 Print thank-you card</a>
                 </div>
+
+                {{-- A changed COD, a corrected address, a replacement parcel: a
+                     new consignment from the order as it is now. data-no-ajax so
+                     a cancelled confirmation really cancels, and the result
+                     (with its reminder about the old consignment) is a full,
+                     unmissable page message rather than a three-second toast. --}}
+                @if($rebookConfirm)
+                    <form action="{{ route('admin.orders.steadfast.rebook', $order) }}" method="POST" class="mt-2" data-no-ajax
+                          onsubmit="return confirm({{ \Illuminate\Support\Js::from($rebookConfirm) }})">
+                        @csrf
+                        <input type="hidden" name="replaces" value="{{ $currentShipment->id }}">
+                        @if($codNeedsConfirm)
+                            <label class="mb-1.5 flex items-start gap-1.5 text-xs text-amber-900">
+                                <input type="checkbox" name="confirm_cod" value="1" required class="mt-0.5">
+                                <span>Collect {{ money($courierNow['cod_amount']) }} on delivery — #{{ $currentShipment->consignment_id }} was booked as prepaid (COD {{ money(0) }})</span>
+                            </label>
+                        @endif
+                        <button class="btn-outline w-full">↻ Book again with courier</button>
+                    </form>
+                    <p class="mt-1 text-[11px] text-ink-700/45 text-center">
+                        Sends a new consignment with the order as it is now. The current one is not cancelled at Steadfast.
+                    </p>
+                @endif
+
+                @if($replacedShipments->isNotEmpty())
+                    <div class="mt-4 pt-3 border-t border-ink-100">
+                        <p class="text-xs text-ink-700/60 mb-1.5">Replaced consignments ({{ $replacedShipments->count() }}) — kept for reference, they no longer move this order:</p>
+                        <ul class="space-y-1.5 text-xs">
+                            @foreach($replacedShipments as $old)
+                                <li class="rounded border border-ink-100 px-2 py-1.5">
+                                    <div class="flex flex-wrap justify-between gap-x-2">
+                                        <span class="break-all">#{{ $old->consignment_id }} · inv {{ $old->bookedInvoice() }}</span>
+                                        <span class="capitalize">{{ str_replace('_', ' ', $old->status ?: 'unknown') }}</span>
+                                    </div>
+                                    <div class="text-ink-700/50">COD {{ money($old->cod_amount) }} · replaced {{ $old->superseded_at?->format('d M, H:i') }}</div>
+                                    @unless($old->isSettled())
+                                        <div class="mt-0.5 text-amber-800">Still live at Steadfast unless it was cancelled in their panel.</div>
+                                    @endunless
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
             @else
                 <p class="text-sm text-ink-700/60 mb-3">Create a courier consignment for COD ৳{{ number_format($order->total,0) }}.</p>
                 <form action="{{ route('admin.orders.steadfast', $order) }}" method="POST">@csrf<button class="btn-primary w-full">Send to Steadfast</button></form>

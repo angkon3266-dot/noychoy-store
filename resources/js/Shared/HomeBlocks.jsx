@@ -273,7 +273,31 @@ function BuyBoxBlock({ block }) {
                             {p.price_text}
                             {p.compare_text && <span className="text-ink-500 line-through text-sm ml-1">{p.compare_text}</span>}
                         </p>
-                        <button type="button" onClick={() => add(p.add_url, { qty: 1 })} className="btn-primary w-full mt-4">{block.cta_label}</button>
+                        {/* add() always hands the server an event id, but only
+                            fires the browser Pixel when it is given `track` —
+                            so until 2026-09-17 every buy-box add reached Meta
+                            as a server AddToCart with no Pixel twin. Same
+                            track as ProductCard's quick add. It needs the
+                            item's id and numeric price from the page data; an
+                            item without an id gets no track rather than a
+                            Pixel event for "prod-undefined".
+                            A product with options gets a link to its page
+                            instead, as ProductCard does: the cart refuses it
+                            until an option is chosen, and the button fired a
+                            Pixel AddToCart for that refused add all the same. */}
+                        {p.has_variants ? (
+                            <SmartLink href={p.url} className="btn-primary w-full mt-4">Select options</SmartLink>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => add(p.add_url, { qty: 1 }, p.id ? {
+                                    contentId: `prod-${p.id}`, name: p.name, value: p.price,
+                                } : null)}
+                                className="btn-primary w-full mt-4"
+                            >
+                                {block.cta_label}
+                            </button>
+                        )}
                         <p className="text-xs text-ink-700/70 mt-2">Cash on delivery · pay when it arrives</p>
                     </div>
                 ))}

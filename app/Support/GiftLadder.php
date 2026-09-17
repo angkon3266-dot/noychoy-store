@@ -6,6 +6,7 @@ use App\Models\Collection as ProductCollection;
 use App\Models\Setting;
 use App\Services\CartService;
 use App\Services\CollectionService;
+use Illuminate\Support\Collection;
 
 /**
  * The reward ladder: every paid piece in the cart climbs one rung, and each
@@ -156,12 +157,30 @@ class GiftLadder
      */
     public function resolve(CartService $cart): array
     {
-        $key = 'resolve:'.md5(json_encode($cart->items()->map(fn ($i) => [$i['product_id'], $i['qty'], $i['price']])->values()));
-
-        return $this->memo[$key] ??= $this->solve($cart);
+        return $this->resolveItems($cart->items());
     }
 
-    protected function solve(CartService $cart): array
+    /**
+     * The memoised solve for any list of cart lines. The line key and name
+     * ride in the memo key because the free gift reports both: two lines of
+     * one product at one price (two variants, say) must not share an answer
+     * that names the wrong line.
+     */
+    protected function resolveItems(Collection $items): array
+    {
+        $key = 'resolve:'.md5(json_encode($items->map(fn ($i) => [$i['key'] ?? null, $i['product_id'], $i['qty'], $i['price'], $i['name'] ?? null])->values()));
+
+        return $this->memo[$key] ??= $this->solveItems($items);
+    }
+
+    /**
+     * The solver itself, as a pure function of the cart lines — it reads the
+     * lines and the ladder settings and nothing else, so it can price a cart
+     * that does not exist yet ("what if she adds two more?") without touching
+     * the session. The product page's reward row and the Frequently-bought-
+     * together totals are quoted this way; see quote().
+     */
+    public function solveItems(Collection $items): array
     {
         $empty = [
             'units' => 0, 'paid_units' => 0, 'tier' => 0, 'value' => 0.0, 'base' => 0.0,
@@ -176,12 +195,12 @@ class GiftLadder
 
         // An empty cart still knows the ladder — every rung locked — so the
         // header strip can name the first milestone before anything is added.
-        if ($cart->isEmpty()) {
+        if ($items->isEmpty()) {
             return ['rewards' => array_map(fn ($t) => $t + ['unlocked' => false, 'pending' => false, 'amount' => 0.0], $tiers)] + $empty;
         }
 
-        $units = (int) $cart->items()->sum('qty');
-        $subtotal = $cart->subtotal();
+        $units = (int) $items->sum('qty');
+        $subtotal = (float) $items->sum(fn ($i) => $i['price'] * $i['qty']);
 
         // The free gift: the cheapest unit from the gifts collection, and only
         // once the OTHER pieces have reached the gift rung — a gift unit can
@@ -191,7 +210,7 @@ class GiftLadder
         $giftIds = $giftTier ? $this->giftIds() : [];
         $free = null;
         if ($giftIds !== [] && $units - 1 >= $giftTier['threshold']) {
-            foreach ($cart->items() as $item) {
+            foreach ($items as $item) {
                 if (! in_array((int) $item['product_id'], $giftIds, true)) {
                     continue;
                 }
@@ -250,6 +269,80 @@ class GiftLadder
             'free' => $free,
             'free_by_line' => $free ? [$free['key'] => 1] : [],
             'gift_pending' => $giftPending,
+        ];
+    }
+
+    /**
+     * What adding these lines to the cart would do to the ladder, without
+     * adding them.
+     *
+     * The owner's call on 17 Sep 2026: the ৳50 first-piece reward was
+     * communicated nowhere on a product, and the Frequently-bought-together
+     * total ignored the ladder entirely, so the shopper only discovered the
+     * saving in the cart. Both now quote it up front — and a quote is only
+     * worth showing if it is the number the cart will actually take off. So
+     * this runs the real solver on an in-memory copy of the cart lines, never
+     * a parallel sum: the lines are merged exactly as CartService::add() merges
+     * them (same line key → the quantities add, the cart's snapshotted price
+     * stands), and the result is diffed against the cart as it is.
+     *
+     * Nothing here writes. The session cart is read, never touched — not an
+     * add-then-remove, not a scoped cart — so a quote can run on every page
+     * view without a trace in the abandoned-cart or funnel reports.
+     *
+     * @param  array<int, array>  $lines  cart lines as CartService::lineFor() builds them
+     * @return array{saving:float, opened:array<int, string>, free_delivery_unlocked:bool, gift_unlocked:bool,
+     *               paid_units_before:int, paid_units_after:int}|null null when the ladder is off
+     */
+    public function quote(CartService $cart, array $lines): ?array
+    {
+        if (! $this->enabled()) {
+            return null;
+        }
+
+        $before = $this->resolve($cart);
+
+        $merged = $cart->items()->keyBy('key')->all();
+        foreach ($lines as $line) {
+            if (isset($merged[$line['key']])) {
+                $merged[$line['key']]['qty'] += (int) $line['qty'];
+            } else {
+                $merged[$line['key']] = $line;
+            }
+        }
+        $after = $this->resolveItems(collect($merged));
+
+        // A free-gift rung with nothing in the gifts collection hands out
+        // nothing, so it is never announced as opened — the same honesty the
+        // product-page promise keeps in pdpBadge(). The collection is only
+        // looked up when such a rung actually opens: a quote runs once per
+        // row, and a ladder without a gift rung should not pay for one.
+        $opened = [];
+        $giftUnlocked = false;
+        foreach ($after['rewards'] as $i => $reward) {
+            if (! $reward['unlocked'] || ($before['rewards'][$i]['unlocked'] ?? false)) {
+                continue;
+            }
+            if ($reward['type'] === 'free_gift') {
+                if ($this->giftIds() === []) {
+                    continue;
+                }
+                $giftUnlocked = true;
+            }
+            $opened[] = $reward['label'];
+        }
+
+        return [
+            // Adding pieces almost never lowers what the ladder takes off —
+            // the exception is a cheaper gift piece taking the free slot from
+            // a dearer one — and a negative "saving" on a price tag would read
+            // as a surcharge, so it is floored rather than shown.
+            'saving' => max(0.0, round($after['value'] - $before['value'], 2)),
+            'opened' => $opened,
+            'free_delivery_unlocked' => $after['free_delivery'] && ! $before['free_delivery'],
+            'gift_unlocked' => $giftUnlocked,
+            'paid_units_before' => $before['paid_units'],
+            'paid_units_after' => $after['paid_units'],
         ];
     }
 
@@ -364,6 +457,17 @@ class GiftLadder
 
         return [
             'units' => $r['paid_units'],
+            // The cart's lines in short — key, quantity and price, the only
+            // things a ladder quote reads — for the product page to tell
+            // whether its reward-ladder quote (stamped with the same value as
+            // `for_signature`) still describes this cart. `units` alone could
+            // not: a free gift piece is not a paid unit, so adding or removing
+            // one left the count where it was and the page kept promising "you
+            // pay ৳0" for a second gift. Swapping one piece for a dearer one
+            // moves a percent rung without moving the count either.
+            'signature' => substr(md5(json_encode($cart->items()
+                ->map(fn ($i) => [(string) ($i['key'] ?? ''), (int) $i['qty'], round((float) $i['price'], 2)])
+                ->values())), 0, 16),
             'tier' => $r['tier'],
             'count' => count($tiers),
             'tiers' => array_map(fn ($t) => [
@@ -372,6 +476,11 @@ class GiftLadder
                 'type' => $t['type'],
                 'label' => $t['label'],
                 'short' => $t['short'],
+                // The rung's own number — ৳ for flat, % for percent, null for
+                // the two switches. Added 17 Sep 2026 so product cards and the
+                // product page can work out "৳50 off your first piece" from the
+                // shared prop without re-parsing the label text.
+                'value' => $t['value'],
                 'unlocked' => $t['unlocked'],
                 'pending' => $t['pending'],
             ], $tiers),
@@ -386,6 +495,13 @@ class GiftLadder
                 'pick_needed' => $r['gift_pending'],
                 'name' => $r['free']['name'] ?? null,
                 'collection' => $collection ? ['name' => $collection->name, 'url' => $collection->url()] : null,
+                // Whether a free gift can actually be handed out: a gift rung
+                // AND a gifts collection with something published in it. An
+                // empty collection still has a name and a URL above, but the
+                // solver never gives a piece from it, so a product card must
+                // not promise "+ Free gift" on the strength of the collection
+                // alone — the same test quote() and pdpBadge() apply.
+                'available' => $this->giftTier() !== null && $this->giftIds() !== [],
             ],
         ];
     }

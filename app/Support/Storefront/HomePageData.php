@@ -360,6 +360,16 @@ class HomePageData
             case 'buy_box':
                 $out['cta_label'] = $b['cta_label'] ?? 'Add to cart';
                 $out['items'] = collect($b['products'] ?? collect())->map(fn ($p) => [
+                    // id and price let the browser Pixel fire the same
+                    // AddToCart the server sends, under one event id.
+                    'id' => $p->id,
+                    'price' => (float) $p->price,
+                    // A product with options cannot be added from here: the
+                    // cart refuses it until one is chosen, so the block links
+                    // to the product page instead — as ProductCard does —
+                    // rather than firing a Pixel AddToCart for an add that
+                    // never happened.
+                    'has_variants' => (bool) $p->has_variants,
                     'name' => $p->name,
                     'url' => route('product.show', $p),
                     'thumb' => $p->thumbnail,

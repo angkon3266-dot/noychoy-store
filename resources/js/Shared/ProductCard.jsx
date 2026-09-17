@@ -1,13 +1,17 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import Icon, { Star } from './Icons';
 import { useCart } from './CartContext';
-import { newEventId } from './format';
+import { money, newEventId } from './format';
+import { rewardLabel, t } from './i18n';
 
 // Storefront product card — data shape comes from ProductCardData::make().
 export default function ProductCard({ product: p }) {
-    const { add } = useCart();
+    const { add, gift } = useCart();
+    const { props } = usePage();
+    const lang = props.chrome?.lang || 'en';
 
     const soldOut = !p.available && !p.preorder;
+    const ladder = soldOut ? null : ladderHint(gift, p, lang);
 
     return (
         <div className="group relative block">
@@ -60,6 +64,12 @@ export default function ProductCard({ product: p }) {
                         </>
                     )}
                 </div>
+                {ladder && (
+                    <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] font-medium leading-tight text-gold-800" lang={lang}>
+                        <Icon name="gift" className="w-3 h-3 shrink-0 text-gold-700" strokeWidth={2} />
+                        <span className="min-w-0 truncate">{ladder}</span>
+                    </p>
+                )}
             </Link>
 
             {/* Quick actions: always visible on touch, reveal on hover on desktop. */}
@@ -114,4 +124,71 @@ export default function ProductCard({ product: p }) {
             </div>
         </div>
     );
+}
+
+/**
+ * What the next piece in the cart would earn on the ladder, for this card:
+ * "৳50 off → ৳1,400", "2% off", "+ Free delivery", "+ Free gift".
+ *
+ * The owner's call on 2026-09-17: the ladder was told only in the cart, so the
+ * first ৳50 off reached nobody browsing the shop. Every card now names the
+ * reward the next piece opens. It is worked out here, in the browser, from
+ * useCart().gift (the shared ladder progress, refreshed by every add and
+ * remove) — never from ProductCardData, whose payloads are cached and shared
+ * between visitors (DailyDeals, the assistant), and a cart-shaped number in
+ * them would be another shopper's.
+ *
+ * Only rungs that open at exactly gift.units + 1 count: a rung two pieces away
+ * is not what this piece earns. Values, thresholds and types all come from the
+ * rungs in Admin → Offers. A flat rung comes off the price the card shows —
+ * the member price when there is one — clamped at ৳0. A percent rung applies
+ * to the whole cart, not this piece, so it is named rather than priced. A gift
+ * rung is only promised when a gift can really be handed out (`gift.available`:
+ * a gifts collection with something published in it), the same honesty the
+ * server keeps when it quotes the ladder. A collection that is set but empty
+ * still has a name and a link, and the card used to promise "+ Free gift" on
+ * the strength of that alone.
+ */
+function ladderHint(gift, p, lang) {
+    if (!gift?.tiers?.length) return null;
+
+    const next = Number(gift.units || 0) + 1;
+    const rungs = gift.tiers.filter((tier) => Number(tier.threshold) === next);
+    if (!rungs.length) return null;
+
+    const sum = (type) => rungs
+        .filter((tier) => tier.type === type)
+        .reduce((total, tier) => total + (Number(tier.value) || 0), 0);
+
+    const parts = [];
+
+    const flat = sum('flat');
+    if (flat > 0) {
+        // price_text is what the card prints (whole taka), so the arrow lands
+        // on a number the shopper can check against it.
+        const shown = (p.member && Number(String(p.member.price_text).replace(/\D/g, ''))) || Number(p.price) || 0;
+        parts.push(t(lang, p.has_variants ? 'card.flat.from' : 'card.flat', {
+            off: rewardLabel(lang, `${money(flat)} off`),
+            price: money(Math.max(0, shown - flat)),
+        }));
+    }
+
+    const percent = Math.round(sum('percent') * 100) / 100;
+    if (percent > 0) {
+        parts.push(rewardLabel(lang, `${percent}% off`));
+    }
+
+    if (rungs.some((tier) => tier.type === 'free_delivery')) {
+        parts.push(`+ ${rewardLabel(lang, 'Free delivery')}`);
+    }
+
+    if (rungs.some((tier) => tier.type === 'free_gift') && gift.gift?.available) {
+        parts.push(`+ ${rewardLabel(lang, 'Free gift')}`);
+    }
+
+    if (!parts.length) return null;
+
+    // "৳50 off → ৳1,400 + 2% off": everything after the first reward joins
+    // with a plus, and the switches already carry theirs.
+    return parts.map((part, i) => (i === 0 || part.startsWith('+') ? part : `+ ${part}`)).join(' ');
 }

@@ -267,13 +267,13 @@ class AdminOrderStatusSlicerTest extends TestCase
         $this->assertStringContainsString('7001', $this->rows($html));
     }
 
-    public function test_the_default_pills_are_pending_processing_and_booked(): void
+    public function test_the_default_pills_are_the_five_working_queues(): void
     {
         $html = $this->actingAs($this->admin())->get('/admin/orders')->assertOk()->getContent();
 
-        $this->assertStringContainsString('status=pending', $html);
-        $this->assertStringContainsString('status=processing', $html);
-        $this->assertStringContainsString('status=booked', $html);
+        foreach (['pending', 'confirmed', 'processing', 'booked', 'shipped'] as $status) {
+            $this->assertStringContainsString('status='.$status, $html);
+        }
     }
 
     public function test_the_owner_can_choose_which_statuses_are_pinned(): void
@@ -300,10 +300,28 @@ class AdminOrderStatusSlicerTest extends TestCase
         $this->assertStringNotContainsString('status=booked', $html);
     }
 
+    /** Five, at the owner's request — not the three the row used to be held to. */
+    public function test_five_pills_can_be_pinned(): void
+    {
+        $five = ['confirmed', 'processing', 'booked', 'shipped', 'delivered'];
+
+        $this->actingAs($this->admin())
+            ->post('/admin/orders/quick-filters', ['statuses' => $five])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($five, Setting::get('admin_order_quick_filters'));
+
+        $html = $this->actingAs($this->admin())->get('/admin/orders?status=all')->assertOk()->getContent();
+        foreach ($five as $status) {
+            $this->assertStringContainsString('status='.$status, $html);
+        }
+        $this->assertStringContainsString('Pin up to 5 statuses as pills.', $html);
+    }
+
     public function test_it_refuses_more_pills_than_the_row_can_hold(): void
     {
         $this->actingAs($this->admin())
-            ->post('/admin/orders/quick-filters', ['statuses' => ['pending', 'confirmed', 'processing', 'booked']])
+            ->post('/admin/orders/quick-filters', ['statuses' => ['pending', 'confirmed', 'processing', 'booked', 'shipped', 'delivered']])
             ->assertSessionHasErrors('statuses');
 
         $this->assertNull(Setting::get('admin_order_quick_filters'));

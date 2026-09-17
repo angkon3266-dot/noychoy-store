@@ -44,7 +44,7 @@
     {{-- Status slicer.
 
          The dropdown can only say one thing at a time, and the owner's day is
-         spent bouncing between the same two or three queues — so those get a
+         spent bouncing between the same handful of queues — so those get a
          pill each, with a live count, one click away. "Multi" changes what a
          click means: off, a pill REPLACES the filter (the dropdown's
          behaviour); on, it ADDS to it, which is the only way to watch Pending
@@ -97,20 +97,25 @@
 
         @php $allOn = $selectedStatuses === []; @endphp
         <a href="{{ route('admin.orders.index', $base + ['status' => 'all']) }}"
-           class="rounded-full border px-3.5 py-1.5 text-sm font-medium transition {{ $allOn ? $pillOn : $pillOff }}">
+           class="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition {{ $allOn ? $pillOn : $pillOff }}">
             All <span class="{{ $allOn ? 'text-white/80' : 'text-ink-700/60' }}">{{ $statusCounts->sum() }}</span>
         </a>
 
         @foreach($pillKeys as $key)
             @php $on = in_array($key, $selectedStatuses, true); $href = $pillHref($key); @endphp
             <a href="{{ $href['single'] }}" :href="multi ? @js($href['multi']) : @js($href['single'])"
-               class="rounded-full border px-3.5 py-1.5 text-sm font-medium transition {{ $on ? $pillOn : $pillOff }}">
+               class="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition {{ $on ? $pillOn : $pillOff }}">
                 {{ $statuses[$key] }}
                 <span class="{{ $on ? 'text-white/80' : 'text-ink-700/60' }}">{{ $statusCounts[$key] ?? 0 }}</span>
             </a>
         @endforeach
 
-        <label class="ml-1 inline-flex cursor-pointer select-none items-center gap-1.5 text-xs text-ink-700/60"
+        {{-- Kept together and pushed right, so wherever the pills wrap the
+             popover below opens leftwards from the right edge. Anchored at
+             the left it ran off a phone screen and scrolled the whole page
+             sideways once five pills pushed Edit pills mid-line. --}}
+        <div class="ml-auto flex items-center gap-3">
+        <label class="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs text-ink-700/60"
                title="Off: a pill replaces the filter. On: pills add up, so you can watch Pending and Processing together.">
             <input type="checkbox" x-model="multi"
                    @change="try { localStorage.setItem('orderStatusMulti', multi ? '1' : '0') } catch (e) {}"
@@ -123,12 +128,12 @@
                     class="text-xs text-ink-700/45 hover:text-gold-700 hover:underline"
                     title="Choose which statuses appear as pills">✎ Edit pills</button>
             <div x-show="open" x-cloak @click.outside="open = false"
-                 class="absolute left-0 top-full z-30 mt-2 w-60 rounded-lg border border-ink-200 bg-white p-3 shadow-lg">
+                 class="absolute right-0 top-full z-30 mt-2 w-60 rounded-lg border border-ink-200 bg-white p-3 shadow-lg">
                 <p class="mb-2 text-xs text-ink-700/60">Pin up to {{ $maxQuickFilters }} statuses as pills.</p>
                 <form action="{{ route('admin.orders.quick-filters') }}" method="POST">
                     @csrf
                     {{-- Held at the cap in the browser as well as on the server:
-                         the server rejects a fourth, but bouncing the owner off
+                         the server rejects one over the cap, but bouncing the owner off
                          to a validation error to say so is a worse answer than
                          greying the box out. --}}
                     @foreach($statuses as $key => $label)
@@ -143,6 +148,7 @@
                     <button class="btn-primary mt-3 w-full py-1.5 text-xs">Save pills</button>
                 </form>
             </div>
+        </div>
         </div>
     </div>
 

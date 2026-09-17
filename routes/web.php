@@ -11,6 +11,7 @@ use App\Http\Controllers\Shop\CatalogController;
 use App\Http\Controllers\Shop\CheckoutController;
 use App\Http\Controllers\Shop\DiscoverController;
 use App\Http\Controllers\Shop\HomeController;
+use App\Http\Controllers\Shop\LadderQuoteController;
 use App\Http\Controllers\Shop\LandingController;
 use App\Http\Controllers\Shop\LeadController;
 use App\Http\Controllers\Shop\LoveController;
@@ -21,9 +22,12 @@ use App\Http\Controllers\Shop\PushController;
 use App\Http\Controllers\Shop\ReviewController;
 use App\Http\Controllers\Shop\SitemapController;
 use App\Http\Controllers\SteadfastWebhookController;
+use App\Http\Middleware\ReadOnlySession;
+use App\Http\Middleware\TrackVisit;
 use App\Services\LoyaltyService;
 use App\Support\Locale;
 use App\Support\Referral;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 
 // Steadfast delivery-status webhook (register at steadfast.com.bd/user/webhook/add)
@@ -133,6 +137,26 @@ Route::controller(CartController::class)->group(function () {
         Route::delete('/cart/points', 'removePoints')->name('cart.points.remove');
     });
 });
+// The product page's reward-ladder quote, refreshed after the cart changes
+// (17 Sep 2026). A read with no side effects, so it is kept out of the pageview
+// count too. Throttled in its own bucket: a bare throttle:60,1 shares one
+// counter per IP with the cart writes above, and shoppers behind one carrier
+// NAT would spend each other's add-to-cart allowance on quotes.
+//
+// It never writes the session either (ReadOnlySession): the quote is fetched
+// right after a cart change, and saving its copy of the session at the end
+// could undo a remove that landed meanwhile. That switch has to run before the
+// throttle, or a 429 would still be saved. Laravel sorts the throttle ahead of
+// SubstituteBindings and so past any unlisted middleware such as this one; the
+// route binds nothing, so SubstituteBindings is dropped and the two keep the
+// order written here. LadderQuoteTest pins that order.
+Route::get('/cart/ladder-quote', LadderQuoteController::class)
+    ->name('cart.ladder-quote')
+    ->middleware([ReadOnlySession::class, 'throttle:120,1,ladder-quote'])
+    ->withoutMiddleware([
+        TrackVisit::class,
+        SubstituteBindings::class,
+    ]);
 
 // Checkout
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');

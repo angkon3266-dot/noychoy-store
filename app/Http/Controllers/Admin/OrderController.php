@@ -22,12 +22,14 @@ class OrderController extends Controller
     /**
      * How many statuses may be pinned as slicer pills.
      *
-     * Three, because the pill row shares a line with the search box and the
-     * print buttons — a fourth wraps it onto two lines and the filter stops
-     * being the one-glance thing it exists to be. Everything not pinned is
-     * still one pick away in the dropdown beside it.
+     * Five, at the owner's request (2026-09-17). The cap used to be three on
+     * the belief that the pills shared a line with the search box; they never
+     * did — the pill row is its own flex-wrap line above it. Five fit on one
+     * line on a laptop and wrap cleanly on a phone, with Multi and Edit pills
+     * held together at the right. Everything not pinned is still one pick
+     * away in the dropdown below.
      */
-    public const MAX_QUICK_FILTERS = 3;
+    public const MAX_QUICK_FILTERS = 5;
 
     public function index(Request $request, SteadfastService $steadfast)
     {
@@ -149,7 +151,7 @@ class OrderController extends Controller
         // editable from the pills themselves: the queue the owner lives in is
         // not the same set of statuses every month, and changing it should not
         // need a developer.
-        $pinned = Setting::get('admin_order_quick_filters', ['pending', 'processing', 'booked']);
+        $pinned = Setting::get('admin_order_quick_filters', ['pending', 'confirmed', 'processing', 'booked', 'shipped']);
         $quickFilters = collect(is_array($pinned) ? $pinned : explode(',', is_scalar($pinned) ? (string) $pinned : ''))
             ->map(fn ($s) => is_string($s) ? trim($s) : null)
             ->filter(fn ($s) => $s !== null && isset(Order::STATUSES[$s]))
@@ -235,16 +237,27 @@ class OrderController extends Controller
         if ($order->shipment?->consignment_id && $steadfast->isConfigured()) {
             try {
                 $live = $steadfast->deliveryStatus($order->shipment->consignment_id);
-                $status = $live ? ['delivery_status' => $live] : [];
-                if (! empty($status['delivery_status'])) {
-                    $order->shipment->update(['status' => $status['delivery_status'], 'response' => $status]);
+                if ($live) {
+                    $order->shipment->update(['status' => $live, 'response' => ['delivery_status' => $live]]);
                     $order->setRelation('shipment', $order->shipment->fresh());
+                }
 
-                    // A settled courier outcome moves the order with it.
-                    if (app(TransitionOrderStatus::class)
-                        ->applyCourierStatus($order, $status['delivery_status'], 'Courier sync')) {
-                        $order->refresh()->load('items.product.images', 'items.variant.image', 'history', 'shipment', 'customer');
-                    }
+                // Replaced consignments first: one delivered after it was
+                // replaced moves the order, and has to be known before the
+                // current consignment's cancellation is weighed.
+                $moved = $this->syncReplacedConsignments($order, $steadfast, function (string $cid) use ($steadfast) {
+                    $raw = $steadfast->deliveryStatus($cid);
+
+                    return $raw ? ['delivery_status' => $raw] : [];
+                }, 'Courier sync');
+
+                // A settled courier outcome moves the order with it.
+                if ($live && $steadfast->applyCourierVerdict($order, $live, 'Courier sync')) {
+                    $moved = true;
+                }
+
+                if ($moved) {
+                    $order->refresh()->load('items.product.images', 'items.variant.image', 'history', 'shipment', 'customer');
                 }
             } catch (\Throwable $e) {
                 // keep last known status
@@ -252,6 +265,12 @@ class OrderController extends Controller
         }
 
         // Courier track record for this customer (from their shipments).
+        //
+        // One outcome per ORDER, read off its current consignment. An order
+        // booked again (2026-09-17) has a replaced consignment too — usually
+        // cancelled at Steadfast on purpose — and counting that as a separate
+        // shipment would mark a customer who received her parcel as someone
+        // who refused one.
         $courier = ['total' => 0, 'delivered' => 0, 'partial' => 0, 'cancelled' => 0, 'returned' => 0, 'pending' => 0];
         Order::where('customer_phone', $order->customer_phone)->with('shipment')->get()->each(function ($o) use (&$courier) {
             if (! $o->shipment) {
@@ -278,11 +297,20 @@ class OrderController extends Controller
         // call the API here — lookups cost plan quota and this is a page view.
         $bdCourier = app(BdCourierService::class);
 
+        // Editing a booked order is allowed (owner's call, 2026-09-17), so the
+        // page has to say when Steadfast's copy no longer matches the order,
+        // and what "Book again with courier" would send in its place.
+        $booked = (bool) $order->shipment?->consignment_id;
+        $order->load('shipments');
+
         return view('admin.orders.show', [
             'order' => $order,
             'statuses' => Order::STATUSES,
             'insight' => $insight->forPhone($order->customer_phone, $order->id),
             'courier' => $courier,
+            'courierDrift' => $booked ? $steadfast->driftFor($order) : [],
+            'courierNow' => $booked ? $steadfast->payloadFor($order) : null,
+            'replacedShipments' => $order->shipments->filter->isSuperseded()->sortByDesc('id')->values(),
             'balance' => $steadfast->balance(),
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
@@ -461,6 +489,13 @@ class OrderController extends Controller
                 'created_by' => auth()->user()?->name ?? 'Admin',
             ]);
         });
+
+        // A value change on a booked parcel leaves the courier collecting the
+        // old COD until the order is booked again — say so where it was made.
+        if ($order->shipment?->consignment_id) {
+            return back()->with('warning',
+                'Order updated. The courier still has the old amount — use Book again with courier to send the new one.');
+        }
 
         return back()->with('success', 'Order updated.');
     }
@@ -718,17 +753,16 @@ class OrderController extends Controller
      * courier fee twice and put the customer's number in the failed-delivery
      * history through no fault of theirs.
      *
-     * Blocked once the consignment exists: at that point the courier holds its
-     * own copy, and editing here would silently put the two out of step. Cancel
-     * the consignment first, then edit, then re-book.
+     * Allowed on a booked order too (owner's call, 2026-09-17). This used to be
+     * blocked once a consignment existed, telling her to cancel it and re-book
+     * — but there was no way to re-book, so the only way out of a wrong address
+     * was a parcel she knew would fail. The courier still holds its own copy,
+     * so the save says so plainly, the order page flags exactly what is out of
+     * date, and "Book again with courier" sends the corrected details.
      */
     public function updateDetails(Request $request, Order $order)
     {
-        if ($order->shipment?->consignment_id) {
-            return back()->with('error',
-                'This order is already booked with the courier. Cancel the consignment first, '
-                .'otherwise the address here and the address on the parcel would disagree.');
-        }
+        $booked = (bool) $order->shipment?->consignment_id;
 
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:120'],
@@ -755,6 +789,11 @@ class OrderController extends Controller
             'created_by' => auth()->user()?->name ?? 'Admin',
         ]);
 
+        if ($booked) {
+            return back()->with('warning',
+                'Saved. The courier still has the old details — use Book again with courier to send these.');
+        }
+
         return back()->with('success', 'Delivery details updated.');
     }
 
@@ -767,14 +806,18 @@ class OrderController extends Controller
      * the moment a Steadfast consignment is created. Anything already shipped,
      * delivered, cancelled or returned is past that point and printing it again
      * just wastes a sheet.
+     *
+     * One exception since orders can be booked again (2026-09-17): a shipped or
+     * delivered order keeps its status when it is re-booked, and its NEW parcel
+     * still needs a label — see Order::isAwaitingLabel(), which the order
+     * page's Print label button uses too.
      */
     public function labels(Request $request)
     {
         $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids'))));
 
         $orders = Order::with('items.product.images', 'items.variant.image', 'shipment')
-            ->where('status', 'booked')
-            ->whereHas('shipment', fn ($s) => $s->whereNotNull('consignment_id'))
+            ->awaitingLabel()
             ->when($ids, fn ($q) => $q->whereIn('id', $ids))
             ->latest()
             ->take(200)
@@ -787,7 +830,21 @@ class OrderController extends Controller
         return view('admin.orders.labels', compact('orders', 'skipped'));
     }
 
-    /** Create Steadfast consignments for several orders at once (skips already-sent). */
+    /**
+     * Create Steadfast consignments for several orders at once.
+     *
+     * Orders that already have a consignment are skipped, and stay skipped
+     * now that an order CAN be booked again (2026-09-17): a second booking
+     * creates a second parcel and can cost a second delivery charge, so it is
+     * only ever done one order at a time, from the order page, behind a
+     * confirmation that says exactly that. The message names the skipped
+     * orders so she knows which ones to open.
+     *
+     * Each order is booked under the same lock as the order page's buttons,
+     * and whether it is already booked is read again inside that lock: the
+     * list below is loaded once, before the loop, and another tab can book
+     * one of these orders while the loop is still working through the others.
+     */
     public function bulkSteadfast(Request $request, SteadfastService $steadfast)
     {
         $ids = $request->validate([
@@ -801,37 +858,68 @@ class OrderController extends Controller
 
         $orders = Order::with('items', 'shipment')->whereIn('id', $ids)->get();
         $created = 0;
-        $skipped = 0;
-        $failed = 0;
+        $skipped = [];
+        $failed = [];
+        $busy = [];
+        $notices = [];
 
         foreach ($orders as $order) {
-            if ($order->shipment && $order->shipment->consignment_id) {
-                $skipped++;
+            $outcome = $this->withBookingLock($order, function () use ($order, $steadfast) {
+                $order->refresh();
 
-                continue;
-            }
-            $shipment = $steadfast->createForOrder($order);
-            if (! $shipment) {
-                $failed++;
+                if ($order->shipment()->first()?->consignment_id) {
+                    return 'skipped';
+                }
 
-                continue;
+                $shipment = $steadfast->createForOrder($order);
+                if (! $shipment) {
+                    return 'failed';
+                }
+
+                if (in_array($order->status, Order::PRE_BOOKING_STATUSES, true)) {
+                    app(TransitionOrderStatus::class)->handle(
+                        $order, 'booked', 'Consignment created at Steadfast', auth()->user()?->name ?? 'Admin',
+                    );
+                }
+
+                return 'created';
+            }, fn () => 'busy');
+
+            if ($outcome === 'created') {
+                $created++;
+
+                if ($notice = $steadfast->lastNotice()) {
+                    $notices[] = '#'.$order->order_number.': '.$notice;
+                }
+            } elseif ($outcome === 'failed') {
+                $failed[] = '#'.$order->order_number.': '.rtrim((string) $steadfast->lastError(), '. ');
+            } elseif ($outcome === 'busy') {
+                $busy[] = '#'.$order->order_number;
+            } else {
+                $skipped[] = '#'.$order->order_number;
             }
-            if (in_array($order->status, Order::PRE_BOOKING_STATUSES, true)) {
-                app(TransitionOrderStatus::class)->handle(
-                    $order, 'booked', 'Consignment created at Steadfast', auth()->user()?->name ?? 'Admin',
-                );
-            }
-            $created++;
         }
 
-        $msg = "Sent {$created} order(s) to Steadfast"
-            .($skipped ? ", {$skipped} already booked" : '')
-            .($failed ? ", {$failed} failed (check logs)" : '').'.'
+        $msg = "Sent {$created} order(s) to Steadfast."
             // They have just left the default (Processing) view, so say where
             // they went rather than letting them look like they vanished.
-            .($created ? ' They are now "Booked with courier" — print their labels from there.' : '');
+            .($created ? ' They are now "Booked with courier" — print their labels from there.' : '')
+            .($skipped
+                ? ' Skipped '.count($skipped).' already booked ('.implode(', ', array_slice($skipped, 0, 10))
+                    .(count($skipped) > 10 ? ' and '.(count($skipped) - 10).' more' : '')
+                    .') — to send one of them again, open the order and use Book again with courier.'
+                : '')
+            .($busy
+                ? ' Skipped '.count($busy).' being booked from another page at the same moment ('.implode(', ', $busy)
+                    .') — refresh and check them before sending again.'
+                : '')
+            .($failed
+                ? ' '.count($failed).' failed — '.implode(' · ', array_slice($failed, 0, 3))
+                    .(count($failed) > 3 ? ' · and '.(count($failed) - 3).' more' : '').'.'
+                : '')
+            .($notices ? ' '.implode(' ', $notices) : '');
 
-        return back()->with($failed ? 'error' : 'success', $msg);
+        return back()->with($failed ? 'error' : ($busy || $notices ? 'warning' : 'success'), $msg);
     }
 
     /** Merge several orders from the same customer into one (the earliest). */
@@ -1081,27 +1169,197 @@ class OrderController extends Controller
             return back()->with('error', 'Steadfast API keys are not configured (Settings → check .env).');
         }
 
-        if ($order->shipment && $order->shipment->consignment_id) {
-            return back()->with('error', 'This order already has a Steadfast consignment.');
+        return $this->withBookingLock($order, function () use ($order, $steadfast) {
+            $current = $order->shipment()->first();
+
+            if ($current?->consignment_id) {
+                return back()->with('error',
+                    'This order already has a Steadfast consignment (#'.$current->consignment_id.'). '
+                    .'To send the courier a new one, use Book again with courier on the order page.');
+            }
+
+            $shipment = $steadfast->createForOrder($order->load('items'));
+
+            // Steadfast's own words, not "check the logs": the owner has no logs,
+            // and "the recipient phone must be 11 digits" tells her what to fix.
+            // A timeout is not a refusal — it may have been booked — and says so.
+            if (! $shipment) {
+                return back()->with('error', $steadfast->lastOutcomeUnknown()
+                    ? $steadfast->lastError()
+                    : 'Steadfast did not accept the booking: '.$steadfast->lastError());
+            }
+
+            // Booking is not shipping: the parcel is registered with Steadfast but
+            // still on the shelf waiting for its label. It moves on to "shipped"
+            // when the courier actually reports movement — that is also when the
+            // customer gets the "on its way" push, rather than a day early.
+            if (in_array($order->status, Order::PRE_BOOKING_STATUSES, true)) {
+                app(TransitionOrderStatus::class)->handle(
+                    $order, 'booked', 'Consignment created at Steadfast', auth()->user()?->name ?? 'Admin',
+                );
+            }
+
+            // An existing consignment linked rather than created: worth a look.
+            if ($notice = $steadfast->lastNotice()) {
+                return back()->with('warning', $notice);
+            }
+
+            return back()->with('success', "Consignment created. Tracking: {$shipment->tracking_code}");
+        });
+    }
+
+    /**
+     * Book an order with Steadfast again, from what the order says NOW.
+     *
+     * The owner's call (2026-09-17): once an order had been sent to the courier
+     * it could never be sent again, so a changed COD, a corrected address or a
+     * replacement parcel had no way to reach Steadfast. This creates a new
+     * consignment from the order's current values — under "<order number>-N",
+     * because Steadfast refuses an invoice it has already seen — and marks the
+     * earlier one replaced, so only the new one drives the order from here on.
+     *
+     * It does NOT cancel the earlier consignment at Steadfast — that stays the
+     * owner's call, made in the Steadfast panel — and the confirmation and the
+     * result both say so, because a forgotten one can be picked up and charged
+     * as a second delivery.
+     *
+     * Status: an order still being prepared, or one that was cancelled or
+     * returned, is booked again, which puts it back on the label queue (and,
+     * from cancelled, takes its released stock back). An order already booked,
+     * shipped or delivered keeps its status and gets a history note instead —
+     * so the customer is never re-notified about a parcel that did not change
+     * status.
+     *
+     * A consignment booked as prepaid (COD 0) is not replaced by one that
+     * collects money without the form saying so (confirm_cod). A cancellation
+     * resets a paid order to unpaid, so booking that order again would
+     * otherwise quietly ask the rider to collect the full total from a
+     * customer who has already paid it.
+     */
+    public function rebookSteadfast(Request $request, Order $order, SteadfastService $steadfast)
+    {
+        if (! $steadfast->isConfigured()) {
+            return back()->with('error', 'Steadfast API keys are not configured (Settings → Integrations).');
         }
 
-        $shipment = $steadfast->createForOrder($order->load('items'));
-
-        if (! $shipment) {
-            return back()->with('error', 'Steadfast rejected the request. Check the logs.');
+        // Never booked: this is simply a first booking.
+        if (! $order->shipment()->first()?->consignment_id) {
+            return $this->pushToSteadfast($order, $steadfast);
         }
 
-        // Booking is not shipping: the parcel is registered with Steadfast but
-        // still on the shelf waiting for its label. It moves on to "shipped"
-        // when the courier actually reports movement — that is also when the
-        // customer gets the "on its way" push, rather than a day early.
-        if (in_array($order->status, Order::PRE_BOOKING_STATUSES, true)) {
-            app(TransitionOrderStatus::class)->handle(
-                $order, 'booked', 'Consignment created at Steadfast', auth()->user()?->name ?? 'Admin',
-            );
+        return $this->withBookingLock($order, function () use ($request, $order, $steadfast) {
+            $previous = $order->shipment()->first();
+
+            // The form carries the consignment it was shown. If that is no longer
+            // the current one, this page is stale (a second tab, a resubmitted
+            // form) and booking now would send a third parcel nobody meant to.
+            $replaces = $request->input('replaces');
+            if (filled($replaces) && (int) $replaces !== (int) $previous->id) {
+                return back()->with('error',
+                    'This order has already been booked again since the page was opened — its current consignment is #'
+                    .$previous->consignment_id.'. Check the page before booking it once more.');
+            }
+
+            $codNow = (float) $steadfast->payloadFor($order->load('items'))['cod_amount'];
+            if ($previous->cod_amount !== null && (float) $previous->cod_amount == 0.0 && $codNow > 0
+                && ! $request->boolean('confirm_cod')) {
+                return back()->with('error',
+                    'Consignment #'.$previous->consignment_id.' was booked as prepaid (COD '.money(0).'), but booking again now would ask the rider to collect '
+                    .money($codNow).' — the order is marked '.($order->payment_status ?: 'unpaid').'. If the customer has already paid, mark the payment paid first. '
+                    .'If they really do owe '.money($codNow).', tick "Collect '.money($codNow).' on delivery" and book again.');
+            }
+
+            $from = $order->status;
+            $locked = $order->isStatusLocked();
+            $pointsWereRefunded = (float) $order->points_discount > 0 && (int) $order->points_redeemed === 0;
+
+            $shipment = $steadfast->createForOrder($order, rebook: true);
+
+            if (! $shipment) {
+                return back()->with('error', $steadfast->lastOutcomeUnknown()
+                    ? rtrim((string) $steadfast->lastError(), '. ').'. Consignment #'.$previous->consignment_id
+                        .' is still the current one here.'
+                    : 'Steadfast did not accept the new booking: '
+                        .rtrim((string) $steadfast->lastError(), '. ').'. Nothing changed — consignment #'
+                        .$previous->consignment_id.' is still the current one.');
+            }
+
+            $by = auth()->user()?->name ?? 'Admin';
+            $note = 'Re-booked with Steadfast: consignment '.$shipment->consignment_id
+                .' replaces '.$previous->consignment_id.' (COD '.money($shipment->cod_amount).')';
+            $fromLabel = Order::STATUSES[$from] ?? $from;
+
+            $reopens = in_array($from, ['cancelled', 'returned'], true) && ! $locked;
+
+            if (in_array($from, Order::PRE_BOOKING_STATUSES, true) || $reopens) {
+                // The shared action, so stock, payment and history move exactly as
+                // they do for any other status change — and "booked" sends the
+                // customer nothing.
+                app(TransitionOrderStatus::class)->handle($order, 'booked', $note, $by);
+                $statusLine = 'The order moved from '.$fromLabel.' to Booked with courier.';
+
+                if ($reopens && $pointsWereRefunded) {
+                    $statusLine .= ' The points the customer spent on it were refunded when it was '.$from
+                        .', and booking again does not take them back.';
+                }
+            } else {
+                $order->history()->create(['status' => $from, 'note' => $note, 'created_by' => $by]);
+                $statusLine = 'The order stays '.$fromLabel.'.';
+
+                if (in_array($from, ['cancelled', 'returned'], true)) {
+                    $statusLine .= ' It was not moved to Booked because the courier had confirmed the earlier'
+                        .' consignment as delivered — change the status by hand if this parcel replaces it.';
+                }
+            }
+
+            $message = 'Booked again with Steadfast — new consignment #'.$shipment->consignment_id
+                .($shipment->tracking_code ? ' (tracking '.$shipment->tracking_code.')' : '')
+                .', invoice '.$shipment->invoice.', COD '.money($shipment->cod_amount).'. '.$statusLine;
+
+            if (! str_contains(strtolower((string) $previous->status), 'cancel')) {
+                $message .= ' Consignment #'.$previous->consignment_id.' was NOT cancelled at Steadfast — '
+                    .'cancel it in the Steadfast panel if that parcel should not go out.';
+            }
+
+            if ($notice = $steadfast->lastNotice()) {
+                $message .= ' '.$notice;
+            }
+
+            return back()->with('success', $message);
+        });
+    }
+
+    /**
+     * Run a Steadfast booking for one order with nobody else booking it at the
+     * same moment.
+     *
+     * A double click, or the same form in two tabs, would otherwise create two
+     * consignments — two parcels, two delivery charges. The button locks itself
+     * in the browser too; this is the part that holds when the browser does not.
+     *
+     * $busy answers when someone else holds the lock; by default that is a
+     * redirect back with an explanation, the bulk send passes its own.
+     */
+    protected function withBookingLock(Order $order, \Closure $book, ?\Closure $busy = null)
+    {
+        try {
+            $lock = \Illuminate\Support\Facades\Cache::lock('steadfast-booking:'.$order->id, 60);
+            $acquired = $lock->get();
+        } catch (\Throwable $e) {
+            // A cache store that cannot lock must not stop the shop booking parcels.
+            return $book();
         }
 
-        return back()->with('success', "Consignment created. Tracking: {$shipment->tracking_code}");
+        if (! $acquired) {
+            return $busy ? $busy() : back()->with('error',
+                'This order is being booked with Steadfast right now. Wait a moment, then refresh the page before trying again.');
+        }
+
+        try {
+            return $book();
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -1181,12 +1439,73 @@ class OrderController extends Controller
         ]);
         $order->setRelation('shipment', $order->shipment->fresh());
 
+        // Consignments replaced by a later booking are read too, so the order
+        // page shows what became of them (was the old parcel really cancelled?).
+        // Read BEFORE the current consignment's verdict is applied: one that was
+        // delivered after being replaced is the parcel the customer has, and it
+        // decides whether the current one's cancellation may cancel the order.
+        $replacedDelivered = $this->syncReplacedConsignments(
+            $order, $steadfast, fn (string $cid) => $steadfast->statusByConsignmentId($cid), 'Courier sync',
+        );
+
         // A settled courier outcome moves the order with it.
-        if (app(TransitionOrderStatus::class)->applyCourierStatus($order, $raw, 'Courier sync')) {
+        $moved = $steadfast->applyCourierVerdict($order, $raw, 'Courier sync');
+
+        if ($replacedDelivered) {
+            $delivered = $order->replacedConsignmentDelivered();
+            $current = $order->shipment()->first();
+
+            return back()->with('warning', 'Delivery status refreshed — consignment #'.$delivered?->consignment_id
+                .', which had been replaced, was delivered, so the order is marked '.$order->fresh()->status.'.'
+                .($current && ! $current->isSettled()
+                    ? ' Consignment #'.$current->consignment_id.' appears unused — cancel it in the Steadfast panel.'
+                    : ''));
+        }
+
+        if ($moved) {
             return back()->with('success', 'Delivery status refreshed — order marked '.$order->fresh()->status.'.');
         }
 
         return back()->with('success', 'Delivery status refreshed.');
+    }
+
+    /**
+     * Record what the courier now says about this order's replaced
+     * consignments that have not settled yet — and let a DELIVERY among them
+     * move the order (SteadfastService::applyReplacedDelivery()). Their
+     * cancellations and in-flight states are only recorded.
+     *
+     * Settled ones are skipped: their answer will not change, and one already
+     * delivered before it was replaced says nothing new.
+     *
+     * @param  \Closure(string): array  $read  Consignment id → Steadfast's status answer.
+     * @return bool True if a replaced consignment's delivery moved the order.
+     */
+    protected function syncReplacedConsignments(Order $order, SteadfastService $steadfast, \Closure $read, string $by): bool
+    {
+        $moved = false;
+
+        $order->shipments()->whereNotNull('superseded_at')->whereNotNull('consignment_id')->get()
+            ->reject(fn ($old) => $old->isSettled())
+            ->each(function ($old) use ($order, $steadfast, $read, $by, &$moved) {
+                try {
+                    $oldStatus = $read((string) $old->consignment_id);
+                } catch (\Throwable $e) {
+                    return; // keep last known status
+                }
+
+                if (empty($oldStatus['delivery_status'])) {
+                    return;
+                }
+
+                $old->update(['status' => $oldStatus['delivery_status'], 'response' => $oldStatus]);
+
+                if ($steadfast->applyReplacedDelivery($order, $old, $oldStatus['delivery_status'], $by)) {
+                    $moved = true;
+                }
+            });
+
+        return $moved;
     }
 
     public function sendSms(Request $request, Order $order, SmsService $sms)

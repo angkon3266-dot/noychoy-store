@@ -100,6 +100,11 @@ class PersonalRowsTest extends TestCase
             ->where('ladder.tier', 0)
             ->where('ladder.next.n', 1)
             ->where('ladder.next.more', 1)
-            ->has('ladder.tiers', 10));
+            ->has('ladder.tiers', 10)
+            // What the product page checks its ladder quote against.
+            ->has('ladder.signature')
+            // The shipped gift rung has no gifts collection behind it, so no
+            // card may promise a free gift.
+            ->where('ladder.gift.available', false));
     }
 }

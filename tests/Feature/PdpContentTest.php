@@ -44,6 +44,10 @@ class PdpContentTest extends TestCase
                 ->missing('refundUrl')
                 ->missing('delivery')
                 ->missing('giftBadge')
+                // The ladder came back on 17 Sep 2026 as a quote on the price
+                // and a row under Add to cart — not the old line — and only
+                // when the ladder is live, which it is not by default.
+                ->where('ladderQuote', null)
                 ->missing('memberBanner')
                 ->missing('ui.registerPct')
                 // Still read by the offers list and the reviews perk box.

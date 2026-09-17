@@ -5,8 +5,11 @@ import ProductCard from '../Shared/ProductCard';
 import ShareButton from '../Shared/ShareButton';
 import RichText from '../Shared/RichText';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
+import ProductVideos, { announceVideoPlay, VIDEO_PLAY_EVENT } from '../Shared/ProductVideos';
+import LadderRow from '../Shared/LadderRow';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
+import { ordinal, rewardLabel, rewardPhrase, t } from '../Shared/i18n';
 
 // The React product page — a superset of the Blade "showcase" template:
 // swipeable gallery + zoom + videos, conversion buy box (variants, qty tiers,
@@ -30,6 +33,29 @@ export default function Product(props) {
     }, [product.id, vcEventId]);
 
     const purchase = usePurchase(pp);
+    const lang = props.chrome?.lang || 'en';
+    const { gift } = useCart();
+    const ladder = useLadderQuote(props, gift);
+
+    // Customer reviews start closed (owner, 2026-09-17), so the state lives
+    // up here: the buy-box star link and "Be the first to review" both point
+    // at #reviews, and following either must land on an open section rather
+    // than a bare heading. A #reviews URL opens it too — on arrival (read
+    // before the first paint, so Inertia's anchor scroll finds it open) and
+    // on a later hash change. "Be the first to review" also unfolds the
+    // write-a-review form, since writing is what that link offers.
+    const [reviewsOpen, setReviewsOpen] = useState(() => typeof window !== 'undefined' && window.location.hash === '#reviews');
+    const [writeOpen, setWriteOpen] = useState(false);
+    const openReviews = useCallback((write = false) => {
+        setReviewsOpen(true);
+        if (write) setWriteOpen(true);
+    }, []);
+    useEffect(() => {
+        const onHash = () => { if (window.location.hash === '#reviews') setReviewsOpen(true); };
+        onHash();
+        window.addEventListener('hashchange', onHash);
+        return () => window.removeEventListener('hashchange', onHash);
+    }, []);
 
     return (
         <div className="mx-auto max-w-7xl px-4 py-8">
@@ -37,17 +63,18 @@ export default function Product(props) {
 
             <div className="grid lg:grid-cols-2 gap-10">
                 <Gallery product={product} img={purchase.img} setImg={purchase.setImg} variantId={purchase.variantId} />
-                <BuyBox {...props} purchase={purchase} />
+                <BuyBox {...props} ladderQuote={ladder.quote} purchase={purchase} onOpenReviews={openReviews} />
             </div>
 
+            <ProductVideos videos={product.videos} name={product.name} poster={product.images[0]?.url} />
             <StorySections sections={product.sections} />
             <Description text={product.description} />
             <Details specs={product.specs} />
             <div className="max-w-3xl mt-6 border-t border-ink-100 pt-4">
                 <ShareButton url={product.url} title={product.name} label="Share" />
             </div>
-            <Reviews {...props} />
-            <FrequentlyBought fbt={props.fbt} />
+            <Reviews {...props} reviewsOpen={reviewsOpen} setReviewsOpen={setReviewsOpen} writeOpen={writeOpen} setWriteOpen={setWriteOpen} />
+            <FrequentlyBought fbt={props.fbt} ladder={ladder.fbt} lang={lang} />
             <CardStrip title="You may also like" products={props.related} cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-5" />
             <CardStrip title="Recently viewed" products={props.recentlyViewed} cols="grid-cols-2 md:grid-cols-4" />
             <StickyBar {...props} purchase={purchase} />
@@ -56,6 +83,114 @@ export default function Product(props) {
 }
 
 Product.layout = (page) => <Layout>{page}</Layout>;
+
+/* ── Reward-ladder quote, kept in step with the cart ──────────────────────── */
+/**
+ * `ladderQuote` and `fbt.ladder` as they stand for the cart right now.
+ *
+ * Both arrive as props, quoted by the server against the cart at page load
+ * (owner, 2026-09-17: the ladder is told on the price and in Frequently bought
+ * together, not only in the cart). But most ways into the cart from this page
+ * are fetches that never touch Inertia props — Add to cart here and in the
+ * sticky bar, the cards in the related strips, a remove in the mini-cart — so
+ * after one of those the props would still promise "৳50 off as your 1st
+ * piece" to a shopper who already has it. Every one of those responses does
+ * refresh useCart().gift, though, and the quote is stamped with the cart it was
+ * made for. When the two disagree, the page asks GET /cart/ladder-quote for the
+ * same two payloads and swaps them in.
+ *
+ * - The cart is compared by its signature (`gift.signature` against the
+ *   quote's `for_signature`: its lines, quantities and prices), not by the
+ *   paid-piece count. A free gift piece is not a paid piece, so adding or
+ *   removing one never moved the count, and the page went on promising "you
+ *   pay ৳0" for a second gift. The count (`units` / `for_units`) stands in
+ *   only if a payload carries no signature.
+ * - Fresh props win outright: "Add selected" in Frequently bought together
+ *   redirects back here, and that page already carries a new quote.
+ * - The first mount is skipped: the cart's `gift` is seeded from the same
+ *   request as the props, so there is nothing to catch up on.
+ * - `gift` only changes once a cart response has landed, so the quote is only
+ *   asked for after the add or remove behind it has been saved — never while
+ *   it is still on its way, when it could read the cart from before it.
+ * - Every cart change retires the request before it, including a change that
+ *   needs no new one. Add a piece and take it straight out again: the cart is
+ *   back where the quote on screen was made, so nothing is asked — but the
+ *   request the add set off is still out, and when it landed it used to put
+ *   up a "2nd piece" quote over an empty cart.
+ * - Only the latest request may answer, and never over props newer than it.
+ * - A failed refresh drops both quotes rather than leave a stale promise up;
+ *   the next cart change tries again.
+ */
+function useLadderQuote(props, gift) {
+    const quoteProp = props.ladderQuote ?? null;
+    const fbtProp = props.fbt?.ladder ?? null;
+    // The cart a payload describes: its signature, or its paid-piece count if
+    // it was built without one.
+    const cartOf = (payload) => (payload ? (payload.for_signature ?? payload.for_units) : undefined);
+    const cart = gift ? (gift.signature ?? gift.units) : undefined;
+    // `forCart`: the cart the quotes were made for. Undefined when there is no
+    // ladder to quote (nothing to keep fresh); null after a failed refresh, so
+    // the next cart change asks again.
+    const seed = () => ({
+        quoteProp, fbtProp, quote: quoteProp, fbt: fbtProp,
+        forCart: cartOf(quoteProp) ?? cartOf(fbtProp),
+    });
+    const [state, setState] = useState(seed);
+
+    // New props (a redirect back, another product): re-seed during render, so
+    // not even one frame shows the previous page's quote.
+    let live = state;
+    if (state.quoteProp !== quoteProp || state.fbtProp !== fbtProp) {
+        live = seed();
+        setState(live);
+    }
+
+    const liveRef = useRef(live);
+    liveRef.current = live;
+    const latest = useRef(0);
+    const mounted = useRef(false);
+
+    const productId = props.product.id;
+    // The tiles in the order the page shows them: the server splits the bundle
+    // saving piece by piece in that order.
+    const fbtIds = props.fbt ? (props.fbt.items || []).map((p) => p.id) : [];
+
+    useEffect(() => {
+        if (!mounted.current) {
+            mounted.current = true;
+            return;
+        }
+
+        // Before any early return: whatever is still out was asked about a
+        // cart that has just changed again.
+        const mine = ++latest.current;
+        if (cart === undefined || cart === null) return;
+
+        const current = liveRef.current;
+        if (current.forCart === undefined || current.forCart === cart) return;
+
+        const { quoteProp: sentQuote, fbtProp: sentFbt } = current;
+        const query = new URLSearchParams({ product: String(productId) });
+        fbtIds.forEach((id) => query.append('fbt[]', String(id)));
+
+        const settle = (next) => {
+            if (mine !== latest.current) return;
+            setState((prev) => (prev.quoteProp !== sentQuote || prev.fbtProp !== sentFbt)
+                ? prev
+                : { ...prev, ...next });
+        };
+
+        fetchJson(`/cart/ladder-quote?${query}`)
+            .then((data) => {
+                const quote = data?.ladderQuote ?? null;
+                const fbt = props.fbt ? (data?.fbtLadder ?? null) : null;
+                settle({ quote, fbt, forCart: cartOf(quote) ?? cartOf(fbt) });
+            })
+            .catch(() => settle({ quote: null, fbt: null, forCart: null }));
+    }, [cart]);
+
+    return live;
+}
 
 /* ── Purchase state: the React port of Alpine's productPage() component ───── */
 function usePurchase(pp) {
@@ -189,6 +324,17 @@ function Gallery({ product, img, setImg, variantId }) {
         };
     }, []);
 
+    // One video talking at a time, page-wide (owner, 2026-09-17). The video
+    // section under the buy box plays the same clips muted as it scrolls into
+    // view and announces it; a clip still playing up here then stops instead
+    // of running on out of sight. Starting one here announces in turn, and
+    // the section pauses.
+    useEffect(() => {
+        const stop = (e) => { if (e.detail?.source !== 'gallery') setPlaying(null); };
+        window.addEventListener(VIDEO_PLAY_EVENT, stop);
+        return () => window.removeEventListener(VIDEO_PLAY_EVENT, stop);
+    }, []);
+
     const current = img || images[0]?.url || '';
 
     const indexAt = () => {
@@ -288,10 +434,10 @@ function Gallery({ product, img, setImg, variantId }) {
                                     s.embed ? (
                                         <iframe src={`${s.embed}?autoplay=1`} title={`Video ${i - images.length + 1}`} className="absolute inset-0 h-full w-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
                                     ) : (
-                                        <video src={s.src} controls autoPlay playsInline className="absolute inset-0 h-full w-full object-contain bg-black" />
+                                        <video src={s.src} controls autoPlay playsInline onPlay={() => announceVideoPlay('gallery')} className="absolute inset-0 h-full w-full object-contain bg-black" />
                                     )
                                 ) : (
-                                    <button type="button" onClick={() => setPlaying(i)} aria-label={`Play video ${i - images.length + 1}`} className="absolute inset-0 grid place-items-center">
+                                    <button type="button" onClick={() => { setPlaying(i); announceVideoPlay('gallery'); }} aria-label={`Play video ${i - images.length + 1}`} className="absolute inset-0 grid place-items-center">
                                         {s.thumb && <img src={s.thumb} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-80" />}
                                         <span className="relative grid h-14 w-14 place-items-center rounded-full bg-white/90 text-ink-900 shadow">
                                             <PlayGlyph className="w-6 h-6" />
@@ -377,9 +523,11 @@ function Gallery({ product, img, setImg, variantId }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────────── */
-function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, reviews, loved, lovesCount, ui }) {
-    const { add } = useCart();
+function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, reviews, loved, lovesCount, ui, chrome, ladderQuote, onOpenReviews }) {
+    const { add, gift } = useCart();
     const preorder = product.preorder;
+    const lang = chrome?.lang || 'en';
+    const ladderText = ladderPriceLine(ladderQuote, purchase, product, lang);
 
     const addToCart = async () => {
         if (!purchase.canBuy) return;
@@ -394,13 +542,18 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
     // Buy now → Inertia POST; the server adds the line and redirects to
     // /checkout, which then renders in place (no page reload).
     const [buying, setBuying] = useState(false);
+    // The Pixel's AddToCart id goes with the post (Meta audit, 2026-09-17).
+    // It used to be made and thrown away, and CartController::buyNow only
+    // sends its Conversions API AddToCart when an id arrives to pair it with
+    // — so the page's strongest intent reached Meta from the browser alone.
     const buyNow = () => {
         if (!purchase.canBuy || buying) return;
-        purchase.makeAddEvent();
+        const eventId = purchase.makeAddEvent();
         setBuying(true);
         router.post(product.buynow_url, {
             variant_id: purchase.variantId === 'none' ? '' : purchase.variantId,
             qty: purchase.qty,
+            event_id: eventId,
         }, { onFinish: () => setBuying(false) });
     };
 
@@ -414,7 +567,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             {/* Five grey stars under a heading say "nobody bought this"; with no
                 reviews yet the line is just the invitation. */}
             {reviews.count > 0 ? (
-                <a href="#reviews" className="mt-2 flex items-center gap-2 text-sm group">
+                <a href="#reviews" onClick={() => onOpenReviews?.()} className="mt-2 flex items-center gap-2 text-sm group">
                     <span className="flex text-gold-500">
                         {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={i > Math.round(reviews.avg)} />)}
                     </span>
@@ -423,7 +576,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                     </span>
                 </a>
             ) : (
-                <a href="#reviews" className="mt-2 inline-block text-sm text-ink-700/70 hover:text-gold-700">Be the first to review</a>
+                <a href="#reviews" onClick={() => onOpenReviews?.(true)} className="mt-2 inline-block text-sm text-ink-700/70 hover:text-gold-700">Be the first to review</a>
             )}
 
             <div className="flex items-center gap-4 flex-wrap">
@@ -443,6 +596,14 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                     <span className="badge bg-success-100 text-success-700">Bundle price · save {money(purchase.savings)}</span>
                 )}
             </div>
+
+            {/* The reward ladder on the price — one line, not a panel. */}
+            {ladderText && (
+                <p className="mt-2 flex items-start gap-1.5 text-[13px] font-medium leading-snug text-gold-800" lang={lang} aria-live="polite">
+                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px text-gold-700" strokeWidth={1.8} />
+                    <span>{ladderText}</span>
+                </p>
+            )}
 
             {product.short_description && <p className="mt-3 text-[15px] leading-relaxed text-ink-700/80">{product.short_description}</p>}
 
@@ -584,6 +745,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                         </button>
                     </div>
                     {!purchase.canBuy && <p className="mt-2 text-xs text-danger-600">Please choose an option above.</p>}
+                    <LadderRow gift={gift} lang={lang} />
                 </>
             ) : (
                 <>
@@ -600,6 +762,70 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             )}
         </div>
     );
+}
+
+/**
+ * The line under the price: "৳50 off as your 1st piece — you pay ৳1,400".
+ *
+ * The owner's call on 2026-09-17: the ৳50 the ladder takes off a first piece
+ * was told nowhere before the cart. The saving is the server's quote (see
+ * useLadderQuote) for this many pieces at this price, run through the real
+ * ladder against her cart — so with a piece already in, the same page says
+ * "৳60 off as your 2nd piece". Nothing about the rungs is assumed here.
+ *
+ * - Rows are keyed by the unit price the cart would charge (a variant can be
+ *   priced differently, and a percent or gift rung then earns differently),
+ *   falling back to the product's own price, which is always there.
+ * - Past `max_qty` the last row stands, since every rung is climbed by then,
+ *   plus the open percent rungs' share (`percent`) of each piece beyond it: a
+ *   flat rung is paid once, but a percent rung takes its cut of every piece.
+ *   Row two of [1: ৳50 off, 2: 10% off] on a ৳1,000 piece is ৳250, and three
+ *   pieces are ৳350, not ৳250 again.
+ * - "You pay" is the price printed just above (a quantity offer included,
+ *   since the cart takes that on top of the ladder) times the pieces, less
+ *   the ladder. It is the ladder's figure, not a checkout total — member
+ *   prices, coupons and delivery come later — so it is never labelled one.
+ * - Before the options are chosen there is no single price to promise, so
+ *   the line names the saving only.
+ * - Nothing when the ladder is off, the piece (or the chosen option) cannot be
+ *   bought, or this many pieces would earn nothing.
+ */
+function ladderPriceLine(quote, purchase, product, lang) {
+    if (!quote?.by_price || !(product.available || product.preorder)) return null;
+    if (purchase.matched && !purchase.variantInStock) return null;
+
+    const rows = quote.by_price[Number(purchase.unitPrice).toFixed(2)] || quote.by_price[quote.default_price_key];
+    if (!rows?.length) return null;
+
+    const qty = Math.max(1, Number(purchase.qty) || 1);
+    const row = rows[Math.min(qty, Number(quote.max_qty) || rows.length, rows.length) - 1];
+    if (!row) return null;
+
+    // Pieces past the last row, each taking the open percent at the price the
+    // cart will charge — to the paisa, as the server rounds a rung's amount.
+    const beyond = qty - (Number(row.qty) || qty);
+    const extra = beyond > 0
+        ? Math.round(beyond * (Number(purchase.unitPrice) || 0) * (Number(quote.percent) || 0)) / 100
+        : 0;
+    const saving = Math.round((Math.max(0, Number(row.saving) || 0) + Math.max(0, extra)) * 100) / 100;
+    const perks = [
+        row.free_delivery_unlocked && rewardPhrase(lang, 'Free delivery'),
+        row.gift_unlocked && rewardPhrase(lang, 'Free gift'),
+    ].filter(Boolean);
+    if (saving <= 0 && perks.length === 0) return null;
+
+    const one = qty === 1;
+    const vars = { n: qty, nth: ordinal(lang, row.first_piece), saving: (extra <= 0 && row.saving_text) || money(saving) };
+
+    if (saving <= 0) {
+        return t(lang, one ? 'ladder.piece.perk' : 'ladder.pieces.perk', { ...vars, perks: perks.join(' + ') });
+    }
+
+    const line = !purchase.hasVariants || purchase.matched
+        ? t(lang, one ? 'ladder.piece' : 'ladder.pieces', { ...vars, pay: money(Math.max(0, purchase.price * qty - saving)) })
+        : t(lang, one ? 'ladder.piece.short' : 'ladder.pieces.short', vars);
+
+    return perks.length ? `${line} + ${perks.join(' + ')}` : line;
 }
 
 function AttributePickers({ purchase }) {
@@ -732,11 +958,16 @@ function StorySections({ sections }) {
 }
 
 function Description({ text }) {
-    // Open by default at the owner's call (2026-09-14), reversing the collapse
-    // of 2026-09-10: shoppers were missing the copy entirely rather than being
-    // helped by the shorter page. The toggle stays, so it can still be folded
-    // away once read.
-    const [open, setOpen] = useState(true);
+    // Collapsed by default, at the owner's request (2026-09-17). This has
+    // gone back and forth, so read the history before flipping it again:
+    // collapsed on 2026-09-10 (3b873f3) because several paragraphs of copy
+    // pushed the Details table, the reviews and the bundle far below the fold
+    // on a phone; reopened on 2026-09-14 (8cd1139) when shoppers scrolled past
+    // the heading instead of tapping it; collapsed again on 2026-09-17, with
+    // the customer reviews, when the owner asked for both to start folded.
+    // The copy stays in the DOM behind the `hidden` class either way, so
+    // search engines still index it and the tap fetches nothing.
+    const [open, setOpen] = useState(false);
     if (!text) return null;
     return (
         <section className="mt-12 max-w-3xl border-t border-ink-100 pt-8">
@@ -768,12 +999,13 @@ function Details({ specs }) {
     );
 }
 
-function Reviews({ product, reviews, ui, flash }) {
-    // Open when there is something to read. The star rating in the buy box
-    // links to #reviews, so leaving this collapsed sent shoppers to a heading
-    // with nothing under it — and hid the photos, the verified-buyer badges
-    // and the review form along with it.
-    const [open, setOpen] = useState(reviews.count > 0);
+function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpen: setOpen, writeOpen, setWriteOpen }) {
+    // Closed by default, even with reviews to read (owner, 2026-09-17). It
+    // used to open itself whenever reviews existed, because the buy-box star
+    // link pointed at #reviews and a folded section left shoppers on a heading
+    // with nothing under it. That problem is now solved at the link instead:
+    // the open state lives in Product, and the star link, "Be the first to
+    // review" and any #reviews URL all open the section on the way in.
     const [rating, setRating] = useState(0);
     const [hover, setHover] = useState(0);
     const { props } = usePage();
@@ -805,136 +1037,169 @@ function Reviews({ product, reviews, ui, flash }) {
             </button>
 
             <div className={`grid md:grid-cols-3 gap-8 mt-6 ${open ? '' : 'hidden'}`}>
-                {true && (
-                <>
-                    {reviews.perk > 0 && (
-                        <div className="md:col-span-3">
-                            {ui.isMember ? (
-                                <div className="flex items-start gap-3 rounded-xl border border-gold-200 bg-gold-100/60 px-4 py-3 text-sm text-gold-800">
-                                    <Icon name="gift" className="w-5 h-5 shrink-0" />
-                                    <p><span className="font-semibold">Share a review, earn {reviews.perk.toLocaleString()} bonus points</span>{reviews.photoPerk > 0 ? ` — add a photo for +${reviews.photoPerk.toLocaleString()} more` : ''}. Points are added to your account as soon as your review is approved.</p>
-                                </div>
-                            ) : (
-                                <div className="flex items-start gap-3 rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm text-ink-700/80">
-                                    <Icon name="gift" className="w-5 h-5 shrink-0" />
-                                    <p>Members earn <span className="font-semibold text-gold-700">{reviews.perk.toLocaleString()} bonus points</span> for every approved review{reviews.photoPerk > 0 ? ` (+${reviews.photoPerk.toLocaleString()} with a photo)` : ''}. <a href={ui.loginUrl} className="font-medium text-gold-700 underline">Sign in</a> or <a href={ui.registerUrl} className="font-medium text-gold-700 underline">join free</a> to start earning.</p>
+                {reviews.perk > 0 && (
+                    <div className="md:col-span-3">
+                        {ui.isMember ? (
+                            <div className="flex items-start gap-3 rounded-xl border border-gold-200 bg-gold-100/60 px-4 py-3 text-sm text-gold-800">
+                                <Icon name="gift" className="w-5 h-5 shrink-0" />
+                                <p><span className="font-semibold">Share a review, earn {reviews.perk.toLocaleString()} bonus points</span>{reviews.photoPerk > 0 ? ` — add a photo for +${reviews.photoPerk.toLocaleString()} more` : ''}. Points are added to your account as soon as your review is approved.</p>
+                            </div>
+                        ) : (
+                            <div className="flex items-start gap-3 rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm text-ink-700/80">
+                                <Icon name="gift" className="w-5 h-5 shrink-0" />
+                                <p>Members earn <span className="font-semibold text-gold-700">{reviews.perk.toLocaleString()} bonus points</span> for every approved review{reviews.photoPerk > 0 ? ` (+${reviews.photoPerk.toLocaleString()} with a photo)` : ''}. <a href={ui.loginUrl} className="font-medium text-gold-700 underline">Sign in</a> or <a href={ui.registerUrl} className="font-medium text-gold-700 underline">join free</a> to start earning.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Summary */}
+                <div>
+                    {reviews.count ? (
+                        <>
+                            <div className="flex items-end gap-2">
+                                <span className="text-4xl font-semibold">{reviews.avg}</span>
+                                <span className="text-ink-700/70 mb-1">/ 5</span>
+                            </div>
+                            <div className="flex text-gold-500 mt-1">
+                                {[1, 2, 3, 4, 5].map((i) => <Star key={i} className="w-5 h-5" off={i > Math.round(reviews.avg)} />)}
+                            </div>
+                            <p className="text-sm text-ink-700/70 mt-1">{reviews.count} review{reviews.count > 1 ? 's' : ''}</p>
+                            <div className="mt-4 space-y-1.5">
+                                {Object.entries(reviews.dist).sort((a, b) => b[0] - a[0]).map(([star, n]) => (
+                                    <div key={star} className="flex items-center gap-2 text-xs">
+                                        <span className="w-6 text-ink-700/70">{star}★</span>
+                                        <div className="flex-1 h-2 rounded-full bg-ink-100 overflow-hidden">
+                                            <div className="h-full bg-gold-500" style={{ width: `${reviews.count ? Math.round(n / reviews.count * 100) : 0}%` }} />
+                                        </div>
+                                        <span className="w-6 text-right text-ink-700/70">{n}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        <p className="text-ink-700/70">No reviews yet. Be the first to review this piece!</p>
+                    )}
+                </div>
+
+                {/* List + write form */}
+                <div className="md:col-span-2 space-y-6">
+                    {reviews.items.map((review, i) => (
+                        <div key={i} className="border-b border-ink-100 pb-5 last:border-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="flex text-gold-500">
+                                    {[1, 2, 3, 4, 5].map((s) => <Star key={s} off={s > review.rating} />)}
+                                </span>
+                                <span className="font-medium text-sm">{review.author}</span>
+                                {review.verified && <span className="badge bg-success-100 text-success-700 text-[10px]">Verified buyer</span>}
+                                <span className="text-xs text-ink-700/70 ml-auto">{review.date}</span>
+                            </div>
+                            {review.title && <p className="font-medium mt-2">{review.title}</p>}
+                            {review.body && <p className="text-sm text-ink-700/80 mt-1">{review.body}</p>}
+                            {review.photos.length > 0 && (
+                                <div className="mt-3 flex gap-2 flex-wrap">
+                                    {review.photos.map((url, j) => <img key={j} src={url} className="w-20 h-20 rounded-lg object-cover border border-ink-100" alt="Customer photo" loading="lazy" />)}
                                 </div>
                             )}
                         </div>
-                    )}
+                    ))}
 
-                    {/* Summary */}
-                    <div>
-                        {reviews.count ? (
-                            <>
-                                <div className="flex items-end gap-2">
-                                    <span className="text-4xl font-semibold">{reviews.avg}</span>
-                                    <span className="text-ink-700/70 mb-1">/ 5</span>
-                                </div>
-                                <div className="flex text-gold-500 mt-1">
-                                    {[1, 2, 3, 4, 5].map((i) => <Star key={i} className="w-5 h-5" off={i > Math.round(reviews.avg)} />)}
-                                </div>
-                                <p className="text-sm text-ink-700/70 mt-1">{reviews.count} review{reviews.count > 1 ? 's' : ''}</p>
-                                <div className="mt-4 space-y-1.5">
-                                    {Object.entries(reviews.dist).sort((a, b) => b[0] - a[0]).map(([star, n]) => (
-                                        <div key={star} className="flex items-center gap-2 text-xs">
-                                            <span className="w-6 text-ink-700/70">{star}★</span>
-                                            <div className="flex-1 h-2 rounded-full bg-ink-100 overflow-hidden">
-                                                <div className="h-full bg-gold-500" style={{ width: `${reviews.count ? Math.round(n / reviews.count * 100) : 0}%` }} />
-                                            </div>
-                                            <span className="w-6 text-right text-ink-700/70">{n}</span>
-                                        </div>
+                    {/* Controlled so "Be the first to review" can unfold it; the
+                        toggle event keeps the state honest when the summary is
+                        tapped. */}
+                    <details open={writeOpen} onToggle={(e) => setWriteOpen(e.currentTarget.open)} className="rounded-xl border border-ink-100 p-5">
+                        <summary className="font-medium cursor-pointer">
+                            <span className="inline-flex items-center gap-1.5"><Icon name="pen" className="w-4 h-4 shrink-0" />Write a review</span>
+                            {reviews.perk > 0 && ui.isMember && <span className="badge bg-gold-100 text-gold-800 ml-1">+{reviews.perk.toLocaleString()} points</span>}
+                        </summary>
+                        {flash?.success && <p className="mt-3 text-sm text-success-700 bg-success-50 rounded p-2">{flash.success}</p>}
+                        {errorMsg && <div className="mt-3 text-sm text-danger-700 bg-danger-50 rounded p-2">{errorMsg}</div>}
+                        <form onSubmit={submit} className="mt-4 space-y-3" encType="multipart/form-data">
+                            <div>
+                                <span className="label">Your rating *</span>
+                                <div className="flex gap-1" role="group" aria-label="Your rating" onMouseLeave={() => setHover(0)}>
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                        <button key={i} type="button" onClick={() => setRating(i)} onMouseEnter={() => setHover(i)} aria-label={`${i} star${i > 1 ? 's' : ''}`} aria-pressed={rating === i} className={`text-2xl transition ${(hover || rating) >= i ? 'text-gold-500' : 'text-ink-200'}`}>★</button>
                                     ))}
                                 </div>
-                            </>
-                        ) : (
-                            <p className="text-ink-700/70">No reviews yet. Be the first to review this piece!</p>
-                        )}
-                    </div>
-
-                    {/* List + write form */}
-                    <div className="md:col-span-2 space-y-6">
-                        {reviews.items.map((review, i) => (
-                            <div key={i} className="border-b border-ink-100 pb-5 last:border-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="flex text-gold-500">
-                                        {[1, 2, 3, 4, 5].map((s) => <Star key={s} off={s > review.rating} />)}
-                                    </span>
-                                    <span className="font-medium text-sm">{review.author}</span>
-                                    {review.verified && <span className="badge bg-success-100 text-success-700 text-[10px]">Verified buyer</span>}
-                                    <span className="text-xs text-ink-700/70 ml-auto">{review.date}</span>
-                                </div>
-                                {review.title && <p className="font-medium mt-2">{review.title}</p>}
-                                {review.body && <p className="text-sm text-ink-700/80 mt-1">{review.body}</p>}
-                                {review.photos.length > 0 && (
-                                    <div className="mt-3 flex gap-2 flex-wrap">
-                                        {review.photos.map((url, j) => <img key={j} src={url} className="w-20 h-20 rounded-lg object-cover border border-ink-100" alt="Customer photo" loading="lazy" />)}
-                                    </div>
-                                )}
+                                <input type="hidden" name="rating" value={rating || ''} required />
                             </div>
-                        ))}
-
-                        <details className="rounded-xl border border-ink-100 p-5">
-                            <summary className="font-medium cursor-pointer">
-                                <span className="inline-flex items-center gap-1.5"><Icon name="pen" className="w-4 h-4 shrink-0" />Write a review</span>
-                                {reviews.perk > 0 && ui.isMember && <span className="badge bg-gold-100 text-gold-800 ml-1">+{reviews.perk.toLocaleString()} points</span>}
-                            </summary>
-                            {flash?.success && <p className="mt-3 text-sm text-success-700 bg-success-50 rounded p-2">{flash.success}</p>}
-                            {errorMsg && <div className="mt-3 text-sm text-danger-700 bg-danger-50 rounded p-2">{errorMsg}</div>}
-                            <form onSubmit={submit} className="mt-4 space-y-3" encType="multipart/form-data">
-                                <div>
-                                    <span className="label">Your rating *</span>
-                                    <div className="flex gap-1" role="group" aria-label="Your rating" onMouseLeave={() => setHover(0)}>
-                                        {[1, 2, 3, 4, 5].map((i) => (
-                                            <button key={i} type="button" onClick={() => setRating(i)} onMouseEnter={() => setHover(i)} aria-label={`${i} star${i > 1 ? 's' : ''}`} aria-pressed={rating === i} className={`text-2xl transition ${(hover || rating) >= i ? 'text-gold-500' : 'text-ink-200'}`}>★</button>
-                                        ))}
-                                    </div>
-                                    <input type="hidden" name="rating" value={rating || ''} required />
-                                </div>
-                                <div className="grid sm:grid-cols-2 gap-3">
-                                    <input name="author_name" aria-label="Your name" placeholder="Your name *" className="input" required defaultValue={ui.customerName || ''} />
-                                    <input name="phone" aria-label="Phone" placeholder="Phone (for verified badge)" className="input" />
-                                </div>
-                                <input name="title" aria-label="Headline" placeholder="Headline (optional)" className="input" />
-                                <textarea name="body" aria-label="Your review" rows={3} placeholder="Share your experience…" className="input" />
-                                <div>
-                                    <label className="label" htmlFor="review-photos">Add photos (optional, up to 4)</label>
-                                    <input id="review-photos" type="file" name="photos[]" accept="image/*" multiple className="input text-sm" />
-                                </div>
-                                <button className="btn-primary" disabled={!rating}>Submit review</button>
-                                <p className="text-xs text-ink-700/70">Reviews appear after approval.</p>
-                            </form>
-                        </details>
-                    </div>
-                </>
-                )}
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                <input name="author_name" aria-label="Your name" placeholder="Your name *" className="input" required defaultValue={ui.customerName || ''} />
+                                <input name="phone" aria-label="Phone" placeholder="Phone (for verified badge)" className="input" />
+                            </div>
+                            <input name="title" aria-label="Headline" placeholder="Headline (optional)" className="input" />
+                            <textarea name="body" aria-label="Your review" rows={3} placeholder="Share your experience…" className="input" />
+                            <div>
+                                <label className="label" htmlFor="review-photos">Add photos (optional, up to 4)</label>
+                                <input id="review-photos" type="file" name="photos[]" accept="image/*" multiple className="input text-sm" />
+                            </div>
+                            <button className="btn-primary" disabled={!rating}>Submit review</button>
+                            <p className="text-xs text-ink-700/70">Reviews appear after approval.</p>
+                        </form>
+                    </details>
+                </div>
             </div>
         </section>
     );
 }
 
-function FrequentlyBought({ fbt }) {
+function FrequentlyBought({ fbt, ladder, lang = 'en' }) {
     const [sel, setSel] = useState(() => {
         const init = {};
         (fbt?.items || []).forEach((p) => { init[p.id] = p.selectable; });
         return init;
     });
-    const { showToast, refresh } = useCart();
+    const [busy, setBusy] = useState(false);
+    const { refresh } = useCart();
     if (!fbt) return null;
 
-    const total = fbt.items.reduce((t, p) => t + (sel[p.id] ? p.price : 0), 0);
-    const none = !Object.values(sel).some(Boolean);
+    const picked = fbt.items.filter((p) => p.selectable && sel[p.id]);
+    const total = picked.reduce((sum, p) => sum + p.price, 0);
+    const none = picked.length === 0;
+
+    // The ladder on the bundle (owner, 2026-09-17): the total used to be the
+    // plain sum, and the cart then took the rungs off — a better price the
+    // shopper only met after deciding. The server quotes every combination of
+    // tickable tiles up front (`fbt.ladder`, kept fresh by useLadderQuote), so
+    // ticking and unticking just picks another entry: the key is the ticked
+    // ids in the order the tiles are shown. Each tile wears its own share of
+    // the saving — the shares add up to the bundle's — and a tile that cannot
+    // be ticked, or a tile the ladder gives nothing, keeps its plain price.
+    const deal = (!none && ladder?.subsets?.[picked.map((p) => p.id).join('-')]) || null;
+    const saving = Math.max(0, Number(deal?.saving) || 0);
+    const shareOf = (p) => (deal && p.selectable && sel[p.id] ? Math.max(0, Number(deal.per_item?.[p.id]) || 0) : 0);
+    const rewarded = saving > 0 || !!deal?.free_delivery_unlocked || !!deal?.gift_unlocked;
 
     // "Buy now" → server redirects to /checkout (rendered in place);
     // "Add selected" → server redirects back here with a flash, and the
     // mini-cart badge refreshes from the new props.
+    //
+    // One Pixel AddToCart for the bundle, its id posted with it so the server's
+    // Conversions API event pairs with it (Meta audit, 2026-09-17): "Add
+    // selected" was the one way into the cart Meta never heard about. The value
+    // is the plain sum of the ticked pieces, the same figure the server sends.
     const submitBundle = (redirect) => {
+        if (none || busy) return;
+        const eventId = newEventId('AddToCart');
+        if (window.track) {
+            window.track('AddToCart', {
+                content_ids: picked.map((p) => `prod-${p.id}`),
+                contents: picked.map((p) => ({ id: `prod-${p.id}`, quantity: 1, item_price: p.price })),
+                content_type: 'product',
+                value: total,
+                currency: 'BDT',
+            }, { eventID: eventId });
+        }
+        setBusy(true);
         router.post(fbt.add_many_url, {
-            product_ids: fbt.items.filter((p) => p.selectable && sel[p.id]).map((p) => p.id),
+            product_ids: picked.map((p) => p.id),
             redirect,
+            event_id: eventId,
         }, {
             preserveScroll: true,
             onSuccess: () => { if (!redirect) refresh(); },
+            onFinish: () => setBusy(false),
         });
     };
 
@@ -957,7 +1222,14 @@ function FrequentlyBought({ fbt }) {
                                     {p.thumb && <img src={p.thumb} className="h-full w-full object-cover" alt={p.name} loading="lazy" decoding="async" />}
                                 </span>
                                 <span className="mt-1 block text-xs truncate">{p.name}</span>
-                                <span className="block text-xs font-semibold text-gold-700">{p.price_text}</span>
+                                {shareOf(p) > 0 ? (
+                                    <>
+                                        <span className="block text-[11px] text-ink-500 line-through">{p.price_text}</span>
+                                        <span className="block text-xs font-semibold text-gold-700">{money(Math.max(0, p.price - shareOf(p)))}</span>
+                                    </>
+                                ) : (
+                                    <span className="block text-xs font-semibold text-gold-700">{p.price_text}</span>
+                                )}
                                 {p.has_variants && <span className="block text-[10px] text-ink-700/70">choose options on its page</span>}
                             </label>
                             {i < fbt.items.length - 1 && <span className="text-2xl text-ink-300">+</span>}
@@ -965,11 +1237,41 @@ function FrequentlyBought({ fbt }) {
                     ))}
                 </div>
                 <div className="card p-5">
+                    {rewarded && <p className="mb-1 text-xs font-semibold text-gold-700" lang={lang}>{t(lang, 'fbt.together')}</p>}
                     <p className="text-sm text-ink-700/70">Total for selected</p>
-                    <p className="text-2xl font-semibold text-gold-700">{money(total)}</p>
+                    {saving > 0 ? (
+                        <>
+                            <p className="mt-0.5 text-sm text-ink-500 line-through">{money(total)}</p>
+                            <p className="text-2xl font-semibold text-gold-700">{money(Math.max(0, total - saving))}</p>
+                        </>
+                    ) : (
+                        <p className="text-2xl font-semibold text-gold-700">{money(total)}</p>
+                    )}
+                    {rewarded && (
+                        <ul className="mt-2 space-y-1 text-[13px] font-medium leading-snug text-success-700" lang={lang}>
+                            {saving > 0 && (
+                                <li className="flex items-start gap-1.5">
+                                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px" strokeWidth={1.8} />
+                                    <span>{t(lang, 'fbt.save', { saving: deal.saving_text || money(saving) })}</span>
+                                </li>
+                            )}
+                            {deal.free_delivery_unlocked && (
+                                <li className="flex items-start gap-1.5">
+                                    <Icon name="truck" className="w-4 h-4 shrink-0 mt-px" strokeWidth={1.8} />
+                                    <span>{t(lang, 'fbt.perk', { perk: rewardLabel(lang, 'Free delivery') })}</span>
+                                </li>
+                            )}
+                            {deal.gift_unlocked && (
+                                <li className="flex items-start gap-1.5">
+                                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px" strokeWidth={1.8} />
+                                    <span>{t(lang, 'fbt.perk', { perk: rewardLabel(lang, 'Free gift') })}</span>
+                                </li>
+                            )}
+                        </ul>
+                    )}
                     <div className="mt-3 space-y-2">
-                        <button type="button" className="btn-primary w-full" disabled={none} onClick={() => submitBundle('checkout')}>Buy now</button>
-                        <button type="button" className="btn-outline w-full" disabled={none} onClick={() => submitBundle('')}>Add selected to cart</button>
+                        <button type="button" className="btn-primary w-full" disabled={none || busy} onClick={() => submitBundle('checkout')}>Buy now</button>
+                        <button type="button" className="btn-outline w-full" disabled={none || busy} onClick={() => submitBundle('')}>Add selected to cart</button>
                     </div>
                 </div>
             </div>
@@ -1030,8 +1332,10 @@ function StickyBar({ product, purchase, ui }) {
                         type="button"
                         onClick={() => {
                             if (!purchase.canBuy) return;
-                            purchase.makeAddEvent();
-                            router.post(product.buynow_url, { variant_id: purchase.variantId === 'none' ? '' : purchase.variantId, qty: purchase.qty });
+                            // Same pairing as the buy box's Buy now: the id
+                            // the Pixel used rides along for the server event.
+                            const eventId = purchase.makeAddEvent();
+                            router.post(product.buynow_url, { variant_id: purchase.variantId === 'none' ? '' : purchase.variantId, qty: purchase.qty, event_id: eventId });
                         }}
                         disabled={!purchase.canBuy}
                         className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-md bg-promo-600 px-4 py-2.5 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}

@@ -21,7 +21,10 @@
     @endif
 
     {{-- ── Appearance tabs ──────────────────────────────────────────────── --}}
-    <div class="flex flex-wrap gap-1 bg-ink-50 rounded-lg p-1 sticky top-2 z-30 text-sm">
+    {{-- Sticks just below the admin header rather than over it: at top-2 it
+         slid across the header and covered the notification bell, its panel
+         and the sidebar fold button. --}}
+    <div class="flex flex-wrap gap-1 bg-ink-50 rounded-lg p-1 sticky top-[4.5rem] z-20 text-sm">
         @foreach(['branding'=>'Branding','homepage'=>'Homepage','sections'=>'Section Builder','filters'=>'Filters','cards'=>'Cards & print'] as $t => $lbl)
             <button type="button" @click="tab='{{ $t }}'"
                     :class="tab==='{{ $t }}' ? 'bg-white shadow-sm text-gold-800 font-medium' : 'text-ink-700/60 hover:text-ink-700'"

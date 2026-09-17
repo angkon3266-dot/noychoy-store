@@ -155,6 +155,8 @@ Route::middleware('admin')->group(function () {
     Route::post('orders/{order}/payment', [OrderController::class, 'updatePayment'])->name('orders.payment');
     Route::post('orders/{order}/steadfast', [OrderController::class, 'pushToSteadfast'])->name('orders.steadfast');
     Route::post('orders/{order}/steadfast/refresh', [OrderController::class, 'refreshShipment'])->name('orders.steadfast.refresh');
+    // A new consignment for an order that already has one (owner, 2026-09-17).
+    Route::post('orders/{order}/steadfast/rebook', [OrderController::class, 'rebookSteadfast'])->name('orders.steadfast.rebook');
     // On-demand BDCourier lookups — throttled because every call spends plan quota.
     Route::post('orders/{order}/courier-check', [OrderController::class, 'courierCheck'])
         ->middleware('throttle:20,1')->name('orders.courier-check');

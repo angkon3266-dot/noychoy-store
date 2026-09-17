@@ -510,4 +510,64 @@ class AbandonedCartFollowUpTest extends TestCase
         $this->assertSame(1, AbandonedCart::open()->count());
         $this->assertTrue($waiting->fresh()->exists);
     }
+
+    /** The owner's ask: the list opens on carts that never became an order. */
+    public function test_the_list_opens_on_abandoned_carts_only(): void
+    {
+        $this->lead(['phone' => '01711111111']);
+        $this->lead(['phone' => '01722222222', 'session_id' => 'sess-2', 'contacted' => true]);
+        $this->lead(['phone' => '01733333333', 'session_id' => 'sess-3', 'recovered' => true]);
+
+        $html = $this->actingAs($this->admin())
+            ->get(route('admin.abandoned.index'))
+            ->assertOk()
+            ->assertSee('01711111111')
+            ->assertSee('01722222222')
+            ->assertDontSee('01733333333')
+            ->getContent();
+
+        // "All" has to name itself, or it would link straight back here.
+        $this->assertStringContainsString('filter=all', $html);
+        $this->assertMatchesRegularExpression('/bg-ink-800 text-white">Abandoned</', $html);
+    }
+
+    public function test_all_still_shows_the_recovered_ones(): void
+    {
+        $this->lead(['phone' => '01711111111']);
+        $this->lead(['phone' => '01733333333', 'session_id' => 'sess-3', 'recovered' => true]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.abandoned.index', ['filter' => 'all']))
+            ->assertOk()
+            ->assertSee('01711111111')
+            ->assertSee('01733333333');
+    }
+
+    public function test_an_unknown_or_malformed_filter_falls_back_to_the_default(): void
+    {
+        $this->lead(['phone' => '01711111111']);
+        $this->lead(['phone' => '01733333333', 'session_id' => 'sess-3', 'recovered' => true]);
+
+        foreach (['/admin/abandoned-carts?filter=bogus', '/admin/abandoned-carts?filter[]=x', '/admin/abandoned-carts?q[]=x'] as $url) {
+            $this->actingAs($this->admin())
+                ->get($url)
+                ->assertOk()
+                ->assertSee('01711111111')
+                ->assertDontSee('01733333333');
+        }
+    }
+
+    public function test_page_two_keeps_the_filter(): void
+    {
+        for ($i = 0; $i < 26; $i++) {
+            $this->lead(['phone' => '0171100'.str_pad((string) $i, 4, '0', STR_PAD_LEFT), 'session_id' => 'sess-p'.$i]);
+        }
+
+        $html = $this->actingAs($this->admin())
+            ->get(route('admin.abandoned.index'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression('/href="[^"]*filter=abandoned[^"]*page=2"/', $html);
+    }
 }

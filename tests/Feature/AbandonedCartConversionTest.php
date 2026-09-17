@@ -276,8 +276,10 @@ class AbandonedCartConversionTest extends TestCase
             ->assertSee('became order 30009')
             ->assertDontSee('Convert to order');
 
+        // A converted lead is no longer abandoned, so it has left the default
+        // list — it is found under Recovered (and All).
         $this->actingAs($this->admin())
-            ->get('/admin/abandoned-carts')
+            ->get('/admin/abandoned-carts?filter=recovered')
             ->assertOk()
             ->assertSee('Order 30009');
     }

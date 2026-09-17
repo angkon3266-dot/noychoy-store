@@ -331,18 +331,21 @@ class CartController extends Controller
     }
 
     /** Add several products at once ("frequently bought together" bundle). */
-    public function addMany(Request $request)
+    public function addMany(Request $request, MetaTrackingService $tracking)
     {
         $data = $request->validate([
             'product_ids' => ['required', 'array', 'min:1'],
             'product_ids.*' => ['integer'],
             'redirect' => ['nullable', 'in:checkout'],
+            // Optional event id the browser Pixel fired its AddToCart with.
+            'event_id' => ['nullable', 'string', 'max:100'],
         ]);
 
         $products = Product::published()->whereIn('id', $data['product_ids'])->get();
         $added = 0;
         $bundleValue = 0.0;
         $firstProductId = null;
+        $addedLines = [];
         foreach ($products as $product) {
             if ($product->has_variants) {
                 continue; // variant products need explicit option selection
@@ -350,7 +353,21 @@ class CartController extends Controller
             $this->cart->add($product, null, 1);
             $bundleValue += (float) $product->price;
             $firstProductId ??= $product->id;
+            $addedLines[] = ['product' => $product, 'variant' => null, 'quantity' => 1];
             $added++;
+        }
+
+        // AddToCart for the bundle, which until 2026-09-17 reached Meta as
+        // nothing: "Add selected" was the one way into the cart the Conversions
+        // API never heard about. One event for the lines that actually went in
+        // (not the ids that were asked for — a variant product is skipped
+        // above), under the event id the browser Pixel used, deferred past the
+        // response exactly like add().
+        if ($added && filled($data['event_id'] ?? null)) {
+            $bundleEventId = $data['event_id'];
+            $bundleUser = $tracking->customerMatchData(auth('customer')->user());
+            $bundleContext = MetaTrackingService::captureClientContext();
+            app()->terminating(fn () => $tracking->addBundleToCart($addedLines, $bundleEventId, $bundleUser, $bundleContext));
         }
 
         // One funnel event for the bundle, not one per piece: the shopper made a

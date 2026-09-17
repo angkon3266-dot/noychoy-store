@@ -234,13 +234,21 @@ class DashboardController extends Controller
 
         return collect(range(0, $days - 1))
             ->chunk($buckets)
-            ->map(function ($chunk) use ($start, $byDay, $buckets) {
+            ->map(function ($chunk) use ($start, $byDay, $buckets, $days) {
                 $first = $start->copy()->addDays($chunk->first());
 
                 return [
                     // One day per bar keeps the weekday initial the chart used
                     // to show; grouped bars need the date to stay readable.
-                    'label' => $buckets === 1 ? $first->format('D') : $first->format('j M'),
+                    //
+                    // Past a week the weekday alone repeats — thirty bars read
+                    // "Mon Tue … Mon" — so the day of the month rides along.
+                    // Since 17 Sep 2026 the chart reads a tapped bar out by its
+                    // label on a phone, and "Wed · ৳4,500" could be any of four
+                    // Wednesdays; "Wed 10 · ৳4,500" is one.
+                    'label' => $buckets === 1
+                        ? $first->format($days > 7 ? 'D j' : 'D')
+                        : $first->format('j M'),
                     'total' => (float) $chunk->sum(
                         fn ($i) => (float) ($byDay[$start->copy()->addDays($i)->toDateString()] ?? 0)
                     ),
