@@ -638,15 +638,14 @@
                     </div>
                 </div>
 
-                {{-- Gallery videos (YouTube/Vimeo link or uploaded MP4). Since
-                     2026-09-17 they also autoplay, muted, in their own section
-                     under the product. The storefront CSP only lets <video>
-                     load from this site (media-src 'self'), so a pasted link
-                     to another site's .mp4 never plays; and an iPhone .mov is
-                     usually HEVC, which Chrome often cannot decode. --}}
+                {{-- Gallery videos (YouTube/Vimeo link or uploaded MP4). The
+                     storefront CSP only lets <video> load from this site
+                     (media-src 'self'), so a pasted link to another site's .mp4
+                     never plays; and an iPhone .mov is usually HEVC, which
+                     Chrome often cannot decode. --}}
                 <div class="border-t border-ink-100 mt-4 pt-4" x-data="{ vids: @js(array_values(old('video_urls', $product->video_urls ?? []))) }">
                     <label class="label">Gallery videos</label>
-                    <p class="text-xs text-ink-700/50 mb-2">Paste a YouTube/Vimeo link, or upload an MP4 below. Videos show inside the product image gallery, and also play automatically (muted) in a video section under the product. An iPhone .mov (HEVC) may not play in Chrome, and links to .mp4 files on other websites are blocked — upload the file here or use a YouTube/Vimeo link.</p>
+                    <p class="text-xs text-ink-700/50 mb-2">Paste a YouTube/Vimeo link, or upload an MP4 below. Videos show inside the product image gallery. An iPhone .mov (HEVC) may not play in Chrome, and links to .mp4 files on other websites are blocked — upload the file here or use a YouTube/Vimeo link.</p>
                     <template x-for="(v, i) in vids" :key="i">
                         <div class="flex gap-2 mb-2">
                             <input :name="`video_urls[${i}]`" x-model="vids[i]" class="input flex-1" placeholder="https://youtu.be/…">

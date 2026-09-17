@@ -14,8 +14,8 @@ use Tests\TestCase;
  * youtube.com/live/ID is the link YouTube's share button gives for a live
  * stream or its recording. youtube_id() did not know the form, so
  * video_meta() typed it as an uploaded file with the watch page as its
- * source: the product page's "See it in motion" section tried to play a web
- * page through a <video> the CSP refuses anyway, and the Meta catalogue was
+ * source: the product gallery's video slide tried to play a web page through
+ * a <video> the CSP refuses anyway, and the Meta catalogue was
  * sent the watch page as a video file to download.
  */
 class YoutubeLiveLinkTest extends TestCase

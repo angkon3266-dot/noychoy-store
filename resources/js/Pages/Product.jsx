@@ -5,7 +5,6 @@ import ProductCard from '../Shared/ProductCard';
 import ShareButton from '../Shared/ShareButton';
 import RichText from '../Shared/RichText';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
-import ProductVideos, { announceVideoPlay, VIDEO_PLAY_EVENT } from '../Shared/ProductVideos';
 import LadderRow from '../Shared/LadderRow';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
@@ -66,7 +65,6 @@ export default function Product(props) {
                 <BuyBox {...props} ladderQuote={ladder.quote} purchase={purchase} onOpenReviews={openReviews} />
             </div>
 
-            <ProductVideos videos={product.videos} name={product.name} poster={product.images[0]?.url} />
             <StorySections sections={product.sections} />
             <Description text={product.description} />
             <Details specs={product.specs} />
@@ -324,17 +322,6 @@ function Gallery({ product, img, setImg, variantId }) {
         };
     }, []);
 
-    // One video talking at a time, page-wide (owner, 2026-09-17). The video
-    // section under the buy box plays the same clips muted as it scrolls into
-    // view and announces it; a clip still playing up here then stops instead
-    // of running on out of sight. Starting one here announces in turn, and
-    // the section pauses.
-    useEffect(() => {
-        const stop = (e) => { if (e.detail?.source !== 'gallery') setPlaying(null); };
-        window.addEventListener(VIDEO_PLAY_EVENT, stop);
-        return () => window.removeEventListener(VIDEO_PLAY_EVENT, stop);
-    }, []);
-
     const current = img || images[0]?.url || '';
 
     const indexAt = () => {
@@ -434,10 +421,10 @@ function Gallery({ product, img, setImg, variantId }) {
                                     s.embed ? (
                                         <iframe src={`${s.embed}?autoplay=1`} title={`Video ${i - images.length + 1}`} className="absolute inset-0 h-full w-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
                                     ) : (
-                                        <video src={s.src} controls autoPlay playsInline onPlay={() => announceVideoPlay('gallery')} className="absolute inset-0 h-full w-full object-contain bg-black" />
+                                        <video src={s.src} controls autoPlay playsInline className="absolute inset-0 h-full w-full object-contain bg-black" />
                                     )
                                 ) : (
-                                    <button type="button" onClick={() => { setPlaying(i); announceVideoPlay('gallery'); }} aria-label={`Play video ${i - images.length + 1}`} className="absolute inset-0 grid place-items-center">
+                                    <button type="button" onClick={() => setPlaying(i)} aria-label={`Play video ${i - images.length + 1}`} className="absolute inset-0 grid place-items-center">
                                         {s.thumb && <img src={s.thumb} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-80" />}
                                         <span className="relative grid h-14 w-14 place-items-center rounded-full bg-white/90 text-ink-900 shadow">
                                             <PlayGlyph className="w-6 h-6" />
