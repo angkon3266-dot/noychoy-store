@@ -562,10 +562,21 @@ class OrderController extends Controller
      */
     public function create(Request $request)
     {
+        // Arriving from "Create order" on a call reminder (owner, 2026-09-17:
+        // a reminder to ring a lead back, with the items she asked about). The
+        // form opens with the number and those items, and saving it ticks the
+        // reminder off. A reminder wins over a lead and a customer: it is the
+        // call she is on, and it already carries whatever lead or customer it
+        // came from. Only a plain id counts, as for ?customer= below.
+        $reminderId = $request->query('reminder');
+        $reminder = is_string($reminderId) && ctype_digit($reminderId)
+            ? \App\Models\CallReminder::find((int) $reminderId)
+            : null;
+
         // Arriving from "Convert to order" on a lead: the form opens with her
         // details and basket already in it, so the call is about closing the
         // sale rather than re-typing what we already captured.
-        $cart = ($id = (int) $request->query('from_cart'))
+        $cart = ! $reminder && ($id = (int) $request->query('from_cart'))
             ? \App\Models\AbandonedCart::find($id)
             : null;
 
@@ -579,7 +590,7 @@ class OrderController extends Controller
         // thing she came to close, and the lead's own customer details ride
         // along with it. Anything that is not a plain id — "abc", ?customer[]=,
         // a customer since deleted — opens the blank form, as a bare link would.
-        $customer = $cart ? null : $this->customerById($request->query('customer'));
+        $customer = ($cart || $reminder) ? null : $this->customerById($request->query('customer'));
 
         return view('admin.orders.create', [
             'products' => \App\Models\Product::where('status', 'published')
@@ -589,7 +600,10 @@ class OrderController extends Controller
             'shipOutside' => (float) \App\Models\Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
             'cart' => $cart,
             'customer' => $customer,
-            'prefill' => $cart ? $this->cartPrefill($cart) : ($customer ? $this->customerPrefill($customer) : null),
+            'reminder' => $reminder,
+            'prefill' => $reminder
+                ? $this->reminderPrefill($reminder)
+                : ($cart ? $this->cartPrefill($cart) : ($customer ? $this->customerPrefill($customer) : null)),
             'restored' => $this->restoredManualInput($request),
         ]);
     }
@@ -822,7 +836,42 @@ class OrderController extends Controller
      */
     protected function cartPrefill(\App\Models\AbandonedCart $cart): array
     {
-        $rows = collect($cart->items ?? []);
+        [$lines, $notices] = $this->snapshotLines($cart->items ?? [], 'the basket');
+
+        if (empty($lines)) {
+            $notices[] = 'Nothing in this basket can still be sold — add the products by hand.';
+        }
+
+        return [
+            'customer' => [
+                'name' => $cart->name,
+                'phone' => $cart->phone,
+                'email' => $cart->email,
+                'address' => $cart->address,
+                'area' => $cart->area,
+                'is_inside_dhaka' => (bool) $cart->is_inside_dhaka,
+            ],
+            'lines' => $lines,
+            'notices' => $notices,
+        ];
+    }
+
+    /**
+     * Snapshot rows — a lead's basket, or the items on a call reminder — as
+     * order-form lines, with a plain word about each that cannot be carried
+     * over as it was.
+     *
+     * Shared since call reminders (owner, 2026-09-17) snapshot items in the
+     * shape a lead does, and "Create order" on one meets the same truths: a
+     * piece unpublished, a size deactivated, the last one sold. `$holder` is
+     * what the rows came from, in those words — "the basket", "the reminder".
+     *
+     * @param  iterable<int, array<string, mixed>>  $rows
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, string>}
+     */
+    protected function snapshotLines(iterable $rows, string $holder): array
+    {
+        $rows = collect($rows);
 
         $products = \App\Models\Product::with('variants')
             ->whereIn('id', $rows->pluck('product_id')->filter()->unique()->all())
@@ -854,12 +903,12 @@ class OrderController extends Controller
                     $notices[] = $name.': the option they chose is gone — agree another before saving.';
                 }
             } elseif ($product->has_variants) {
-                $notices[] = $name.' has options and the basket never recorded one — set the price by hand.';
+                $notices[] = $name.' has options and '.$holder.' never recorded one — set the price by hand.';
             }
 
             $stock = $variant ? (int) $variant->stock_quantity : (int) $product->stock_quantity;
             if (($variant || $product->manage_stock) && $stock < $qty) {
-                $notices[] = $name.': only '.max(0, $stock).' left, and the basket has '.$qty.'.';
+                $notices[] = $name.': only '.max(0, $stock).' left, and '.$holder.' has '.$qty.'.';
             }
 
             $lines[] = [
@@ -873,22 +922,71 @@ class OrderController extends Controller
             ];
         }
 
-        if (empty($lines)) {
-            $notices[] = 'Nothing in this basket can still be sold — add the products by hand.';
-        }
+        return [$lines, $notices];
+    }
 
-        return [
+    /**
+     * A call reminder, shaped for the manual order form the way a lead is.
+     *
+     * Owner, 2026-09-17: "Create order" on a reminder opens this form with the
+     * phone and the items filled in. Who it is for follows the number, as the
+     * order itself will: a customer the shop knows arrives exactly as opening
+     * the form from her page does — her own name, and delivery details from her
+     * saved address or last order — and anyone else arrives as the name and
+     * number on the reminder. A reminder made from a lead borrows the address
+     * the shopper typed at checkout when nothing better is on file.
+     *
+     * The items are re-read against the live catalogue like a lead's basket;
+     * a reminder noted without items opens on the usual blank line.
+     *
+     * @return array{customer:array<string,mixed>,lines:array<int,array<string,mixed>>,notices:array<int,string>,picked?:array<string,mixed>}
+     */
+    protected function reminderPrefill(\App\Models\CallReminder $reminder): array
+    {
+        $customer = $reminder->customer?->phone === $reminder->phone
+            ? $reminder->customer
+            : Customer::firstWhere('phone', $reminder->phone);
+
+        $prefill = $customer ? $this->customerPrefill($customer) : [
             'customer' => [
-                'name' => $cart->name,
-                'phone' => $cart->phone,
-                'email' => $cart->email,
+                'name' => $reminder->name,
+                'phone' => $reminder->phone,
+                'email' => null,
+                'address' => null,
+                'area' => null,
+                'district' => null,
+                'is_inside_dhaka' => false,
+            ],
+            'lines' => [],
+            'notices' => [],
+        ];
+
+        $cart = $reminder->abandonedCart;
+        if ($cart && blank($prefill['customer']['address'] ?? null) && filled($cart->address)) {
+            $prefill['customer'] = array_merge($prefill['customer'], [
+                'email' => ($prefill['customer']['email'] ?? null) ?: $cart->email,
                 'address' => $cart->address,
                 'area' => $cart->area,
                 'is_inside_dhaka' => (bool) $cart->is_inside_dhaka,
-            ],
-            'lines' => $lines,
-            'notices' => $notices,
-        ];
+            ]);
+
+            if (isset($prefill['picked'])) {
+                $prefill['picked']['source'] = 'Delivery details from the checkout this reminder was made from — check them before saving.';
+            }
+        }
+
+        if (! empty($reminder->items)) {
+            [$lines, $notices] = $this->snapshotLines($reminder->items, 'the reminder');
+
+            if (empty($lines)) {
+                $notices[] = 'Nothing on this reminder can still be sold — add the products by hand.';
+            }
+
+            $prefill['lines'] = $lines;
+            $prefill['notices'] = array_merge($prefill['notices'], $notices);
+        }
+
+        return $prefill;
     }
 
     /**
@@ -914,6 +1012,7 @@ class OrderController extends Controller
             'discount' => ['nullable', 'numeric', 'min:0'],
             'status' => ['nullable', 'in:'.implode(',', array_keys(Order::STATUSES))],
             'abandoned_cart_id' => ['nullable', 'integer', 'exists:abandoned_carts,id'],
+            'reminder_id' => ['nullable', 'integer', 'exists:call_reminders,id'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'lines.*.variant_id' => ['nullable', 'integer'],
@@ -933,6 +1032,17 @@ class OrderController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
+        // A call reminder that became this sale (owner, 2026-09-17): the call
+        // is made, so it leaves Due now and the bell, saying which order it
+        // turned into. After the order exists, never before — a save that
+        // bounces must leave the reminder waiting.
+        $reminderClosed = ($reminderId = $data['reminder_id'] ?? null)
+            && \App\Models\CallReminder::find($reminderId)?->closeWithOrder($order, $request->user()?->id);
+        if ($reminderClosed) {
+            \App\Services\AdminAlerts::flush();
+        }
+        $alsoReminder = $reminderClosed ? ' The call reminder is marked done.' : '';
+
         // A lead she chased and closed. CreateManualOrder has already flipped
         // every cart on this phone to recovered; this records which one became
         // this order, so the lead can be opened from the sale and back again.
@@ -940,11 +1050,11 @@ class OrderController extends Controller
             $order->forceFill(['abandoned_cart_id' => $cartId])->save();
 
             return redirect()->route('admin.orders.show', $order)
-                ->with('success', 'Order '.$order->order_number.' created, and the lead is marked recovered.');
+                ->with('success', 'Order '.$order->order_number.' created, and the lead is marked recovered.'.$alsoReminder);
         }
 
         return redirect()->route('admin.orders.show', $order)
-            ->with('success', 'Order '.$order->order_number.' created.');
+            ->with('success', 'Order '.$order->order_number.' created.'.$alsoReminder);
     }
 
     /**

@@ -3,42 +3,47 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\CheckCustomersCourier;
 use App\Models\Customer;
+use App\Rules\BdPhone;
+use App\Services\BdCourierService;
 use App\Services\CustomerInsight;
+use App\Services\Meta\MetaQueueRunner;
 use App\Services\SmsService;
+use App\Support\CourierTier;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, BdCourierService $bdCourier)
     {
         $sort = $request->query('sort', 'spend');
+        $tier = $this->requestedTier($request);
 
-        $customers = Customer::query()
-            ->when($request->query('q'), function ($q, $term) {
-                $q->where(fn ($w) => $w->where('name', 'like', "%{$term}%")
-                    ->orWhere('phone', 'like', "%{$term}%")
-                    ->orWhere('email', 'like', "%{$term}%"));
-            })
-            ->when($request->boolean('repeat'), fn ($q) => $q->where('total_orders', '>', 1))
-            ->when($request->boolean('blacklisted'), fn ($q) => $q->where('blacklisted', true))
-            ->when($request->boolean('members'), fn ($q) => $q->whereNotNull('password'))
-            ->when($request->boolean('has_points'), fn ($q) => $q->where('points', '>', 0))
-            ->when($request->boolean('has_email'), fn ($q) => $q->whereNotNull('email')->where('email', '!=', ''))
-            ->when($request->boolean('new_month'), fn ($q) => $q->where('created_at', '>=', now()->startOfMonth()))
-            ->when($request->filled('min_spend'), fn ($q) => $q->where('total_spent', '>=', (float) $request->query('min_spend')))
-            ->when($request->filled('max_spend'), fn ($q) => $q->where('total_spent', '<=', (float) $request->query('max_spend')))
-            ->when($request->filled('min_orders'), fn ($q) => $q->where('total_orders', '>=', (int) $request->query('min_orders')))
-            // Lapsed = has ordered but not in the last N days (default 30 when toggled).
-            ->when($request->boolean('lapsed'), fn ($q) => $q->where('total_orders', '>', 0)
-                ->where('last_order_at', '<', now()->subDays((int) ($request->query('lapsed_days') ?: 30))))
-            ->orderBy(match ($sort) {
-                'orders' => 'total_orders',
-                'recent' => 'last_order_at',
-                'points' => 'points',
-                'name' => 'name',
-                default => 'total_spent',
-            }, $sort === 'name' ? 'asc' : 'desc')
+        $customers = $this->courierTier($this->filteredCustomers($request), $tier)
+            // Only the customer's own columns: the join also brings an `id`
+            // and a `phone`, and the courier row's id would overwrite the
+            // customer's on every hydrated model.
+            ->select('customers.*')
+            ->with('courierCheck')
+            ->when(
+                $sort === 'parcels',
+                // Never-checked customers have no parcel count and sort last
+                // (NULL is the smallest value in both MySQL and SQLite), with
+                // spend deciding between them.
+                fn ($q) => $q->orderByDesc('courier_checks.total_parcel')->orderByDesc('customers.total_spent'),
+                fn ($q) => $q->orderBy(match ($sort) {
+                    'orders' => 'customers.total_orders',
+                    'recent' => 'customers.last_order_at',
+                    'points' => 'customers.points',
+                    'name' => 'customers.name',
+                    default => 'customers.total_spent',
+                }, $sort === 'name' ? 'asc' : 'desc'),
+            )
+            // A tiebreaker, so pages 2, 3… neither repeat nor skip a customer
+            // among the hundreds tied at "not checked" or ৳0.
+            ->orderByDesc('customers.id')
             ->paginate(30)
             ->withQueryString();
 
@@ -53,7 +58,266 @@ class CustomerController extends Controller
             'blacklisted' => Customer::where('blacklisted', true)->count(),
         ];
 
-        return view('admin.customers.index', compact('customers', 'analytics', 'sort'));
+        // Courier value tiers (owner, 2026-09-17). Everything here is read
+        // from lookups already stored — rendering this page never calls
+        // BDCourier, because every call costs the shop a credit.
+        $courier = [
+            'tiers' => CourierTier::all(),
+            'counts' => $this->courierTierCounts($request),
+            'active' => $tier,
+            'configured' => $bdCourier->isConfigured(),
+            // Store-wide, not filtered: the batch button works through every
+            // customer, whatever the list happens to be showing.
+            'unchecked' => $this->uncheckedCustomers()->count(),
+            'batchSize' => CheckCustomersCourier::SIZE,
+            'batch' => $this->courierBatchView(CheckCustomersCourier::status()),
+        ];
+
+        return view('admin.customers.index', compact('customers', 'analytics', 'sort', 'courier'));
+    }
+
+    /**
+     * The list's own filters — search, checkboxes, spend and order bounds —
+     * with each customer's stored courier result joined alongside.
+     *
+     * Shared by the table and the tier slicer so the two can never disagree:
+     * with "Repeat" ticked, the pills count repeat buyers only. The tier itself
+     * is deliberately NOT applied here — a pill must keep showing its own total
+     * while another pill is the active one, as the order list's status pills do.
+     *
+     * Columns are spelled out with their table: `courier_checks` also has an
+     * `id`, a `phone` and a `created_at`.
+     */
+    protected function filteredCustomers(Request $request): Builder
+    {
+        return Customer::query()
+            // courier_checks.phone is unique, so the join never repeats a customer.
+            ->leftJoin('courier_checks', 'courier_checks.phone', '=', 'customers.phone')
+            ->when($request->query('q'), function ($q, $term) {
+                $q->where(fn ($w) => $w->where('customers.name', 'like', "%{$term}%")
+                    ->orWhere('customers.phone', 'like', "%{$term}%")
+                    ->orWhere('customers.email', 'like', "%{$term}%"));
+            })
+            ->when($request->boolean('repeat'), fn ($q) => $q->where('customers.total_orders', '>', 1))
+            ->when($request->boolean('blacklisted'), fn ($q) => $q->where('customers.blacklisted', true))
+            ->when($request->boolean('members'), fn ($q) => $q->whereNotNull('customers.password'))
+            ->when($request->boolean('has_points'), fn ($q) => $q->where('customers.points', '>', 0))
+            ->when($request->boolean('has_email'), fn ($q) => $q->whereNotNull('customers.email')->where('customers.email', '!=', ''))
+            ->when($request->boolean('new_month'), fn ($q) => $q->where('customers.created_at', '>=', now()->startOfMonth()))
+            ->when($request->filled('min_spend'), fn ($q) => $q->where('customers.total_spent', '>=', (float) $request->query('min_spend')))
+            ->when($request->filled('max_spend'), fn ($q) => $q->where('customers.total_spent', '<=', (float) $request->query('max_spend')))
+            ->when($request->filled('min_orders'), fn ($q) => $q->where('customers.total_orders', '>=', (int) $request->query('min_orders')))
+            // Lapsed = has ordered but not in the last N days (default 30 when toggled).
+            ->when($request->boolean('lapsed'), fn ($q) => $q->where('customers.total_orders', '>', 0)
+                ->where('customers.last_order_at', '<', now()->subDays((int) ($request->query('lapsed_days') ?: 30))));
+    }
+
+    /** ?tier= as a known slicer key, or null for "All" (and for anything made up). */
+    protected function requestedTier(Request $request): ?string
+    {
+        $tier = $request->query('tier');
+
+        return is_string($tier) && ($tier === CourierTier::UNCHECKED || CourierTier::find($tier)) ? $tier : null;
+    }
+
+    /**
+     * Narrow a query that already carries the courier_checks join to one tier.
+     * "Not checked" means a phone that could be looked up and never was — a
+     * customer with no number cannot be checked, so is not waiting to be.
+     */
+    protected function courierTier(Builder $query, ?string $tier): Builder
+    {
+        if ($tier === CourierTier::UNCHECKED) {
+            return $query->whereNull('courier_checks.id')
+                ->whereNotNull('customers.phone')
+                ->where('customers.phone', '!=', '');
+        }
+
+        if ($band = CourierTier::find($tier)) {
+            $query->where('courier_checks.total_parcel', '>=', $band['min']);
+
+            if ($band['max'] !== null) {
+                $query->where('courier_checks.total_parcel', '<', $band['max']);
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Every slicer pill's count in one grouped query.
+     *
+     * The CASE is built from CourierTier, highest floor first, so the brackets
+     * are defined once. Its values are integers and keys from that class, never
+     * request input, which is why they are written into the SQL directly.
+     *
+     * @return array<string, int> keyed by tier key, plus all / unchecked / no-phone
+     */
+    protected function courierTierCounts(Request $request): array
+    {
+        $tiers = CourierTier::all();
+        $lowest = array_key_first($tiers);
+        $whens = collect(array_reverse($tiers))
+            ->reject(fn ($t) => $t['key'] === $lowest)
+            ->map(fn ($t) => 'when courier_checks.total_parcel >= '.(int) $t['min']." then '".$t['key']."'")
+            ->implode(' ');
+
+        $rows = $this->filteredCustomers($request)
+            ->toBase()
+            ->selectRaw("case when customers.phone is null or customers.phone = '' then 'no-phone'"
+                ." when courier_checks.id is null then 'unchecked' {$whens} else '{$lowest}' end as bucket, count(*) as tally")
+            ->groupBy('bucket')
+            ->pluck('tally', 'bucket');
+
+        $counts = ['all' => 0, CourierTier::UNCHECKED => 0, 'no-phone' => 0] + array_fill_keys(array_keys($tiers), 0);
+
+        foreach ($rows as $bucket => $tally) {
+            $counts[$bucket] = (int) $tally;
+            $counts['all'] += (int) $tally;
+        }
+
+        return $counts;
+    }
+
+    /** Customers with a phone that has never been looked up, store-wide. */
+    protected function uncheckedCustomers(): Builder
+    {
+        return Customer::query()
+            ->whereNotNull('customers.phone')
+            ->where('customers.phone', '!=', '')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')
+                ->from('courier_checks')
+                ->whereColumn('courier_checks.phone', 'customers.phone'));
+    }
+
+    /**
+     * Who the next "Check next 50" press looks up: never checked, highest
+     * lifetime spend first, then whoever ordered most recently — the owner's
+     * order of who is worth a credit first.
+     *
+     * Numbers that are not Bangladeshi mobiles are passed over rather than
+     * sent: BDCourier cannot answer for them, and left in they would head
+     * every batch forever.
+     *
+     * @return array<int, int> customer ids
+     */
+    protected function nextCustomersToCheck(int $limit): array
+    {
+        return $this->uncheckedCustomers()
+            ->orderByDesc('customers.total_spent')
+            ->orderByDesc('customers.last_order_at')
+            ->orderBy('customers.id')
+            ->get(['customers.id', 'customers.phone'])
+            ->filter(fn (Customer $c) => (bool) preg_match(BdPhone::PATTERN, (string) $c->phone))
+            ->take($limit)
+            ->map(fn (Customer $c) => (int) $c->id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * One BDCourier lookup for one customer — the list's "Check" button and
+     * the customer page's Check / Refresh. One credit, on a click, never on a
+     * page view; the result is stored per phone, so the order pages of the
+     * same number show it too.
+     */
+    public function courierCheck(Customer $customer, BdCourierService $bdCourier)
+    {
+        if (blank($customer->phone)) {
+            return back()->with('error', 'This customer has no phone number to check.');
+        }
+
+        $result = $bdCourier->check($customer->phone);
+
+        if (! ($result['ok'] ?? false)) {
+            return back()->with('error', $result['error'] ?? 'Courier check failed.');
+        }
+
+        $total = (int) ($result['summary']['total_parcel'] ?? 0);
+
+        if ($total === 0) {
+            return back()->with('success', 'Courier history for '.$customer->name.': no parcels with any courier yet.');
+        }
+
+        return back()->with('success', 'Courier history for '.$customer->name.': '.number_format($total).' parcels ('
+            .CourierTier::forTotal($total)['label'].'), '
+            .CourierTier::delivery($result['summary']['success_ratio'] ?? 0, $total)['label'].'.');
+    }
+
+    /**
+     * "Check next 50 customers": queue BDCourier lookups for the next batch of
+     * never-checked customers (owner's choice, 2026-09-17: batches on a click,
+     * nothing automatic). See CheckCustomersCourier for why it is queued.
+     */
+    public function courierBatch(BdCourierService $bdCourier, MetaQueueRunner $runner)
+    {
+        if (! $bdCourier->isConfigured()) {
+            return back()->with('error', 'BDCourier is not configured. Add the API key under Admin → Integrations.');
+        }
+
+        if (CheckCustomersCourier::status()['running'] ?? false) {
+            return back()->with('error', 'A courier check is already running. Wait for it to finish before starting the next batch.');
+        }
+
+        $ids = $this->nextCustomersToCheck(CheckCustomersCourier::SIZE);
+
+        if ($ids === []) {
+            $left = $this->uncheckedCustomers()->count();
+
+            return back()->with('warning', $left > 0
+                ? 'Nothing left to check: the '.$left.' customer(s) not yet checked have no valid Bangladeshi mobile number.'
+                : 'Every customer with a phone number has been checked already.');
+        }
+
+        // The status check above is for the message; this is the guard. Two
+        // presses that both got past it still cannot both start.
+        if (CheckCustomersCourier::start($ids) === null) {
+            return back()->with('error', 'A courier check is already running. Wait for it to finish before starting the next batch.');
+        }
+
+        // The scheduler drains the queue within a minute; this just makes the
+        // usual case start straight away. A no-op where exec() is disabled.
+        $runner->kick();
+
+        return back()->with('success', 'Checking '.count($ids).' customers in the background (up to '.count($ids)
+            .' BDCourier credits). You can keep working — the progress shows above the customer list.');
+    }
+
+    /** The batch banner polls this while a batch runs. */
+    public function courierBatchStatus()
+    {
+        return response()->json($this->courierBatchView(CheckCustomersCourier::status()) ?? ['running' => false]);
+    }
+
+    /**
+     * The batch's progress record plus the sentence and colour the banner
+     * shows. Built here, once, so the first paint and every poll say the same.
+     *
+     * @param  array<string, mixed>|null  $status
+     * @return array<string, mixed>|null
+     */
+    protected function courierBatchView(?array $status): ?array
+    {
+        if ($status === null) {
+            return null;
+        }
+
+        $progress = $status['done'].' of '.$status['total'].' customers';
+
+        [$tone, $message] = match (true) {
+            $status['running'] => ['info', 'Checking '.$status['total'].' customers… '.$status['done'].' done'
+                .($status['failed'] ? ' · '.$status['failed'].' failed' : '')],
+            $status['interrupted'] => ['warning', 'The last courier check stopped after '.$progress
+                .'. Press “Check next '.CheckCustomersCourier::SIZE.' customers” to carry on.'],
+            (bool) $status['stopped'] => ['error', 'Courier check stopped after '.$progress.': '.$status['error']],
+            default => [$status['failed'] ? 'warning' : 'success', 'Courier check finished: '
+                .$status['checked'].' of '.$status['total'].' customers checked'
+                .($status['failed'] ? ' · '.$status['failed'].' failed ('.$status['error'].')' : '')
+                .($status['skipped'] ? ' · '.$status['skipped'].' skipped (checked meanwhile, or no usable number)' : '')
+                .'.'],
+        };
+
+        return $status + ['tone' => $tone, 'message' => $message];
     }
 
     /** All personalized offers across customers — the "customized offers" hub. */
@@ -71,7 +335,7 @@ class CustomerController extends Controller
         return view('admin.customers.offers', compact('offers', 'status'));
     }
 
-    public function show(Customer $customer, CustomerInsight $insight)
+    public function show(Customer $customer, CustomerInsight $insight, BdCourierService $bdCourier)
     {
         $orders = $customer->orders()->with('shipment')->latest()->get();
 
@@ -83,17 +347,28 @@ class CustomerController extends Controller
             'pointLog' => $customer->pointTransactions()->take(20)->get(),
             'allCategories' => \App\Models\Category::orderBy('name')->get(['id', 'name']),
             'allProducts' => \App\Models\Product::orderBy('name')->get(['id', 'name']),
+            // Whatever lookup is stored for the number, however old — a stale
+            // parcel count still places the customer, and the card says when
+            // it was taken. Never fetched here: a page view spends no credit.
+            'courierCheck' => filled($customer->phone) ? $customer->courierCheck : null,
+            'bdCourierOn' => $bdCourier->isConfigured(),
         ]);
     }
 
     /** Export customers (name, phone, address, spend…) to an Excel-friendly CSV. */
     public function export(Request $request)
     {
-        $rows = Customer::query()
-            ->when($request->boolean('members'), fn ($q) => $q->whereNotNull('password'))
-            ->when($request->filled('min_spend'), fn ($q) => $q->where('total_spent', '>=', (float) $request->query('min_spend')))
-            ->orderByDesc('total_spent')
-            ->with('defaultAddress')
+        $rows = $this->courierTier(
+            Customer::query()->leftJoin('courier_checks', 'courier_checks.phone', '=', 'customers.phone'),
+            // The Export button carries the list's query string, so an export
+            // taken while the "1,000+" pill is on is that tier's call list.
+            $this->requestedTier($request),
+        )
+            ->select('customers.*')
+            ->when($request->boolean('members'), fn ($q) => $q->whereNotNull('customers.password'))
+            ->when($request->filled('min_spend'), fn ($q) => $q->where('customers.total_spent', '>=', (float) $request->query('min_spend')))
+            ->orderByDesc('customers.total_spent')
+            ->with(['defaultAddress', 'courierCheck'])
             ->get();
 
         $filename = \Illuminate\Support\Str::slug(store_name()).'-customers-'.now()->format('Y-m-d').'.csv';
@@ -105,9 +380,13 @@ class CustomerController extends Controller
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads Bangla/symbols correctly
-            fputcsv($out, ['Name', 'Phone', 'Email', 'Address', 'Area', 'District', 'Orders', 'Total spent', 'Points', 'Last order', 'Registered']);
+            fputcsv($out, ['Name', 'Phone', 'Email', 'Address', 'Area', 'District', 'Orders', 'Total spent', 'Points', 'Last order', 'Registered',
+                'Courier tier', 'Total parcels', 'Delivered %']);
             foreach ($rows as $c) {
                 $a = $c->defaultAddress;
+                // Blank, not "0", for a number never looked up: nought parcels
+                // is an answer BDCourier gives, and this is not that.
+                $check = $c->courierCheck;
                 fputcsv($out, [
                     $c->name,
                     $c->phone,
@@ -120,6 +399,9 @@ class CustomerController extends Controller
                     $c->points,
                     $c->last_order_at?->format('Y-m-d'),
                     $c->created_at?->format('Y-m-d'),
+                    $check ? CourierTier::forTotal((int) $check->total_parcel)['label'] : (filled($c->phone) ? 'Not checked' : null),
+                    $check?->total_parcel,
+                    $check ? number_format((float) $check->success_ratio, 2, '.', '') : null,
                 ]);
             }
             fclose($out);

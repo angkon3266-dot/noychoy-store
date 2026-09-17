@@ -74,8 +74,16 @@ class RunOccasions extends Command
         $column = static::stampColumn($occasion, $kind);
 
         return Customer::query()
-            ->where($occasion.'_day', $target->day)
             ->where($occasion.'_month', $target->month)
+            // On the last day of a month, also anyone whose stored day that
+            // month does not reach: 29 February in a year without one, or an
+            // impossible "31 April" typed at checkout. Matching the exact day
+            // only meant those customers were never wished at all — the
+            // Birthdays page (2026-09-17) shows them on the month's last day,
+            // and the automation now agrees with it.
+            ->where(fn ($q) => $target->day === $target->daysInMonth
+                ? $q->where($occasion.'_day', '>=', $target->day)
+                : $q->where($occasion.'_day', $target->day))
             ->where('blacklisted', false)
             // Someone we can actually reach: a phone for SMS or a login for the bell.
             ->where(fn ($q) => $q->whereNotNull('phone')->orWhereNotNull('password'))

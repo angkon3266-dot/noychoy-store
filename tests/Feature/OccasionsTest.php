@@ -62,6 +62,28 @@ class OccasionsTest extends TestCase
         $this->assertSame([$wish->id], RunOccasions::dueQuery('anniversary', 'wish')->pluck('id')->all());
     }
 
+    /**
+     * A 29 February birthday is wished on 28 February in a year without one,
+     * and an impossible stored day ("31 April") on the month's last day — the
+     * exact-day match used to skip both for ever.
+     */
+    public function test_a_date_the_month_does_not_reach_is_wished_on_its_last_day(): void
+    {
+        $leapling = $this->customer(['phone' => '01711100021', 'birthday_day' => 29, 'birthday_month' => 2]);
+        $april = $this->customer(['phone' => '01711100022', 'birthday_day' => 31, 'birthday_month' => 4]);
+        $onTheDay = $this->customer(['phone' => '01711100023', 'birthday_day' => 28, 'birthday_month' => 2]);
+
+        $feb28 = \Carbon\Carbon::create(2027, 2, 28, 10, 0, 0, 'Asia/Dhaka');
+        $this->assertEqualsCanonicalizing([$leapling->id, $onTheDay->id], RunOccasions::dueQuery('birthday', 'wish', $feb28)->pluck('id')->all());
+
+        // In a leap year the 28th is an ordinary day: the leapling waits for the 29th.
+        $leap28 = \Carbon\Carbon::create(2028, 2, 28, 10, 0, 0, 'Asia/Dhaka');
+        $this->assertSame([$onTheDay->id], RunOccasions::dueQuery('birthday', 'wish', $leap28)->pluck('id')->all());
+
+        $apr30 = \Carbon\Carbon::create(2027, 4, 30, 10, 0, 0, 'Asia/Dhaka');
+        $this->assertSame([$april->id], RunOccasions::dueQuery('birthday', 'wish', $apr30)->pluck('id')->all());
+    }
+
     public function test_the_command_stamps_then_queues_and_never_repeats(): void
     {
         Queue::fake();

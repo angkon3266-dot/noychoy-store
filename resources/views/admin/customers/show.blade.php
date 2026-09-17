@@ -6,9 +6,22 @@
 <div class="flex flex-wrap items-center justify-between gap-3">
     <a href="{{ route('admin.customers.index') }}" class="text-sm text-gold-700 hover:underline">← All customers</a>
 
-    {{-- The manual order form, opened with this customer's name, number and
-         last delivery details already in it (owner, 2026-09-17). --}}
-    <a href="{{ route('admin.orders.create', ['customer' => $customer->id]) }}" class="btn-primary py-2 text-sm">+ New order</a>
+    <div class="flex flex-wrap items-center gap-2">
+        {{-- "…so I can call and follow them" (owner, 2026-09-17): the number
+             one tap away, and a reminder for the call that cannot happen now.
+             The reminders screen is built alongside this page; its button
+             waits for the route. --}}
+        @if($tel = tel_link($customer->phone))
+            <a href="{{ $tel }}" class="btn-outline py-2 text-sm" title="Call {{ $customer->phone }}">📞 Call</a>
+        @endif
+        @if(\Illuminate\Support\Facades\Route::has('admin.reminders.create'))
+            <a href="{{ route('admin.reminders.create', ['customer' => $customer->id]) }}" class="btn-outline py-2 text-sm">⏰ Remind me to call</a>
+        @endif
+
+        {{-- The manual order form, opened with this customer's name, number and
+             last delivery details already in it (owner, 2026-09-17). --}}
+        <a href="{{ route('admin.orders.create', ['customer' => $customer->id]) }}" class="btn-primary py-2 text-sm">+ New order</a>
+    </div>
 </div>
 
 <div class="grid lg:grid-cols-3 gap-6 mt-4">
@@ -38,6 +51,104 @@
                 </div>
             </div>
         @endif
+
+        {{-- Courier history across every courier (BDCourier), where the card
+             above only knows this shop's own parcels. The tier is the owner's
+             colour code from the customer list (2026-09-17). Shown from the
+             stored lookup however old it is — the date says how old — and
+             refreshed only by the button, because each lookup is a credit. --}}
+        <div class="card p-5">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h2 class="font-semibold">Courier history</h2>
+                @if($courierCheck)
+                    @php
+                        $courierTotal = (int) $courierCheck->total_parcel;
+                        $courierTier = \App\Support\CourierTier::forTotal($courierTotal);
+                        $courierDelivery = \App\Support\CourierTier::delivery($courierCheck->success_ratio, $courierTotal);
+                        $courierSummary = (array) ($courierCheck->payload['summary'] ?? []);
+                        $courierBreakdown = (array) ($courierCheck->payload['couriers'] ?? []);
+                    @endphp
+                    <div class="flex items-center gap-1.5">
+                        <span class="badge {{ $courierTier['badge'] }}" title="Courier value tier">{{ $courierTier['label'] }} parcels</span>
+                        <span class="badge border bg-white {{ $courierDelivery['classes'] }}" title="{{ $courierDelivery['note'] }}">{{ $courierDelivery['label'] }}</span>
+                    </div>
+                @endif
+            </div>
+
+            @if($courierCheck)
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4">
+                    <div class="rounded-lg bg-ink-50 py-2">
+                        <div class="text-lg font-semibold tabular-nums">{{ number_format($courierTotal) }}</div>
+                        <div class="text-[11px] text-ink-700/55">Total parcels</div>
+                    </div>
+                    <div class="rounded-lg bg-green-50 py-2">
+                        <div class="text-lg font-semibold tabular-nums text-green-700">{{ number_format((int) ($courierSummary['success_parcel'] ?? 0)) }}</div>
+                        <div class="text-[11px] text-ink-700/55">Delivered</div>
+                    </div>
+                    <div class="rounded-lg bg-red-50 py-2">
+                        <div class="text-lg font-semibold tabular-nums text-red-700">{{ number_format((int) ($courierSummary['cancelled_parcel'] ?? 0)) }}</div>
+                        <div class="text-[11px] text-ink-700/55">Cancelled</div>
+                    </div>
+                    <div class="rounded-lg bg-ink-50 py-2">
+                        <div class="text-lg font-semibold tabular-nums">{{ $courierTotal > 0 ? rtrim(rtrim(number_format((float) $courierCheck->success_ratio, 2), '0'), '.').'%' : '—' }}</div>
+                        <div class="text-[11px] text-ink-700/55">Delivered rate</div>
+                    </div>
+                </div>
+
+                @if($courierBreakdown)
+                    <table class="w-full text-xs mb-3">
+                        <thead class="text-ink-700/50 text-left">
+                            <tr><th class="py-1">Courier</th><th class="py-1 text-right">Total</th><th class="py-1 text-right">Delivered</th><th class="py-1 text-right">Cancelled</th><th class="py-1 text-right">Rate</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-ink-100">
+                            @foreach($courierBreakdown as $row)
+                                <tr>
+                                    <td class="py-1.5">
+                                        <span class="flex items-center gap-1.5">
+                                            @if(! empty($row['logo']))<img src="{{ $row['logo'] }}" alt="" class="h-4 w-4 rounded object-contain" loading="lazy">@endif
+                                            {{ $row['name'] ?? ($row['key'] ?? 'Courier') }}
+                                        </span>
+                                    </td>
+                                    <td class="py-1.5 text-right tabular-nums">{{ number_format((int) ($row['total_parcel'] ?? 0)) }}</td>
+                                    <td class="py-1.5 text-right tabular-nums text-green-700">{{ number_format((int) ($row['success_parcel'] ?? 0)) }}</td>
+                                    <td class="py-1.5 text-right tabular-nums text-red-700">{{ number_format((int) ($row['cancelled_parcel'] ?? 0)) }}</td>
+                                    <td class="py-1.5 text-right font-medium tabular-nums">{{ $row['success_ratio'] ?? 0 }}%</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+
+                @if($courierCheck->reports_count > 0)
+                    <p class="mb-3 text-xs text-red-700">⚠️ {{ $courierCheck->reports_count }} fraud report(s) from other merchants against this number.</p>
+                @endif
+
+                <p class="mb-3 text-xs text-ink-700/45">
+                    Checked {{ store_time($courierCheck->checked_at)?->format('j M Y, g:ia') }} ({{ $courierCheck->checked_at?->diffForHumans() }})
+                </p>
+            @elseif(filled($customer->phone))
+                <p class="mb-3 text-sm text-ink-700/60">
+                    Not checked yet. A lookup shows how many parcels <strong>{{ $customer->phone }}</strong> has sent with every
+                    courier, how many were delivered, and which value tier that puts this customer in.
+                </p>
+            @else
+                <p class="text-sm text-ink-700/50">No phone number on file, so there is nothing to look up.</p>
+            @endif
+
+            @if(filled($customer->phone))
+                @if($bdCourierOn)
+                    <form action="{{ route('admin.customers.courier-check', $customer) }}" method="POST"
+                          onsubmit="return confirm('{{ $courierCheck ? 'Refresh' : 'Look up' }} the courier history for {{ $customer->phone }}? Uses one BDCourier credit.')">
+                        @csrf
+                        <button class="btn-outline w-full">{{ $courierCheck ? '↻ Refresh courier history' : '🔍 Check courier history' }}</button>
+                    </form>
+                    <p class="mt-2 text-[11px] text-ink-700/40 text-center">Uses one BDCourier credit.</p>
+                @else
+                    <button type="button" class="btn-outline w-full" disabled>🔍 Check courier history</button>
+                    <p class="mt-2 text-[11px] text-ink-700/40 text-center">BDCourier is not set up — add the API key under Admin → Integrations.</p>
+                @endif
+            @endif
+        </div>
 
         {{-- Orders --}}
         <div class="card overflow-hidden">

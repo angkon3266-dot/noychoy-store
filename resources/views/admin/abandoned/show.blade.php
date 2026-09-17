@@ -38,6 +38,13 @@
         @unless($cart->recovered)
             <a href="{{ route('admin.orders.create', ['from_cart' => $cart->id]) }}"
                class="btn-primary py-2 text-sm">✓ Convert to order</a>
+            {{-- "Call me this evening" (owner, 2026-09-17): a call reminder
+                 with her number, name and basket already in it, which
+                 remembers this lead. --}}
+            @if(auth()->user()->canAccess('reminders'))
+                <a href="{{ route('admin.reminders.create', ['cart' => $cart->id]) }}"
+                   class="btn-outline py-2 text-sm">⏰ Remind me to call</a>
+            @endif
         @endunless
     </div>
 </div>

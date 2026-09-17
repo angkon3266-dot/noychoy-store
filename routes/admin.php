@@ -172,6 +172,20 @@ Route::middleware('admin')->group(function () {
     // Customers (CRM, analytics, SMS, import)
     Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('customers/all-offers', [CustomerController::class, 'offersIndex'])->name('customers.all-offers');
+    Route::get('customers/occasions', [\App\Http\Controllers\Admin\CustomerOccasionController::class, 'index'])->name('customers.occasions');
+
+    // ── Customer courier tiers (owner, 2026-09-17) ─────────────────────────
+    // BDCourier lookups from the customer list and the customer page. Every
+    // lookup spends a plan credit, so each is a POST behind a click and all are
+    // throttled. Declared above `customers/{customer}` so "courier-batch" is
+    // never read as a customer id.
+    Route::post('customers/courier-batch', [CustomerController::class, 'courierBatch'])
+        ->middleware('throttle:6,1')->name('customers.courier-batch');
+    Route::get('customers/courier-batch', [CustomerController::class, 'courierBatchStatus'])
+        ->name('customers.courier-batch.status');
+    Route::post('customers/{customer}/courier-check', [CustomerController::class, 'courierCheck'])
+        ->middleware('throttle:20,1')->name('customers.courier-check');
+    // ── end customer courier tiers ─────────────────────────────────────────
 
     // Customer segments (groups)
     Route::get('segments', [SegmentController::class, 'index'])->name('segments.index');
@@ -295,6 +309,28 @@ Route::middleware('admin')->group(function () {
     Route::post('abandoned-carts/{cart}/sms', [AbandonedCartController::class, 'sendSms'])->name('abandoned.sms')->missing($leadIsGone);
     Route::patch('abandoned-carts/{cart}/contacted', [AbandonedCartController::class, 'markContacted'])->name('abandoned.contacted')->missing($leadIsGone);
     Route::delete('abandoned-carts/{cart}', [AbandonedCartController::class, 'destroy'])->name('abandoned.destroy')->missing($leadIsGone);
+
+    // ── Call reminders ────────────────────────────────────────────────────
+    // Numbers to ring back later, with what they asked about (owner,
+    // 2026-09-17: "create a reminder option where I can add customer lead
+    // phone number along with items to call later"). Every name starts with
+    // 'reminders.' so the section gate and the sidebar's active state both
+    // work; staff have the section, since they take the phone orders.
+    //
+    // A reminder another person deleted can still be open in this tab, so a
+    // stale Snooze or Edit lands back on the list with a word, not on a 404.
+    // Fully qualified rather than imported, so this block stands alone.
+    $reminderIsGone = fn () => redirect()->route('admin.reminders.index')
+        ->with('warning', 'That reminder is no longer there — someone may have deleted it.');
+
+    Route::get('reminders', [\App\Http\Controllers\Admin\CallReminderController::class, 'index'])->name('reminders.index');
+    Route::get('reminders/create', [\App\Http\Controllers\Admin\CallReminderController::class, 'create'])->name('reminders.create');
+    Route::post('reminders', [\App\Http\Controllers\Admin\CallReminderController::class, 'store'])->name('reminders.store');
+    Route::get('reminders/{reminder}/edit', [\App\Http\Controllers\Admin\CallReminderController::class, 'edit'])->name('reminders.edit')->whereNumber('reminder')->missing($reminderIsGone);
+    Route::put('reminders/{reminder}', [\App\Http\Controllers\Admin\CallReminderController::class, 'update'])->name('reminders.update')->whereNumber('reminder')->missing($reminderIsGone);
+    Route::post('reminders/{reminder}/snooze', [\App\Http\Controllers\Admin\CallReminderController::class, 'snooze'])->name('reminders.snooze')->whereNumber('reminder')->missing($reminderIsGone);
+    Route::post('reminders/{reminder}/done', [\App\Http\Controllers\Admin\CallReminderController::class, 'complete'])->name('reminders.done')->whereNumber('reminder')->missing($reminderIsGone);
+    Route::delete('reminders/{reminder}', [\App\Http\Controllers\Admin\CallReminderController::class, 'destroy'])->name('reminders.destroy')->whereNumber('reminder')->missing($reminderIsGone);
 
     // Coupons
     Route::get('coupons', [CouponController::class, 'index'])->name('coupons.index');

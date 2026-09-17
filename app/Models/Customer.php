@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Customer extends Authenticatable
@@ -96,6 +97,18 @@ class Customer extends Authenticatable
     public function segments(): BelongsToMany
     {
         return $this->belongsToMany(CustomerSegment::class, 'customer_segment_members');
+    }
+
+    /**
+     * The BDCourier result stored for this customer's number, if one was ever
+     * paid for — from the order page, the customer page or a "Check next 50"
+     * batch. Matched on the phone itself: both tables keep the canonical
+     * 01XXXXXXXXX form, and a lookup belongs to the number, not the order.
+     * Reading it never spends a credit.
+     */
+    public function courierCheck(): HasOne
+    {
+        return $this->hasOne(CourierCheck::class, 'phone', 'phone');
     }
 
     public function genderLabel(): string

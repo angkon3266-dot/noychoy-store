@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AbandonedCart;
 use App\Models\AdminAlertRead;
+use App\Models\CallReminder;
 use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\Order;
@@ -90,6 +91,7 @@ class AdminAlerts
             ...$this->lowStock(),
             ...$this->pendingReviews(),
             ...$this->abandonedCarts(),
+            ...$this->callReminders(),
             ...$this->newOrders(),
             ...$this->stuckOrders(),
             ...$this->failedDeliveries(),
@@ -203,6 +205,42 @@ class AdminAlerts
                 trim(($c->name ?: 'A visitor').' left '.$c->item_count.' item(s) at '.$c->last_step.'. Nobody has followed up.'),
                 route('admin.abandoned.show', $c), $c->created_at,
             ))->all());
+    }
+
+    /**
+     * Calls she promised to make, now due (owner, 2026-09-17: a due list, and
+     * an alert in this bell when a reminder comes due).
+     *
+     * One alert for all of them, not one per call — the Due now list is where
+     * they are worked, oldest first. Warning, or urgent once any has waited
+     * more than a day: a lead rung back a day late is a lead going cold.
+     *
+     * Keyed on the most recently due reminder and its due time, so reading it
+     * stays read while the list is worked through, and a new call coming due —
+     * including a snoozed one coming round again — rings the bell afresh. It
+     * disappears on its own when nothing is left due.
+     */
+    protected function callReminders(): array
+    {
+        return $this->guard(function () {
+            $count = CallReminder::due()->count();
+
+            if ($count === 0) {
+                return [];
+            }
+
+            $oldest = CallReminder::due()->with('customer:id,name')->orderBy('due_at')->orderBy('id')->first();
+            $newest = CallReminder::due()->orderByDesc('due_at')->orderByDesc('id')->first(['id', 'due_at']);
+            $who = $oldest->displayName() ?: $oldest->phone;
+
+            return [$this->alert(
+                "reminder.due.{$newest->id}.{$newest->due_at->getTimestamp()}", 'reminder',
+                $oldest->due_at->lt(now()->subDay()) ? 'urgent' : 'warning',
+                $count === 1 ? '1 call reminder due' : "{$count} call reminders due",
+                ($count === 1 ? "Call {$who}" : "The longest waiting is {$who}").' — due '.$oldest->due_at->diffForHumans().'.',
+                route('admin.reminders.index', ['tab' => 'due']), $newest->due_at,
+            )];
+        });
     }
 
     // ── Orders ───────────────────────────────────────────────────────────────

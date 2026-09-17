@@ -40,6 +40,36 @@
     </div>
 @endif
 
+@if(!empty($reminder))
+    {{-- "Create order" on a call reminder (owner, 2026-09-17). The same review
+         step as converting a lead: the items were noted days ago, so anything
+         that can no longer be sold as noted is said here, not thrown on save.
+         Saving marks the reminder done and links it to the order. --}}
+    <div class="mb-5 rounded-xl border-2 border-gold-300 bg-gold-50 px-4 py-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-semibold text-sm">
+                Order from the call reminder for {{ $reminder->displayName() ?: $reminder->phone }}
+            </h2>
+            <a href="{{ route('admin.reminders.index', ['tab' => $reminder->tab()]) }}" class="text-xs text-gold-700 hover:underline">
+                Back to call reminders
+            </a>
+        </div>
+        <p class="mt-1 text-xs text-ink-700/70">
+            Due {{ $reminder->dueExact() }}. Check it over, then create the order — the reminder is marked done and linked to it.
+        </p>
+        @if($reminder->notes)
+            <p class="mt-1 text-xs text-ink-700/70 whitespace-pre-line">Notes: {{ \Illuminate\Support\Str::limit($reminder->notes, 300) }}</p>
+        @endif
+        @if(!empty($prefill['notices']))
+            <ul class="mt-2 space-y-1 text-xs text-warning-800 list-disc list-inside">
+                @foreach($prefill['notices'] as $notice)
+                    <li>{{ $notice }}</li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+@endif
+
 @if($errors->any())
     {{-- Validation used to fail silently here: the form came back with nothing
          said. A refused coupon is now a routine reason to bounce, so the reason
@@ -70,6 +100,14 @@
       class="grid lg:grid-cols-3 gap-6">
     @csrf
     @if($cart)<input type="hidden" name="abandoned_cart_id" value="{{ $cart->id }}">@endif
+    @if(!empty($reminder))
+        <input type="hidden" name="reminder_id" value="{{ $reminder->id }}">
+        {{-- A reminder made from a lead closes that lead too, as "Convert to
+             order" would — while the lead is still open and on this number. --}}
+        @if($reminder->abandonedCart && ! $reminder->abandonedCart->recovered && $reminder->abandonedCart->phone === $reminder->phone)
+            <input type="hidden" name="abandoned_cart_id" value="{{ $reminder->abandoned_cart_id }}">
+        @endif
+    @endif
     {{-- Not saved on the order — the order is still matched to a customer by
          phone. It only lets a bounced save say again whose details these are. --}}
     <input type="hidden" name="picked_customer" value="{{ $picked['id'] ?? '' }}" :value="picked ? picked.id : ''">

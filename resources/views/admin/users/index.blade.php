@@ -27,7 +27,7 @@
         <div class="mt-4 text-xs text-ink-700/60 space-y-1">
             <p><strong>Administrator</strong> — full access incl. settings &amp; users.</p>
             <p><strong>Manager</strong> — products, orders, offers, etc. No settings/users.</p>
-            <p><strong>Staff</strong> — dashboard &amp; orders only.</p>
+            <p><strong>Staff</strong> — dashboard, orders &amp; call reminders.</p>
         </div>
     </div>
 

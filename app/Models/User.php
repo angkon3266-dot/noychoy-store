@@ -20,7 +20,7 @@ class User extends Authenticatable
     public const ROLES = [
         'admin' => 'Administrator (full access)',
         'manager' => 'Manager (no settings/users)',
-        'staff' => 'Staff (orders only)',
+        'staff' => 'Staff (orders & call reminders)',
     ];
 
     public function isAdmin(): bool
@@ -36,8 +36,11 @@ class User extends Authenticatable
             // it is chrome, not a section. Leaving it out gave managers and
             // staff a bell that 403'd every 25 seconds and silently swallowed
             // the failure, so they never saw a new order.
-            'manager' => ['dashboard', 'alerts', 'products', 'categories', 'collections', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'customers', 'suppliers', 'purchase-orders', 'media', 'menu', 'profile'],
-            'staff' => ['dashboard', 'alerts', 'orders', 'profile'],
+            //
+            // `reminders` — calls to ring back (owner, 2026-09-17) — is on both
+            // lists: staff take the phone orders, so they make those calls.
+            'manager' => ['dashboard', 'alerts', 'products', 'categories', 'collections', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'reminders', 'customers', 'suppliers', 'purchase-orders', 'media', 'menu', 'profile'],
+            'staff' => ['dashboard', 'alerts', 'orders', 'reminders', 'profile'],
             default => ['*'], // admin
         };
     }

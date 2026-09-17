@@ -236,6 +236,9 @@
         @php $nav = [
             ['dashboard','Dashboard','M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
             ['orders.index','Orders','M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z'],
+            // Calls to ring back (owner, 2026-09-17): an outgoing call, beside
+            // the orders those calls turn into. SMS keeps the handheld phone.
+            ['reminders.index','Call reminders','M20.25 3.75v4.5m0-4.5h-4.5m4.5 0l-6 6m3 12c-8.284 0-15-6.716-15-15V4.5A2.25 2.25 0 014.5 2.25h1.372c.516 0 .966.351 1.091.852l1.106 4.423c.11.44-.054.902-.417 1.173l-1.293.97a1.062 1.062 0 00-.38 1.21 12.035 12.035 0 007.143 7.143c.441.162.928-.004 1.21-.38l.97-1.293a1.125 1.125 0 011.173-.417l4.423 1.106c.5.125.852.575.852 1.091V19.5a2.25 2.25 0 01-2.25 2.25h-2.25z'],
             ['customers.index','Customers','M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z'],
             ['products.index','Products','M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
             ['media.index','Media','M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z'],
@@ -284,6 +287,13 @@
                 'abandoned.index' => [
                     'count' => \App\Models\AbandonedCart::open()->count(),
                     'title' => 'abandoned cart(s) waiting for follow-up',
+                ],
+                // Calls whose time has come (owner, 2026-09-17). Covered by the
+                // (done_at, due_at) index; dueCount() answers 0 rather than take
+                // every admin page down if the table is missing mid-deploy.
+                'reminders.index' => [
+                    'count' => \App\Models\CallReminder::dueCount(),
+                    'title' => 'call reminder(s) due',
                 ],
             ];
         @endphp
