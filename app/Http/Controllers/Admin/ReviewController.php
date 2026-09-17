@@ -107,11 +107,24 @@ class ReviewController extends Controller
             return collect(); // a lone "#" would match every colour code in every description
         }
         if (ctype_digit($number)) {
-            return $withCounts(Product::withTrashed()->where(fn ($q) => $q
-                ->where('serial', (int) $number)
-                ->orWhere('sku', $number)))
-                ->orderBy('name')
-                ->get();
+            // Tiered, first non-empty tier wins. On the live catalogue most SKUs
+            // are the same digits as the Product ID, and deleted June imports
+            // still carry them — so "#12" matched one live piece and two dead
+            // copies, and offered a choice where there was an answer.
+            $tiers = [
+                fn () => Product::where('serial', (int) $number),
+                fn () => Product::onlyTrashed()->where('serial', (int) $number),
+                fn () => Product::where('sku', $number),
+                fn () => Product::onlyTrashed()->where('sku', $number),
+            ];
+            foreach ($tiers as $tier) {
+                $found = $withCounts($tier())->orderBy('name')->get();
+                if ($found->isNotEmpty()) {
+                    return $found;
+                }
+            }
+
+            return collect();
         }
 
         foreach ([false, true] as $loose) {

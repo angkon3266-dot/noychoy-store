@@ -315,4 +315,23 @@ class AdminReviewProductSearchTest extends TestCase
             $this->actingAs($this->admin())->get($url)->assertOk();
         }
     }
+
+    public function test_a_product_id_opens_the_live_piece_even_when_dead_copies_share_its_sku(): void
+    {
+        // The live catalogue's shape: SKUs are mostly the Product ID's own
+        // digits, and deleted June imports still carry them. "#12" matched the
+        // live piece and two dead copies and offered a pick list instead of
+        // opening the product.
+        $live = $this->product('Prismatic Floral Cubic Zirconia Studs', 'prismatic-studs', ['serial' => 12, 'sku' => '12']);
+        $copy = $this->product('Prismatic Floral Cubic Zirconia Studs', 'prismatic-studs-old', ['serial' => 146, 'sku' => '12']);
+        $older = $this->product('Multicolored CZ Flower Stud Earrings', 'cz-flower-studs', ['sku' => '12']);
+        $copy->delete();
+        $older->delete();
+
+        foreach (['#12', '12'] as $typed) {
+            $this->actingAs($this->admin())
+                ->get(route('admin.reviews.index', ['q' => $typed]))
+                ->assertRedirect(route('admin.reviews.index', ['product' => $live->id]));
+        }
+    }
 }
