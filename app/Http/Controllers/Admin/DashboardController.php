@@ -8,10 +8,11 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\Setting;
 use App\Models\Visit;
 use App\Services\DashboardAnalytics;
+use App\Services\DashboardInsights;
 use App\Services\LoyaltyService;
+use App\Support\DashboardLayout;
 use App\Support\DateRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -20,7 +21,15 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    /** Optional deep-analysis panels, in display order. */
+    /**
+     * The deep-analysis groups the old ⚙ picker offered, in its display order.
+     *
+     * Superseded on 2026-09-18 by per-block arrangement (App\Support\
+     * DashboardBlocks, where each block names the group it came from as
+     * `legacy_panel`). Kept because the store-wide `dashboard_panels` setting
+     * saved through it still decides what an admin who has never arranged
+     * the dashboard sees, and because savePanels() below still accepts it.
+     */
     public const PANELS = [
         'profit' => 'Revenue & profit',
         'funnel' => 'Traffic & conversion funnel',
@@ -28,14 +37,68 @@ class DashboardController extends Controller
         'operations' => 'Operations & inventory',
     ];
 
-    /** Save which panels this admin wants to see. */
+    /**
+     * Save this admin's arrangement of the dashboard — the order of every
+     * block and which of them are hidden (owner, 2026-09-18).
+     *
+     * Posted as JSON by the arrange bar, which then reloads; answered with a
+     * redirect for anything that is not an XHR so a plain form would work too.
+     */
+    public function saveLayout(Request $request)
+    {
+        $request->validate([
+            'order' => ['nullable', 'array'],
+            'order.*' => ['string', 'max:64'],
+            'hidden' => ['nullable', 'array'],
+            'hidden.*' => ['string', 'max:64'],
+        ]);
+
+        // Unknown keys are dropped and repeats collapsed here, before the
+        // save: the resolver would have filtered them on every read anyway,
+        // but a stored layout that is already clean is one less thing to
+        // reason about when a block is renamed later.
+        $request->user()->forceFill([
+            'dashboard_layout' => DashboardLayout::normalise($request->input('order'), $request->input('hidden')),
+        ])->save();
+
+        return $request->expectsJson()
+            ? response()->json(['ok' => true])
+            : back()->with('success', 'Dashboard layout saved.');
+    }
+
+    /** Forget this admin's arrangement: the default order, nothing hidden. */
+    public function resetLayout(Request $request)
+    {
+        // An explicit empty layout, not null: null means "never arranged", which
+        // re-applies the old store-wide ⚙ tick-list and hid blocks the button
+        // had just promised to show (2026-09-18 review).
+        $request->user()->forceFill(['dashboard_layout' => DashboardLayout::normalise([], [])])->save();
+
+        return $request->expectsJson()
+            ? response()->json(['ok' => true])
+            : back()->with('success', 'Dashboard layout reset.');
+    }
+
+    /**
+     * The old ⚙ form: which deep-analysis groups to show.
+     *
+     * Until 2026-09-18 this wrote the store-wide `dashboard_panels` setting.
+     * Now it is translated into the calling admin's own layout — the blocks
+     * of an unticked group hidden, the rest shown, the order untouched — so a
+     * page rendered before the deploy still saves something sensible, and no
+     * longer changes what every other admin sees. The setting itself is left
+     * as it was: it is still the default for admins who have never arranged.
+     */
     public function savePanels(Request $request)
     {
         $chosen = array_values(array_intersect(
             array_keys(self::PANELS),
             (array) $request->input('panels', [])
         ));
-        Setting::put('dashboard_panels', $chosen);
+
+        $request->user()->forceFill([
+            'dashboard_layout' => DashboardLayout::withLegacyPanels($request->user(), $chosen),
+        ])->save();
 
         return back()->with('success', 'Dashboard layout saved.');
     }
@@ -59,7 +122,7 @@ class DashboardController extends Controller
         }
     }
 
-    public function index(DashboardAnalytics $analytics, Request $request)
+    public function index(DashboardAnalytics $analytics, DashboardInsights $insights, Request $request)
     {
         $today = now()->startOfDay();
 
@@ -124,11 +187,6 @@ class DashboardController extends Controller
         // Top products in the window, by units sold on non-cancelled orders.
         $inRange = fn ($q) => $range->constrain($q->whereNotIn('status', ['cancelled', 'returned']));
 
-        $topProducts = OrderItem::query()
-            ->whereHas('order', $inRange)
-            ->select('name', DB::raw('SUM(quantity) as qty'), DB::raw('SUM(subtotal) as revenue'))
-            ->groupBy('name')->orderByDesc('qty')->take(5)->get();
-
         // Best-selling categories in the window, by units sold.
         $topCategories = OrderItem::query()
             ->whereHas('order', $inRange)
@@ -167,15 +225,24 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->pluck('count', 'status');
 
-        // Deep-analysis panels (admin chooses which are visible; all on by default).
-        $saved = Setting::get('dashboard_panels', null);
-        $panels = is_array($saved) ? $saved : array_keys(self::PANELS);
+        // This admin's arrangement of the blocks (owner, 2026-09-18): the
+        // order they render in and which are hidden. A hidden block is not
+        // rendered, and the analytics only it reads are not computed — the
+        // registry says which $deep key each block needs, and a key is
+        // computed when any VISIBLE block needs it. Hiding the funnel really
+        // does skip the visits-table scans, which is the point on a host
+        // where that table is the biggest one.
+        $layout = DashboardLayout::for($request->user());
+        $needed = DashboardLayout::needs($layout);
 
-        // Each panel is computed defensively: analytics are decoration, and one
-        // panel failing (a migration that hasn't run, an odd row) must not take
-        // the whole dashboard down with it. A panel that errors is reported and
-        // simply doesn't render.
-        $safe = function (callable $fn, $fallback = null) {
+        // Each analytics key is computed defensively: analytics are decoration,
+        // and one failing (a migration that hasn't run, an odd row) must not
+        // take the whole dashboard down with it. One that errors is reported
+        // and its block simply doesn't render.
+        // false, never null, on failure: null means "not wanted", and the page
+        // turns false into a one-line "couldn't be computed" card instead of
+        // a block that quietly vanishes as if there were nothing to show.
+        $safe = function (callable $fn, $fallback = false) {
             try {
                 return $fn();
             } catch (\Throwable $e) {
@@ -184,18 +251,41 @@ class DashboardController extends Controller
                 return $fallback;
             }
         };
-        $on = fn (string $panel) => in_array($panel, $panels, true);
+        $want = fn (string $key) => in_array($key, $needed, true);
 
+        // Null means "not wanted by any visible block"; each partial guards on
+        // its own key, so a collection-typed key falls back to collect() only
+        // when it was actually computed and failed.
         $deep = [
-            'profit' => $on('profit') ? $safe(fn () => $analytics->periodComparison($range)) : null,
-            'funnel' => $on('funnel') ? $safe(fn () => $analytics->funnel($range)) : null,
-            // collect(), not null: the funnel panel @foreaches this directly.
-            'series' => $on('funnel') ? $safe(fn () => $analytics->funnelByDay($range), collect()) : null,
-            'sources' => $on('funnel') ? $safe(fn () => $analytics->trafficSources($range), collect()) : null,
-            'ads' => $on('funnel') ? $safe(fn () => $analytics->adPerformance($range), collect()) : collect(),
-            'viewedNotSold' => $on('funnel') ? $safe(fn () => $analytics->viewedNotSold($range), collect()) : null,
-            'retention' => $on('retention') ? $safe(fn () => $analytics->retention($range)) : null,
-            'operations' => $on('operations') ? $safe(fn () => $analytics->operations($range)) : null,
+            'profit' => $want('profit') ? $safe(fn () => $analytics->periodComparison($range)) : null,
+            'funnel' => $want('funnel') ? $safe(fn () => $analytics->funnel($range)) : null,
+            // collect(), not null: the chart @foreaches this directly.
+            'series' => $want('series') ? $safe(fn () => $analytics->funnelByDay($range), collect()) : null,
+            'sources' => $want('sources') ? $safe(fn () => $analytics->trafficSources($range), collect()) : null,
+            'ads' => $want('ads') ? $safe(fn () => $analytics->adPerformance($range), collect()) : null,
+            'viewedNotSold' => $want('viewedNotSold') ? $safe(fn () => $analytics->viewedNotSold($range), collect()) : null,
+            'retention' => $want('retention') ? $safe(fn () => $analytics->retention($range)) : null,
+            'operations' => $want('operations') ? $safe(fn () => $analytics->operations($range)) : null,
+
+            // The second layer (owner, 2026-09-18: "add other analytical info
+            // on the dashboard"): App\Services\DashboardInsights, one key per
+            // block, computed on the same terms as the keys above — only when
+            // a visible block reads it, and never allowed to take the page
+            // down. The call list is a to-do list and has no window; the
+            // rest follow the chosen range. A block whose key came back null
+            // because its insight threw renders nothing, and the page shows
+            // it as "nothing to show right now" in arrange mode.
+            'callList' => $want('callList') ? $safe(fn () => $insights->callList()) : null,
+            'cashAtCourier' => $want('cashAtCourier') ? $safe(fn () => $insights->cashAtCourier($range)) : null,
+            'deliverySpeed' => $want('deliverySpeed') ? $safe(fn () => $insights->deliverySpeed($range)) : null,
+            'stockHealth' => $want('stockHealth') ? $safe(fn () => $insights->stockHealth($range)) : null,
+            'discountLeakage' => $want('discountLeakage') ? $safe(fn () => $insights->discountLeakage($range)) : null,
+            'channelEconomics' => $want('channelEconomics') ? $safe(fn () => $insights->channelEconomics($range)) : null,
+            'topEarners' => $want('topEarners') ? $safe(fn () => $insights->topEarners($range)) : null,
+            'earnersByCategory' => $want('earnersByCategory') ? $safe(fn () => $insights->earnersByCategory($range)) : null,
+            'leadRecovery' => $want('leadRecovery') ? $safe(fn () => $insights->leadRecovery($range)) : null,
+            'assistantAndSms' => $want('assistantAndSms') ? $safe(fn () => $insights->assistantAndSms($range)) : null,
+            'orderClock' => $want('orderClock') ? $safe(fn () => $insights->orderClock($range)) : null,
         ];
 
         // Unique visitors: all-time as the headline, plus the chosen window.
@@ -204,9 +294,9 @@ class DashboardController extends Controller
         $stats['visitors_period'] = (int) $safe(fn () => $range->constrain(Visit::query())->distinct()->count('visitor_token'), 0);
 
         return view('admin.dashboard', compact(
-            'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'topProducts', 'lowStockProducts',
+            'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'lowStockProducts',
             'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability',
-            'unreadMessages', 'recentMessages', 'deep', 'panels', 'range'
+            'unreadMessages', 'recentMessages', 'deep', 'layout', 'range'
         ));
     }
 

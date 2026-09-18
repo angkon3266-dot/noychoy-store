@@ -78,6 +78,10 @@ Route::middleware('admin')->group(function () {
     Route::post('products/bulk-serials', [ProductController::class, 'bulkSerials'])->name('products.bulk-serials');
     Route::patch('products/{product}/serial', [ProductController::class, 'updateSerial'])->name('products.serial');
 
+    // The admin's own arrangement of the dashboard blocks (owner, 2026-09-18).
+    // `panels` is the older ⚙ form, kept so a stale page still saves.
+    Route::post('dashboard/layout', [DashboardController::class, 'saveLayout'])->name('dashboard.layout');
+    Route::post('dashboard/layout/reset', [DashboardController::class, 'resetLayout'])->name('dashboard.layout.reset');
     Route::post('dashboard/panels', [DashboardController::class, 'savePanels'])->name('dashboard.panels');
     // Polled by the "on the site right now" card — see DashboardController::live.
     Route::get('dashboard/live', [DashboardController::class, 'live'])->name('dashboard.live');

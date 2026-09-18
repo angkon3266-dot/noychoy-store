@@ -60,6 +60,9 @@ class NotificationController extends Controller
                 'abandoned_sms_delay_minutes' => (int) Setting::get('abandoned_sms_delay_minutes', 60),
                 'abandoned_sms_max_hours' => (int) Setting::get('abandoned_sms_max_hours', 48),
                 'abandoned_sms_per_run' => (int) Setting::get('abandoned_sms_per_run', 50),
+                // Per-segment SMS price, read by DashboardInsights::assistantAndSms
+                // (2026-09-18) to cost the texts sent. Null until typed.
+                'sms_cost_per_segment' => Setting::get('sms_cost_per_segment'),
             ],
             'winbackDue' => \App\Models\Customer::whereNotNull('password')->where('blacklisted', false)
                 ->where('total_orders', '>', 0)
@@ -357,12 +360,16 @@ class NotificationController extends Controller
             'abandoned_sms_delay_minutes' => ['required', 'integer', 'min:15', 'max:1440'],
             'abandoned_sms_max_hours' => ['required', 'integer', 'min:2', 'max:720'],
             'abandoned_sms_per_run' => ['required', 'integer', 'min:1', 'max:300'],
+            'sms_cost_per_segment' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
         Setting::put('abandoned_sms_enabled', $request->boolean('abandoned_sms_enabled'));
         Setting::put('abandoned_sms_delay_minutes', $data['abandoned_sms_delay_minutes']);
         Setting::put('abandoned_sms_max_hours', $data['abandoned_sms_max_hours']);
         Setting::put('abandoned_sms_per_run', $data['abandoned_sms_per_run']);
+        // Blank clears it, so the dashboard goes back to "set the per-SMS
+        // cost" rather than pricing texts at a rate that was typed by mistake.
+        Setting::put('sms_cost_per_segment', filled($data['sms_cost_per_segment'] ?? null) ? (float) $data['sms_cost_per_segment'] : null);
 
         return back()->with('success', 'Abandoned-cart SMS settings saved.');
     }

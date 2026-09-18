@@ -190,6 +190,10 @@
                     <div><label class="label text-xs">Wait this long after they leave (minutes)</label><input type="number" name="abandoned_sms_delay_minutes" value="{{ $settings['abandoned_sms_delay_minutes'] }}" min="15" max="1440" class="input py-1.5 text-sm" required></div>
                     <div><label class="label text-xs">Give up after (hours)</label><input type="number" name="abandoned_sms_max_hours" value="{{ $settings['abandoned_sms_max_hours'] }}" min="2" max="720" class="input py-1.5 text-sm" required></div>
                     <div class="col-span-2"><label class="label text-xs">Max texts per run</label><input type="number" name="abandoned_sms_per_run" value="{{ $settings['abandoned_sms_per_run'] }}" min="1" max="300" class="input py-1.5 text-sm" required></div>
+                    {{-- What KhudeBarta charges per segment. The dashboard's
+                         Chat & SMS card (2026-09-18) prices every text sent
+                         with it; blank leaves that cost as "not set". --}}
+                    <div class="col-span-2"><label class="label text-xs">Cost per SMS segment (৳) — for the dashboard's Chat &amp; SMS card; 0 means a bundled plan</label><input type="number" name="sms_cost_per_segment" value="{{ $settings['sms_cost_per_segment'] }}" min="0" max="100" step="0.01" class="input py-1.5 text-sm" placeholder="e.g. 0.25"></div>
                 </div>
                 <p class="text-xs text-ink-700/50">The wording lives on the <a href="{{ route('admin.system-config.integrations') }}" class="text-gold-700 hover:underline">Integrations</a> page, under SMS templates.</p>
                 <div class="flex gap-2">

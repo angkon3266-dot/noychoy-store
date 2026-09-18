@@ -120,11 +120,13 @@ class DashboardMobileLayoutTest extends TestCase
             ->assertSee('Dead stock');
     }
 
-    public function test_the_panel_picker_keeps_its_name_when_it_shrinks_to_a_gear_on_a_phone(): void
+    public function test_the_arrange_button_keeps_its_name_when_it_shrinks_to_a_gear_on_a_phone(): void
     {
+        // Since 18 Sep 2026 the ⚙ is "Arrange" (the whole dashboard moves,
+        // not just four panels) — the name still has to survive the shrink.
         $this->actingAs($this->admin())->get('/admin')
             ->assertOk()
-            ->assertSee('Customize dashboard')
+            ->assertSee('Arrange dashboard')
             // The chosen preset is marked, so the sideways strip can scroll to it.
             ->assertSee('aria-current="page"', false);
     }
