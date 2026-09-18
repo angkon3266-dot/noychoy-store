@@ -33,6 +33,13 @@ class LeadController extends Controller
             return response()->json(['ok' => false], 200);
         }
 
+        // A blocked number leaves no lead behind: the follow-up desk exists to
+        // chase people the shop wants back, and the chaser should never be
+        // handed someone the shop has refused.
+        if (\App\Models\BlockedPhone::blocks($data['phone'])) {
+            return response()->json(['ok' => false], 200);
+        }
+
         // product_id / variant_id are what make the snapshot actionable: the
         // recovery SMS links to a route that rebuilds this cart, and a list of
         // names and prices cannot be turned back into a cart.

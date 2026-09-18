@@ -352,62 +352,7 @@ class CouponController extends Controller
      */
     protected function readPhones(string $text): array
     {
-        $numbers = [];
-        $unreadable = [];
-        $isMobile = fn (string $digits) => (bool) preg_match('/^01[3-9]\d{8}$/', bd_phone($digits));
-        $isDigits = fn (string $token) => (bool) preg_match('/^[+(]*\d[\d().+-]*$/', $token);
-
-        foreach (preg_split('/[\r\n,;]+/', $text) as $entry) {
-            // "Nadia-01712345678" is a name and a number, not one word. Marks
-            // count as letters: a Bengali name can end in a vowel sign.
-            $spaced = preg_replace('/(?<=[\pL\pM])[-–—]*(?=[+(]?\d)|(?<=\d)(?=[\pL\pM])/u', ' ', $entry) ?? $entry;
-            $tokens = preg_split('/[\s|:–—]+/u', trim($spaced), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-
-            $found = [];
-            $words = [];
-            $leftBefore = count($unreadable);
-
-            for ($i = 0, $n = count($tokens); $i < $n; $i++) {
-                if (! $isDigits($tokens[$i])) {
-                    $words[] = $tokens[$i];
-
-                    continue;
-                }
-
-                // Join this digit group with the ones after it until they make
-                // a number, giving up once longer than any number can be.
-                $joined = '';
-                for ($j = $i; $j < $n && $isDigits($tokens[$j]); $j++) {
-                    $joined .= $tokens[$j];
-
-                    if ($isMobile($joined)) {
-                        $found[] = bd_phone($joined);
-                        $i = $j;
-
-                        continue 2;
-                    }
-                    if (strlen(preg_replace('/\D/', '', $joined)) > 14) {
-                        break;
-                    }
-                }
-
-                $unreadable[] = $tokens[$i];
-            }
-
-            if ($found === [] && $words !== [] && count($unreadable) === $leftBefore) {
-                $unreadable[] = trim($entry);
-            }
-
-            // The separators are already split out above; trimming the dashes
-            // here as well would be byte-wise, and can cut a Bengali letter in half.
-            $name = count($found) === 1 ? trim(implode(' ', $words), " \t-") : '';
-
-            foreach ($found as $phone) {
-                $numbers[$phone] = $name !== '' ? mb_substr($name, 0, 120) : ($numbers[$phone] ?? null);
-            }
-        }
-
-        return [$numbers, array_values(array_unique($unreadable))];
+        return \App\Support\PhoneList::read($text);
     }
 
     protected function nullableNumber($value)

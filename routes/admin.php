@@ -178,6 +178,14 @@ Route::middleware('admin')->group(function () {
     Route::get('customers/all-offers', [CustomerController::class, 'offersIndex'])->name('customers.all-offers');
     Route::get('customers/occasions', [\App\Http\Controllers\Admin\CustomerOccasionController::class, 'index'])->name('customers.occasions');
 
+    // ── Numbers that may not order (owner, 2026-09-18) ─────────────────────
+    // Kept in the customers section: blocking somebody is a customer decision,
+    // and the people who work orders should not be able to make it silently.
+    Route::get('customers/blocked', [\App\Http\Controllers\Admin\BlockedPhoneController::class, 'index'])->name('customers.blocked');
+    Route::post('customers/blocked', [\App\Http\Controllers\Admin\BlockedPhoneController::class, 'store'])->name('customers.blocked.store');
+    Route::post('customers/blocked/quick', [\App\Http\Controllers\Admin\BlockedPhoneController::class, 'quickStore'])->name('customers.blocked.quick');
+    Route::delete('customers/blocked/{blockedPhone}', [\App\Http\Controllers\Admin\BlockedPhoneController::class, 'destroy'])->name('customers.blocked.destroy');
+
     // ── Customer courier tiers (owner, 2026-09-17) ─────────────────────────
     // BDCourier lookups from the customer list and the customer page. Every
     // lookup spends a plan credit, so each is a POST behind a click and all are

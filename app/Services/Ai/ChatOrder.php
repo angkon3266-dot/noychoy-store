@@ -653,6 +653,13 @@ class ChatOrder
 
         $details = $state['details'];
 
+        // Refused the same way the checkout refuses it, and before a total is
+        // placed the assistant would not be allowed to write (2026-09-18).
+        if (\App\Models\BlockedPhone::blocks($details['phone'] ?? null)) {
+            return ['ok' => false, 'reason' => 'blocked',
+                'message' => 'We cannot take an order on this number. Give the customer the WhatsApp link so a person can look at it.'];
+        }
+
         if ($this->placedToday($details['phone'] ?? null) >= $this->dailyLimit()) {
             return ['ok' => false, 'reason' => 'daily_limit',
                 'message' => 'That is as many orders as I can take for one customer today. Give the WhatsApp link so a person can help with another.'];

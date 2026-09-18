@@ -39,6 +39,17 @@ class PlaceOrder
         // last screen. Everything below reads the cart *after* this, so the
         // reservation check, the per-phone cap and the row lock all judge the
         // same coupon the customer was shown.
+        // A blocked number may not order, whichever door it came through —
+        // the web checkout, the assistant, or a restored cart link (owner,
+        // 2026-09-18). Checked on the canonical form, so "+880 1712-345678"
+        // and "01712345678" are the same person.
+        if (\App\Models\BlockedPhone::blocks($data['phone'])) {
+            throw new CheckoutException(
+                'We cannot take an order on this number. Please call us on '
+                .(\App\Models\Setting::get('store_phone', config('store.phone')) ?: 'our hotline').' if you think this is a mistake.'
+            );
+        }
+
         $this->cart->rememberCheckoutPhone($data['phone']);
 
         $insideDhaka = (bool) ($data['is_inside_dhaka'] ?? false);

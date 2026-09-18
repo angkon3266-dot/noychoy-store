@@ -40,6 +40,15 @@ class CreateManualOrder
     {
         $data['phone'] = bd_phone($data['phone']);
 
+        // The block list holds for orders typed in the admin as well —
+        // otherwise a number refused at checkout could be let in by hand
+        // without anyone deciding to. Unblock it first if that is meant.
+        if (\App\Models\BlockedPhone::blocks($data['phone'])) {
+            throw ValidationException::withMessages([
+                'phone' => 'This number is on the blocked list. Unblock it under Customers → Blocked numbers to take an order on it.',
+            ]);
+        }
+
         return DB::transaction(function () use ($data, $lines) {
             $subtotal = 0.0;
             $resolved = [];

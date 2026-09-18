@@ -192,6 +192,14 @@ class CheckoutController extends Controller
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);
 
+        // Said on the field she just typed: PlaceOrder refuses this too, but
+        // that path bounces her to the cart, which reads as a basket problem.
+        if (\App\Models\BlockedPhone::blocks($data['phone'])) {
+            return back()->withInput()->withErrors([
+                'phone' => 'We cannot take an order on this number. Please call us if you think this is a mistake.',
+            ]);
+        }
+
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
         $data['is_gift'] = $request->boolean('is_gift');
 

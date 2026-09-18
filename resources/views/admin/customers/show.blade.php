@@ -20,6 +20,23 @@
 
         {{-- The manual order form, opened with this customer's name, number and
              last delivery details already in it (owner, 2026-09-17). --}}
+        {{-- Blocking is a decision about this person, so it belongs beside
+             her name rather than only on a list of digits (owner, 2026-09-18). --}}
+        @if(\App\Models\BlockedPhone::blocks($customer->phone))
+            <form action="{{ route('admin.customers.blocked.destroy', \App\Models\BlockedPhone::where('phone', bd_phone($customer->phone))->value('id')) }}" method="POST"
+                  onsubmit="return confirm('Let {{ $customer->phone }} order again?')">
+                @csrf @method('DELETE')
+                <button class="btn-outline py-2 text-sm text-red-600">🚫 Blocked — unblock</button>
+            </form>
+        @else
+            <form action="{{ route('admin.customers.blocked.quick') }}" method="POST"
+                  onsubmit="return confirm('Block {{ $customer->phone }}? They will not be able to place an order.')">
+                @csrf
+                <input type="hidden" name="phone" value="{{ $customer->phone }}">
+                <button class="btn-outline py-2 text-sm">🚫 Block from ordering</button>
+            </form>
+        @endif
+
         <a href="{{ route('admin.orders.create', ['customer' => $customer->id]) }}" class="btn-primary py-2 text-sm">+ New order</a>
     </div>
 </div>
