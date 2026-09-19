@@ -147,9 +147,10 @@ class CatalogController extends Controller
             return;
         }
 
+        // Price sorts go by the listed price — live offer off — as the cards print it.
         match ($sort) {
-            'price_asc' => $query->orderBy('price'),
-            'price_desc' => $query->orderByDesc('price'),
+            'price_asc' => $query->orderByRaw(offer_pricing()->listedPriceSql().' asc'),
+            'price_desc' => $query->orderByRaw(offer_pricing()->listedPriceSql().' desc'),
             'name' => $query->orderBy('name'),
             'popular' => $query->orderByDesc('views'),
             // Real units sold (cancelled/returned/deleted orders excluded) —
@@ -239,7 +240,8 @@ class CatalogController extends Controller
 
         return response()->json($products->map(fn ($p) => [
             'name' => $p->name,
-            'price' => money($p->price),
+            // As the card and the product page list it, live offer off.
+            'price' => money(offer_pricing()->priceFor($p)),
             'thumb' => $p->thumbnail,
             'url' => route('product.show', $p),
         ]));
@@ -334,12 +336,21 @@ class CatalogController extends Controller
         $tracking = $this->tracking;
         app()->terminating(fn () => $tracking->viewContent($product, $vcEventId, $vcUser, $vcContext));
 
+        // The live offer this piece lists under (App\Support\OfferPricing). The
+        // page takes it off every price it prints and strikes the regular one
+        // through; `price` below stays the regular unit the cart line carries.
+        $offer = offer_pricing()->offerFor($product);
+
         // Shared Alpine config for the product page (built once, used by every template).
         $pp = [
             'id' => $product->id,
             'name' => $product->name,
             'price' => (float) $product->price,
             'compare' => (float) $product->compare_at_price,
+            'offer' => $offer ? [
+                'percent' => (float) $offer->percent,
+                'label' => $offer->badge_label ?: $offer->title,
+            ] : null,
             'hasVariants' => (bool) $product->has_variants,
             'image' => $product->images->first()?->url ?? '',
             'attributes' => $product->options ?? [],   // [{name, values:[]}]

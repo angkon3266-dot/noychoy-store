@@ -6,6 +6,7 @@ use App\Models\Offer;
 use App\Models\Product;
 use App\Services\LoyaltyService;
 use App\Services\WebPushService;
+use App\Support\OfferPricing;
 use Illuminate\Support\Collection;
 
 /**
@@ -27,6 +28,11 @@ class ProductPageData
     ): array {
         $preorder = $product->isPreorder();
         $offerTiers = $product->offerTiers();
+
+        // What the piece lists at once the live offer is off
+        // (App\Support\OfferPricing), and that offer's percentage.
+        $quote = offer_pricing()->quote($product);
+        $offerPct = $quote['offer'] ? $quote['percent'] : 0.0;
 
         $pdpOffers = Offer::active()->where('show_on_pdp', true)->get()
             ->filter(fn ($o) => $o->appliesToProduct($product))->values();
@@ -51,8 +57,10 @@ class ProductPageData
                 'url' => route('product.show', $product),
                 'short_description' => $product->short_description,
                 'description' => $product->description,
-                'price' => (float) $product->price,
-                'price_text' => money($product->price),
+                // The listed price — the ViewContent pixel's value, matching
+                // the server event and the catalogue feed's sale price.
+                'price' => $quote['price'],
+                'price_text' => money($quote['price']),
                 'images' => $product->images->map(fn ($i) => [
                     'id' => $i->id,
                     'url' => $i->url,
@@ -93,12 +101,15 @@ class ProductPageData
                 'love_url' => route('product.love', $product),
             ],
             'pp' => $pp,
-            'offerTiers' => collect($offerTiers)->map(function ($tier) use ($product) {
-                $each = round((float) $product->price * (1 - $tier['percent'] / 100), 2);
+            // A quantity tier and the live offer both come off the full price
+            // in the cart, so they add up: "৳700 each instead of ৳800" when
+            // the offer already makes it ৳800.
+            'offerTiers' => collect($offerTiers)->map(function ($tier) use ($product, $quote, $offerPct) {
+                $each = OfferPricing::less((float) $product->price, $tier['percent'] + $offerPct);
 
                 return $tier + [
                     'each_text' => money($each),
-                    'price_text' => money($product->price),
+                    'price_text' => money($quote['price']),
                     'save_total_text' => money($tier['save_each'] * max(1, $tier['min_qty'])),
                     'save_each_text' => money($tier['save_each']),
                 ];
@@ -146,8 +157,10 @@ class ProductPageData
                     'url' => route('product.show', $p),
                     // A w-32 tile does not need the 1600px original.
                     'thumb' => image_variant($p->thumbnail) ?: $p->thumbnail,
-                    'price' => (float) $p->price,
-                    'price_text' => money($p->price),
+                    // Listed prices, live offer off: the ladder's saving
+                    // (below) comes off on top, as it does in the cart.
+                    'price' => $price = offer_pricing()->priceFor($p),
+                    'price_text' => money($price),
                     'selectable' => $p->isAvailable() && ! $p->has_variants,
                     'has_variants' => (bool) $p->has_variants,
                 ])->values(),

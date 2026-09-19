@@ -426,6 +426,9 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                                     <Icon name="close" className="w-3 h-3 shrink-0" />{removing === item.key ? 'Removing…' : 'Remove'}
                                                 </button>
                                             )}
+                                            {item.promo && (
+                                                <span className="block text-[11px] text-success-700">{item.promo.label} · you save {item.promo.saving_text}</span>
+                                            )}
                                         </span>
                                         <span className="font-medium shrink-0">{item.lineText}</span>
                                     </div>

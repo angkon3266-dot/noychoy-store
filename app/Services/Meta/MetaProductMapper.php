@@ -56,7 +56,7 @@ class MetaProductMapper
     private function simpleData(Product $product): array
     {
         $images = $this->images($product);
-        [$price, $salePrice] = $this->prices((float) $product->price, $product->compare_at_price ? (float) $product->compare_at_price : null);
+        [$price, $salePrice] = $this->prices(offer_pricing()->quote($product));
 
         return array_filter([
             'retailer_id' => $this->retailerId($product),
@@ -86,8 +86,7 @@ class MetaProductMapper
         $attrs = collect($variant->attributes ?? []);
         $variantImage = $variant->image?->url;
         $images = $this->images($product);
-        $price = $variant->price !== null ? (float) $variant->price : (float) $product->price;
-        [$regular, $sale] = $this->prices($price, $product->compare_at_price ? (float) $product->compare_at_price : null);
+        [$regular, $sale] = $this->prices(offer_pricing()->quote($product, $variant));
 
         return array_filter([
             'retailer_id' => $this->retailerId($product, $variant),
@@ -126,24 +125,28 @@ class MetaProductMapper
     }
 
     /**
-     * Our `price` is the current selling price and `compare_at_price` the higher
-     * struck-through original. Meta expects `price` = regular, `sale_price` =
-     * discounted. So when a compare-at price exists and is higher, it becomes
-     * the regular price and the selling price becomes the sale price.
+     * Meta expects `price` = regular and `sale_price` = discounted. The quote
+     * (App\Support\OfferPricing) carries both: while a live offer covers the
+     * piece, its regular price and what it lists at; otherwise a higher
+     * compare-at price and the selling price — the figures the product page
+     * and the scheduled CSV feed use, so the two ways into the catalogue agree.
      *
+     * @param  array{price: float, was: ?float, offer: ?\App\Models\Offer}  $quote
      * @return array{0:?string, 1:?string} [price, sale_price]
      */
-    private function prices(float $selling, ?float $compareAt): array
+    private function prices(array $quote): array
     {
+        // With price sync off only the piece's own price goes up — never a
+        // sale price.
         if (! $this->settings->toggle('sync_price')) {
-            return [$this->money($selling), null];
+            return [$this->money($quote['offer'] ? $quote['was'] : $quote['price']), null];
         }
 
-        if ($compareAt && $compareAt > $selling) {
-            return [$this->money($compareAt), $this->money($selling)];
+        if ($quote['was'] !== null) {
+            return [$this->money($quote['was']), $this->money($quote['price'])];
         }
 
-        return [$this->money($selling), null];
+        return [$this->money($quote['price']), null];
     }
 
     private function availability(Product $product): string

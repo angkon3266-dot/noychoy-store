@@ -80,8 +80,7 @@ class ProductFeedController extends Controller
                             'description' => feed_description($p),
                             'availability' => ($p->isAvailable() || $p->isPreorder()) ? 'in stock' : 'out of stock',
                             'condition' => 'new',
-                            'price' => number_format((float) ($p->compare_at_price ?: $p->price), 2, '.', '').' '.$currency,
-                            'sale_price' => $p->is_on_sale ? number_format((float) $p->price, 2, '.', '').' '.$currency : '',
+                        ], $this->metaPrices(offer_pricing()->quote($p), $currency), [
                             'link' => route('product.show', $p),
                             'image_link' => $this->absUrl($primary->url),
                             'additional_image_link' => $additional,
@@ -99,17 +98,13 @@ class ProductFeedController extends Controller
                         // grouped under the parent via item_group_id.
                         if ($p->has_variants && $p->variants->isNotEmpty()) {
                             foreach ($p->variants as $v) {
-                                $price = $v->price !== null ? (float) $v->price : (float) $p->price;
                                 $row([
                                     'id' => meta_content_id($p, $v),
                                     'item_group_id' => meta_content_id($p),
                                     'title' => trim($p->name.' '.$v->label),
                                     'availability' => ((int) $v->stock_quantity > 0 || $p->isPreorder()) ? 'in stock' : 'out of stock',
-                                    'price' => number_format((float) ($p->compare_at_price ?: $price), 2, '.', '').' '.$currency,
-                                    'sale_price' => $p->compare_at_price && $price < (float) $p->compare_at_price
-                                        ? number_format($price, 2, '.', '').' '.$currency : '',
                                     'image_link' => $this->absUrl($v->image?->url ?: $primary->url),
-                                ]);
+                                ] + $this->metaPrices(offer_pricing()->quote($p, $v), $currency));
                             }
 
                             continue;
@@ -197,13 +192,13 @@ class ProductFeedController extends Controller
                         // the parent so Google shows them as one product family.
                         if ($p->has_variants && $p->variants->isNotEmpty()) {
                             foreach ($p->variants as $v) {
-                                $price = $v->price !== null ? (float) $v->price : (float) $p->price;
-                                $compare = $p->compare_at_price ? (float) $p->compare_at_price : null;
                                 $attrs = collect($v->attributes ?? []);
 
-                                if ($price <= 0) {
+                                if (($v->price !== null ? (float) $v->price : (float) $p->price) <= 0) {
                                     continue; // see the guard on simple products
                                 }
+
+                                $quote = offer_pricing()->quote($p, $v);
 
                                 $this->googleItem($out, $base, [
                                     'g:id' => meta_content_id($p, $v),
@@ -211,8 +206,10 @@ class ProductFeedController extends Controller
                                     'title' => Str::limit(trim($p->name.' '.$v->label), 150, ''),
                                     'g:image_link' => $this->absUrl($v->image?->url ?: $primary->url),
                                     'g:availability' => ((int) $v->stock_quantity > 0 || $p->isPreorder()) ? 'in_stock' : 'out_of_stock',
-                                    'g:price' => $money($compare ?: $price),
-                                    'g:sale_price' => $compare && $price < $compare ? $money($price) : null,
+                                    // Regular price, and what it sells for while
+                                    // an offer is on (App\Support\OfferPricing).
+                                    'g:price' => $money($quote['was'] ?? $quote['price']),
+                                    'g:sale_price' => $quote['was'] !== null ? $money($quote['price']) : null,
                                     'g:color' => $this->variantAttr($attrs, ['color', 'colour']),
                                     'g:size' => $this->variantAttr($attrs, ['size']),
                                     'g:material' => $this->variantAttr($attrs, ['material']),
@@ -229,10 +226,12 @@ class ProductFeedController extends Controller
                             continue;
                         }
 
+                        $quote = offer_pricing()->quote($p);
+
                         $this->googleItem($out, $base, [
                             'g:availability' => ($p->isAvailable() || $p->isPreorder()) ? 'in_stock' : 'out_of_stock',
-                            'g:price' => $money((float) ($p->compare_at_price ?: $p->price)),
-                            'g:sale_price' => $p->is_on_sale ? $money((float) $p->price) : null,
+                            'g:price' => $money($quote['was'] ?? $quote['price']),
+                            'g:sale_price' => $quote['was'] !== null ? $money($quote['price']) : null,
                             'g:color' => collect($p->colors ?? [])->filter()->first(),
                         ], $shippingXml);
                     }
@@ -241,6 +240,26 @@ class ProductFeedController extends Controller
             fwrite($out, "</channel>\n</rss>\n");
             fclose($out);
         }, 200, $headers);
+    }
+
+    /**
+     * The Meta CSV's price pair: `price` is the regular price, `sale_price`
+     * what the piece sells for while an offer (or a compare-at price) takes
+     * something off it — the same figures the product page shows, so an ad
+     * never quotes a price the page does not. An offer that ends drops the
+     * sale price at the next scheduled fetch.
+     *
+     * @param  array{price: float, was: ?float}  $quote  OfferPricing::quote()
+     * @return array{price: string, sale_price: string}
+     */
+    protected function metaPrices(array $quote, string $currency): array
+    {
+        $money = fn (float $v) => number_format($v, 2, '.', '').' '.$currency;
+
+        return [
+            'price' => $money($quote['was'] ?? $quote['price']),
+            'sale_price' => $quote['was'] !== null ? $money($quote['price']) : '',
+        ];
     }
 
     /**

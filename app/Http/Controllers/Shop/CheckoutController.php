@@ -101,6 +101,11 @@ class CheckoutController extends Controller
                 'name' => $i['name'],
                 'qty' => $i['qty'],
                 'lineText' => money($i['price'] * $i['qty']),
+                // The line's Admin → Offers saving, as on the cart page.
+                'promo' => ($promo = $this->cart->linePromo($i['key'])) ? [
+                    'label' => $promo['label'],
+                    'saving_text' => money($promo['amount']),
+                ] : null,
             ])->values(),
             'summary' => [
                 'subtotalText' => money($this->cart->subtotal()),

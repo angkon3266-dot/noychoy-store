@@ -23,8 +23,12 @@ class Offer extends Model
     {
         // Deals of the Day is cached (it costs 2-3 queries per offer), so an
         // edit has to clear it — otherwise the owner changes a deal and waits
-        // ten minutes wondering why the homepage disagrees with her.
-        $bust = fn () => \App\Support\DailyDeals::flushCache();
+        // ten minutes wondering why the homepage disagrees with her. The listed
+        // prices hold their offers for the request, and let go the same way.
+        $bust = function () {
+            \App\Support\DailyDeals::flushCache();
+            offer_pricing()->forget();
+        };
 
         static::saved($bust);
         static::deleted($bust);
@@ -77,11 +81,33 @@ class Offer extends Model
         return true; // 'all' — whole-order offer, show everywhere
     }
 
-    /** Does a single cart line fall within this offer's scope? */
+    /**
+     * Can a single piece promise this offer? No minimum cart value and no
+     * minimum count — so App\Support\OfferPricing may take it off the price a
+     * product lists at, and the cart will honour that for a piece on its own.
+     */
+    public function isUnconditional(): bool
+    {
+        return (float) $this->percent > 0
+            && (float) ($this->min_subtotal ?? 0) <= 0
+            && (int) ($this->min_qty ?? 0) <= 1;
+    }
+
+    /**
+     * Does a single cart line fall within this offer's scope?
+     *
+     * A line carries every category its product is filed under once the cart
+     * has looked them up (`category_ids`, CartService::withCategories) — the
+     * same set appliesToProduct() checks for the product page. A line without
+     * them falls back to its primary category.
+     */
     public function lineEligible(array $item): bool
     {
         return match ($this->applies_to) {
-            'categories' => in_array((int) ($item['category_id'] ?? 0), array_map('intval', $this->category_ids ?? []), true),
+            'categories' => (bool) array_intersect(
+                array_map('intval', $item['category_ids'] ?? [$item['category_id'] ?? 0]),
+                array_map('intval', $this->category_ids ?? []),
+            ),
             'products' => in_array((int) ($item['product_id'] ?? 0), array_map('intval', $this->product_ids ?? []), true),
             default => true,
         };
@@ -129,16 +155,6 @@ class Offer extends Model
         }
 
         return true;
-    }
-
-    /** Discount amount this percentage offer gives on its eligible items. */
-    public function discountAmount(CartService $cart): float
-    {
-        if ($this->type !== 'order_percent') {
-            return 0.0;
-        }
-
-        return round($this->eligibleSubtotal($cart) * (float) $this->percent / 100, 2);
     }
 
     /** How much more (whole-order) the customer must spend to unlock this offer. */

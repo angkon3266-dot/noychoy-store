@@ -118,6 +118,11 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                                         {item.offer.label} (you save {item.offer.saving_text})
                                     </p>
                                 )}
+                                {item.promo && (
+                                    <p className="mt-1 inline-block badge bg-success-100 text-success-700 text-[11px]">
+                                        {item.promo.label} (you save {item.promo.saving_text})
+                                    </p>
+                                )}
                             </div>
                             <div className="inline-flex items-center rounded-md border border-ink-100 bg-white">
                                 <button type="button" onClick={() => updateQty(item.key, item.qty - 1)} className="px-2.5 py-1.5 hover:text-gold-700" aria-label="Decrease quantity">−</button>

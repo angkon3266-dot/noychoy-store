@@ -144,13 +144,15 @@ class MetaTrackingService
             'content_ids' => [$this->contentId($product)],
             'content_name' => $product->name,
             'currency' => $this->currency(),
-            'value' => (float) $product->price,
+            // What the page lists it at, live offer off — the value the
+            // browser Pixel sends with this same event id.
+            'value' => offer_pricing()->priceFor($product),
         ], $eventId, context: $context, timeout: self::STOREFRONT_TIMEOUT);
     }
 
     public function addToCart(Product $product, int $quantity, string $eventId, array $user = [], ?ProductVariant $variant = null, ?array $context = null): void
     {
-        $unit = $variant?->price !== null ? (float) $variant->price : (float) $product->price;
+        $unit = offer_pricing()->priceFor($product, $variant);
 
         $this->send('AddToCart', $this->hashUser($user), [
             'content_type' => 'product',
@@ -182,7 +184,7 @@ class MetaTrackingService
 
         foreach ($lines as $line) {
             $variant = $line['variant'] ?? null;
-            $unit = $variant?->price !== null ? (float) $variant->price : (float) $line['product']->price;
+            $unit = offer_pricing()->priceFor($line['product'], $variant);
             $qty = max(1, (int) ($line['quantity'] ?? 1));
 
             $contents[] = [

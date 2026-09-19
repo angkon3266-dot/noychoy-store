@@ -246,10 +246,11 @@
                             @endif
                         </a>
                         <h3 class="font-medium mt-4">{{ $product->name }}</h3>
+                        @php $quote = offer_pricing()->quote($product); @endphp
                         <p class="text-gold-700 text-lg font-semibold mt-1">
-                            {{ money($product->price) }}
-                            @if($product->compare_at_price > $product->price)
-                                <span class="text-ink-400 line-through text-sm ml-1">{{ money($product->compare_at_price) }}</span>
+                            {{ money($quote['price']) }}
+                            @if($quote['was'] !== null)
+                                <span class="text-ink-400 line-through text-sm ml-1">{{ money($quote['was']) }}</span>
                             @endif
                         </p>
                         <form action="{{ route('cart.add', $product->slug) }}" method="POST" class="mt-4"

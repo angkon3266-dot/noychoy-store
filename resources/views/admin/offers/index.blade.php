@@ -271,7 +271,10 @@
                 <p class="text-xs text-ink-700/50 mt-1">Shown on the “Deals of the Day” card. Leave empty to borrow a photo from whatever this offer applies to — which is why several cards can end up sharing one product's picture. Landscape works best (e.g. 800×500).</p>
             </div>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="members_only" value="1" @checked(old('members_only', $editing->members_only ?? false))> Members only (logged-in customers) — for “register to save”</label>
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="show_on_pdp" value="1" @checked(old('show_on_pdp', $editing->show_on_pdp ?? true))> Show on product pages</label>
+            <div>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="show_on_pdp" value="1" @checked(old('show_on_pdp', $editing->show_on_pdp ?? true))> Show on product pages</label>
+                <p class="text-xs text-ink-700/50 mt-1 ml-6">A percentage discount with no minimum cart value or items also changes the price everywhere: the products it covers show the discounted price with the regular price crossed out, in the shop and in the Meta/Google feeds. Delete or pause the offer and prices go back to normal. Untick to apply it at checkout only.</p>
+            </div>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $editing->is_active ?? true))> Active</label>
             <div><label class="label">Sort order</label><input name="sort" type="number" value="{{ old('sort', $editing->sort ?? 0) }}" class="input w-24"></div>
             <div class="flex gap-2">

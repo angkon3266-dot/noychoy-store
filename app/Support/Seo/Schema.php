@@ -158,10 +158,14 @@ class Schema
             default => 'https://schema.org/OutOfStock',
         };
 
+        // The price the page shows: the live offer off (App\Support\OfferPricing).
+        // Google checks the structured price against the visible one.
+        $quote = offer_pricing()->quote($product);
+
         $offer = [
             '@type' => 'Offer',
             'url' => route('product.show', $product),
-            'price' => number_format((float) $product->price, 2, '.', ''),
+            'price' => number_format($quote['price'], 2, '.', ''),
             'priceCurrency' => config('store.currency', 'BDT'),
             'availability' => $availability,
             'itemCondition' => 'https://schema.org/NewCondition',
@@ -173,6 +177,17 @@ class Schema
             'seller' => ['@id' => self::baseUrl().'/#organization'],
             'areaServed' => ['@type' => 'Country', 'name' => 'Bangladesh'],
         ];
+
+        // The struck-through price, the way Google reads one in a merchant
+        // listing — so a search result can show the saving the page shows.
+        if ($quote['was'] !== null) {
+            $offer['priceSpecification'] = [
+                '@type' => 'UnitPriceSpecification',
+                'priceType' => 'https://schema.org/StrikethroughPrice',
+                'price' => number_format($quote['was'], 2, '.', ''),
+                'priceCurrency' => config('store.currency', 'BDT'),
+            ];
+        }
 
         if ($shipping = self::shippingDetails()) {
             $offer['shippingDetails'] = $shipping;

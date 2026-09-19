@@ -113,8 +113,15 @@
     <meta property="product:brand" content="{{ store_name() }}">
     <meta property="product:availability" content="{{ ($product->isAvailable() || $product->isPreorder()) ? 'in stock' : 'out of stock' }}">
     <meta property="product:condition" content="new">
-    <meta property="product:price:amount" content="{{ number_format((float) $product->price, 2, '.', '') }}">
+    {{-- Meta's reading, as in the catalogue feed: price is the regular one,
+         sale_price what it lists at while an offer is on. --}}
+    @php $ogQuote = offer_pricing()->quote($product); @endphp
+    <meta property="product:price:amount" content="{{ number_format($ogQuote['was'] ?? $ogQuote['price'], 2, '.', '') }}">
     <meta property="product:price:currency" content="{{ config('store.currency', 'BDT') }}">
+    @if($ogQuote['was'] !== null)
+    <meta property="product:sale_price:amount" content="{{ number_format($ogQuote['price'], 2, '.', '') }}">
+    <meta property="product:sale_price:currency" content="{{ config('store.currency', 'BDT') }}">
+    @endif
 @else
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ $canonical ?? $request->url() }}">

@@ -505,12 +505,26 @@ class AssistantService
         $results = [];
         foreach ($found as $p) {
             $card = ProductCardData::make($p);
+
+            // A budget is judged on what the piece sells for, live offer off.
+            // productQuery() only widened the search to reach those pieces.
+            if ($maxPrice !== null && $maxPrice > 0 && $card['price'] > $maxPrice) {
+                continue;
+            }
+            if (count($results) >= 6) {
+                break;
+            }
+
             if (count($this->products) < 6) {
                 $this->products[$p->id] = $card;
             }
             $results[] = [
                 'name' => $p->name,
+                // The price the product page shows — any live offer already off.
                 'price' => $card['price_text'],
+                // The regular price it is struck through against, while an
+                // offer (or a compare-at price) takes something off.
+                'was_price' => $card['compare_text'],
                 'member_price' => $card['member']['price_text'] ?? null,
                 'on_sale' => $card['on_sale'],
                 'available' => $card['available'],
@@ -532,11 +546,19 @@ class AssistantService
     protected function productQuery(string $term, ?float $maxPrice)
     {
         $q = Product::published()->search($term)->with('images', 'approvedReviews', 'category');
+        $take = 6;
+
         if ($maxPrice !== null && $maxPrice > 0) {
-            $q->where('price', '<=', $maxPrice);
+            // A live offer lists a ৳1,250 piece at ৳1,000, which is inside a
+            // ৳1,000 budget. Reach as far as the deepest offer could bring a
+            // regular price down; searchProducts() then keeps only the pieces
+            // whose listed price really fits, so fetch a few spare.
+            $deepest = (float) offer_pricing()->offers()->where('members_only', false)->max('percent');
+            $q->where('price', '<=', $deepest > 0 ? $maxPrice / (1 - min(90, $deepest) / 100) : $maxPrice);
+            $take = $deepest > 0 ? 12 : 6;
         }
 
-        return ProductSearch::orderByRelevance($q, $term)->take(6);
+        return ProductSearch::orderByRelevance($q, $term)->take($take);
     }
 
     /**

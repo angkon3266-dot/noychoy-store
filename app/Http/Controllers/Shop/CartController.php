@@ -78,6 +78,14 @@ class CartController extends Controller
                         'label' => $cart->lineOfferTier($item)['label'] ?? 'Bundle offer',
                         'saving_text' => money($cart->lineOfferSaving($item)),
                     ] : null,
+                    // The Admin → Offers saving on this line. The line stays
+                    // at its regular price and the summary keeps the offer's
+                    // own discount line (owner, 19 Sep 2026); the tag ties
+                    // the two to the price the product page showed.
+                    'promo' => ($promo = $cart->linePromo($item['key'])) ? [
+                        'label' => $promo['label'],
+                        'saving_text' => money($promo['amount']),
+                    ] : null,
                 ];
             })->values(),
             'summary' => [
@@ -224,6 +232,11 @@ class CartController extends Controller
                 'price_text' => money($i['price'] * $i['qty']),
                 'image' => $i['image'],
                 'url' => route('product.show', $i['slug']),
+                // The line's Admin → Offers saving, as on the cart page.
+                'promo' => ($promo = $this->cart->linePromo($i['key'])) ? [
+                    'label' => $promo['label'],
+                    'saving_text' => money($promo['amount']),
+                ] : null,
             ])->values(),
         ], $extra);
     }

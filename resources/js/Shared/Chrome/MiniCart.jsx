@@ -66,6 +66,9 @@ export default function MiniCart() {
                                     <span className="block text-sm font-medium truncate">{item.name}</span>
                                     <span className="block text-xs text-ink-700/70">Qty {item.qty}</span>
                                     <span className="block text-sm text-gold-700">{item.price_text}</span>
+                                    {item.promo && (
+                                        <span className="block text-[11px] text-success-700">{item.promo.label} · you save {item.promo.saving_text}</span>
+                                    )}
                                 </span>
                             </SmartLink>
                             <button

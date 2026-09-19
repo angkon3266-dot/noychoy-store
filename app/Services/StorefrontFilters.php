@@ -122,24 +122,32 @@ class StorefrontFilters
             });
         }
 
+        // Prices are judged as the cards print them: less any live offer
+        // (App\Support\OfferPricing), so the gift finder's "Under ৳1,000" finds
+        // a ৳1,250 piece listed at ৳1,000.
+        $listed = offer_pricing()->listedPriceSql();
+
         // Price band(s) — checkbox ranges like "301-500".
         $ranges = array_filter((array) $request->query('price_range', []));
         if ($ranges) {
-            $query->where(function ($w) use ($ranges) {
+            $query->where(function ($w) use ($ranges, $listed) {
                 foreach ($ranges as $r) {
                     [$min, $max] = array_pad(explode('-', $r), 2, null);
                     if (is_numeric($min) && is_numeric($max)) {
-                        $w->orWhereBetween('price', [(float) $min, (float) $max]);
+                        $w->orWhereRaw("{$listed} between ? and ?", [(float) $min, (float) $max]);
                     }
                 }
             });
         }
 
-        // Free min/max price.
-        $query->when($request->filled('price_min'), fn ($q) => $q->where('price', '>=', (float) $request->query('price_min')))
-              ->when($request->filled('price_max'), fn ($q) => $q->where('price', '<=', (float) $request->query('price_max')))
+        // Free min/max price. On sale: an offer lists it below its price, or a
+        // compare-at price is set above it.
+        $query->when($request->filled('price_min'), fn ($q) => $q->whereRaw("{$listed} >= ?", [(float) $request->query('price_min')]))
+              ->when($request->filled('price_max'), fn ($q) => $q->whereRaw("{$listed} <= ?", [(float) $request->query('price_max')]))
               ->when($request->boolean('in_stock'), fn ($q) => $q->where('in_stock', true))
-              ->when($request->boolean('on_sale'), fn ($q) => $q->whereNotNull('compare_at_price')->whereColumn('compare_at_price', '>', 'price'));
+              ->when($request->boolean('on_sale'), fn ($q) => $q->where(fn ($w) => $w
+                  ->whereRaw("{$listed} < products.price")
+                  ->orWhere(fn ($c) => $c->whereNotNull('compare_at_price')->whereColumn('compare_at_price', '>', 'price'))));
 
         // Variation attribute filters: attr[Color][]=Blue
         foreach ((array) $request->query('attr', []) as $name => $values) {

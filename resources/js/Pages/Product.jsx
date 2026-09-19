@@ -190,6 +190,11 @@ function useLadderQuote(props, gift) {
     return live;
 }
 
+/** `unit` less `pct` percent, to the paisa — OfferPricing::less on the server. */
+const less = (unit, pct) => (pct > 0
+    ? Math.round(Math.max(0, unit - Math.round(unit * pct) / 100) * 100) / 100
+    : unit);
+
 /* ── Purchase state: the React port of Alpine's productPage() component ───── */
 function usePurchase(pp) {
     const [img, setImg] = useState(pp.image || '');
@@ -213,14 +218,25 @@ function usePurchase(pp) {
     }, [pp.hasVariants, attributes, variants, selected]);
 
     const variantId = pp.hasVariants ? (matched ? String(matched.id) : '') : 'none';
+    // The regular unit the cart line carries — the ladder quote is keyed by it.
     const unitPrice = pp.hasVariants ? (matched ? matched.price : pp.price) : pp.price;
-    const compareAt = pp.hasVariants ? (matched ? (matched.compare || 0) : 0) : (pp.compare || 0);
-    const onSale = compareAt > unitPrice;
-    const discountPct = onSale ? Math.round((1 - unitPrice / compareAt) * 100) : 0;
 
+    // The live offer from Admin → Offers (19 Sep 2026): the piece lists at its
+    // price less the offer, with the regular price struck through. Without one,
+    // a compare-at price typed on the product still does the striking.
+    const livePct = Number(pp.offer?.percent) || 0;
+    const listed = (unit) => less(unit, livePct);
+    const compareAt = livePct > 0
+        ? unitPrice
+        : (pp.hasVariants ? (matched ? (matched.compare || 0) : 0) : (pp.compare || 0));
+    const onSale = livePct > 0 || compareAt > unitPrice;
+    const discountPct = livePct > 0 ? livePct : (onSale ? Math.round((1 - unitPrice / compareAt) * 100) : 0);
+
+    // A quantity tier comes off the full price on top of the live offer — the
+    // cart takes both from the regular price, so they add up.
     const offerPercent = offers.reduce((best, o) => (qty >= o.min_qty && o.percent > best ? o.percent : best), 0);
-    const price = offerPercent > 0 ? Math.round(unitPrice * (1 - offerPercent / 100) * 100) / 100 : unitPrice;
-    const savings = Math.round((unitPrice - price) * qty * 100) / 100;
+    const price = less(unitPrice, offerPercent + livePct);
+    const savings = Math.round(unitPrice * offerPercent / 100 * qty * 100) / 100;
     const canBuy = !pp.hasVariants || (!!matched && !!matched.inStock);
 
     const selectAttr = (name, val) => {
@@ -235,12 +251,24 @@ function usePurchase(pp) {
     const valueInStock = (name, val) =>
         variants.some((v) => String(v.attrs[name]) === String(val) && v.inStock);
 
+    // Before the options are chosen: the cheapest variant, as listed.
+    const fromPrice = () => {
+        const prices = variants.map((v) => v.price).filter((p) => p > 0);
+        return prices.length ? Math.min(...prices) : pp.price;
+    };
+
     const priceText = () => {
         if (pp.hasVariants && !matched) {
-            const prices = variants.map((v) => v.price).filter((p) => p > 0);
-            return prices.length ? 'From ' + money(Math.min(...prices)) : money(pp.price);
+            return (variants.some((v) => v.price > 0) ? 'From ' : '') + money(listed(fromPrice()));
         }
         return money(price);
+    };
+
+    // The struck-through price beside it; with options unchosen, only an offer
+    // can say what the cheapest one was.
+    const compareText = () => {
+        if (pp.hasVariants && !matched) return livePct > 0 ? money(fromPrice()) : null;
+        return onSale ? money(compareAt) : null;
     };
 
     /** One event id shared by the browser Pixel and the server CAPI AddToCart. */
@@ -264,7 +292,7 @@ function usePurchase(pp) {
     return {
         img, setImg, qty, setQty, selected, selectAttr, valueInStock,
         matched, variantId, unitPrice, compareAt, onSale, discountPct,
-        offerPercent, price, savings, canBuy, priceText, makeAddEvent,
+        offerPercent, price, savings, canBuy, priceText, compareText, makeAddEvent,
         hasVariants: !!pp.hasVariants,
         attributesList: attributes,
         variantInStock: matched ? !!matched.inStock : null,
@@ -573,9 +601,9 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
 
             <div className="mt-4 flex items-baseline gap-3 flex-wrap">
                 <span className="text-2xl font-semibold text-gold-700">{purchase.priceText()}</span>
-                {purchase.onSale && (!purchase.hasVariants || purchase.matched) && (
+                {purchase.compareText() && (
                     <>
-                        <span className="text-ink-500 line-through">{money(purchase.compareAt)}</span>
+                        <span className="text-ink-500 line-through">{purchase.compareText()}</span>
                         <span className="badge bg-danger-100 text-danger-700">Save {purchase.discountPct}%</span>
                     </>
                 )}

@@ -116,7 +116,8 @@ class Meta
         )));
         $lead = trim(preg_replace('/\s+/u', ' ', $lead) ?? '');
 
-        $price = config('store.currency_symbol', '৳').number_format((float) $product->price);
+        // The listed price, live offer off — what the page and its schema say.
+        $price = config('store.currency_symbol', '৳').number_format(offer_pricing()->priceFor($product));
         // Not "<name> at <price>" — the name is almost always the first words
         // of the lead sentence already, and Google's snippet is too short to
         // spend twice on the same phrase.

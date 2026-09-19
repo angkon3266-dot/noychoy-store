@@ -361,9 +361,10 @@ class HomePageData
                 $out['cta_label'] = $b['cta_label'] ?? 'Add to cart';
                 $out['items'] = collect($b['products'] ?? collect())->map(fn ($p) => [
                     // id and price let the browser Pixel fire the same
-                    // AddToCart the server sends, under one event id.
+                    // AddToCart the server sends, under one event id. The
+                    // listed price: the live offer off, the regular one struck.
                     'id' => $p->id,
-                    'price' => (float) $p->price,
+                    'price' => ($quote = offer_pricing()->quote($p))['price'],
                     // A product with options cannot be added from here: the
                     // cart refuses it until one is chosen, so the block links
                     // to the product page instead — as ProductCard does —
@@ -373,8 +374,8 @@ class HomePageData
                     'name' => $p->name,
                     'url' => route('product.show', $p),
                     'thumb' => $p->thumbnail,
-                    'price_text' => money($p->price),
-                    'compare_text' => $p->compare_at_price > $p->price ? money($p->compare_at_price) : null,
+                    'price_text' => money($quote['price']),
+                    'compare_text' => $quote['was'] !== null ? money($quote['was']) : null,
                     'add_url' => route('cart.add', $p->slug),
                 ])->values();
 

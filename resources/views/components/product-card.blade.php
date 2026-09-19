@@ -4,9 +4,16 @@
     $available = $product->isAvailable();
     $preorder = $product->isPreorder();
     $variable = $product->has_variants;
+    // The listed price: the live offer off, the regular price struck through
+    // (App\Support\OfferPricing) — the same figures ProductCardData sends React.
+    $quote = offer_pricing()->quote($product);
     // Member pricing: logged-in customers see the discounted price.
-    $memberPct = (is_member() && member_pricing()->enabled()) ? member_pricing()->percentForProduct($product) : 0;
-    $memberPrice = $memberPct > 0 ? member_pricing()->memberPrice($product) : null;
+    $memberPct = is_member()
+        ? (member_pricing()->enabled() ? member_pricing()->percentForProduct($product) : 0) + (float) (offer_pricing()->memberOfferFor($product)?->percent ?? 0)
+        : 0;
+    $memberPrice = $memberPct > 0
+        ? \App\Support\OfferPricing::less((float) $product->price, $quote['offer'] ? $quote['percent'] + $memberPct : $memberPct)
+        : null;
 @endphp
 
 <div class="group relative block">
@@ -30,8 +37,8 @@
             @endif
             @if($preorder)
                 <span class="absolute top-2 left-2 badge bg-violet-600 text-white">Pre-order</span>
-            @elseif($product->is_on_sale)
-                <span class="absolute top-2 left-2 badge bg-red-600 text-white">-{{ $product->discount_percent }}%</span>
+            @elseif($quote['was'] !== null)
+                <span class="absolute top-2 left-2 badge bg-red-600 text-white">-{{ \App\Support\OfferPricing::percentText($quote['percent']) }}%</span>
             @endif
             @if(! $available && ! $preorder)
                 <span class="absolute top-2 right-2 badge bg-ink-900/80 text-white">Sold out</span>
@@ -48,12 +55,12 @@
         <div class="mt-1 flex items-center gap-2 flex-wrap">
             @if($memberPrice !== null)
                 <span class="font-semibold text-gold-700">{{ $variable ? 'From ' : '' }}{{ money($memberPrice) }}</span>
-                <span class="text-xs text-ink-400 line-through">{{ money($product->price) }}</span>
-                <span class="badge bg-gold-600 text-white text-[10px]">Member −{{ rtrim(rtrim(number_format($memberPct,1),'0'),'.') }}%</span>
+                <span class="text-xs text-ink-400 line-through">{{ money($quote['price']) }}</span>
+                <span class="badge bg-gold-600 text-white text-[10px]">Member −{{ \App\Support\OfferPricing::percentText($memberPct) }}%</span>
             @else
-                <span class="font-semibold text-gold-700">{{ $variable ? 'From ' : '' }}{{ money($product->price) }}</span>
-                @if($product->is_on_sale)
-                    <span class="text-xs text-ink-400 line-through">{{ money($product->compare_at_price) }}</span>
+                <span class="font-semibold text-gold-700">{{ $variable ? 'From ' : '' }}{{ money($quote['price']) }}</span>
+                @if($quote['was'] !== null)
+                    <span class="text-xs text-ink-400 line-through">{{ money($quote['was']) }}</span>
                 @endif
             @endif
         </div>

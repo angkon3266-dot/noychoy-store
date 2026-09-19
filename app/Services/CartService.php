@@ -252,12 +252,13 @@ class CartService
     public function discountableItems(): Collection
     {
         return $this->memo('discountable_items', function () {
+            $items = $this->withCategories($this->items());
             $free = app(\App\Support\GiftLadder::class)->freeUnitsByLine($this);
             if ($free === []) {
-                return $this->items();
+                return $items;
             }
 
-            return $this->items()
+            return $items
                 ->map(function ($i) use ($free) {
                     $i['qty'] -= min((int) $i['qty'], $free[$i['key']] ?? 0);
 
@@ -265,6 +266,39 @@ class CartService
                 })
                 ->filter(fn ($i) => $i['qty'] > 0)
                 ->values();
+        });
+    }
+
+    /**
+     * Stamp each line with every category its product is filed under — the
+     * primary one and any extra — so an offer scoped to categories covers a
+     * line exactly when it covers the product's page (Offer::appliesToProduct).
+     *
+     * A line's own `category_id` is only the primary, snapshotted when it was
+     * added. Once offer prices were printed on products (19 Sep 2026), a piece
+     * filed under a second category would have listed at "20% off" and been
+     * charged in full. Only looked up while an offer is scoped to categories.
+     */
+    protected function withCategories(Collection $items): Collection
+    {
+        $this->offerCache ??= Offer::active()->get();
+
+        if ($items->isEmpty() || ! $this->offerCache->contains('applies_to', 'categories')) {
+            return $items;
+        }
+
+        $ids = $items->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $primary = Product::withTrashed()->whereIn('id', $ids)->pluck('category_id', 'id');
+        $filed = \Illuminate\Support\Facades\DB::table('category_product')
+            ->whereIn('product_id', $ids)->get(['product_id', 'category_id'])->groupBy('product_id');
+
+        return $items->map(function ($i) use ($primary, $filed) {
+            $id = (int) $i['product_id'];
+            $i['category_ids'] = collect([$primary[$id] ?? $i['category_id'] ?? null])
+                ->merge(collect($filed[$id] ?? [])->pluck('category_id'))
+                ->filter()->map(fn ($c) => (int) $c)->unique()->values()->all();
+
+            return $i;
         });
     }
 
@@ -336,18 +370,97 @@ class CartService
     }
 
     /**
-     * Auto-offer discount: best non-member percentage offer (on its eligible items)
-     * plus the best members-only offer (stacks). Scoped offers only discount their items.
+     * Admin → Offers percentages, line by line.
+     *
+     * Every paid line takes the best offer that covers it and whose conditions
+     * the cart meets, plus — for a signed-in customer — the best members-only
+     * one on top. That is the pick the listed price makes
+     * (App\Support\OfferPricing::offerFor), so a piece shown at ৳800 is charged
+     * ৳800 whatever else is in the basket. It used to be the ONE offer worth
+     * most across the whole cart, which let a 20% storewide offer overrule a
+     * 30% category offer on the very pieces whose pages said 30% — harmless
+     * while an offer was only a note, a broken promise once it is the price
+     * (19 Sep 2026). Unrounded; promoByOffer() rounds.
+     *
+     * @return list<array{key:string, offer:Offer, amount:float}>
      */
+    protected function promoLines(): array
+    {
+        return $this->memo('promo_lines', function () {
+            // Best first; ties keep the admin's sort order.
+            $offers = $this->matchingOffers()
+                ->filter(fn (Offer $o) => $o->type === 'order_percent' && (float) $o->percent > 0)
+                ->sortByDesc(fn (Offer $o) => (float) $o->percent);
+
+            $lines = [];
+            foreach ($offers->isEmpty() ? [] : $this->discountableItems() as $item) {
+                foreach ([false, true] as $membersOnly) {
+                    $best = $offers->first(fn (Offer $o) => $o->members_only === $membersOnly && $o->lineEligible($item));
+
+                    if ($best) {
+                        $lines[] = [
+                            'key' => $item['key'],
+                            'offer' => $best,
+                            'amount' => $item['price'] * $item['qty'] * (float) $best->percent / 100,
+                        ];
+                    }
+                }
+            }
+
+            return $lines;
+        });
+    }
+
+    /**
+     * What each offer takes off, before the cascade's cap — rounded per offer,
+     * as a single percentage of its lines always was.
+     *
+     * @return array<int, float> offer id => amount
+     */
+    protected function promoByOffer(): array
+    {
+        return $this->memo('promo_by_offer', function () {
+            $amounts = [];
+            foreach ($this->promoLines() as $line) {
+                $amounts[$line['offer']->id] = ($amounts[$line['offer']->id] ?? 0) + $line['amount'];
+            }
+
+            return array_map(fn ($amount) => round($amount, 2), $amounts);
+        });
+    }
+
+    /** Auto-offer discount: every line's best offer, plus the members' one (stacks). */
     protected function rawPromoDiscount(): float
     {
-        return $this->memo('promo_raw', function () {
-            $offers = $this->matchingOffers()->where('type', 'order_percent');
-            $best = (float) $offers->where('members_only', false)->max(fn (Offer $o) => $o->discountAmount($this));
-            $member = (float) $offers->where('members_only', true)->max(fn (Offer $o) => $o->discountAmount($this));
+        return $this->memo('promo_raw', fn () => round(min($this->promoBase(), array_sum($this->promoByOffer())), 2));
+    }
 
-            return round(min($this->promoBase(), $best + $member), 2);
-        });
+    /**
+     * The offer saving on one cart line as applied, for the tag under it —
+     * "20% Flat Off · you save ৳250". Scaled like discountLines() when the
+     * cascade's cap bites, and null when nothing reached the line (no offer
+     * covers it, or an exclusive coupon displaced the offers).
+     *
+     * @return array{label:string, amount:float}|null
+     */
+    public function linePromo(string $key): ?array
+    {
+        $raw = array_sum($this->promoByOffer());
+        $scale = $raw > 0 ? $this->promoDiscount() / $raw : 0.0;
+        $mine = collect($this->promoLines())->where('key', $key);
+        $amount = round($mine->sum('amount') * $scale, 2);
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        // Everyone's offer names the tag; a members-only one only adds to it.
+        $offer = $mine->first()['offer'];
+
+        return [
+            'label' => $offer->badge_label ?: ($offer->title ?: \App\Support\OfferPricing::percentText((float) $offer->percent).'% off'),
+            'amount' => $amount,
+        ];
     }
 
     /** Auto-offer discount actually applied (capped to the remaining base). */
@@ -907,7 +1020,6 @@ class CartService
     public function discountLines(): array
     {
         $lines = [];
-        $offers = $this->matchingOffers()->where('type', 'order_percent');
         $cascade = $this->cascade();
 
         // One line per unlocked ladder rung that is worth money, so the
@@ -919,22 +1031,30 @@ class CartService
             }
         }
 
-        // The auto-offer lines are shown at the amount actually applied: when the
-        // cap bites, the raw offer amounts are scaled down so the breakdown still
-        // adds up to discount() instead of over-explaining the saving.
-        $bestNon = $offers->where('members_only', false)->sortByDesc(fn (Offer $o) => $o->discountAmount($this))->first();
-        $bestMember = $offers->where('members_only', true)->sortByDesc(fn (Offer $o) => $o->discountAmount($this))->first();
-        $rawNon = $bestNon ? round($bestNon->discountAmount($this), 2) : 0.0;
-        $rawMember = $bestMember ? round($bestMember->discountAmount($this), 2) : 0.0;
-        $rawPromo = $rawNon + $rawMember;
+        // One line per offer that took something off — everyone's offers, then
+        // the members' — shown at the amount actually applied: when the cap
+        // bites, the raw amounts are scaled down so the breakdown still adds
+        // up to discount() instead of over-explaining the saving.
+        $byOffer = $this->promoByOffer();
+        $rawPromo = array_sum($byOffer);
         $scale = $rawPromo > 0 ? $cascade['promo'] / $rawPromo : 0.0;
+        $offers = collect($this->promoLines())->pluck('offer')->keyBy('id');
+        arsort($byOffer);
 
-        if ($rawNon > 0 && round($rawNon * $scale, 2) > 0) {
-            $lines[] = ['label' => $bestNon->title ?: (rtrim(rtrim((string) $bestNon->percent, '0'), '.').'% off'), 'amount' => round($rawNon * $scale, 2)];
-        }
+        foreach ([false, true] as $membersOnly) {
+            foreach ($byOffer as $id => $raw) {
+                $offer = $offers[$id];
+                if ($offer->members_only !== $membersOnly || round($raw * $scale, 2) <= 0) {
+                    continue;
+                }
 
-        if ($rawMember > 0 && round($rawMember * $scale, 2) > 0) {
-            $lines[] = ['label' => ($bestMember->title ?: 'Member discount').' · members', 'amount' => round($rawMember * $scale, 2)];
+                $lines[] = [
+                    'label' => $membersOnly
+                        ? ($offer->title ?: 'Member discount').' · members'
+                        : ($offer->title ?: \App\Support\OfferPricing::percentText((float) $offer->percent).'% off'),
+                    'amount' => round($raw * $scale, 2),
+                ];
+            }
         }
 
         if ($cascade['offer'] > 0) {

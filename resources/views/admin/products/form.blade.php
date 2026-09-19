@@ -155,7 +155,10 @@
                 {{-- Simple-only price (hidden for variable; price comes from variations) --}}
                 <div class="grid sm:grid-cols-2 gap-4" x-show="type==='simple'">
                     <div><label class="label">Price (৳) *</label><input name="price" type="number" step="0.01" x-model.number="price" :required="type==='simple'" class="input"></div>
-                    <div><label class="label">Compare-at (৳)</label><input name="compare_at_price" type="number" step="0.01" value="{{ old('compare_at_price', $product->compare_at_price) }}" class="input"></div>
+                    <div>
+                        <label class="label">Compare-at (৳)</label><input name="compare_at_price" type="number" step="0.01" value="{{ old('compare_at_price', $product->compare_at_price) }}" class="input">
+                        <span class="block text-xs text-ink-700/50 mt-0.5">Optional. While a live offer (Offers page) covers this product, the store strikes through its regular price instead.</span>
+                    </div>
                 </div>
 
                 <div class="grid sm:grid-cols-2 gap-4">

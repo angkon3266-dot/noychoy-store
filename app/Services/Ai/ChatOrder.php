@@ -260,7 +260,9 @@ class ChatOrder
                     'asked_for' => filled($variant) ? $variant : null,
                     'options' => $variants->map(fn ($v) => [
                         'variant' => $v->label,
-                        'price' => money($v->effective_price),
+                        // As the product page lists it, any live offer off;
+                        // the order summary shows the offer as a saving.
+                        'price' => money(offer_pricing()->priceFor($product, $v)),
                         'in_stock' => (int) $v->stock_quantity > 0,
                     ])->values()->all(),
                     'message' => filled($variant)

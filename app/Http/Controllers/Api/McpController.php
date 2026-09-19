@@ -141,7 +141,7 @@ class McpController extends Controller
                         'short_description' => ['type' => 'string'],
                         'description' => ['type' => 'string'],
                         'price' => ['type' => 'number'],
-                        'compare_at_price' => ['type' => 'number', 'description' => 'Was-price, for showing a discount.'],
+                        'compare_at_price' => ['type' => 'number', 'description' => 'Was-price, for showing a discount. Leave it out when the discount comes from an offer: while an Admin → Offers offer covers the product, the store strikes through the regular price instead and ignores this.'],
                         'stock_quantity' => ['type' => 'integer'],
                         'status' => ['type' => 'string', 'enum' => ['published', 'draft']],
                         'is_featured' => ['type' => 'boolean'],
@@ -170,7 +170,7 @@ class McpController extends Controller
                     'properties' => [
                         'name' => ['type' => 'string'],
                         'price' => ['type' => 'number'],
-                        'compare_at_price' => ['type' => 'number', 'description' => 'Was-price, for showing a discount.'],
+                        'compare_at_price' => ['type' => 'number', 'description' => 'Was-price, for showing a discount. Leave it out when the discount comes from an offer: while an Admin → Offers offer covers the product, the store strikes through the regular price instead and ignores this.'],
                         'category' => ['type' => 'string', 'description' => 'Category id, slug or exact name (see list_categories).'],
                         'sku' => ['type' => 'string'],
                         'short_description' => ['type' => 'string', 'description' => 'One or two sentences shown under the title.'],

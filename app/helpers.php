@@ -217,6 +217,14 @@ if (! function_exists('member_pricing')) {
     }
 }
 
+if (! function_exists('offer_pricing')) {
+    /** Shared OfferPricing instance — what a piece lists at once the live offers are counted. */
+    function offer_pricing(): \App\Support\OfferPricing
+    {
+        return app(\App\Support\OfferPricing::class);
+    }
+}
+
 if (! function_exists('is_member')) {
     /** Is a storefront customer logged in? */
     function is_member(): bool

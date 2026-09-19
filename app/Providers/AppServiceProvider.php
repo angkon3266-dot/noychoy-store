@@ -46,6 +46,12 @@ class AppServiceProvider extends ServiceProvider
         // when both the layout and the cart view ask for it.
         $this->app->singleton(MemberPricingService::class);
 
+        // The live offers that move a listed price, read once per request
+        // however many cards the page prints. Scoped, not a singleton: a queue
+        // worker lives for many jobs, and a catalogue sync must not keep
+        // pricing by an offer the owner deleted an hour ago.
+        $this->app->scoped(\App\Support\OfferPricing::class);
+
         // Shared config store (memoises reads for the request/worker lifecycle).
         $this->app->singleton(SystemConfigRepository::class);
 
