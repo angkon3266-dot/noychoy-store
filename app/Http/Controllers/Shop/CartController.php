@@ -10,6 +10,7 @@ use App\Models\Visit;
 use App\Services\CartService;
 use App\Services\LoyaltyService;
 use App\Services\Meta\MetaTrackingService;
+use App\Support\DuplicateOrders;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
@@ -304,17 +305,32 @@ class CartController extends Controller
             return back()->with('error', 'Please choose the available options first.');
         }
 
-        $this->cart->add($product, $variant, $data['qty'] ?? 1);
+        // Pressed twice — a double tap, or Back from the checkout and Buy now
+        // again — this used to send two pieces to the checkout (owner,
+        // 2026-09-19). While duplicate orders are stopped, Buy now only tops
+        // the line up to the quantity chosen; a repeat press adds nothing.
+        $buyQty = max(1, (int) ($data['qty'] ?? 1));
+        if (DuplicateOrders::enabled()) {
+            $added = $this->cart->ensure($product, $variant, $buyQty);
+        } else {
+            $this->cart->add($product, $variant, $buyQty);
+            $added = $buyQty;
+        }
+
+        // Nothing went in, so there is no add to count and nothing to tell Meta
+        // — the shopper is simply sent back to the checkout she already had.
+        if ($added === 0) {
+            return redirect()->route('checkout');
+        }
 
         // Buy now puts a piece in the cart exactly like Add to cart does, so it
         // is the same funnel step. Recording it only in add() meant the
         // strongest intent on the page was invisible to the dashboard: the
         // shopper reappeared at "Started checkout" having apparently never
         // added anything.
-        $buyQty = max(1, (int) ($data['qty'] ?? 1));
         Visit::record('cart_add', [
             'product_id' => $product->id,
-            'value' => round((float) ($variant->price ?? $product->price) * $buyQty, 2),
+            'value' => round((float) ($variant->price ?? $product->price) * $added, 2),
         ]);
 
         // Buy now is the strongest intent on the page and used to reach Meta as
@@ -342,7 +358,13 @@ class CartController extends Controller
         ]);
 
         $products = Product::published()->whereIn('id', $data['product_ids'])->get();
+        $toCheckout = ($data['redirect'] ?? null) === 'checkout';
+        // The bundle's Buy now, pressed twice, doubled every piece in it — the
+        // same fault as the buy box's Buy now, and the same cure. "Add
+        // selected" still adds, as Add to cart does.
+        $once = $toCheckout && DuplicateOrders::enabled();
         $added = 0;
+        $already = 0;
         $bundleValue = 0.0;
         $firstProductId = null;
         $addedLines = [];
@@ -350,7 +372,13 @@ class CartController extends Controller
             if ($product->has_variants) {
                 continue; // variant products need explicit option selection
             }
-            $this->cart->add($product, null, 1);
+            if (! $once) {
+                $this->cart->add($product, null, 1);
+            } elseif ($this->cart->ensure($product, null, 1) === 0) {
+                $already++;   // in the cart already — nothing added, nothing to report
+
+                continue;
+            }
             $bundleValue += (float) $product->price;
             $firstProductId ??= $product->id;
             $addedLines[] = ['product' => $product, 'variant' => null, 'quantity' => 1];
@@ -380,8 +408,9 @@ class CartController extends Controller
             ]);
         }
 
-        // "Buy now" sends the shopper straight to checkout with the selected items.
-        if ($added && ($data['redirect'] ?? null) === 'checkout') {
+        // "Buy now" sends the shopper straight to checkout with the selected
+        // items — including a repeat press, whose pieces were all already in.
+        if (($added || $already) && $toCheckout) {
             return redirect()->route('checkout');
         }
 

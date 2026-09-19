@@ -1281,6 +1281,9 @@ function CardStrip({ title, products, cols }) {
 function StickyBar({ product, purchase, ui }) {
     const { add } = useCart();
     const [scrolled, setScrolled] = useState(false);
+    // The buy box's guard, which this bar never had: a double tap sent two
+    // posts (the server keeps a repeat to one piece either way).
+    const [buying, setBuying] = useState(false);
     const preorder = product.preorder;
 
     useEffect(() => {
@@ -1318,13 +1321,16 @@ function StickyBar({ product, purchase, ui }) {
                     <button
                         type="button"
                         onClick={() => {
-                            if (!purchase.canBuy) return;
+                            if (!purchase.canBuy || buying) return;
+                            setBuying(true);
                             // Same pairing as the buy box's Buy now: the id
                             // the Pixel used rides along for the server event.
                             const eventId = purchase.makeAddEvent();
-                            router.post(product.buynow_url, { variant_id: purchase.variantId === 'none' ? '' : purchase.variantId, qty: purchase.qty, event_id: eventId });
+                            router.post(product.buynow_url, { variant_id: purchase.variantId === 'none' ? '' : purchase.variantId, qty: purchase.qty, event_id: eventId }, {
+                                onFinish: () => setBuying(false),
+                            });
                         }}
-                        disabled={!purchase.canBuy}
+                        disabled={!purchase.canBuy || buying}
                         className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-md bg-promo-600 px-4 py-2.5 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}
                     >
                         {preorder ? 'Book now' : 'Buy now'}

@@ -6,6 +6,7 @@ use App\Actions\PlaceOrder;
 use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Customer\AccountController;
+use App\Models\AbandonedCart;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Visit;
@@ -16,6 +17,7 @@ use App\Services\MemberPricingService;
 use App\Services\Meta\MetaTrackingService;
 use App\Services\SteadfastService;
 use App\Support\DeliveryEstimate;
+use App\Support\DuplicateOrders;
 use App\Support\Referral;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -169,6 +171,14 @@ class CheckoutController extends Controller
     public function store(Request $request, PlaceOrder $placeOrder)
     {
         if ($this->cart->isEmpty()) {
+            // Place order pressed twice. The route runs one request per session
+            // at a time, so the second press arrives after the first has placed
+            // the order and emptied the cart. Show her that order: "Your cart
+            // is empty" reads as though it failed, and invites a third try.
+            if (DuplicateOrders::enabled() && ($placed = DuplicateOrders::justPlacedHere())) {
+                return redirect()->route('order.confirmation', $placed->order_number);
+            }
+
             return redirect()->route('cart')->with('error', 'Your cart is empty.');
         }
 
@@ -203,6 +213,12 @@ class CheckoutController extends Controller
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
         $data['is_gift'] = $request->boolean('is_gift');
 
+        // The same pieces on the same number a few minutes ago: someone unsure
+        // the first order went through, not someone who wants two parcels.
+        if (DuplicateOrders::enabled() && ($twin = DuplicateOrders::twin($this->cart, $data['phone']))) {
+            return $this->alreadyPlaced($twin, $data['phone']);
+        }
+
         try {
             $order = $placeOrder->handle($data);
         } catch (CheckoutException $e) {
@@ -230,9 +246,7 @@ class CheckoutController extends Controller
         // Order numbers are sequential and guessable — only the buyer may view
         // this page: the session that just placed it, the logged-in owner, or a
         // signed link. Everyone else goes to the phone-verified tracking page.
-        $allowed = in_array($orderNumber, (array) session('placed_orders', []), true)
-            || (auth('customer')->check() && (int) $order->customer_id === (int) auth('customer')->id())
-            || $request->hasValidSignature();
+        $allowed = $this->isTheirs($order) || $request->hasValidSignature();
 
         if (! $allowed) {
             return redirect()->route('track')
@@ -303,6 +317,38 @@ class CheckoutController extends Controller
             // a real login. Null for anyone already signed in or registered.
             'claimAccount' => $this->claimOffer($order),
         ])->withViewData(['pageTitle' => 'Order Confirmed']);
+    }
+
+    /** This browser placed the order, or it belongs to the signed-in customer. */
+    protected function isTheirs(Order $order): bool
+    {
+        return in_array($order->order_number, (array) session('placed_orders', []), true)
+            || (auth('customer')->check() && (int) $order->customer_id === (int) auth('customer')->id());
+    }
+
+    /**
+     * The answer to an order that is already placed (DuplicateOrders::twin):
+     * no second order, the basket that would have made it emptied, and the
+     * follow-up desk told she bought — PlaceOrder marks her lead recovered,
+     * and this checkout made a fresh one when she typed her number again.
+     *
+     * Her own order is shown. Anyone else who typed the same number and the
+     * same pieces only learns it exists: the confirmation page carries the
+     * name and the delivery details.
+     */
+    protected function alreadyPlaced(Order $order, string $phone)
+    {
+        $this->cart->clear();
+
+        AbandonedCart::where('recovered', false)
+            ->where(fn ($q) => $q->where('phone', bd_phone($phone))->orWhere('session_id', session()->getId()))
+            ->update(['recovered' => true]);
+
+        $message = 'You placed this order a few minutes ago, so we have not taken it twice. We will call you to confirm it.';
+
+        return $this->isTheirs($order)
+            ? redirect()->route('order.confirmation', $order->order_number)->with('success', $message)
+            : redirect()->route('cart')->with('success', $message);
     }
 
     /**

@@ -32,6 +32,21 @@
                     message and it prints the live amount — or disappears entirely while the promise is off, so the bar can never advertise something the checkout will not honour.
                 </p>
             </div>
+            <div class="rounded-md border border-ink-100 p-4">
+                {{-- The hidden twin sends 0 when the box is unticked. --}}
+                <input type="hidden" name="prevent_duplicate_orders" value="0">
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" name="prevent_duplicate_orders" value="1" class="mt-0.5" @checked($general['prevent_duplicate_orders'])>
+                    <span>
+                        <strong>Stop duplicate orders</strong>
+                        <span class="block text-xs text-ink-700/50 mt-1">
+                            Pressing <strong>Buy now</strong> twice — a double tap, or Back from the checkout and Buy now again — still sends <em>one</em> piece to the checkout, not two.
+                            Pressing <strong>Place order</strong> twice makes one order, and the same pieces ordered again on the same phone number within {{ \App\Support\DuplicateOrders::WINDOW_MINUTES }} minutes are not taken a second time: the customer is told the order is already placed.
+                            <strong>Add to cart</strong> still adds a piece on every press.
+                        </span>
+                    </span>
+                </label>
+            </div>
             <button class="btn-primary">Save settings</button>
         </form>
     </div>

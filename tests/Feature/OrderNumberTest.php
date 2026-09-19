@@ -35,12 +35,12 @@ class OrderNumberTest extends TestCase
         ]);
     }
 
-    protected function checkout(Product $p): \Illuminate\Testing\TestResponse
+    protected function checkout(Product $p, string $phone = '01712345678'): \Illuminate\Testing\TestResponse
     {
         $this->post('/cart/add/'.$p->slug, ['qty' => 1]);
 
         return $this->post('/checkout', [
-            'name' => 'Buyer', 'phone' => '01712345678',
+            'name' => 'Buyer', 'phone' => $phone,
             'address' => '1 Road, Dhaka', 'is_inside_dhaka' => 1,
         ]);
     }
@@ -99,9 +99,11 @@ class OrderNumberTest extends TestCase
     {
         $p = $this->product();
 
-        foreach (['10001', '10002', '10003'] as $expected) {
-            $this->checkout($p)->assertRedirect();
-            $this->assertSame($expected, Order::latest('id')->first()->order_number);
+        // Three buyers, not one: the same piece on the same number seconds
+        // apart is a duplicate the checkout refuses (DuplicateOrdersTest).
+        foreach (['10001' => '01712345671', '10002' => '01712345672', '10003' => '01712345673'] as $expected => $phone) {
+            $this->checkout($p, $phone)->assertRedirect();
+            $this->assertSame((string) $expected, Order::latest('id')->first()->order_number);
         }
     }
 

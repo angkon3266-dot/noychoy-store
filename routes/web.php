@@ -159,9 +159,24 @@ Route::get('/cart/ladder-quote', LadderQuoteController::class)
     ]);
 
 // Checkout
+//
+// Placing an order and capturing the lead both hold the session for one
+// request at a time (block: the lock lasts 15s at most, and a waiting request
+// gives up after 20s, so it always outlives a stuck holder). A session is read
+// whole at the start of a request and written whole at the end, so two at once
+// each wrote back the cart they started with:
+//  - Place order pressed twice sent two requests that both saw the full cart
+//    and could both place it. Now the second sees the cart the first emptied,
+//    and DuplicateOrders shows it that order.
+//  - The lead capture fires on blur — which tapping Place order causes — and a
+//    lead finishing after the order put the cart back and dropped the "placed
+//    here" mark, so the confirmation page refused her and the full cart invited
+//    her to order again.
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
-Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')->middleware('throttle:10,1');
-Route::post('/checkout/lead', [LeadController::class, 'capture'])->name('checkout.lead')->middleware('throttle:15,1');
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store')
+    ->middleware('throttle:10,1')->block(15, 20);
+Route::post('/checkout/lead', [LeadController::class, 'capture'])->name('checkout.lead')
+    ->middleware('throttle:15,1')->block(15, 20);
 
 // Rebuilds a saved cart from the abandoned-cart reminder SMS. Signed, because
 // a cart's contents are the shopper's business and the id is guessable.

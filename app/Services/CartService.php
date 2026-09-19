@@ -102,6 +102,32 @@ class CartService
     }
 
     /**
+     * Make sure the cart holds at least $qty of this piece, adding only what is
+     * missing — Buy now's add while duplicate orders are stopped
+     * (App\Support\DuplicateOrders).
+     *
+     * A second press finds the piece already there and adds nothing, so a
+     * double tap, or Back from the checkout and Buy now again, no longer sends
+     * two to the checkout. It never lowers a quantity the shopper chose: two
+     * already in the cart stay two when Buy now asks for one.
+     *
+     * @return int pieces actually added (0 when the cart already had enough)
+     */
+    public function ensure(Product $product, ?ProductVariant $variant, int $qty = 1): int
+    {
+        $qty = max(1, $qty);
+        $have = (int) (session($this->sessionKey, [])[static::lineKey($product->id, $variant?->id)]['qty'] ?? 0);
+
+        if ($have >= $qty) {
+            return 0;
+        }
+
+        $this->add($product, $variant, $qty - $have);
+
+        return $qty - $have;
+    }
+
+    /**
      * The cart line add() would write for this product, variant and quantity.
      *
      * Public, static and clear of the session since 17 Sep 2026, so the

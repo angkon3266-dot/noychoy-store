@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Services\SmsService;
 use App\Services\SteadfastService;
+use App\Support\DuplicateOrders;
 use Illuminate\Http\Request;
 
 class SettingController extends Controller
@@ -20,6 +21,7 @@ class SettingController extends Controller
                 'shipping_inside' => Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
                 'shipping_outside' => Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
                 'free_shipping_threshold' => free_shipping_threshold(),
+                'prevent_duplicate_orders' => DuplicateOrders::enabled(),
             ],
             'integrations' => [
                 'steadfast_configured' => $steadfast->isConfigured(),
@@ -100,6 +102,13 @@ class SettingController extends Controller
 
         foreach ($data as $key => $value) {
             Setting::put($key, $value === '' ? null : $value);
+        }
+
+        // A checkbox, sent as 0 or 1 by the form's hidden twin. Only this form
+        // carries it, so a request without the field leaves the switch alone
+        // rather than reading its absence as "off".
+        if ($request->has(DuplicateOrders::SETTING)) {
+            Setting::put(DuplicateOrders::SETTING, $request->boolean(DuplicateOrders::SETTING));
         }
 
         return back()->with('success', 'Settings saved.');

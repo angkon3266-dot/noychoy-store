@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import Icon, { Star } from './Icons';
 import { useCart } from './CartContext';
@@ -9,6 +10,10 @@ export default function ProductCard({ product: p }) {
     const { add, gift } = useCart();
     const { props } = usePage();
     const lang = props.chrome?.lang || 'en';
+    // One Buy now at a time: a double tap sent two posts and two Pixel
+    // AddToCarts. The server keeps a repeat to one piece anyway
+    // (CartService::ensure), so this only spares the second request.
+    const [buying, setBuying] = useState(false);
 
     const soldOut = !p.available && !p.preorder;
     const ladder = soldOut ? null : ladderHint(gift, p, lang);
@@ -99,7 +104,10 @@ export default function ProductCard({ product: p }) {
                             cart and redirects to /checkout, which renders in place. */}
                         <button
                             type="button"
+                            disabled={buying}
                             onClick={() => {
+                                if (buying) return;
+                                setBuying(true);
                                 // Buy now skips the cart, so without this the
                                 // strongest intent signal on the page reached
                                 // Meta as nothing at all.
@@ -113,9 +121,11 @@ export default function ProductCard({ product: p }) {
                                         currency: 'BDT',
                                     }, { eventID: eventId });
                                 }
-                                router.post(p.buynow_url, { variant_id: '', qty: 1, event_id: eventId });
+                                router.post(p.buynow_url, { variant_id: '', qty: 1, event_id: eventId }, {
+                                    onFinish: () => setBuying(false),
+                                });
                             }}
-                            className="flex-1 rounded-full bg-gold-700 px-3 py-2 text-xs font-medium text-white hover:bg-gold-800 transition"
+                            className="flex-1 rounded-full bg-gold-700 px-3 py-2 text-xs font-medium text-white hover:bg-gold-800 transition disabled:opacity-60"
                         >
                             {p.preorder ? 'Book now' : 'Buy now'}
                         </button>
