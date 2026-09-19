@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\Schema;
  * with that. The owner chose to clear them all but keep the field, so one can
  * still be set by hand later — it shows only while no offer covers the piece.
  *
- * On production that is 30 products (24 of them published, 2 in the bin) and
+ * On production that is 32 products (24 of them published, 2 in the bin) and
  * 8 variants. Nothing is lost: each value is copied into
  * `compare_at_price_backups` first, beside the price it stood against, and
  * rolling this migration back puts every one back — except where the field has
  * been filled in again since, which then wins.
  *
- * Query builder, not models: saving 38 products would queue 38 knowledge syncs
+ * Query builder, not models: saving 32 products would queue 32 knowledge syncs
  * to change a column the storefront no longer shows.
  */
 return new class extends Migration
