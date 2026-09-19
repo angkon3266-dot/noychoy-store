@@ -37,6 +37,8 @@ class AlertController extends Controller
                 'body' => $a['body'],
                 'level' => $a['level'],
                 'url' => $a['url'],
+                // The product's picture on stock/margin/interest alerts.
+                'image' => $a['image'] ?? null,
                 'read' => (bool) $a['read'],
                 'at' => $a['at']?->diffForHumans(),
             ])->values(),

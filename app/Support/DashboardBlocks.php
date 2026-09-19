@@ -91,6 +91,10 @@ final class DashboardBlocks
         'profit' => ['title' => 'Revenue & profit', 'span' => 'full', 'needs' => 'profit', 'legacy_panel' => 'profit'],
         'discount_leakage' => ['title' => 'Where the discounts go', 'span' => 'half', 'needs' => 'discountLeakage'],
         'assistant_sms' => ['title' => 'Chat & SMS', 'span' => 'half', 'needs' => 'assistantAndSms'],
+        // What is left after Admin → Expenses (owner, 2026-09-19), right after
+        // the cards that take Revenue & profit apart. Computed for admins only
+        // — the Expenses section is theirs — so it is empty for everyone else.
+        'net_profit' => ['title' => 'Expenses & net profit', 'span' => 'full', 'needs' => 'netProfit'],
         'funnel' => ['title' => 'Conversion funnel', 'span' => 'two_thirds', 'needs' => 'funnel', 'legacy_panel' => 'funnel'],
         'sources' => ['title' => 'Where visitors come from', 'span' => 'third', 'needs' => 'sources,channelEconomics', 'legacy_panel' => 'funnel'],
         'traffic_over_time' => ['title' => 'Traffic & conversion over time', 'span' => 'full', 'needs' => 'series', 'legacy_panel' => 'funnel'],

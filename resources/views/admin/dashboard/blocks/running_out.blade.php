@@ -7,7 +7,10 @@
         <p class="text-[11px] sm:text-xs text-ink-700/55 mb-1.5 sm:mb-3">Days of stock left at the current sales rate.</p>
         @forelse($o['stock_cover'] as $c)
             <div class="{{ $loop->index >= 3 ? 'hidden md:flex group-data-[all]:flex' : 'flex' }} justify-between items-center text-[13px] sm:text-sm py-1.5 border-b border-ink-100 last:border-0">
-                <a href="{{ route('admin.products.edit', $c['slug'] ?? $c['id']) }}" class="truncate hover:text-gold-700">{{ $c['name'] }}</a>
+                <a href="{{ route('admin.products.edit', $c['slug'] ?? $c['id']) }}" class="min-w-0 flex items-center gap-2 hover:text-gold-700">
+                    <x-admin.thumb :src="$thumbs[$c['id']] ?? null" />
+                    <span class="truncate">{{ $c['name'] }}</span>
+                </a>
                 <span class="whitespace-nowrap tabular-nums ml-2 {{ $c['days_left'] <= 7 ? 'text-red-600 font-medium' : 'text-ink-700/60' }}">
                     {{ $c['days_left'] }}d · {{ $c['stock_quantity'] }} left
                 </span>

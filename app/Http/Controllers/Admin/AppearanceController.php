@@ -69,6 +69,17 @@ class AppearanceController extends Controller
             'announcement_messages' => ['nullable', 'string'],
             'announcement_link' => ['nullable', 'string', 'max:255'],
             'announcement_speed' => ['nullable', 'integer', 'min:2', 'max:30'],
+            // Pinned message (owner, 2026-09-19) — App\Support\PinnedMessage.
+            // The link is a page on this shop ("/shop") or a full web address;
+            // anything else (a javascript: URL) is refused.
+            'pinned_enabled' => ['nullable', 'boolean'],
+            'pinned_text' => ['nullable', 'string', 'max:200', 'required_if_accepted:pinned_enabled'],
+            'pinned_link' => ['nullable', 'string', 'max:255', 'regex:/^(\/(?!\/)|https?:\/\/)/i'],
+            'pinned_link_label' => ['nullable', 'string', 'max:40'],
+            'pinned_bg' => ['nullable', 'string', 'regex:/^#[0-9a-f]{6}$/i'],
+            'pinned_color' => ['nullable', 'string', 'regex:/^#[0-9a-f]{6}$/i'],
+            'pinned_until' => ['nullable', 'date'],
+            'pinned_dismissible' => ['nullable', 'boolean'],
             'whatsapp_number' => ['nullable', 'string', 'max:20'],
             'free_shipping_bar' => ['nullable', 'boolean'],
             'show_recently_viewed' => ['nullable', 'boolean'],
@@ -200,6 +211,11 @@ class AppearanceController extends Controller
             'filter_categories' => ['nullable', 'array'],
             'filter_categories.*' => ['integer'],
             'filter_price_ranges' => ['nullable', 'string'],
+        ], [
+            'pinned_text.required_if_accepted' => 'Write the pinned message before switching it on.',
+            'pinned_link.regex' => 'The pinned message link must be a page on the shop (starting with /) or a full web address (https://…).',
+            'pinned_bg.regex' => 'Pick the pinned message background with the colour picker.',
+            'pinned_color.regex' => 'Pick the pinned message text colour with the colour picker.',
         ]);
 
         $current = theme();
@@ -432,7 +448,7 @@ class AppearanceController extends Controller
         Setting::put('home_content', $home);
 
         // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'show_delivery_estimate', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo', 'gift_enabled'] as $bool) {
+        foreach (['announcement_enabled', 'pinned_enabled', 'pinned_dismissible', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'show_delivery_estimate', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo', 'gift_enabled'] as $bool) {
             $current[$bool] = $request->boolean($bool);
         }
 
@@ -464,7 +480,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
             'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
             'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
             'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',

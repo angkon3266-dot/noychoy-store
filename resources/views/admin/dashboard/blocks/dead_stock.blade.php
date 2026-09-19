@@ -12,7 +12,10 @@
             <p class="text-[11px] sm:text-xs text-ink-700/55 mt-1 mb-2 sm:mb-3">In stock, zero sales in this period — cash sitting still.</p>
             @forelse($o['dead_stock'] as $p)
                 <div class="flex justify-between items-center text-[13px] sm:text-sm py-1.5 border-b border-ink-100 last:border-0">
-                    <a href="{{ route('admin.products.edit', $p['slug'] ?? $p['id']) }}" class="truncate hover:text-gold-700">{{ $p['name'] }}</a>
+                    <a href="{{ route('admin.products.edit', $p['slug'] ?? $p['id']) }}" class="min-w-0 flex items-center gap-2 hover:text-gold-700">
+                        <x-admin.thumb :src="$thumbs[$p['id']] ?? null" />
+                        <span class="truncate">{{ $p['name'] }}</span>
+                    </a>
                     <span class="text-ink-700/60 text-xs tabular-nums whitespace-nowrap ml-2">{{ $p['stock_quantity'] }} pcs</span>
                 </div>
             @empty

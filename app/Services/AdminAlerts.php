@@ -13,6 +13,7 @@ use App\Models\Review;
 use App\Models\User;
 use App\Services\Meta\Credentials\MetaCredentialResolver;
 use App\Support\DateRange;
+use App\Support\ProductThumbs;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -130,8 +131,12 @@ class AdminAlerts
         }
     }
 
-    /** `at` is stored as a Unix timestamp — see all() for why nothing here may be an object. */
-    protected function alert(string $key, string $type, string $level, string $title, string $body, ?string $url, $at = null): array
+    /**
+     * `at` is stored as a Unix timestamp — see all() for why nothing here may
+     * be an object. `image` is the product's picture on alerts about one
+     * (owner, 2026-09-19), a plain URL string for the same reason.
+     */
+    protected function alert(string $key, string $type, string $level, string $title, string $body, ?string $url, $at = null, ?string $image = null): array
     {
         return [
             'key' => $key,
@@ -141,6 +146,7 @@ class AdminAlerts
             'body' => $body,
             'url' => $url,
             'at' => $at ? Carbon::parse($at)->getTimestamp() : null,
+            'image' => $image,
         ];
     }
 
@@ -151,12 +157,13 @@ class AdminAlerts
         return $this->guard(fn () => Product::where('status', 'published')
             ->where('manage_stock', true)->where('stock_quantity', '<=', 0)
             ->orderByDesc('updated_at')->limit(self::PER_SOURCE)
+            ->with('images')
             ->get(['id', 'name', 'slug', 'updated_at'])
             ->map(fn ($p) => $this->alert(
                 "stock.out.{$p->id}", 'stock', 'urgent',
                 "{$p->name} is out of stock",
                 'Published and unbuyable — restock it or set it to draft.',
-                route('admin.products.edit', $p), $p->updated_at,
+                route('admin.products.edit', $p), $p->updated_at, ProductThumbs::url($p),
             ))->all());
     }
 
@@ -168,12 +175,13 @@ class AdminAlerts
             ->where('manage_stock', true)
             ->whereBetween('stock_quantity', [1, $threshold])
             ->orderBy('stock_quantity')->limit(self::PER_SOURCE)
+            ->with('images')
             ->get(['id', 'name', 'slug', 'stock_quantity', 'updated_at'])
             ->map(fn ($p) => $this->alert(
                 "stock.low.{$p->id}.{$p->stock_quantity}", 'stock', 'warning',
                 "{$p->name} is down to {$p->stock_quantity}",
                 "At or below your low-stock threshold of {$threshold}.",
-                route('admin.products.edit', $p), $p->updated_at,
+                route('admin.products.edit', $p), $p->updated_at, ProductThumbs::url($p),
             ))->all());
     }
 
@@ -302,12 +310,13 @@ class AdminAlerts
             ->whereNotNull('cost_price')->where('cost_price', '>', 0)
             ->whereRaw('price < (COALESCE(cost_price, 0) + COALESCE(transport_cost, 0))')
             ->limit(self::PER_SOURCE)
+            ->with('images')
             ->get(['id', 'name', 'slug', 'price', 'cost_price', 'transport_cost', 'updated_at'])
             ->map(fn ($p) => $this->alert(
                 "margin.{$p->id}", 'money', 'urgent',
                 "{$p->name} sells below cost",
                 money($p->price).' each against '.money((float) $p->cost_price + (float) $p->transport_cost).' landed cost.',
-                route('admin.products.edit', $p), $p->updated_at,
+                route('admin.products.edit', $p), $p->updated_at, ProductThumbs::url($p),
             ))->all());
     }
 
@@ -454,14 +463,20 @@ class AdminAlerts
 
     protected function viewedNotSold(): array
     {
-        return $this->guard(fn () => collect(
-            app(DashboardAnalytics::class)->viewedNotSold(DateRange::preset('30d'), 3)
-        )->map(fn ($r) => $this->alert(
-            "growth.viewed.{$r['id']}", 'growth', 'info',
-            "{$r['name']}: {$r['views']} views, no sales",
-            'People are looking and not buying — usually the photos, the price, or the description.',
-            route('admin.products.edit', Product::find($r['id']) ?? $r['id']), now(),
-        ))->all());
+        return $this->guard(function () {
+            $rows = collect(app(DashboardAnalytics::class)->viewedNotSold(DateRange::preset('30d'), 3));
+            // One query for the rows' products (and their pictures), not a
+            // Product::find() per row.
+            $products = Product::with('images')->whereIn('id', $rows->pluck('id'))->get()->keyBy('id');
+
+            return $rows->map(fn ($r) => $this->alert(
+                "growth.viewed.{$r['id']}", 'growth', 'info',
+                "{$r['name']}: {$r['views']} views, no sales",
+                'People are looking and not buying — usually the photos, the price, or the description.',
+                route('admin.products.edit', $products->get($r['id']) ?? $r['id']), now(),
+                ProductThumbs::url($products->get($r['id'])),
+            ))->all();
+        });
     }
 
     /** Repeat buyers who came back this week — the cheapest people to sell to again. */

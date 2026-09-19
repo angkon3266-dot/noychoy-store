@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DripController;
+use App\Http\Controllers\Admin\ExpenseController;
 use App\Http\Controllers\Admin\IntegrationController;
 use App\Http\Controllers\Admin\KnowledgeController;
 use App\Http\Controllers\Admin\LandingPageController;
@@ -290,6 +291,15 @@ Route::middleware('admin')->group(function () {
     Route::get('purchase-orders/{purchaseOrder}/export', [PurchaseOrderController::class, 'export'])->name('purchase-orders.export');
     Route::post('purchase-orders-fetch-image', [PurchaseOrderController::class, 'fetchImage'])->name('purchase-orders.fetch-image');
     Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-orders.destroy');
+
+    // Expenses (owner, 2026-09-19). Admin-only: no preset role lists the
+    // `expenses` section. `export` is declared before `{expense}` routes.
+    Route::get('expenses', [ExpenseController::class, 'index'])->name('expenses.index');
+    Route::get('expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
+    Route::post('expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::put('expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
+    Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
+    Route::get('expenses/{expense}/receipt', [ExpenseController::class, 'receipt'])->name('expenses.receipt');
 
     // Reviews (moderation, and writing down what arrived in Messenger)
     Route::get('reviews', [ReviewController::class, 'index'])->name('reviews.index');

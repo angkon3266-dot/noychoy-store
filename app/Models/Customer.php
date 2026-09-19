@@ -74,6 +74,26 @@ class Customer extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    /**
+     * Rebuild total_orders and total_spent from the orders that are sales.
+     *
+     * A cancelled or returned order brought no money in (owner, 2026-09-19:
+     * cancellations must not count), and until then it stayed in both figures
+     * for good — ranking Top customers, marking people "repeat" and filling
+     * spend-based segments on money that never arrived. Every place that
+     * recomputes the rollups (a status change into or out of those states,
+     * trash, restore, merge) goes through here, so they cannot disagree.
+     */
+    public function recountOrders(): void
+    {
+        $sales = $this->orders()->whereNotIn('status', Order::NOT_SALES);
+
+        $this->update([
+            'total_orders' => (clone $sales)->count(),
+            'total_spent' => (float) (clone $sales)->sum('total'),
+        ]);
+    }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);

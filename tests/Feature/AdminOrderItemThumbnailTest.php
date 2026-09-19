@@ -81,7 +81,10 @@ class AdminOrderItemThumbnailTest extends TestCase
 
     public function test_a_variation_line_shows_that_variations_own_picture(): void
     {
-        $p = $this->product(['name' => 'Opal Band', 'has_variants' => true]);
+        // Stocked, so the bell raises no stock alert for it: since 2026-09-19
+        // an alert shows the product's main photo, and the page-wide check
+        // below is about the order line, not the bell.
+        $p = $this->product(['name' => 'Opal Band', 'has_variants' => true, 'manage_stock' => true, 'stock_quantity' => 50]);
         $generic = ProductImage::create([
             'product_id' => $p->id, 'path' => 'products/generic.webp', 'position' => 1, 'is_primary' => true,
         ]);

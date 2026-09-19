@@ -98,6 +98,8 @@ class HandleInertiaRequests extends Middleware
                 'color' => theme('announcement_color'),
                 'link' => theme('announcement_link'),
             ] : null,
+            // Appearance → Pinned message: one line that floats with the sticky header.
+            'pinned' => \App\Support\PinnedMessage::current(),
             'logo' => [
                 'desktop' => theme_asset(theme('logo')),
                 'mobile' => theme_asset(theme('logo_mobile')) ?: theme_asset(theme('logo')),

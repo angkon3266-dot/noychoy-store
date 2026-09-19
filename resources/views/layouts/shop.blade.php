@@ -172,6 +172,7 @@
     {{-- Landing pages can hide the shop chrome for a distraction-free funnel. --}}
     @unless($hideChrome ?? false)
     <header class="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200" x-data="{ msearch: false, rot: {{ $menuRot }} }">
+        @include('partials.pinned-message')
         <div class="mx-auto max-w-7xl px-4">
             <div class="relative flex h-16 items-center gap-2">
                 {{-- Mobile menu toggle (far left) — opens the off-canvas drawer.

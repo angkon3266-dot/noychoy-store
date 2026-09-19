@@ -1394,12 +1394,7 @@ class OrderController extends Controller
             }
 
             // Recompute the customer's rollups from what's left.
-            if ($customer = $target->customer) {
-                $customer->update([
-                    'total_orders' => $customer->orders()->count(),
-                    'total_spent' => $customer->orders()->sum('total'),
-                ]);
-            }
+            $target->customer?->recountOrders();
         });
 
         return back()->with('success', "Merged into order {$target->order_number} (now Processing).");
@@ -1561,14 +1556,8 @@ class OrderController extends Controller
     /** Recompute a customer's order/spend rollups from their remaining orders. */
     protected function recomputeCustomer(?Customer $customer): void
     {
-        if (! $customer) {
-            return;
-        }
-
-        $customer->update([
-            'total_orders' => $customer->orders()->count(),
-            'total_spent' => (float) $customer->orders()->sum('total'),
-        ]);
+        // Cancelled and returned orders are not sales — see Customer::recountOrders().
+        $customer?->recountOrders();
     }
 
     public function pushToSteadfast(Order $order, SteadfastService $steadfast)

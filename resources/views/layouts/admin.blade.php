@@ -246,6 +246,9 @@
             ['collections.index','Collections','M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 8.25V6zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25A2.25 2.25 0 0113.5 8.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 018.25 20.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'],
             ['suppliers.index','Suppliers','M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12'],
             ['purchase-orders.index','Purchase orders','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
+            // What the business spends (owner, 2026-09-19), beside the other
+            // money going out. Banknotes — no other entry uses them.
+            ['expenses.index','Expenses','M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z'],
             ['coupons.index','Coupons','M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z'],
             ['offers.index','Offers','M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'],
             ['reviews.index','Reviews','M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z'],
@@ -419,6 +422,9 @@
                                         <button class="w-full text-left px-4 py-3 hover:bg-ink-50 transition flex gap-3" :class="a.read && 'opacity-45'">
                                             <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                                                   :class="a.read ? 'bg-ink-300' : (a.level === 'urgent' ? 'bg-red-500' : (a.level === 'warning' ? 'bg-amber-500' : 'bg-sky-500'))"></span>
+                                            <template x-if="a.image">
+                                                <img :src="a.image" alt="" loading="lazy" class="h-10 w-10 shrink-0 rounded object-cover bg-ink-50">
+                                            </template>
                                             <span class="min-w-0">
                                                 <span class="block text-sm font-medium" x-text="a.title"></span>
                                                 <span class="block text-xs text-ink-700/60 mt-0.5" x-text="a.body"></span>
@@ -438,6 +444,9 @@
                                 <input type="hidden" name="url" value="{{ $a['url'] }}">
                                 <button class="w-full text-left px-4 py-3 hover:bg-ink-50 transition flex gap-3 {{ $a['read'] ? 'opacity-45' : '' }}">
                                     <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $a['read'] ? 'bg-ink-300' : ($alertTone[$a['level']] ?? 'bg-ink-400') }}"></span>
+                                    @if(! empty($a['image']))
+                                        <img src="{{ $a['image'] }}" alt="" loading="lazy" class="h-10 w-10 shrink-0 rounded object-cover bg-ink-50">
+                                    @endif
                                     <span class="min-w-0">
                                         <span class="block text-sm font-medium">{{ $a['title'] }}</span>
                                         <span class="block text-xs text-ink-700/60 mt-0.5">{{ $a['body'] }}</span>

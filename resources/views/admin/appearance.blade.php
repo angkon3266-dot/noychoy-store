@@ -190,6 +190,55 @@
         </div>
     </div>
 
+    <!-- Pinned message (owner, 2026-09-19) — App\Support\PinnedMessage -->
+    <div class="card p-6" x-show="tab==='branding'"
+         x-data="{ ptext: @js($theme['pinned_text'] ?? ''), pbg: @js($theme['pinned_bg'] ?? '#b42318'), pcolor: @js($theme['pinned_color'] ?? '#ffffff'), plabel: @js($theme['pinned_link_label'] ?? '') }">
+        <div class="flex items-center justify-between gap-3 mb-1">
+            <h2 class="font-semibold">Pinned message</h2>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="pinned_enabled" value="1" @checked($theme['pinned_enabled'] ?? false)> Show it</label>
+        </div>
+        <p class="text-xs text-ink-700/60 mb-4">
+            One line that stays at the very top of every page while shoppers scroll — for a sale or a notice, e.g.
+            <em>Stock clearance sale — flat 30% off on all products</em>. It only announces: the discount itself is set up in
+            <a href="{{ route('admin.offers.index') }}" class="text-gold-700 underline">Offers</a> or
+            <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a>, or the checkout will not give it.
+        </p>
+        <label class="label" for="pinned-text">Message</label>
+        <input id="pinned-text" name="pinned_text" x-model="ptext" maxlength="200" class="input" placeholder="Stock clearance sale — flat 30% off on all products">
+        <div class="grid sm:grid-cols-2 gap-4 mt-4">
+            <div>
+                <label class="label" for="pinned-link">Link (optional)</label>
+                <input id="pinned-link" name="pinned_link" value="{{ $theme['pinned_link'] ?? '' }}" class="input" placeholder="/shop">
+                <p class="text-[11px] text-ink-700/50 mt-1">A page on the shop (<code>/shop</code>, <code>/category/rings</code>) or a full web address.</p>
+            </div>
+            <div>
+                <label class="label" for="pinned-link-label">Link text</label>
+                <input id="pinned-link-label" name="pinned_link_label" x-model="plabel" maxlength="40" class="input" placeholder="Shop now">
+            </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+            <div><label class="label">Background</label><input type="color" name="pinned_bg" x-model="pbg" class="h-10 w-14 rounded border border-ink-100"></div>
+            <div><label class="label">Text colour</label><input type="color" name="pinned_color" x-model="pcolor" class="h-10 w-14 rounded border border-ink-100"></div>
+            <div class="col-span-2">
+                <label class="label" for="pinned-until">Take it down at (optional)</label>
+                <input id="pinned-until" type="datetime-local" name="pinned_until" value="{{ $theme['pinned_until'] ?? '' }}" class="input">
+                <p class="text-[11px] text-ink-700/50 mt-1">Bangladesh time. Empty keeps it up until you untick “Show it”.</p>
+            </div>
+        </div>
+        <label class="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" name="pinned_dismissible" value="1" @checked($theme['pinned_dismissible'] ?? false)> Let shoppers close it (×)</label>
+
+        <div class="mt-4">
+            <span class="label">Preview</span>
+            <div class="overflow-hidden rounded-lg border border-ink-100">
+                <div class="px-4 py-2 text-center text-sm leading-snug" :style="`background:${pbg};color:${pcolor}`">
+                    <span class="font-semibold" x-text="ptext || 'Your message'"></span>
+                    <span x-show="plabel" class="ml-1 underline underline-offset-2" x-text="plabel + ' →'"></span>
+                </div>
+                <div class="flex h-10 items-center border-t border-gold-200 bg-gold-50 px-3 text-xs text-ink-700/40">{{ store_name() }} header — the message stays above it while the page scrolls</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Templates -->
     <div class="card p-6" x-show="tab==='homepage'">
         <h2 class="font-semibold mb-1">Homepage template</h2>

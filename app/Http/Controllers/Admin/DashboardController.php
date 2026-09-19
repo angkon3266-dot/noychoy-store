@@ -14,6 +14,8 @@ use App\Services\DashboardInsights;
 use App\Services\LoyaltyService;
 use App\Support\DashboardLayout;
 use App\Support\DateRange;
+use App\Support\ExpenseReport;
+use App\Support\ProductThumbs;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -148,6 +150,12 @@ class DashboardController extends Controller
         $totalCustomers = Customer::count();
         $repeatCustomers = Customer::where('total_orders', '>', 1)->count();
 
+        // The owner's own threshold (Appearance → Conversion features), the one
+        // the bell alerts and the shop's "only N left" badge already read. The
+        // dashboard had 3 written in, so the two could disagree about what low
+        // stock is.
+        $lowStockAt = max(1, (int) (theme('low_stock_threshold') ?: 3));
+
         $stats = [
             // Orders/sales for the chosen window. Still called *_period rather
             // than *_month now that the window is the admin's to pick.
@@ -170,7 +178,8 @@ class DashboardController extends Controller
             'customers' => $totalCustomers,
             'repeat_rate' => $totalCustomers ? round($repeatCustomers / $totalCustomers * 100) : 0,
             'new_customers_period' => $range->constrain(Customer::query())->count(),
-            'low_stock' => Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)->count(),
+            'low_stock' => Product::where('manage_stock', true)->where('stock_quantity', '<=', $lowStockAt)->count(),
+            'low_stock_at' => $lowStockAt,
             // Inventory on hand: units + what that stock cost (landed = cost + transport).
             'stock_units' => (int) Product::where('manage_stock', true)->where('stock_quantity', '>', 0)->sum('stock_quantity'),
             'stock_cost_value' => (float) Product::where('manage_stock', true)->where('stock_quantity', '>', 0)
@@ -205,7 +214,7 @@ class DashboardController extends Controller
         $pointsOutstanding = (int) Customer::sum('points');
         $pointsLiability = app(LoyaltyService::class)->pointsValue($pointsOutstanding);
 
-        $lowStockProducts = Product::where('manage_stock', true)->where('stock_quantity', '<=', 3)
+        $lowStockProducts = Product::where('manage_stock', true)->where('stock_quantity', '<=', $lowStockAt)
             ->orderBy('stock_quantity')->take(5)->get(['id', 'name', 'slug', 'stock_quantity']);
 
         // Most-loved products (by love reactions received).
@@ -258,6 +267,10 @@ class DashboardController extends Controller
         // when it was actually computed and failed.
         $deep = [
             'profit' => $want('profit') ? $safe(fn () => $analytics->periodComparison($range)) : null,
+            // Salaries and the net result are the owner's: only someone who
+            // may open Admin → Expenses gets the figures computed at all.
+            'netProfit' => $want('netProfit') && $request->user()?->canAccess('expenses')
+                ? $safe(fn () => ExpenseReport::for($range)) : null,
             'funnel' => $want('funnel') ? $safe(fn () => $analytics->funnel($range)) : null,
             // collect(), not null: the chart @foreaches this directly.
             'series' => $want('series') ? $safe(fn () => $analytics->funnelByDay($range), collect()) : null,
@@ -288,6 +301,20 @@ class DashboardController extends Controller
             'orderClock' => $want('orderClock') ? $safe(fn () => $insights->orderClock($range)) : null,
         ];
 
+        // A picture beside every product the lists name (owner, 2026-09-19:
+        // "add product image for easy ref"), for all of them in one query.
+        // Looked up here rather than cached inside each report — see
+        // ProductThumbs::for(). Only the lists that were computed contribute.
+        $rowIds = fn ($rows) => collect(is_iterable($rows) ? $rows : [])->pluck('id');
+        $thumbs = $safe(fn () => ProductThumbs::for([
+            ...$lowStockProducts->pluck('id'),
+            ...$mostLoved->pluck('id'),
+            ...$rowIds(is_array($deep['operations']) ? ($deep['operations']['stock_cover'] ?? []) : []),
+            ...$rowIds(is_array($deep['operations']) ? ($deep['operations']['dead_stock'] ?? []) : []),
+            ...$rowIds($deep['viewedNotSold']),
+            ...$rowIds(is_array($deep['topEarners']) ? ($deep['topEarners']['rows'] ?? []) : []),
+        ]), []);
+
         // Unique visitors: all-time as the headline, plus the chosen window.
         $stats['visitors_total'] = (int) $safe(fn () => Visit::distinct()->count('visitor_token'), 0);
         $stats['visitors_today'] = (int) $safe(fn () => Visit::whereDate('created_at', $today)->distinct()->count('visitor_token'), 0);
@@ -296,7 +323,7 @@ class DashboardController extends Controller
         return view('admin.dashboard', compact(
             'stats', 'recentOrders', 'statusCounts', 'daily', 'dailyMax', 'lowStockProducts',
             'mostLoved', 'totalLoves', 'topCategories', 'catMax', 'topCustomers', 'pointsOutstanding', 'pointsLiability',
-            'unreadMessages', 'recentMessages', 'deep', 'layout', 'range'
+            'unreadMessages', 'recentMessages', 'deep', 'layout', 'range', 'thumbs'
         ));
     }
 

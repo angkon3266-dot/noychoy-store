@@ -51,10 +51,12 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     const [live, setLive] = useState(null);
     const [code, setCode] = useState('');
     const [couponBusy, setCouponBusy] = useState(false);
-    // The order summary starts folded away — by the time someone is on this
-    // page they have already seen the cart, and the only thing they still need
-    // in front of them is the total, which the fold's own header carries.
-    const [summaryOpen, setSummaryOpen] = useState(false);
+    // The order summary starts open (owner, 2026-09-19): the pieces, the
+    // savings and the delivery charge are what she is agreeing to pay for, so
+    // they are shown rather than tucked behind a tap. It was folded on
+    // 2026-09-11 to de-clutter the page; the header still folds it for anyone
+    // who wants the form alone.
+    const [summaryOpen, setSummaryOpen] = useState(true);
 
     // Taking a piece out without leaving the checkout (owner, 2026-09-17).
     // The line goes through the same remove the mini-cart uses, so the header
@@ -141,6 +143,21 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     const freeShip = live ? live.freeShipping : freeShipping;
     const ship = freeShip ? 0 : (inside ? view.shipInside : view.shipOutside);
     const total = view.sub + ship;
+    // What she is saving, and the price it came off (owner, 2026-09-19: the
+    // original struck through beside the total, and the saving said). The
+    // same sum as the header's "saved" badge (CartService::totalSaved): money
+    // off the pieces, plus the delivery charge once delivery is free — at the
+    // lower of the two rates, as the badge counts it, since the zone is not
+    // asked for then.
+    const deliverySaved = freeShip ? Math.min(view.shipInside, view.shipOutside) : 0;
+    const saved = Math.max(0, (view.rawSubtotal ?? view.sub) - view.sub) + deliverySaved;
+    const original = total + saved;
+    // A whole taka at least: money() rounds, and a paisa of saving would
+    // strike through the very figure printed beside it.
+    const saving = saved >= 1;
+    const wasPrice = saving && (
+        <s className="mr-1 font-normal opacity-70"><span className="sr-only">was </span>{money(original)}</s>
+    );
     // Pieces, not lines: "2 items" for one product bought twice.
     const itemCount = items.reduce((n, i) => n + i.qty, 0);
 
@@ -273,13 +290,19 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                         {err('area') && <p id="co-area-error" className="text-xs text-danger-600 mt-1">{err('area')}</p>}
                     </div>
 
-                    {/* The summary below is folded shut, so the button carries
-                        the total — nobody should have to open anything to know
-                        what they are agreeing to pay. */}
+                    {/* The summary sits below the form, so the button carries
+                        the total — nobody should have to scroll or open
+                        anything to know what they are agreeing to pay. */}
                     <div className="pt-1">
                         <button type="submit" className="btn-primary w-full" disabled={form.processing}>
-                            {form.processing ? 'Placing order…' : `Place order · ${money(total)}`}
+                            {form.processing ? 'Placing order…' : <>Place order · {wasPrice}{money(total)}</>}
                         </button>
+                        {saving && (
+                            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success-700" aria-live="polite">
+                                <Icon name="tag" className="w-4 h-4 shrink-0" />
+                                <span>You're saving {money(saved)}</span>
+                            </p>
+                        )}
                         <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-ink-700/70">
                             <Icon name="cash" className="w-4 h-4 shrink-0" />
                             <span>Cash on delivery — no advance payment, we call to confirm.</span>
@@ -357,10 +380,10 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                     </div>
                 </div>
 
-                {/* Order summary — folded shut on arrival. The header keeps the
-                    only two things that matter at a glance (how many items and
-                    what it comes to); the breakdown, the coupon box and the
-                    offer notices are one tap away for whoever wants them. */}
+                {/* Order summary — open on arrival (owner, 2026-09-19). The
+                    header keeps the two things that matter at a glance (how
+                    many items and what it comes to) and still folds the
+                    breakdown, the coupon box and the offer notices away. */}
                 <div className="card overflow-hidden">
                     <h2>
                         <button
@@ -377,7 +400,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                 </span>
                             </span>
                             <span className="flex shrink-0 items-center gap-2">
-                                <span className="font-semibold">{money(total)}</span>
+                                <span className="font-semibold">{wasPrice}{money(total)}</span>
                                 <Icon name="chevronDown" className={`w-4 h-4 text-ink-700/60 transition-transform ${summaryOpen ? 'rotate-180' : ''}`} />
                             </span>
                         </button>
@@ -442,13 +465,21 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                 )) : (view.discountText && (
                                     <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{view.discountText}</dd></div>
                                 ))}
-                                <div className="flex justify-between"><dt className="text-ink-700/70">Shipping</dt><dd>৳{ship}</dd></div>
-                                <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{money(total)}</dd></div>
+                                <div className="flex justify-between">
+                                    <dt className="text-ink-700/70">Shipping</dt>
+                                    <dd>{deliverySaved > 0
+                                        ? <><s className="mr-1 text-ink-700/50"><span className="sr-only">was </span>{money(deliverySaved)}</s><span className="text-success-700">Free</span></>
+                                        : money(ship)}</dd>
+                                </div>
+                                <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{wasPrice}{money(total)}</dd></div>
                             </dl>
 
-                            {view.discountText && (
+                            {/* The whole saving, delivery included — the same figure
+                                as the line under Place order. The percentage is
+                                off what the order would have cost. */}
+                            {saving && (
                                 <div className="mt-3 rounded-md bg-success-50 border border-success-200 text-success-800 px-3 py-2 text-sm font-medium">
-                                    You're saving {view.discountText}{view.discountPct > 0 ? ` (${view.discountPct}% off)` : ''}
+                                    You're saving {money(saved)}{original > 0 && Math.round(saved / original * 100) > 0 ? ` (${Math.round(saved / original * 100)}% off)` : ''}
                                 </div>
                             )}
 

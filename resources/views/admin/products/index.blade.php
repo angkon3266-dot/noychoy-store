@@ -4,8 +4,16 @@
 
 @section('content')
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-    <form method="GET" class="flex flex-wrap gap-2">
-        <input name="q" value="{{ request('q') }}" placeholder="Search products…" class="input py-2 w-48">
+    {{-- On a phone the eight filters stacked full width filled the whole first
+         screen before a single product showed, so below lg they fold behind
+         one button — open on arrival whenever a filter is already applied. --}}
+    @php $filtering = collect(request()->only(['status', 'type', 'tag', 'category', 'custom', 'sort']))->filter()->isNotEmpty() || request('per_page', '20') !== '20'; @endphp
+    <form method="GET" class="flex flex-wrap gap-2" x-data="{ more: @js($filtering) }">
+        <input name="q" value="{{ request('q') }}" placeholder="Search products…" class="input py-2 w-48 max-lg:flex-1">
+        <button type="button" @click="more = !more" class="btn-outline lg:hidden" :aria-expanded="more.toString()">
+            <span x-text="more ? 'Hide filters' : 'Filters'">Filters</span>
+        </button>
+        <div class="hidden w-full flex-wrap gap-2 lg:contents" :class="more && 'max-lg:flex'">
         <select name="status" onchange="submitForm(this.form)" class="input py-2">
             <option value="">All status</option>
             <option value="published" @selected(request('status')=='published')>Published</option>
@@ -43,6 +51,7 @@
             @endforeach
         </select>
         <button class="btn-outline">Filter</button>
+        </div>
     </form>
     <div class="flex gap-2">
         {{-- Carries the filters, so this exports the list actually on screen --}}
@@ -111,9 +120,21 @@
         <template x-for="id in sel" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
     </form>
 
-    <div class="card overflow-hidden">
-        <table class="w-full text-sm">
-            <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
+    {{-- Below lg every product is a stacked card: the table is ~1,060px wide,
+         and the old overflow-hidden card clipped everything from the price
+         column on — price, stock, margin and Edit/Delete were unreachable on a
+         phone (owner, 2026-09-19). Above lg it stays a table that scrolls
+         sideways rather than clips, since the sidebar leaves a laptop short of
+         room too. The margin label is a ::before because the inline editors
+         repaint that cell's HTML after a save. --}}
+    @if($products->isNotEmpty())
+        <label class="lg:hidden mb-2 flex items-center gap-2 text-xs text-ink-700/70">
+            <input type="checkbox" @change="toggleAll($event)" :checked="sel.length && sel.length === allIds.length"> Select all on this page
+        </label>
+    @endif
+    <div class="card overflow-x-auto">
+        <table class="w-full text-sm max-lg:block">
+            <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60 max-lg:hidden">
                 <tr>
                     <th class="px-4 py-3 w-8"><input type="checkbox" @change="toggleAll($event)" :checked="sel.length && sel.length === allIds.length"></th>
                     <th class="px-4 py-3">Product</th>
@@ -125,10 +146,10 @@
                 </tr>
             </thead>
             @forelse($products as $product)
-            <tbody x-data="{ q: false }" class="border-b border-ink-100">
-                <tr class="hover:bg-ink-50">
-                    <td class="px-4 py-3"><input type="checkbox" value="{{ $product->id }}" x-model.number="sel"></td>
-                    <td class="px-4 py-3">
+            <tbody x-data="{ q: false }" class="border-b border-ink-100 max-lg:block">
+                <tr class="hover:bg-ink-50 max-lg:grid max-lg:grid-cols-[auto_minmax(0,1fr)] max-lg:gap-x-3 max-lg:gap-y-2 max-lg:px-4 max-lg:py-3">
+                    <td class="px-4 py-3 max-lg:p-0"><input type="checkbox" value="{{ $product->id }}" x-model.number="sel"></td>
+                    <td class="px-4 py-3 max-lg:col-start-2 max-lg:p-0">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded bg-gold-100 overflow-hidden shrink-0">
                                 <img src="{{ $product->thumbnail }}" data-row-thumb
@@ -158,14 +179,15 @@
                             </div>
                         </div>
                     </td>
-                    <td class="px-4 py-3 text-ink-700/70">
+                    <td class="px-4 py-3 text-ink-700/70 max-lg:col-start-2 max-lg:p-0 max-lg:text-xs">
                         @php $rowCats = $product->categories->isNotEmpty() ? $product->categories->pluck('name') : collect([$product->category?->name])->filter(); @endphp
+                        <span class="lg:hidden text-ink-700/50">Category:</span>
                         {{ $rowCats->isNotEmpty() ? $rowCats->implode(', ') : '—' }}
                     </td>
                     {{-- Saves inline via fetch — no page reload, so filters, page
                          number and scroll position all survive an edit. --}}
-                    <td class="px-4 py-3" x-data="quickPrice('{{ route('admin.products.quick', $product) }}')">
-                        <form @submit.prevent="save($event.target)" class="flex items-center gap-1.5">
+                    <td class="px-4 py-3 max-lg:col-start-2 max-lg:p-0" x-data="quickPrice('{{ route('admin.products.quick', $product) }}')">
+                        <form @submit.prevent="save($event.target)" class="flex items-center gap-1.5 max-lg:flex-wrap">
                             @csrf @method('PATCH')
                             <span class="text-ink-700/50 text-xs">৳</span>
                             <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Price"
@@ -183,7 +205,7 @@
                                     :class="state === 'error' && 'text-red-600'"></button>
                         </form>
                     </td>
-                    <td class="px-4 py-3" data-margin-cell>
+                    <td class="px-4 py-3 max-lg:col-start-2 max-lg:flex max-lg:items-baseline max-lg:gap-1.5 max-lg:p-0 max-lg:before:content-['Margin'] max-lg:before:text-xs max-lg:before:text-ink-700/50" data-margin-cell>
                         @if($product->margin_percent !== null)
                             <span class="font-medium {{ $product->margin_amount < 0 ? 'text-red-600' : ($product->margin_percent < 20 ? 'text-amber-600' : 'text-green-700') }}">{{ $product->margin_percent }}%</span>
                             <div class="text-xs text-ink-700/50">{{ money($product->margin_amount) }}/unit</div>
@@ -191,8 +213,9 @@
                             <span class="text-xs text-ink-700/40">—</span>
                         @endif
                     </td>
-                    <td class="px-4 py-3"><span data-status-badge class="badge {{ $product->status=='published' ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} capitalize">{{ $product->status }}</span></td>
-                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                    {{-- The row's own Published/Draft select says the same on a phone. --}}
+                    <td class="px-4 py-3 max-lg:hidden"><span data-status-badge class="badge {{ $product->status=='published' ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} capitalize">{{ $product->status }}</span></td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap max-lg:col-start-2 max-lg:p-0 max-lg:text-left max-lg:whitespace-normal max-lg:leading-7">
                         <button type="button" @click="q=!q" class="text-gold-700 hover:underline" x-text="q ? 'Close' : 'Quick edit'"></button>
                         <a href="{{ route('admin.products.edit', $product) }}" class="text-ink-700/70 hover:underline ml-2">Edit</a>
                         <form action="{{ route('admin.products.duplicate', $product) }}" method="POST" class="inline">@csrf<button class="text-ink-700/70 hover:underline ml-2">Duplicate</button></form>
@@ -202,8 +225,8 @@
                     </td>
                 </tr>
                 {{-- Inline quick-edit: price, stock, add images & video links without opening the full editor --}}
-                <tr x-show="q" x-cloak>
-                    <td colspan="7" class="bg-ink-50/60 px-4 py-4">
+                <tr x-show="q" x-cloak class="max-lg:block">
+                    <td colspan="7" class="bg-ink-50/60 px-4 py-4 max-lg:block">
                         <form x-data="quickPanel('{{ route('admin.products.quick-media', $product) }}')"
                               @submit.prevent="save($event.target)"
                               enctype="multipart/form-data" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
@@ -272,7 +295,7 @@
                 </tr>
             </tbody>
             @empty
-            <tbody><tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No products yet. <a href="{{ route('admin.products.create') }}" class="text-gold-700 hover:underline">Add your first product</a>.</td></tr></tbody>
+            <tbody class="max-lg:block"><tr class="max-lg:block"><td colspan="7" class="px-4 py-10 text-center text-ink-700/50 max-lg:block">No products yet. <a href="{{ route('admin.products.create') }}" class="text-gold-700 hover:underline">Add your first product</a>.</td></tr></tbody>
             @endforelse
         </table>
     </div>

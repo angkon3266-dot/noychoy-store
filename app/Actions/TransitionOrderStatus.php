@@ -52,6 +52,12 @@ class TransitionOrderStatus
 
         $this->syncStock($order, $from, $status);
 
+        // Into or out of cancelled/returned, the order stops or starts being a
+        // sale, so the customer's order count and spend follow it.
+        if (in_array($from, Order::NOT_SALES, true) !== in_array($status, Order::NOT_SALES, true)) {
+            $order->customer?->recountOrders();
+        }
+
         if ($status === 'delivered') {
             app(LoyaltyService::class)->awardForOrder($order->fresh('customer'));
             // An invited customer's first delivery pays the referral, both ways.
@@ -129,18 +135,26 @@ class TransitionOrderStatus
 
     /**
      * Release stock back to inventory when an order enters "cancelled", and
-     * re-deduct it if it is moved back out. The stock_restored flag makes both
-     * directions idempotent.
+     * re-deduct it when the order goes live again. The stock_restored flag is
+     * the truth about where the pieces are, which makes both directions
+     * idempotent.
+     *
+     * "Returned" moves nothing either way. Coming from a live order, the goods
+     * are not restocked until someone has looked at them (see
+     * RELEASE_STATUSES). Coming from "cancelled", they were restocked when
+     * the courier cancelled — and marking the order Returned once the parcel
+     * physically arrives used to take them off the shelf again (2026-09-19),
+     * because leaving "cancelled" for anything re-reserved.
      */
     public function syncStock(Order $order, string $from, string $to): void
     {
-        $wasReleased = in_array($from, self::RELEASE_STATUSES, true);
         $nowReleased = in_array($to, self::RELEASE_STATUSES, true);
+        $nowLive = ! $nowReleased && $to !== 'returned';
 
-        if ($nowReleased && ! $wasReleased && ! $order->stock_restored) {
+        if ($nowReleased && ! $order->stock_restored) {
             $this->adjustStock($order, +1);         // return to inventory
             $order->update(['stock_restored' => true]);
-        } elseif (! $nowReleased && $wasReleased && $order->stock_restored) {
+        } elseif ($nowLive && $order->stock_restored) {
             $this->adjustStock($order, -1);         // re-reserve
             $order->update(['stock_restored' => false]);
         }

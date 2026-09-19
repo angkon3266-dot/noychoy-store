@@ -13,7 +13,10 @@
                 <div class="flex justify-between items-center text-[13px] sm:text-sm py-1.5 border-b border-ink-100 last:border-0">
                     {{-- Linked by slug: Product::getRouteKeyName() is 'slug', so
                          an admin link built from the id 404s. --}}
-                    <a href="{{ route('admin.products.edit', $r['slug'] ?: $r['id']) }}" class="truncate hover:text-gold-700">{{ $r['name'] }}</a>
+                    <a href="{{ route('admin.products.edit', $r['slug'] ?: $r['id']) }}" class="min-w-0 flex items-center gap-2 hover:text-gold-700">
+                        <x-admin.thumb :src="$thumbs[$r['id']] ?? null" />
+                        <span class="truncate">{{ $r['name'] }}</span>
+                    </a>
                     <span class="text-ink-700/60 text-xs tabular-nums whitespace-nowrap ml-2">{{ $r['views'] }} views · 0 sold</span>
                 </div>
             @empty

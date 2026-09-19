@@ -15,6 +15,9 @@ class Order extends Model
     /** Where the order was taken. 'web' is the checkout page, 'chat' the AI assistant. */
     public const SOURCES = ['web', 'chat', 'admin'];
 
+    /** Orders that are not sales: no money came in, so no revenue, profit or spend. */
+    public const NOT_SALES = ['cancelled', 'returned'];
+
     public const STATUSES = [
         'pending' => 'Pending',
         'confirmed' => 'Confirmed',

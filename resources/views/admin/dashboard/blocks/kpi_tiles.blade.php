@@ -14,7 +14,7 @@
         ['COD success', $stats['cod_success'] === null ? '—' : $stats['cod_success'].'%', 'text-green-700', 'delivered / resolved · all time'],
         ['Customers', $stats['customers'], 'text-ink-800', $stats['repeat_rate'].'% repeat'],
         ['New customers', $stats['new_customers_period'], 'text-ink-800', $per],
-        ['Low stock', $stats['low_stock'], 'text-red-600', '≤ 3 left · now'],
+        ['Low stock', $stats['low_stock'], 'text-red-600', '≤ '.($stats['low_stock_at'] ?? 3).' left · now'],
         ['Stock on hand', number_format($stats['stock_units']).' pcs', 'text-ink-800', money($stats['stock_cost_value']).' at cost'],
     ]; @endphp
     @foreach($cards as [$label, $value, $color, $sub])

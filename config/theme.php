@@ -66,6 +66,17 @@ return [
         'announcement_link' => null,
         'announcement_speed' => 6,   // seconds per message (lower = faster scroll)
 
+        // Pinned message — one line that floats with the sticky header
+        // (App\Support\PinnedMessage). Off until the owner writes one.
+        'pinned_enabled' => false,
+        'pinned_text' => null,
+        'pinned_link' => null,
+        'pinned_link_label' => null,
+        'pinned_bg' => '#b42318',
+        'pinned_color' => '#ffffff',
+        'pinned_until' => null,          // Y-m-d\TH:i in the shop's time, or null for no end
+        'pinned_dismissible' => false,
+
         // Registered-customer offer bar (personalised greeting + offer)
         'cbar_enabled' => false,
         'cbar_text' => 'Welcome back, {name}! Here’s a little something for you 🎁',

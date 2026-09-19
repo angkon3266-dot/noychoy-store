@@ -4,6 +4,7 @@ import SmartLink from '../SmartLink';
 import Icon from '../Icons';
 import SearchBox from './SearchBox';
 import NotificationsBell from './NotificationsBell';
+import PinnedMessage from './PinnedMessage';
 import { useCart } from '../CartContext';
 import { useMobileNav } from './MobileDrawer';
 import { t } from '../i18n';
@@ -23,6 +24,8 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-40 bg-gold-50/95 backdrop-blur border-b border-gold-200">
+            {/* Inside the sticky header, so it floats with it (owner, 2026-09-19). */}
+            <PinnedMessage config={chrome.pinned} />
             <div className="mx-auto max-w-7xl px-4">
                 <div className="relative flex h-16 items-center gap-2">
                     {/* Mobile menu toggle — custom icon with guaranteed SVG fallback */}

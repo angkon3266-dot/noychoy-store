@@ -51,7 +51,7 @@ class DashboardCacheTest extends TestCase
         $a->retention($range);
         $a->operations($range);
 
-        foreach (['cmp.30d', 'funnel.30d', 'series.30d', 'src.30d.8', 'ads.30d.12', 'vns.30d', 'ret.30d', 'ops.30d'] as $key) {
+        foreach (['cmp.30d', 'funnel.30d', 'series.30d', 'src.30d.8', 'ads.30d.12', 'vns.30d.6', 'ret.30d', 'ops.30d'] as $key) {
             $payload = $this->cachedPayload($key);
             $this->assertNotSame('ABSENT', $payload, "nothing cached for {$key}");
             $this->assertTrue(
@@ -93,7 +93,7 @@ class DashboardCacheTest extends TestCase
 
     public function test_the_dashboard_renders_with_a_poisoned_cache(): void
     {
-        foreach (['series.30d', 'src.30d.8', 'ads.30d.12', 'vns.30d', 'ops.30d'] as $key) {
+        foreach (['series.30d', 'src.30d.8', 'ads.30d.12', 'vns.30d.6', 'ops.30d'] as $key) {
             Cache::put('dash.v3.'.$key, new \stdClass, 300);
         }
 

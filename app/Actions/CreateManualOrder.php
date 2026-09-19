@@ -120,7 +120,16 @@ class CreateManualOrder
                 ['name' => $data['name'], 'email' => $data['email'] ?? null],
             );
 
+            // An order typed in already cancelled (a phone sale recorded after
+            // it fell through) never holds stock. It used to take the pieces
+            // off the shelf anyway, and nothing ever put them back: the order
+            // never passed through TransitionOrderStatus. Now nothing is taken
+            // and the flag says the stock is free, so moving it to a live
+            // status later takes it then, like any cancelled order.
+            $holdsStock = ($data['status'] ?? 'confirmed') !== 'cancelled';
+
             $order = $this->createWithUniqueNumber([
+                'stock_restored' => ! $holdsStock,
                 'customer_id' => $customer->id,
                 'customer_name' => $data['name'],
                 'customer_phone' => $data['phone'],
@@ -159,7 +168,9 @@ class CreateManualOrder
                     'subtotal' => round($r['price'] * $r['qty'], 2),
                 ]);
 
-                $this->decrementStock($r['product'], $r['variant'], $r['qty']);
+                if ($holdsStock) {
+                    $this->decrementStock($r['product'], $r['variant'], $r['qty']);
+                }
             }
 
             if ($coupon) {
@@ -198,8 +209,11 @@ class CreateManualOrder
             // looked like a one-time buyer everywhere those figures are read:
             // the customer list's spend and repeat filters, the new-order
             // customer picker, and the win-back and occasion audiences.
-            $customer->increment('total_orders');
-            $customer->increment('total_spent', $order->total);
+            // One typed in already cancelled or returned is not a sale.
+            if (! in_array($order->status, Order::NOT_SALES, true)) {
+                $customer->increment('total_orders');
+                $customer->increment('total_spent', $order->total);
+            }
             $customer->update(['last_order_at' => now()]);
 
             return $order;

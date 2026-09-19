@@ -18,6 +18,7 @@
     <div class="hidden md:block group-data-[open]:block mt-1 sm:mt-3">
         @forelse($mostLoved as $p)
             <div class="flex items-center gap-2 sm:gap-3 py-1.5 sm:py-2 border-b border-ink-50 last:border-0 text-[13px] sm:text-sm">
+                <x-admin.thumb :src="$thumbs[$p->id] ?? null" />
                 <a href="{{ route('admin.products.edit', $p) }}" class="min-w-0 flex-1 sm:flex-none sm:w-48 sm:shrink-0 truncate text-gold-700 hover:underline">{{ $p->name }}</a>
                 <div class="w-16 shrink-0 sm:w-auto sm:shrink sm:flex-1 h-1.5 sm:h-2 rounded-full bg-ink-50 overflow-hidden">
                     <div class="h-full rounded-full bg-red-400" style="width: {{ round($p->loves_count / $lovedMax * 100) }}%"></div>

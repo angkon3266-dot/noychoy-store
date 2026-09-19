@@ -81,8 +81,10 @@ class CampaignAnalyticsService
         }
 
         // Half-open interval [from, to) so a boundary order isn't counted twice.
+        // Cancelled and returned orders are not sales a campaign earned.
         $q = Order::query()
             ->whereNotNull('customer_id')
+            ->whereNotIn('status', Order::NOT_SALES)
             ->where('created_at', '>=', $from)
             ->where('created_at', '<', $to);
 

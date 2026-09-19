@@ -40,6 +40,7 @@
                          x-data="{ open: false }" :data-open="open">
                         <div class="flex items-center justify-between gap-2 min-w-0 cursor-pointer md:cursor-auto" @click="open = !open">
                             <span class="min-w-0 flex items-center gap-1.5">
+                                <x-admin.thumb :src="$thumbs[$r['id'] ?? 0] ?? null" class="mr-0.5" />
                                 @if(empty($r['deleted']) && $r['slug'])<a href="{{ route('admin.products.edit', $r['slug']) }}" class="min-w-0 truncate hover:text-gold-700" @click.stop>{{ $r['name'] }}</a>@else<span class="min-w-0 truncate text-ink-700/70">{{ $r['name'] }}</span>@endif
                                 @if($r['badges']['reorder'])<span class="badge bg-amber-100 text-amber-700 text-[10px] shrink-0">Reorder</span>@endif
                                 @if($r['badges']['slow'])<span class="badge bg-ink-100 text-ink-700 text-[10px] shrink-0">Slow</span>@endif

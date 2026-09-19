@@ -685,7 +685,10 @@ class DashboardAnalytics
      */
     public function viewedNotSold(DateRange $range, int $limit = 6): \Illuminate\Support\Collection
     {
-        return collect($this->remember('vns.'.$range->cacheKey(), function () use ($range, $limit) {
+        // The limit is part of the key: the bell asks for 3 rows and the
+        // dashboard for 6, and with one key between them whichever ran first
+        // decided how many both got.
+        return collect($this->remember('vns.'.$range->cacheKey().'.'.$limit, function () use ($range, $limit) {
             $sold = $range->constrain(
                 OrderItem::query()
                     ->join('orders', 'orders.id', '=', 'order_items.order_id')
