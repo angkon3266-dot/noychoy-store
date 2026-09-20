@@ -1814,7 +1814,9 @@ class OrderController extends Controller
             $parts[] = $result['failed'].' failed';
         }
         if ($result['skipped']) {
-            $parts[] = $result['skipped'].' skipped (limit '.BdCourierService::BULK_LIMIT.' per run)';
+            // Either the per-run cap or the clock stopped the run. Which one
+            // does not change what to do next, so the message doesn't say.
+            $parts[] = $result['skipped'].' not reached — select those and run it again';
         }
 
         return back()->with($result['failed'] ? 'error' : 'success',

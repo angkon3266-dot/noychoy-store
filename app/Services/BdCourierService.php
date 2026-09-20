@@ -36,6 +36,24 @@ class BdCourierService
     public const BULK_LIMIT = 25;
 
     /**
+     * How long to wait for one lookup. BDCourier queries every courier behind
+     * the scenes before it answers, so a number is routinely a few seconds and
+     * occasionally half a minute — 20s was inside that spread and turned slow
+     * answers into "could not reach BDCourier".
+     */
+    public const TIMEOUT_SECONDS = 60;
+
+    /** Separate, and short: an unreachable host should fail fast, not sit out the whole timeout. */
+    public const CONNECT_TIMEOUT_SECONDS = 10;
+
+    /**
+     * Wall-clock budget for one bulk run, under the 300s the controller asks
+     * for. Twenty-five numbers at the timeout above is far more than a request
+     * can survive, so the run stops on the clock and says what it left.
+     */
+    public const BULK_BUDGET_SECONDS = 240;
+
+    /**
      * Stored results for many phones at once, for the orders list. One query,
      * and never an API call — rendering a page must not spend quota.
      *
@@ -124,15 +142,28 @@ class BdCourierService
             return ['ok' => false, 'error' => 'BDCourier is not configured. Add the API key under Admin → Integrations.'];
         }
 
+        $started = microtime(true);
+
         try {
             $response = Http::withToken((string) $this->config()['bdcourier_api_key'])
                 ->acceptJson()
-                ->timeout(20)
+                ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+                ->timeout(self::TIMEOUT_SECONDS)
                 ->post($this->baseUrl().'/courier-check', ['phone' => bd_phone($phone)]);
         } catch (\Throwable $e) {
-            Log::warning('BDCourier lookup failed', ['error' => $e->getMessage()]);
+            $elapsed = microtime(true) - $started;
 
-            return ['ok' => false, 'error' => 'Could not reach BDCourier. Please try again.'];
+            // Error, not warning: production runs at LOG_LEVEL=error, so a
+            // warning was discarded and a failed lookup left no trace of why.
+            // This line is the only record there is.
+            Log::error('BDCourier lookup failed', [
+                'phone' => bd_phone($phone),
+                'seconds' => round($elapsed, 2),
+                'type' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['ok' => false, 'error' => $this->transportError($elapsed)];
         }
 
         if ($response->status() === 401 || $response->status() === 403) {
@@ -161,6 +192,22 @@ class BdCourierService
         }
 
         return $result;
+    }
+
+    /**
+     * What to say when the call never produced a response at all.
+     *
+     * The two cases need different things from the admin: a lookup that ran
+     * out of time means BDCourier is slow and pressing it again usually works,
+     * while anything that died early means the shop could not reach it and
+     * pressing again will not help. Told apart by the clock rather than by the
+     * wording of a cURL error, which varies by build.
+     */
+    protected function transportError(float $elapsed): string
+    {
+        return $elapsed >= self::TIMEOUT_SECONDS - 2
+            ? 'BDCourier did not answer within '.self::TIMEOUT_SECONDS.' seconds. It is being slow rather than down — try that number again.'
+            : 'Could not reach BDCourier. Please try again.';
     }
 
     /**
@@ -198,7 +245,19 @@ class BdCourierService
             $todo = $todo->take(self::BULK_LIMIT);
         }
 
+        $deadline = microtime(true) + self::BULK_BUDGET_SECONDS;
+        $done = 0;
+
         foreach ($todo as $phone) {
+            // Never on the first number — one lookup always gets its chance,
+            // however long the selection is.
+            if ($done > 0 && microtime(true) >= $deadline) {
+                $out['skipped'] += $todo->count() - $done;
+
+                break;
+            }
+
+            $done++;
             $result = $this->check($phone);
 
             if ($result['ok'] ?? false) {

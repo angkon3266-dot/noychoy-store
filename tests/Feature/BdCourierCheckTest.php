@@ -9,6 +9,7 @@ use App\Services\BdCourierService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -234,6 +235,62 @@ class BdCourierCheckTest extends TestCase
             ->assertSessionHas('error');
 
         $this->actingAs($this->admin())->get('/admin/orders/'.$order->id)->assertOk();
+    }
+
+    public function test_a_failed_lookup_is_logged_at_a_level_production_keeps(): void
+    {
+        // Production runs at LOG_LEVEL=error. A lookup that failed used to log
+        // a warning, which was thrown away — so the one time it mattered there
+        // was nothing at all to say why.
+        $this->configure();
+        Http::fake(fn () => throw new \RuntimeException('cURL error 6: Could not resolve host'));
+
+        Log::shouldReceive('error')
+            ->once()
+            ->withArgs(fn ($message, $context = []) => $message === 'BDCourier lookup failed'
+                && ($context['phone'] ?? null) === '01870620635'
+                && str_contains((string) ($context['error'] ?? ''), 'Could not resolve host'));
+
+        app(BdCourierService::class)->check('01870620635');
+    }
+
+    public function test_a_slow_answer_is_given_a_minute_before_it_is_called_a_failure(): void
+    {
+        // BDCourier asks every courier before it answers, so a number is
+        // routinely seconds and occasionally half a minute. The old 20s
+        // ceiling sat inside that spread and reported slow as unreachable.
+        // Connecting is held to its own short limit, so a host that really is
+        // unreachable still fails in seconds.
+        $this->configure();
+
+        $options = [];
+        Http::fake(function ($request, $opts) use (&$options) {
+            $options = $opts;
+
+            return Http::response($this->payload());
+        });
+
+        $order = $this->order();
+        $this->actingAs($this->admin())->post('/admin/orders/'.$order->id.'/courier-check');
+
+        $this->assertGreaterThanOrEqual(60, $options['timeout'] ?? 0);
+        $this->assertLessThanOrEqual(10, $options['connect_timeout'] ?? 99);
+    }
+
+    public function test_a_lookup_that_ran_out_of_time_is_not_reported_as_unreachable(): void
+    {
+        // Two different things for the admin to do: press it again, or stop
+        // pressing it. Told apart by how long the call lasted.
+        $svc = new class extends BdCourierService
+        {
+            public function message(float $elapsed): string
+            {
+                return $this->transportError($elapsed);
+            }
+        };
+
+        $this->assertStringContainsString('slow', $svc->message(BdCourierService::TIMEOUT_SECONDS));
+        $this->assertStringContainsString('Could not reach', $svc->message(0.4));
     }
 
     public function test_the_panel_is_hidden_when_bdcourier_is_not_configured(): void
