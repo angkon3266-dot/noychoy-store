@@ -4,6 +4,7 @@ import Icon, { Star } from './Icons';
 import { useCart } from './CartContext';
 import { money, newEventId } from './format';
 import { rewardLabel, t } from './i18n';
+import OfferCountdown from './OfferCountdown';
 
 // Storefront product card — data shape comes from ProductCardData::make().
 export default function ProductCard({ product: p }) {
@@ -69,6 +70,12 @@ export default function ProductCard({ product: p }) {
                         </>
                     )}
                 </div>
+                {p.offer_ends && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium leading-tight text-danger-600">
+                        <Icon name="clock" className="w-3 h-3 shrink-0" strokeWidth={2} />
+                        <OfferCountdown ends={p.offer_ends} lang={lang} compact />
+                    </p>
+                )}
                 {ladder && (
                     <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] font-medium leading-tight text-gold-800" lang={lang}>
                         <Icon name="gift" className="w-3 h-3 shrink-0 text-gold-700" strokeWidth={2} />

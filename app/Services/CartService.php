@@ -441,7 +441,7 @@ class CartService
      * cascade's cap bites, and null when nothing reached the line (no offer
      * covers it, or an exclusive coupon displaced the offers).
      *
-     * @return array{label:string, amount:float}|null
+     * @return array{label:string, amount:float, ends:?int}|null
      */
     public function linePromo(string $key): ?array
     {
@@ -460,6 +460,8 @@ class CartService
         return [
             'label' => $offer->badge_label ?: ($offer->title ?: \App\Support\OfferPricing::percentText((float) $offer->percent).'% off'),
             'amount' => $amount,
+            // The deadline the cart counts down to, if the offer has one.
+            'ends' => $offer->endsAtUnix(),
         ];
     }
 

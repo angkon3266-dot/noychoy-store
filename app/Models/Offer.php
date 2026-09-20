@@ -37,7 +37,7 @@ class Offer extends Model
     protected $fillable = [
         'title', 'description', 'type', 'applies_to', 'category_ids', 'product_ids',
         'percent', 'min_subtotal', 'min_qty',
-        'members_only', 'badge_label', 'image', 'show_on_pdp', 'is_active', 'sort',
+        'members_only', 'badge_label', 'image', 'show_on_pdp', 'is_active', 'ends_at', 'sort',
     ];
 
     protected $casts = [
@@ -49,12 +49,35 @@ class Offer extends Model
         'members_only' => 'boolean',
         'show_on_pdp' => 'boolean',
         'is_active' => 'boolean',
+        'ends_at' => 'datetime',
         'sort' => 'integer',
     ];
 
+    /**
+     * The offers running right now.
+     *
+     * A deadline is part of being active, not decoration: the shop prints a
+     * countdown from `ends_at` (20 Sep 2026), so when it passes the offer has
+     * to stop everywhere the same second — the listed prices, the product-page
+     * note, the checkout discount and the deal card all read this scope.
+     */
     public function scopeActive(Builder $q): Builder
     {
-        return $q->where('is_active', true)->orderBy('sort');
+        return $q->where('is_active', true)
+            ->where(fn (Builder $w) => $w->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->orderBy('sort');
+    }
+
+    /** Has this offer's deadline passed? */
+    public function hasEnded(): bool
+    {
+        return $this->ends_at !== null && $this->ends_at->isPast();
+    }
+
+    /** The deadline as a unix second for the browser's countdown, or null. */
+    public function endsAtUnix(): ?int
+    {
+        return $this->ends_at?->getTimestamp();
     }
 
     /**

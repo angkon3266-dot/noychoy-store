@@ -26,13 +26,34 @@ final class PinnedMessage
 
     public const DEFAULT_COLOR = '#ffffff';
 
-    /** @return array{id:string,text:string,link:?string,linkLabel:?string,bg:string,color:string,until:?string,dismissible:bool}|null */
+    /** The placeholder the owner can drop into the message for a live timer. */
+    public const COUNTDOWN = '{countdown}';
+
+    /** @return array{id:string,text:string,link:?string,linkLabel:?string,bg:string,color:string,until:?string,dismissible:bool,countdown:?int}|null */
     public static function current(): ?array
     {
         $text = trim((string) theme('pinned_text'));
 
         if (! theme('pinned_enabled') || $text === '') {
             return null;
+        }
+
+        // {countdown} counts down to the soonest offer deadline, so a "flat 30%
+        // off" line can carry the clock its offer already runs on (owner,
+        // 20 Sep 2026).
+        //
+        // A message written around the clock is tied to it: "ends in
+        // {countdown}" with nothing left to count is both broken copy and a
+        // sale that is over, so the whole line stands down rather than
+        // advertising a discount the checkout no longer gives.
+        $countdown = null;
+
+        if (str_contains($text, self::COUNTDOWN)) {
+            $countdown = static::nextOfferDeadline();
+
+            if ($countdown === null) {
+                return null;
+            }
         }
 
         $until = static::until();
@@ -54,7 +75,16 @@ final class PinnedMessage
             'color' => static::colour(theme('pinned_color'), self::DEFAULT_COLOR),
             'until' => $until?->toIso8601String(),
             'dismissible' => (bool) theme('pinned_dismissible'),
+            'countdown' => $countdown,
         ];
+    }
+
+    /** When the next offer with a deadline runs out, as a unix second. */
+    protected static function nextOfferDeadline(): ?int
+    {
+        // reorder(), not orderBy(): Offer::active() sorts by the admin's order,
+        // and the nearest deadline is what a countdown must show.
+        return \App\Models\Offer::active()->whereNotNull('ends_at')->reorder('ends_at')->first()?->endsAtUnix();
     }
 
     /** The end time, from the admin's date-and-time field, in the shop's time. */

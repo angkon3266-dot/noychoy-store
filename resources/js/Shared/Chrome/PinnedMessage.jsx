@@ -1,7 +1,28 @@
 import { useEffect, useState } from 'react';
 import SmartLink from '../SmartLink';
+import { countdownText, useSecondsLeft } from '../OfferCountdown';
 
 const DISMISSED_KEY = 'pinned-dismissed';
+
+// The owner can drop {countdown} into the message; it becomes the live clock
+// on the soonest offer deadline (App\Support\PinnedMessage). A message
+// written around it is tied to it: with nothing counting down the server sends
+// no message at all, and at zero this one takes itself down.
+const COUNTDOWN = '{countdown}';
+
+function Words({ text, seconds }) {
+    const [before, ...rest] = text.split(COUNTDOWN);
+
+    if (!rest.length) return <>{text}</>;
+
+    return (
+        <>
+            {before}
+            <span className="tabular-nums">{countdownText(seconds)}</span>
+            {rest.join(COUNTDOWN)}
+        </>
+    );
+}
 
 // The owner's pinned message (Appearance → Pinned message; built by
 // App\Support\PinnedMessage). It renders inside the sticky header, so it
@@ -12,6 +33,10 @@ const DISMISSED_KEY = 'pinned-dismissed';
 export default function PinnedMessage({ config }) {
     const [expired, setExpired] = useState(false);
     const [dismissed, setDismissed] = useState(false);
+    // The offer's clock, when the message carries one. At zero the line goes
+    // with the offer — OfferCountdown has already asked the page for the
+    // props that no longer carry either.
+    const seconds = useSecondsLeft(config?.countdown);
 
     useEffect(() => {
         setExpired(false);
@@ -37,7 +62,7 @@ export default function PinnedMessage({ config }) {
         }
     }, [config?.id, config?.dismissible]);
 
-    if (!config || expired || dismissed) return null;
+    if (!config || expired || dismissed || (config.countdown && !seconds)) return null;
 
     const dismiss = () => {
         setDismissed(true);
@@ -48,7 +73,11 @@ export default function PinnedMessage({ config }) {
         }
     };
 
-    const words = <span className="font-semibold [overflow-wrap:anywhere]">{config.text}</span>;
+    const words = (
+        <span className="font-semibold [overflow-wrap:anywhere]">
+            <Words text={config.text} seconds={seconds} />
+        </span>
+    );
 
     return (
         <div className="relative text-center text-[13px] sm:text-sm leading-snug" style={{ background: config.bg, color: config.color }} data-pinned-message>

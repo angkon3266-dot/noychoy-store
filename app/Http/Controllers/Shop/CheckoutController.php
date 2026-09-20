@@ -105,6 +105,7 @@ class CheckoutController extends Controller
                 'promo' => ($promo = $this->cart->linePromo($i['key'])) ? [
                     'label' => $promo['label'],
                     'saving_text' => money($promo['amount']),
+                    'ends' => $promo['ends'],
                 ] : null,
             ])->values(),
             'summary' => [

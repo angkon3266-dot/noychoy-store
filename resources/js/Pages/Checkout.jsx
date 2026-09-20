@@ -5,6 +5,7 @@ import { fetchJson, money } from '../Shared/format';
 import Icon from '../Shared/Icons';
 import MemberPill from '../Shared/MemberPill';
 import { useCart } from '../Shared/CartContext';
+import OfferCountdown from '../Shared/OfferCountdown';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
 // what "the same number" is — and so "017 1234 5678" is not silently dropped.
@@ -427,7 +428,10 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                                 </button>
                                             )}
                                             {item.promo && (
-                                                <span className="block text-[11px] text-success-700">{item.promo.label} · you save {item.promo.saving_text}</span>
+                                                <span className="block text-[11px] text-success-700">
+                                                    {item.promo.label} · you save {item.promo.saving_text}
+                                                    {item.promo.ends && <OfferCountdown ends={item.promo.ends} className="ml-1 font-semibold text-danger-600" />}
+                                                </span>
                                             )}
                                         </span>
                                         <span className="font-medium shrink-0">{item.lineText}</span>

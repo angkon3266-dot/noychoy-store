@@ -228,6 +228,7 @@ class OfferController extends Controller
             'badge_label' => ['nullable', 'string', 'max:30'],
             'offer_image' => ['nullable', 'file', 'image', 'max:5120'],
             'offer_image_url' => ['nullable', 'string', 'max:500'],
+            'ends_at' => ['nullable', 'date'],
             'sort' => ['nullable', 'integer', 'min:0'],
         ]);
 
@@ -239,6 +240,15 @@ class OfferController extends Controller
             $data['image'] = null;
         }
         unset($data['offer_image'], $data['offer_image_url']);
+
+        // The deadline the shopper counts down to. Typed in Bangladesh time —
+        // the field says so — and converted here, because Eloquent stores a
+        // Carbon in whatever zone it is handed: 11:59 PM Dhaka would otherwise
+        // be written as 11:59 PM UTC and the offer would run six hours late.
+        $data['ends_at'] = filled($data['ends_at'] ?? null)
+            ? \Illuminate\Support\Carbon::parse($data['ends_at'], config('store.timezone', 'Asia/Dhaka'))
+                ->setTimezone(config('app.timezone', 'UTC'))
+            : null;
 
         $data['members_only'] = $request->boolean('members_only');
         $data['show_on_pdp'] = $request->boolean('show_on_pdp');

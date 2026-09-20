@@ -205,6 +205,11 @@
         </p>
         <label class="label" for="pinned-text">Message</label>
         <input id="pinned-text" name="pinned_text" x-model="ptext" maxlength="200" class="input" placeholder="Stock clearance sale — flat 30% off on all products">
+        <p class="text-[11px] text-ink-700/50 mt-1">
+            Type <code>{countdown}</code> anywhere in the line to show a live clock counting down to your next offer's
+            end time (set that under <a href="{{ route('admin.offers.index') }}" class="text-gold-700 underline">Offers</a>).
+            With no offer counting down, a message containing it stays hidden — so the bar takes itself down when the sale does.
+        </p>
         <div class="grid sm:grid-cols-2 gap-4 mt-4">
             <div>
                 <label class="label" for="pinned-link">Link (optional)</label>

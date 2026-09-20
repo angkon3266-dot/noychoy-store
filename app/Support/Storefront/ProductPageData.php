@@ -119,6 +119,9 @@ class ProductPageData
                 'title' => $o->title,
                 'description' => $o->description,
                 'members_only' => (bool) $o->members_only,
+                // Counted down beside the offer; at zero the page reloads and
+                // the offer — and its price — is gone (Offer::scopeActive).
+                'ends' => $o->endsAtUnix(),
             ]),
             'myOffers' => $myOffers->map(fn ($o) => [
                 'reward' => $o->rewardText(),

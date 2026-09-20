@@ -85,6 +85,7 @@ class CartController extends Controller
                     'promo' => ($promo = $cart->linePromo($item['key'])) ? [
                         'label' => $promo['label'],
                         'saving_text' => money($promo['amount']),
+                        'ends' => $promo['ends'],
                     ] : null,
                 ];
             })->values(),
@@ -236,6 +237,7 @@ class CartController extends Controller
                 'promo' => ($promo = $this->cart->linePromo($i['key'])) ? [
                     'label' => $promo['label'],
                     'saving_text' => money($promo['amount']),
+                    'ends' => $promo['ends'],
                 ] : null,
             ])->values(),
         ], $extra);

@@ -7,6 +7,7 @@ import GiftLadderBar from '../Shared/GiftLadderBar';
 import Icon from '../Shared/Icons';
 import MemberPill from '../Shared/MemberPill';
 import { t } from '../Shared/i18n';
+import OfferCountdown from '../Shared/OfferCountdown';
 
 // Full cart page. Mutations go through Inertia (the server redirects back to
 // /cart with fresh props + flash) but never re-mount the page: `preserveState`
@@ -121,6 +122,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                                 {item.promo && (
                                     <p className="mt-1 inline-block badge bg-success-100 text-success-700 text-[11px]">
                                         {item.promo.label} (you save {item.promo.saving_text})
+                                        {item.promo.ends && <OfferCountdown ends={item.promo.ends} lang={props.chrome?.lang} className="ml-1 font-semibold text-danger-600" />}
                                     </p>
                                 )}
                             </div>

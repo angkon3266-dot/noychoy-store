@@ -37,6 +37,10 @@ const en = {
     'fbt.save': 'You save {saving} with piece rewards',
     'fbt.perk': '+ {perk} unlocked',
     'fbt.together': 'Buy them together at a better deal',
+
+    // An offer's deadline, ticking (OfferCountdown). {t} is "2d 04:12:33".
+    'offer.ends': 'Ends in {t}',
+    'offer.endsSoon': 'Hurry — ends in {t}',
 };
 
 const bn = {
@@ -70,6 +74,9 @@ const bn = {
     'fbt.save': 'পিস রিওয়ার্ডে সাশ্রয় {saving}',
     'fbt.perk': '+ {perk} আনলক',
     'fbt.together': 'একসাথে কিনলে আরও ভালো দামে',
+
+    'offer.ends': 'শেষ হতে বাকি {t}',
+    'offer.endsSoon': 'তাড়াতাড়ি করুন — বাকি {t}',
 };
 
 export function t(lang, key, vars = {}) {

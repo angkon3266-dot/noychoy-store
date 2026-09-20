@@ -42,7 +42,7 @@ class ProductFeedController extends Controller
 
         $columns = array_merge([
             'id', 'item_group_id', 'title', 'description', 'availability', 'condition',
-            'price', 'sale_price', 'link', 'image_link', 'additional_image_link',
+            'price', 'sale_price', 'sale_price_effective_date', 'link', 'image_link', 'additional_image_link',
             'brand', 'product_type', 'custom_label_0', 'custom_label_1', 'google_product_category',
         ], array_map(fn ($i) => "video[{$i}].url", range(0, self::MAX_VIDEOS - 1)));
 
@@ -183,6 +183,7 @@ class ProductFeedController extends Controller
                             'g:availability' => null,
                             'g:price' => null,
                             'g:sale_price' => null,
+                            'g:sale_price_effective_date' => null,
                             'g:color' => null,
                             'g:size' => null,
                             'g:material' => null,
@@ -210,6 +211,7 @@ class ProductFeedController extends Controller
                                     // an offer is on (App\Support\OfferPricing).
                                     'g:price' => $money($quote['was'] ?? $quote['price']),
                                     'g:sale_price' => $quote['was'] !== null ? $money($quote['price']) : null,
+                                    'g:sale_price_effective_date' => self::saleWindow($quote['offer']),
                                     'g:color' => $this->variantAttr($attrs, ['color', 'colour']),
                                     'g:size' => $this->variantAttr($attrs, ['size']),
                                     'g:material' => $this->variantAttr($attrs, ['material']),
@@ -232,6 +234,7 @@ class ProductFeedController extends Controller
                             'g:availability' => ($p->isAvailable() || $p->isPreorder()) ? 'in_stock' : 'out_of_stock',
                             'g:price' => $money($quote['was'] ?? $quote['price']),
                             'g:sale_price' => $quote['was'] !== null ? $money($quote['price']) : null,
+                            'g:sale_price_effective_date' => self::saleWindow($quote['offer']),
                             'g:color' => collect($p->colors ?? [])->filter()->first(),
                         ], $shippingXml);
                     }
@@ -259,7 +262,26 @@ class ProductFeedController extends Controller
         return [
             'price' => $money($quote['was'] ?? $quote['price']),
             'sale_price' => $quote['was'] !== null ? $money($quote['price']) : '',
+            // When the offer runs out, so Meta stops showing the sale price at
+            // the same moment the website does, even between feed fetches.
+            'sale_price_effective_date' => self::saleWindow($quote['offer'] ?? null) ?? '',
         ];
+    }
+
+    /**
+     * The sale's window as both feeds want it: "start/end" in ISO 8601, in the
+     * shop's own time. Null unless the offer carries a deadline (Offer.ends_at).
+     */
+    protected static function saleWindow(?\App\Models\Offer $offer): ?string
+    {
+        if (! $offer?->ends_at) {
+            return null;
+        }
+
+        $format = fn (\Illuminate\Support\Carbon $at) => store_time($at)->format('Y-m-d\TH:iP');
+        $start = $offer->created_at && $offer->created_at->isPast() ? $offer->created_at : now();
+
+        return $format($start).'/'.$format($offer->ends_at);
     }
 
     /**

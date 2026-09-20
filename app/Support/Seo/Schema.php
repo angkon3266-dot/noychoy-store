@@ -171,9 +171,11 @@ class Schema
             'itemCondition' => 'https://schema.org/NewCondition',
             // Without this Google treats the price as indefinite and eventually
             // flags the offer as stale. A rolling year is the convention for a
-            // shop whose prices are not campaign-bound.
-            'priceValidUntil' => now(config('store.timezone', 'Asia/Dhaka'))
-                ->addYear()->toDateString(),
+            // shop whose prices are not campaign-bound — but when an offer with
+            // a deadline is what made this price, the deadline is the truth.
+            'priceValidUntil' => ($quote['offer']?->ends_at
+                ? store_time($quote['offer']->ends_at)
+                : now(config('store.timezone', 'Asia/Dhaka'))->addYear())->toDateString(),
             'seller' => ['@id' => self::baseUrl().'/#organization'],
             'areaServed' => ['@type' => 'Country', 'name' => 'Bangladesh'],
         ];

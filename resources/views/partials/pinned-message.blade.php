@@ -3,8 +3,14 @@
      resources/js/Shared/Chrome/PinnedMessage.jsx draws on the React ones.
      Included inside the sticky header, so it floats with it. Hides itself at
      its end time for a page the LiteSpeed cache kept past it. --}}
-@php $pinned = \App\Support\PinnedMessage::current(); @endphp
-@if($pinned)
+@php
+    $pinned = \App\Support\PinnedMessage::current();
+    // A message with {countdown} in it needs a ticking clock, and these Blade
+    // templates (the non-React homepages, landing pages) have none — printing
+    // "ends in" with nothing after it is worse than staying quiet. The React
+    // storefront, which is what the shop actually serves, ticks it properly.
+@endphp
+@if($pinned && ! $pinned['countdown'])
     <div x-data="{
             show: true,
             init() {

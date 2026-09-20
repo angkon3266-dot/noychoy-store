@@ -6,6 +6,7 @@ import ShareButton from '../Shared/ShareButton';
 import RichText from '../Shared/RichText';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import LadderRow from '../Shared/LadderRow';
+import OfferCountdown from '../Shared/OfferCountdown';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
 import { ordinal, rewardLabel, rewardPhrase, t } from '../Shared/i18n';
@@ -670,6 +671,12 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                                 {o.badge && <span className="mr-1.5 inline-block rounded-full bg-success-600 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.badge}</span>}
                                 <strong className="font-semibold">{o.title}</strong>
                                 {o.description && <span className="text-ink-700/70"> — {o.description}</span>}
+                                {o.ends && (
+                                    <span className="ml-1.5 inline-flex items-center gap-1 whitespace-nowrap font-semibold text-danger-600">
+                                        <Icon name="clock" className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                                        <OfferCountdown ends={o.ends} lang={lang} />
+                                    </span>
+                                )}
                                 {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-gold-700 underline">Register to unlock</a></>}
                             </span>
                         </li>

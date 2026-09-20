@@ -215,7 +215,18 @@
 
 <div class="grid lg:grid-cols-3 gap-6">
     {{-- Form --}}
-    <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}', applies: '{{ old('applies_to', $editing->applies_to ?? 'all') }}', catQ: '' }">
+    @php
+        // Deadline presets, worked out on the server so they are Bangladesh
+        // time whatever the clock on the admin's own computer says.
+        $offerNow = store_time(now());
+        $endPresets = [
+            'Tonight' => $offerNow->copy()->setTime(23, 59),
+            'Tomorrow night' => $offerNow->copy()->addDay()->setTime(23, 59),
+            'In 3 days' => $offerNow->copy()->addDays(3)->setTime(23, 59),
+            'In a week' => $offerNow->copy()->addWeek()->setTime(23, 59),
+        ];
+    @endphp
+    <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}', applies: '{{ old('applies_to', $editing->applies_to ?? 'all') }}', catQ: '', endsAt: @js(old('ends_at', store_time($editing->ends_at ?? null)?->format('Y-m-d\TH:i') ?? '')) }">
         <h2 class="font-semibold mb-4">{{ $editing ? 'Edit offer' : 'New offer' }}</h2>
         @if($errors->any())<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $errors->first() }}</div>@endif
         <form action="{{ $editing ? route('admin.offers.update', $editing) : route('admin.offers.store') }}" method="POST" class="space-y-3">
@@ -276,6 +287,22 @@
                 <p class="text-xs text-ink-700/50 mt-1 ml-6">A percentage discount with no minimum cart value or items also changes the price everywhere: the products it covers show the discounted price with the regular price crossed out, in the shop and in the Meta/Google feeds. Delete or pause the offer and prices go back to normal. Untick to apply it at checkout only.</p>
             </div>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $editing->is_active ?? true))> Active</label>
+            <div>
+                <label class="label" for="offer-ends-at">Ends at (optional)</label>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input id="offer-ends-at" type="datetime-local" name="ends_at" x-model="endsAt" class="input max-w-[16rem]">
+                    @foreach($endPresets as $label => $when)
+                        <button type="button" class="badge bg-ink-100 text-ink-700 hover:bg-gold-100 hover:text-gold-800" x-on:click="endsAt = @js($when->format('Y-m-d\TH:i'))">{{ $label }}</button>
+                    @endforeach
+                    <button type="button" class="badge bg-ink-100 text-ink-700 hover:bg-red-100 hover:text-red-700" x-show="endsAt !== ''" x-on:click="endsAt = ''" x-cloak>Clear</button>
+                </div>
+                <p class="text-xs text-ink-700/50 mt-1">
+                    Bangladesh time. Shoppers see a live countdown — on the product, on the cards, in the cart and in your pinned message if it contains <code>{countdown}</code> — and when it reaches zero <strong>the offer stops by itself</strong>: prices go back and checkout stops giving the discount. Orders already placed keep their price. Leave empty to run until you untick Active.
+                    @if(($editing?->ends_at) && $editing->hasEnded())
+                        <span class="block mt-1 text-red-700">This offer ended {{ store_time($editing->ends_at)->diffForHumans() }} — set a new time (or clear it) to run it again.</span>
+                    @endif
+                </p>
+            </div>
             <div><label class="label">Sort order</label><input name="sort" type="number" value="{{ old('sort', $editing->sort ?? 0) }}" class="input w-24"></div>
             <div class="flex gap-2">
                 <button class="btn-primary flex-1">{{ $editing ? 'Save offer' : 'Create offer' }}</button>
@@ -288,7 +315,7 @@
     <div class="lg:col-span-2 card overflow-x-auto">
         <table class="w-full min-w-[640px] text-sm">
             <thead class="bg-ink-50 text-left text-xs uppercase tracking-wide text-ink-700/60">
-                <tr><th class="px-4 py-3">Offer</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Conditions</th><th class="px-4 py-3">On PDP</th><th class="px-4 py-3">Active</th><th></th></tr>
+                <tr><th class="px-4 py-3">Offer</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Conditions</th><th class="px-4 py-3">Ends</th><th class="px-4 py-3">On PDP</th><th class="px-4 py-3">Active</th><th></th></tr>
             </thead>
             <tbody class="divide-y divide-ink-100">
                 @forelse($offers as $offer)
@@ -300,6 +327,14 @@
                             {{ $offer->min_qty ? ($offer->min_subtotal ? ' & ' : '').'≥ '.$offer->min_qty.' items' : '' }}
                             {{ ! $offer->min_subtotal && ! $offer->min_qty ? 'always' : '' }}
                         </td>
+                        <td class="px-4 py-3 text-xs {{ $offer->hasEnded() ? 'text-red-700' : 'text-ink-700/60' }}">
+                            @if($offer->ends_at)
+                                {{ store_time($offer->ends_at)->format('d M, g:i A') }}
+                                <span class="block">{{ $offer->hasEnded() ? 'ended' : store_time($offer->ends_at)->diffForHumans() }}</span>
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="px-4 py-3">{!! $offer->show_on_pdp ? '✓' : '—' !!}</td>
                         <td class="px-4 py-3">{!! $offer->is_active ? '<span class="badge bg-green-100 text-green-700">Yes</span>' : '<span class="badge bg-ink-100 text-ink-700">No</span>' !!}</td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -308,7 +343,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-4 py-10 text-center text-ink-700/50">No offers yet. Create one on the left.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-10 text-center text-ink-700/50">No offers yet. Create one on the left.</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -40,6 +40,9 @@ class ProductCardData
             'compare_text' => $quote['was'] !== null ? money($quote['was']) : null,
             'on_sale' => $quote['was'] !== null,
             'discount_percent' => $quote['was'] !== null ? OfferPricing::percentValue($quote['percent']) : null,
+            // The offer's deadline, for the card's countdown. The card ticks it
+            // down and asks the page for fresh prices when it runs out.
+            'offer_ends' => $quote['offer']?->endsAtUnix(),
             'preorder' => $p->isPreorder(),
             'available' => $p->isAvailable(),
             'has_variants' => (bool) $p->has_variants,

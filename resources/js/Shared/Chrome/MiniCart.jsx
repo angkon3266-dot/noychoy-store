@@ -7,6 +7,7 @@ import GiftLadderBar from '../GiftLadderBar';
 import Icon from '../Icons';
 import { trapTab } from '../focusTrap';
 import { t } from '../i18n';
+import OfferCountdown from '../OfferCountdown';
 
 // Mini-cart slide-over — same /cart/mini data contract as the Alpine drawer.
 export default function MiniCart() {
@@ -67,7 +68,10 @@ export default function MiniCart() {
                                     <span className="block text-xs text-ink-700/70">Qty {item.qty}</span>
                                     <span className="block text-sm text-gold-700">{item.price_text}</span>
                                     {item.promo && (
-                                        <span className="block text-[11px] text-success-700">{item.promo.label} · you save {item.promo.saving_text}</span>
+                                        <span className="block text-[11px] text-success-700">
+                                            {item.promo.label} · you save {item.promo.saving_text}
+                                            {item.promo.ends && <OfferCountdown ends={item.promo.ends} className="ml-1 font-semibold text-danger-600" />}
+                                        </span>
                                     )}
                                 </span>
                             </SmartLink>
