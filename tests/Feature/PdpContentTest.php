@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -10,8 +11,9 @@ use Tests\TestCase;
 /**
  * The product page payload after the phone de-clutter: the vertical
  * trust-badge list beside the buy button stays, while the member pill, the
- * arrival box, the gift-ladder line and the Care / Shipping & returns
- * accordions are gone from the page and from the props.
+ * arrival box, the gift-ladder line and the Shipping & returns accordion are
+ * gone from the page and from the props. Care came back on 2026-09-22 as a
+ * folded section, the same text on every product.
  */
 class PdpContentTest extends TestCase
 {
@@ -39,7 +41,7 @@ class PdpContentTest extends TestCase
                 // The config default promise list, whatever its current wording.
                 ->has('pdpPoints.items', count(config('theme.defaults.pdp_points')))
                 ->where('pdpPoints.items.0.title', config('theme.defaults.pdp_points.0.title'))
-                ->missing('care')
+                ->where('care', config('theme.defaults.pdp_care_text'))
                 ->missing('returns')
                 ->missing('refundUrl')
                 ->missing('delivery')
@@ -55,6 +57,31 @@ class PdpContentTest extends TestCase
                 ->has('ui.registerUrl')
                 ->has('ui.loginUrl'),
             );
+    }
+
+    public function test_care_instructions_follow_appearance_and_blank_hides_them(): void
+    {
+        $admin = User::create(['name' => 'Admin', 'email' => 'care@b.test', 'password' => bcrypt('secret'), 'role' => 'admin']);
+        $payload = ['homepage_template' => 'couture', 'product_template' => 'showcase'];
+        $product = $this->product();
+        $care = "- Keep it dry.\n- Store it in the pouch.";
+
+        $this->actingAs($admin)->post('/admin/appearance', $payload + ['pdp_care_text' => $care])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->get(route('product.show', $product))
+            ->assertInertia(fn (Assert $page) => $page->where('care', $care));
+
+        // A save that leaves the box out of the post keeps the text.
+        $this->post('/admin/appearance', $payload)->assertRedirect();
+        $this->assertSame($care, theme('pdp_care_text'));
+
+        $this->post('/admin/appearance', $payload + ['pdp_care_text' => ''])->assertRedirect();
+
+        $this->get(route('product.show', $product))
+            ->assertInertia(fn (Assert $page) => $page->where('care', null));
+
+        $this->get('/admin/appearance')->assertOk()->assertSee('name="pdp_care_text"', false);
     }
 
     public function test_seo_surfaces_print_description_without_markdown_tokens(): void

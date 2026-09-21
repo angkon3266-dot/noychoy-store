@@ -69,6 +69,7 @@ export default function Product(props) {
             <StorySections sections={product.sections} />
             <Description text={product.description} />
             <Details specs={product.specs} />
+            <Care text={props.care} />
             <div className="max-w-3xl mt-6 border-t border-ink-100 pt-4">
                 <ShareButton url={product.url} title={product.name} label="Share" />
             </div>
@@ -1017,6 +1018,26 @@ function Details({ specs }) {
                     </div>
                 ))}
             </dl>
+        </section>
+    );
+}
+
+/**
+ * How to look after the piece — one store-wide text from Appearance, on every
+ * product page. Folded shut on arrival (owner, 2026-09-22), built like the
+ * Description fold: the copy stays in the DOM behind `hidden`, so the tap
+ * fetches nothing and crawlers still read it.
+ */
+function Care({ text }) {
+    const [open, setOpen] = useState(false);
+    if (!text) return null;
+    return (
+        <section className="mt-10 max-w-3xl border-t border-ink-100 pt-8">
+            <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
+                <h2 className="font-display text-2xl font-semibold">Care instructions</h2>
+                <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
+            </button>
+            <RichText text={text} className={`text-[15px] text-ink-700/85 mt-3 ${open ? '' : 'hidden'}`} />
         </section>
     );
 }

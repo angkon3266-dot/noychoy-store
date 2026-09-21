@@ -133,6 +133,9 @@ class ProductPageData
             // own, else its category's, else the store-wide one. The footer
             // strip still reads theme.trust_badges in HandleInertiaRequests.
             'pdpPoints' => PdpPoints::for($product),
+            // The folded "Care instructions" section under Details, the same
+            // on every product (Appearance); null hides it.
+            'care' => filled(theme('pdp_care_text')) ? theme('pdp_care_text') : null,
             'reviews' => [
                 'avg' => $product->average_rating,
                 'count' => $count,

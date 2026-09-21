@@ -1208,6 +1208,13 @@
         @include('admin.partials.pdp-points-editor', ['points' => $theme['pdp_points'] ?? [], 'scope' => 'store'])
     </div>
 
+    {{-- Product page care instructions --}}
+    <div class="card p-6" x-show="tab==='branding'">
+        <h2 class="font-semibold mb-1">Product page care instructions</h2>
+        <p class="text-xs text-ink-700/60 mb-4">Shown on every product page under the Details table, folded shut until a shopper taps <strong>Care instructions</strong>. A line starting with “- ” becomes a bullet, “## ” a heading, and a blank line starts a new paragraph. Leave it empty to hide the section.</p>
+        <textarea name="pdp_care_text" rows="6" maxlength="2000" class="input font-mono text-xs">{{ $theme['pdp_care_text'] ?? '' }}</textarea>
+    </div>
+
     {{-- Trust badges --}}
     <div class="card p-6" x-show="tab==='branding'" x-data="{ badges: @js(array_values($theme['trust_badges'] ?? config('theme.defaults.trust_badges', []))) }">
         <h2 class="font-semibold mb-1">Trust badges</h2>

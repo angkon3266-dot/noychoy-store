@@ -139,6 +139,8 @@ class AppearanceController extends Controller
             'pdp_points.*.icon' => ['nullable', 'string', 'max:24'],
             'pdp_points.*.title' => ['nullable', 'string', 'max:80'],
             'pdp_points.*.text' => ['nullable', 'string', 'max:140'],
+            // Product page "Care instructions" fold; blank hides it
+            'pdp_care_text' => ['nullable', 'string', 'max:2000'],
             'trust_badges.*.icon' => ['nullable', 'string', 'max:24'],
             'trust_badges.*.title' => ['nullable', 'string', 'max:40'],
             'trust_badges.*.text' => ['nullable', 'string', 'max:60'],
@@ -493,7 +495,7 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_copyright',
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'pdp_care_text', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_copyright',
             'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
             'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
             'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',

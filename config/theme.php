@@ -187,6 +187,17 @@ return [
             ['icon' => 'gift', 'title' => 'উপহারের জন্য প্রস্তুত', 'text' => 'সুন্দর বক্সে প্যাক করে পাঠানো হয়'],
             ['icon' => 'truck', 'title' => 'সারা বাংলাদেশে দ্রুত ডেলিভারি', 'text' => ''],
         ],
+
+        // Product page: the folded "Care instructions" section under the
+        // Details table (Appearance → Product page care instructions). Light
+        // format, same as descriptions: "- " bullets, "## " headings, blank
+        // lines for paragraphs. Removed in the 2026-09-10 de-clutter, back at
+        // the owner's ask on 2026-09-22 — production kept its saved row, so
+        // this wording is what the live store shows too. Blank hides it.
+        'pdp_care_text' => "- Keep away from perfume, hairspray and water — put jewelry on last, take it off first.\n"
+            ."- Wipe gently with the dry soft cloth after wearing to keep the plating bright.\n"
+            ."- Store each piece separately in the pouch or box it arrived in, away from sunlight.\n"
+            ."- Avoid wearing during exercise, swimming or sleeping.",
     ],
 
     // Homepage templates (brand-inspired presets). Each maps to a Blade view.
