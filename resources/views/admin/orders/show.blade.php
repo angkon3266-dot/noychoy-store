@@ -442,6 +442,46 @@
                             <strong>Book again with courier</strong>.
                         </p>
                     @endif
+
+                    {{-- Block the number where the order that prompted it is
+                         open. Same list as Customers → Blocked numbers; the
+                         order itself is left as it is. Staff see that a number
+                         is blocked (they take the phone orders) but the list is
+                         a Customers-section decision, so only roles with that
+                         section get the buttons. --}}
+                    @php $canBlock = (bool) auth()->user()?->canAccess('customers'); @endphp
+                    @if($blockedPhone)
+                        <div class="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
+                            <p class="font-medium">🚫 This number is blocked from ordering.</p>
+                            @if($blockedPhone->reason)<p class="mt-0.5">{{ $blockedPhone->reason }}</p>@endif
+                            <p class="mt-0.5 text-red-800/60">Blocked {{ store_time($blockedPhone->created_at)->format('d M Y') }}{{ $blockedPhone->blockedBy ? ' by '.$blockedPhone->blockedBy->name : '' }}</p>
+                            @if($canBlock)
+                                <form action="{{ route('admin.customers.blocked.destroy', $blockedPhone) }}" method="POST" class="mt-1.5"
+                                      onsubmit="return confirm(@js('Let '.$order->customer_phone.' order again?'))">
+                                    @csrf @method('DELETE')
+                                    <button class="font-medium underline hover:no-underline">Unblock</button>
+                                </form>
+                            @endif
+                        </div>
+                    @elseif($canBlock && bd_phone((string) $order->customer_phone) !== '')
+                        <div x-data="{ blocking: false }" class="mt-3 border-t border-ink-100 pt-3">
+                            <button type="button" x-show="!blocking" @click="blocking = true" class="text-xs text-red-600 hover:underline">🚫 Block this number</button>
+                            <form x-show="blocking" x-cloak action="{{ route('admin.customers.blocked.quick') }}" method="POST" class="space-y-2"
+                                  onsubmit="return confirm(@js('Block '.$order->customer_phone.'? They will not be able to place another order.'))">
+                                @csrf
+                                <input type="hidden" name="phone" value="{{ $order->customer_phone }}">
+                                <div>
+                                    <label class="label text-xs" for="block-reason">Why — shown on the blocked list</label>
+                                    <input id="block-reason" name="reason" value="Order {{ $order->order_number }}" maxlength="200" class="input py-1.5 text-sm">
+                                </div>
+                                <p class="text-[11px] text-ink-700/50">They will not be able to order again — on the site, through the chat assistant, or typed in here. This order stays as it is: cancel it too if it should not go out.</p>
+                                <div class="flex items-center gap-2">
+                                    <button class="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">Block {{ $order->customer_phone }}</button>
+                                    <button type="button" @click="blocking = false" class="text-xs text-ink-700/60 hover:underline">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
                 </div>
 
                 {{-- "Wrong flat number" / "use my office address" is the most

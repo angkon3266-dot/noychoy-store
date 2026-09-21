@@ -314,6 +314,11 @@ class OrderController extends Controller
             'balance' => $steadfast->balance(),
             'bdCourierOn' => $bdCourier->isConfigured(),
             'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
+            // The order that prompts a block is where the owner is when she
+            // decides (2026-09-22), so the Customer card blocks and unblocks.
+            'blockedPhone' => bd_phone((string) $order->customer_phone) !== ''
+                ? \App\Models\BlockedPhone::with('blockedBy:id,name')->where('phone', bd_phone((string) $order->customer_phone))->first()
+                : null,
             // The amend form's "add a product" box searches (admin.orders.product-search)
             // instead of carrying the whole catalogue in the page.
         ]);

@@ -226,6 +226,65 @@ class BlockedPhoneTest extends TestCase
         $this->assertFalse(BlockedPhone::blocks('01712345678'));
     }
 
+    protected function orderFrom(string $phone): Order
+    {
+        return Order::create([
+            'order_number' => '10084', 'customer_name' => 'Buyer', 'customer_phone' => $phone,
+            'shipping_address' => 'Dhaka', 'status' => 'processing', 'subtotal' => 1500, 'total' => 1500,
+        ]);
+    }
+
+    /**
+     * The order that prompts a block is where the owner is when she decides
+     * (2026-09-22): its Customer card blocks with the order as the reason,
+     * then says the number is blocked and offers to let it order again.
+     */
+    public function test_the_order_page_blocks_the_number_and_unblocks_it(): void
+    {
+        $order = $this->orderFrom('01712345678');
+        $page = route('admin.orders.show', $order);
+        $admin = $this->actingAs($this->admin());
+
+        $admin->get($page)->assertOk()
+            ->assertSee('Block this number')
+            ->assertSee('value="Order 10084"', false);
+
+        $admin->from($page)->post(route('admin.customers.blocked.quick'), [
+            'phone' => '01712345678', 'reason' => 'Order 10084 — refused the parcel twice',
+        ])->assertRedirect($page);
+        $this->assertTrue(BlockedPhone::blocks('01712345678'));
+        $this->assertSame('Order 10084 — refused the parcel twice', BlockedPhone::first()->reason);
+
+        $admin->get($page)->assertOk()
+            ->assertSee('This number is blocked from ordering')
+            ->assertSee('Order 10084 — refused the parcel twice')
+            ->assertDontSee('Block this number');
+
+        $admin->from($page)->delete(route('admin.customers.blocked.destroy', BlockedPhone::first()))->assertRedirect($page);
+        $this->assertFalse(BlockedPhone::blocks('01712345678'));
+
+        // A block is about the next order; this one is left as it was.
+        $this->assertSame('processing', $order->fresh()->status);
+    }
+
+    public function test_staff_see_a_blocked_number_on_the_order_but_get_no_buttons(): void
+    {
+        $order = $this->orderFrom('01712345678');
+        $staff = User::create(['name' => 'Staff', 'email' => 'order-staff@b.test', 'password' => bcrypt('secret'), 'role' => 'staff']);
+
+        // They take the phone orders, so they need to know — but the list is
+        // a Customers-section decision they cannot open.
+        $this->actingAs($staff)->get(route('admin.orders.show', $order))->assertOk()
+            ->assertDontSee('Block this number');
+
+        BlockedPhone::block('01712345678', 'Refused twice');
+
+        $this->actingAs($staff)->get(route('admin.orders.show', $order))->assertOk()
+            ->assertSee('This number is blocked from ordering')
+            ->assertSee('Refused twice')
+            ->assertDontSee('Unblock');
+    }
+
     public function test_staff_cannot_reach_the_blocked_list(): void
     {
         $staff = User::create(['name' => 'Staff', 'email' => 's@b.test', 'password' => bcrypt('secret'), 'role' => 'staff']);
