@@ -12,9 +12,26 @@
     For single-use codes use <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a>.
 </p>
 
+@php
+    // The settings cards start folded. The one whose form was just turned
+    // down (its old input carries `_card`) or just saved (the controller
+    // flashes `offers_card`) opens, with that form's error inside it — the
+    // error used to land in the New offer form whichever form it came from.
+    $openCard = old('_card') ?: session('offers_card');
+    $cardError = fn (string $card) => old('_card') === $card && $errors->any() ? $errors->first() : null;
+    $pct = fn ($n) => rtrim(rtrim(number_format((float) $n, 1), '0'), '.');
+    $onBadge = '<span class="badge bg-green-100 text-green-700">%s</span>';
+    $offBadge = '<span class="badge bg-ink-100 text-ink-700">Off</span>';
+@endphp
+
+<div class="max-w-3xl space-y-3 mb-6">
 {{-- Reward ladder — every paid piece climbs a rung, each rung's reward stays unlocked --}}
-<div class="card p-5 mb-6 max-w-3xl" x-data="{ tiers: @js($giftLadder['tiers']) }">
-    <h2 class="font-semibold mb-1">Reward ladder</h2>
+<x-admin.settings-card id="ladder" title="Reward ladder" :open="$openCard === 'ladder'">
+    <x-slot:status>
+        {!! $giftLadder['enabled'] ? sprintf($onBadge, 'Live') : $offBadge !!}
+        <span class="text-xs text-ink-700/50">{{ count($giftLadder['tiers']) ? count($giftLadder['tiers']).' '.Str::plural('rung', count($giftLadder['tiers'])) : 'no rungs yet' }}</span>
+    </x-slot:status>
+    <div x-data="{ tiers: @js($giftLadder['tiers']) }">
     <p class="text-xs text-ink-700/60 mb-3">
         “Add more, save more”: every <strong>paid piece</strong> in the cart climbs one rung, and each rung's reward
         <strong>stays unlocked</strong> as the cart grows — at 4 pieces the customer holds rungs 1 to 4 at once.
@@ -28,6 +45,8 @@
     </p>
     <form action="{{ route('admin.offers.gift-ladder') }}" method="POST">
         @csrf
+        <input type="hidden" name="_card" value="ladder">
+        @if($err = $cardError('ladder'))<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $err }}</div>@endif
         <div class="flex flex-wrap items-end gap-3 mb-3">
             <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
                 <input type="checkbox" name="enabled" value="1" @checked($giftLadder['enabled'])>
@@ -89,15 +108,25 @@
             A rung at 1 piece applies to <strong>every</strong> order — check your margins before switching it on.
         </p>
     </form>
-</div>
+    </div>
+</x-admin.settings-card>
 
 {{-- Registration offer (shown to guests, applied automatically to logged-in members) --}}
-<div class="card p-5 mb-6 max-w-3xl">
-    <h2 class="font-semibold mb-1">Register-for-discount offer</h2>
+<x-admin.settings-card id="register-offer" title="Register-for-discount offer" :open="$openCard === 'register'">
+    <x-slot:status>
+        @if((float) $registerOffer['percent'] > 0)
+            {!! sprintf($onBadge, 'On') !!}
+            <span class="text-xs text-ink-700/50">{{ $pct($registerOffer['percent']) }}% off for members</span>
+        @else
+            {!! $offBadge !!}
+        @endif
+    </x-slot:status>
     <p class="text-xs text-ink-700/60 mb-3">Guests see this as a nudge at checkout &amp; on the register page. Logged-in customers get the discount automatically on every order. Set the percent to 0 to turn it off.</p>
     <form action="{{ route('admin.offers.register') }}" method="POST" class="flex flex-wrap items-end gap-3"
           x-data="{ rows: @js($memberOverrides), categories: @js($categories->map(fn($c)=>['id'=>$c->id,'name'=>$c->name])->values()), products: @js($products->map(fn($p)=>['id'=>$p->id,'name'=>$p->name])->values()) }">
         @csrf
+        <input type="hidden" name="_card" value="register">
+        @if($err = $cardError('register'))<div class="w-full rounded bg-red-50 text-red-700 text-sm px-3 py-2">{{ $err }}</div>@endif
         <div>
             <label class="label">Member discount %</label>
             <input name="register_offer_percent" type="number" step="0.1" min="0" max="90" value="{{ $registerOffer['percent'] }}" class="input w-32">
@@ -137,14 +166,23 @@
         <button class="btn-primary">Save</button>
         <p class="w-full text-xs text-ink-700/50 mt-1">Logged-in members see this discounted price on every product. The discount applies to at most <strong>Max uses</strong> orders within each rolling window of <strong>Per (days)</strong> days per customer (0 = unlimited).</p>
     </form>
-</div>
+</x-admin.settings-card>
 
 {{-- Loyalty & points configuration --}}
-<div class="card p-5 mb-6 max-w-3xl">
-    <h2 class="font-semibold mb-1">Loyalty &amp; points</h2>
+<x-admin.settings-card id="loyalty" title="Loyalty & points" :open="$openCard === 'loyalty'">
+    <x-slot:status>
+        @if($loyalty['enabled'])
+            {!! sprintf($onBadge, 'On') !!}
+            <span class="text-xs text-ink-700/50">{{ $loyalty['per_1000'] }} {{ Str::plural('point', (int) $loyalty['per_1000']) }} per ৳1,000</span>
+        @else
+            {!! $offBadge !!}
+        @endif
+    </x-slot:status>
     <p class="text-xs text-ink-700/60 mb-3">Control how customers earn and spend points. Points are credited <strong>after an order is delivered</strong>.</p>
     <form action="{{ route('admin.offers.loyalty') }}" method="POST">
         @csrf
+        <input type="hidden" name="_card" value="loyalty">
+        @if($err = $cardError('loyalty'))<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $err }}</div>@endif
         <label class="flex items-center gap-2 text-sm mb-3"><input type="checkbox" name="enabled" value="1" @checked($loyalty['enabled'])> Enable the points / rewards program</label>
         <div class="grid sm:grid-cols-3 gap-3">
             <div>
@@ -174,11 +212,18 @@
         </div>
         <button class="btn-primary mt-3">Save loyalty settings</button>
     </form>
-</div>
+</x-admin.settings-card>
 
 {{-- Birthday & anniversary automations --}}
-<div class="card p-5 mb-6 max-w-3xl">
-    <h2 class="font-semibold mb-1">Birthday &amp; anniversary messages</h2>
+<x-admin.settings-card id="occasions" title="Birthday & anniversary messages" :open="$openCard === 'occasions'">
+    <x-slot:status>
+        @if($occasions['enabled'])
+            {!! sprintf($onBadge, 'On') !!}
+            <span class="text-xs text-ink-700/50">{{ $occasions['sms'] ? 'in-app + SMS' : 'in-app only' }}{{ (float) $occasions['offer_percent'] > 0 ? ' · '.$pct($occasions['offer_percent']).'% gift on the day' : '' }}</span>
+        @else
+            {!! $offBadge !!}
+        @endif
+    </x-slot:status>
     <p class="text-xs text-ink-700/60 mb-3">
         Customers can leave a birthday and an anniversary (day + month) at checkout or in their account —
         <strong>{{ $occasions['on_file'] }}</strong> have so far. A reminder with the matching collection goes out before the date,
@@ -187,6 +232,8 @@
     </p>
     <form action="{{ route('admin.offers.occasions') }}" method="POST" class="flex flex-wrap items-end gap-3">
         @csrf
+        <input type="hidden" name="_card" value="occasions">
+        @if($err = $cardError('occasions'))<div class="w-full rounded bg-red-50 text-red-700 text-sm px-3 py-2">{{ $err }}</div>@endif
         <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
             <input type="checkbox" name="enabled" value="1" @checked($occasions['enabled'])> Automation on
         </label>
@@ -211,6 +258,7 @@
             SMS wording lives under System Config → Integrations → SMS templates (“occasion_reminder”, “occasion_wish”).
         </p>
     </form>
+</x-admin.settings-card>
 </div>
 
 <div class="grid lg:grid-cols-3 gap-6">
@@ -228,7 +276,7 @@
     @endphp
     <div class="card p-6 h-fit" x-data="{ type: '{{ old('type', $editing->type ?? 'order_percent') }}', applies: '{{ old('applies_to', $editing->applies_to ?? 'all') }}', catQ: '', endsAt: @js(old('ends_at', store_time($editing->ends_at ?? null)?->format('Y-m-d\TH:i') ?? '')) }">
         <h2 class="font-semibold mb-4">{{ $editing ? 'Edit offer' : 'New offer' }}</h2>
-        @if($errors->any())<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $errors->first() }}</div>@endif
+        @if($errors->any() && ! old('_card'))<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $errors->first() }}</div>@endif
         <form action="{{ $editing ? route('admin.offers.update', $editing) : route('admin.offers.store') }}" method="POST" class="space-y-3">
             @csrf
             @if($editing) @method('PUT') @endif

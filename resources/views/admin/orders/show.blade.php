@@ -2,6 +2,13 @@
 @section('title', $order->order_number)
 @section('heading', 'Order '.$order->order_number)
 
+{{-- This page shows no field errors of its own, so a save the server turned
+     down (amend, details, SMS…) came back looking exactly like nothing had
+     happened. In the flash zone it also raises the red toast. --}}
+@section('flash')
+    @if($errors->any())<div class="m-4 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">Not saved — {{ $errors->first() }}</div>@endif
+@endsection
+
 @section('content')
 @if($order->is_gift)
     <div class="mb-4 rounded-xl border-2 border-gold-300 bg-gold-50 px-4 py-3 text-sm flex items-start gap-3">
@@ -363,7 +370,7 @@
                     <p class="font-medium text-xs text-ink-700/60">Custom adjustments (positive = extra charge, negative = discount)</p>
                     <template x-for="(adj, i) in adjustments" :key="i">
                         <div class="grid grid-cols-12 gap-2 items-center">
-                            <input :name="`adjustments[${i}][label]`" x-model="adj.label" placeholder="Label (e.g. Gift wrap)" class="input py-1 text-sm col-span-7">
+                            <input :name="`adjustments[${i}][label]`" x-model="adj.label" maxlength="60" placeholder="Label (e.g. Gift wrap)" class="input py-1 text-sm col-span-7">
                             <input type="number" step="0.01" :name="`adjustments[${i}][amount]`" x-model.number="adj.amount" placeholder="Amount ৳" class="input py-1 text-sm col-span-4">
                             <button type="button" @click="adjustments.splice(i,1)" class="col-span-1 text-red-600">✕</button>
                         </div>

@@ -31,7 +31,7 @@
         @else
             Automatic birthday &amp; anniversary messages are off.
         @endif
-        <a href="{{ route('admin.offers.index') }}" class="text-gold-700 hover:underline">Settings →</a>
+        <a href="{{ route('admin.offers.index') }}#occasions" class="text-gold-700 hover:underline">Settings →</a>
     </p>
 </div>
 

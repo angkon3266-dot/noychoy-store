@@ -332,8 +332,9 @@ class OrderController extends Controller
             'items.*.id' => ['required', 'integer'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'shipping_cost' => ['required', 'numeric', 'min:0'],
-            'discount' => ['required', 'numeric', 'min:0'],
+            // Always posted, but an emptied box means none: see below.
+            'shipping_cost' => ['present', 'nullable', 'numeric', 'min:0'],
+            'discount' => ['present', 'nullable', 'numeric', 'min:0'],
             'adjustments' => ['nullable', 'array', 'max:20'],
             'adjustments.*.label' => ['nullable', 'string', 'max:60'],
             'adjustments.*.amount' => ['nullable', 'numeric', 'between:-1000000,1000000'],
@@ -344,7 +345,27 @@ class OrderController extends Controller
             'new_lines.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'new_lines.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
             'new_lines.*.price' => ['nullable', 'numeric', 'min:0'],
+        ], [], [
+            // A rejected save is now shown on the page, so it has to read as
+            // English rather than "The items.0.price field is required."
+            'items.*.price' => 'unit price',
+            'items.*.quantity' => 'quantity',
+            'shipping_cost' => 'shipping',
+            'adjustments.*.label' => 'adjustment label',
+            'adjustments.*.amount' => 'adjustment amount',
+            'new_lines.*.product_id' => 'added product',
+            'new_lines.*.variant_id' => 'option',
+            'new_lines.*.qty' => 'quantity',
+            'new_lines.*.price' => 'unit price',
         ]);
+
+        // Clearing the Shipping box is how "make delivery free" gets typed, and
+        // the form's running total already counts a blank box as ৳0 — so it
+        // showed the free total, then failed `required` on save with nothing on
+        // the page to say so, and the old charge stayed (order 10084,
+        // 2026-09-21). Blank means none, for the discount too.
+        $data['shipping_cost'] = round((float) ($data['shipping_cost'] ?? 0), 2);
+        $data['discount'] = round((float) ($data['discount'] ?? 0), 2);
 
         // A payload with neither kept lines nor new ones would empty the order.
         // The form always posts what it is showing, so this only fires on a
@@ -367,6 +388,8 @@ class OrderController extends Controller
             $itemsById = $order->items->keyBy('id');
             $subtotal = 0.0;
             $changes = [];
+            $wasShipping = (float) $order->shipping_cost;
+            $wasDiscount = (float) $order->discount;
 
             // Stock is only this order's to move while it is actually holding
             // it. Once an order is cancelled or returned its units are already
@@ -480,6 +503,18 @@ class OrderController extends Controller
                 'adjustments' => $adjustments ?: null,
                 'total' => $total,
             ]);
+
+            // The note only ever said the new total, so "did the free delivery
+            // save?" had no answer in the history. Money first: the note keeps
+            // six changes at most.
+            $amounts = [];
+            if (abs($wasShipping - $data['shipping_cost']) >= 0.01) {
+                $amounts[] = 'shipping '.money($wasShipping).' → '.money($data['shipping_cost']);
+            }
+            if (abs($wasDiscount - $data['discount']) >= 0.01) {
+                $amounts[] = 'discount '.money($wasDiscount).' → '.money($data['discount']);
+            }
+            $changes = array_merge($amounts, $changes);
 
             $order->history()->create([
                 'status' => $order->status,

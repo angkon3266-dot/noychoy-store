@@ -71,7 +71,7 @@ class OfferController extends Controller
         \App\Models\Setting::put('occasion_offer_percent', (float) ($data['offer_percent'] ?? 0));
         \App\Models\Setting::put('occasion_offer_days', (int) $data['offer_days']);
 
-        return back()->with('success', 'Birthday & anniversary settings saved.');
+        return back()->with('success', 'Birthday & anniversary settings saved.')->with('offers_card', 'occasions');
     }
 
     /** Save the loyalty/points configuration. */
@@ -94,7 +94,7 @@ class OfferController extends Controller
         \App\Models\Setting::put('loyalty_signup_points', (int) $data['signup']);
         \App\Models\Setting::put('loyalty_review_photo_bonus', (int) $data['photo_bonus']);
 
-        return back()->with('success', 'Loyalty settings saved.');
+        return back()->with('success', 'Loyalty settings saved.')->with('offers_card', 'loyalty');
     }
 
     /**
@@ -120,13 +120,13 @@ class OfferController extends Controller
         $hasGiftRung = collect($tiers)->contains(fn ($t) => $t['type'] === 'free_gift');
 
         if ($enabled && $tiers === []) {
-            return back()->with('error', 'Add at least one rung (a ৳ or % value is required for money rewards) before switching the ladder on.');
+            return back()->with('error', 'Add at least one rung (a ৳ or % value is required for money rewards) before switching the ladder on.')->with('offers_card', 'ladder');
         }
 
         if ($enabled && $hasGiftRung) {
             $gifts = $giftsId ? \App\Models\Collection::active()->find($giftsId) : null;
             if (! $gifts || app(\App\Services\CollectionService::class)->count($gifts) < 1) {
-                return back()->with('error', 'The free-gift rung needs a gifts collection with at least one product. Pick one, or remove that rung.');
+                return back()->with('error', 'The free-gift rung needs a gifts collection with at least one product. Pick one, or remove that rung.')->with('offers_card', 'ladder');
             }
         }
 
@@ -137,7 +137,7 @@ class OfferController extends Controller
         ));
         \App\Models\Setting::put('gift_ladder_gifts_collection_id', $giftsId);
 
-        return back()->with('success', $enabled ? 'Reward ladder saved and live.' : 'Reward ladder saved (off).');
+        return back()->with('success', $enabled ? 'Reward ladder saved and live.' : 'Reward ladder saved (off).')->with('offers_card', 'ladder');
     }
 
     /** Save the "register for an extra discount" offer (shown to guests, applied to members). */
@@ -172,7 +172,7 @@ class OfferController extends Controller
         }
         \App\Models\Setting::put('member_discount_overrides', $overrides);
 
-        return back()->with('success', 'Registration offer saved.');
+        return back()->with('success', 'Registration offer saved.')->with('offers_card', 'register');
     }
 
     /** Stored member-discount overrides → flat rows for the admin builder. */

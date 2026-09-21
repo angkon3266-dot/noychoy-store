@@ -349,6 +349,59 @@ class AdminUsabilityTest extends TestCase
         $this->assertSame(1, $order->fresh()->items()->count());
     }
 
+    /**
+     * Order 10084, 21 Sep 2026: the owner emptied the Shipping box to make
+     * delivery free. The form's running total read the blank as ৳0, the save
+     * failed `required`, and the page came back unchanged with no message.
+     */
+    public function test_clearing_the_shipping_box_makes_delivery_free(): void
+    {
+        [$order, , $item] = $this->orderWithItem(stock: 10, qty: 1);
+        $order->update(['shipping_cost' => 80, 'total' => 1080]);
+
+        // An emptied number box posts an empty string.
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [['id' => $item->id, 'price' => 1000, 'quantity' => 1]],
+            'shipping_cost' => '', 'discount' => '',
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        $order->refresh();
+        $this->assertSame(0.0, (float) $order->shipping_cost);
+        $this->assertSame(1000.0, (float) $order->total);
+        // The history says what changed, not only the new total.
+        $this->assertStringContainsString('shipping ৳80 → ৳0', $order->history()->first()->note);
+    }
+
+    public function test_an_amend_without_a_shipping_field_is_not_read_as_free(): void
+    {
+        [$order, , $item] = $this->orderWithItem(stock: 10, qty: 1);
+        $order->update(['shipping_cost' => 80, 'total' => 1080]);
+
+        // Blank means none; missing means a broken request.
+        $this->actingAs($this->admin())->post(route('admin.orders.amend', $order), [
+            'items' => [['id' => $item->id, 'price' => 1000, 'quantity' => 1]],
+            'discount' => 0,
+        ])->assertSessionHasErrors('shipping_cost');
+
+        $this->assertSame(80.0, (float) $order->fresh()->shipping_cost);
+    }
+
+    public function test_an_amend_the_server_turns_down_says_so_on_the_order_page(): void
+    {
+        [$order, , $item] = $this->orderWithItem(stock: 10, qty: 1);
+
+        $this->actingAs($this->admin())
+            ->from(route('admin.orders.show', $order))
+            ->followingRedirects()
+            ->post(route('admin.orders.amend', $order), [
+                'items' => [['id' => $item->id, 'price' => '', 'quantity' => 1]],
+                'shipping_cost' => 0, 'discount' => 0,
+            ])
+            ->assertOk()
+            ->assertSee('Not saved', false)
+            ->assertSee('unit price field is required', false);
+    }
+
     public function test_amending_a_cancelled_order_does_not_invent_stock(): void
     {
         [$order, $product, $item] = $this->orderWithItem(stock: 10, qty: 2);
