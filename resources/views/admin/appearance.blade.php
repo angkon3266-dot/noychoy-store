@@ -1163,9 +1163,17 @@
                 <label class="label">About text</label>
                 <textarea name="footer_about" rows="2" class="input" placeholder="Handpicked jewelry, delivered across Bangladesh…">{{ $theme['footer_about'] ?? '' }}</textarea>
             </div>
-            <div class="grid sm:grid-cols-2 gap-4">
-                <div><label class="label">Facebook page URL</label><input name="footer_facebook" value="{{ $theme['footer_facebook'] ?? '' }}" class="input" placeholder="https://facebook.com/yourpage"></div>
-                <div><label class="label">Instagram URL</label><input name="footer_instagram" value="{{ $theme['footer_instagram'] ?? '' }}" class="input" placeholder="https://instagram.com/yourpage"></div>
+            <div>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    @foreach(\App\Support\SocialLinks::PLATFORMS as $platform => $social)
+                        @php $socialKey = \App\Support\SocialLinks::key($platform); @endphp
+                        <div>
+                            <label class="label" for="social-{{ $platform }}">{{ $social['field'] }}</label>
+                            <input id="social-{{ $platform }}" name="{{ $socialKey }}" value="{{ old($socialKey, $theme[$socialKey] ?? '') }}" class="input" placeholder="{{ $social['placeholder'] }}">
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-xs text-ink-700/50 mt-1">Paste the link to each page, or just the @handle. Each one filled in shows as an icon in the footer and the phone menu; leave a box empty to hide that icon.</p>
             </div>
             <div>
                 <label class="label">Copyright line</label>

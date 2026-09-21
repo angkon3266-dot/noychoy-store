@@ -9,6 +9,7 @@ use App\Models\Review;
 use App\Models\Setting;
 use App\Services\ImageOptimizer;
 use App\Services\StorefrontFilters;
+use App\Support\SocialLinks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -40,6 +41,14 @@ class AppearanceController extends Controller
 
     public function update(Request $request, ImageOptimizer $optimizer)
     {
+        // An @handle, or a link typed without https://, becomes the full
+        // address before it is checked, so the box shows what gets linked.
+        foreach (array_keys(SocialLinks::PLATFORMS) as $platform) {
+            if ($request->has($key = SocialLinks::key($platform))) {
+                $request->merge([$key => SocialLinks::normalise($request->input($key), $platform)]);
+            }
+        }
+
         $data = $request->validate([
             'primary' => ['nullable', 'string', 'max:9'],
             'accent' => ['nullable', 'string', 'max:9'],
@@ -56,8 +65,9 @@ class AppearanceController extends Controller
             'font_body_file' => ['nullable', 'file', 'extensions:woff,woff2,ttf,otf', 'max:8192'],
             'footer_brand' => ['nullable', 'string', 'max:60'],
             'footer_about' => ['nullable', 'string', 'max:300'],
-            'footer_facebook' => ['nullable', 'string', 'max:200'],
-            'footer_instagram' => ['nullable', 'string', 'max:200'],
+            ...collect(SocialLinks::PLATFORMS)->mapWithKeys(fn ($m, $platform) => [
+                SocialLinks::key($platform) => ['nullable', 'string', 'max:200', 'regex:'.SocialLinks::WEB_LINK],
+            ])->all(),
             'footer_copyright' => ['nullable', 'string', 'max:200'],
             'footer_show_trust' => ['nullable', 'boolean'],
             'footer_category_ids' => ['nullable', 'array'],
@@ -216,6 +226,9 @@ class AppearanceController extends Controller
             'pinned_link.regex' => 'The pinned message link must be a page on the shop (starting with /) or a full web address (https://…).',
             'pinned_bg.regex' => 'Pick the pinned message background with the colour picker.',
             'pinned_color.regex' => 'Pick the pinned message text colour with the colour picker.',
+            ...collect(SocialLinks::PLATFORMS)->mapWithKeys(fn ($m, $platform) => [
+                SocialLinks::key($platform).'.regex' => "The {$m['label']} link must be a web address, like {$m['placeholder']}",
+            ])->all(),
         ]);
 
         $current = theme();
@@ -480,12 +493,19 @@ class AppearanceController extends Controller
         }
 
         // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_facebook', 'footer_instagram', 'footer_copyright',
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_copyright',
             'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
             'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
             'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',
             'card_border_inset', 'card_logo_height'] as $key) {
             if (array_key_exists($key, $data)) {
+                $current[$key] = $data[$key];
+            }
+        }
+
+        // Social accounts, already turned into full addresses above.
+        foreach (array_keys(SocialLinks::PLATFORMS) as $platform) {
+            if (array_key_exists($key = SocialLinks::key($platform), $data)) {
                 $current[$key] = $data[$key];
             }
         }

@@ -1,5 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
-import Icon, { Facebook, IconOrGlyph, Instagram, WhatsApp } from '../Icons';
+import Icon, { IconOrGlyph, SOCIAL_ICONS, WhatsApp } from '../Icons';
 import SmartLink from '../SmartLink';
 import { t } from '../i18n';
 
@@ -43,10 +43,13 @@ export default function Footer({ minimal = false }) {
                 <div>
                     <div className="font-display text-xl font-bold text-gold-300">{footer.brand}</div>
                     <p className="mt-3 text-sm text-gold-100/70">{footer.about}</p>
-                    {(footer.facebook || footer.instagram) && (
+                    {footer.socials?.length > 0 && (
                         <div className="mt-4 flex gap-3">
-                            {footer.facebook && <a href={footer.facebook} target="_blank" rel="noopener" className="text-gold-100/70 hover:text-white" aria-label="Facebook"><Facebook /></a>}
-                            {footer.instagram && <a href={footer.instagram} target="_blank" rel="noopener" className="text-gold-100/70 hover:text-white" aria-label="Instagram"><Instagram /></a>}
+                            {footer.socials.map(({ platform, label, url }) => {
+                                const Glyph = SOCIAL_ICONS[platform];
+
+                                return Glyph && <a key={platform} href={url} target="_blank" rel="noopener" className="text-gold-100/70 hover:text-white" aria-label={label}><Glyph /></a>;
+                            })}
                         </div>
                     )}
                 </div>

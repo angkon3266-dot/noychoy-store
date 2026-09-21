@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
-import Icon, { Facebook, Instagram } from '../Icons';
+import Icon, { SOCIAL_ICONS } from '../Icons';
 import SmartLink from '../SmartLink';
 import { trapTab } from '../focusTrap';
 
@@ -171,16 +171,15 @@ export default function MobileDrawer() {
                 <div className="shrink-0 border-t border-ink-100 px-4 py-3 flex items-center justify-between" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
                     <span className="text-xs text-ink-700/70">{storeName}</span>
                     <div className="flex items-center gap-2">
-                        {footer.facebook && (
-                            <a href={footer.facebook} target="_blank" rel="noopener" aria-label="Facebook" className="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
-                                <Facebook className="w-4.5 h-4.5" />
-                            </a>
-                        )}
-                        {footer.instagram && (
-                            <a href={footer.instagram} target="_blank" rel="noopener" aria-label="Instagram" className="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
-                                <Instagram className="w-4.5 h-4.5" />
-                            </a>
-                        )}
+                        {(footer.socials || []).map(({ platform, label, url }) => {
+                            const Glyph = SOCIAL_ICONS[platform];
+
+                            return Glyph && (
+                                <a key={platform} href={url} target="_blank" rel="noopener" aria-label={label} className="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
+                                    <Glyph className="w-4.5 h-4.5" />
+                                </a>
+                            );
+                        })}
                     </div>
                 </div>
             </aside>

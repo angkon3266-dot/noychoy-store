@@ -379,8 +379,7 @@ class Schema
     private static function sameAs(): array
     {
         return array_values(array_unique(array_filter([
-            theme('footer_facebook'),
-            theme('footer_instagram'),
+            ...array_column(\App\Support\SocialLinks::present(), 'url'),
             ...(array) config('seo.organization.same_as', []),
         ])));
     }

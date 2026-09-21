@@ -114,8 +114,11 @@ return [
         // Footer (editable in Appearance → Footer)
         'footer_brand' => null,              // footer heading text; defaults to store name
         'footer_about' => 'Handpicked jewelry, delivered across Bangladesh. Cash on delivery available.',
+        // Social accounts (App\Support\SocialLinks lists them)
         'footer_facebook' => null,
         'footer_instagram' => null,
+        'footer_tiktok' => null,
+        'footer_youtube' => null,
         'footer_copyright' => null,          // defaults to "© YEAR Store. All rights reserved."
 
         // Product page conversion helpers

@@ -160,8 +160,8 @@ class HandleInertiaRequests extends Middleware
                     'name' => $c->name,
                     'url' => route('category.show', $c),
                 ])->values(),
-                'facebook' => theme('footer_facebook'),
-                'instagram' => theme('footer_instagram'),
+                // [{platform, label, url}] — icons come from SOCIAL_ICONS in Icons.jsx.
+                'socials' => \App\Support\SocialLinks::present(),
                 'phone' => \App\Models\Setting::get('store_phone', config('store.phone')),
                 'email' => \App\Models\Setting::get('store_email', config('store.email')),
                 'whatsapp' => theme('whatsapp_number'),
