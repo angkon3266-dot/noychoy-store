@@ -180,29 +180,65 @@ class CheckoutTest extends TestCase
         $this->assertNull($order->card_message);
     }
 
+    // ── The delivery zone ────────────────────────────────────────────────────
+
+    public function test_the_delivery_zone_starts_inside_dhaka_for_a_guest(): void
+    {
+        $this->addToCart($this->product());
+
+        $this->get('/checkout')->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Checkout')
+                ->where('prefill.inside', true));
+    }
+
+    public function test_a_saved_address_outside_dhaka_still_wins(): void
+    {
+        $customer = \App\Models\Customer::create([
+            'name' => 'Rumana Haque', 'phone' => '01712345678', 'password' => bcrypt('secret'),
+        ]);
+        $customer->addresses()->create([
+            'name' => 'Rumana Haque', 'phone' => '01712345678',
+            'address' => 'Station Road, Sylhet', 'is_inside_dhaka' => false, 'is_default' => true,
+        ]);
+        $this->addToCart($this->product());
+
+        $this->actingAs($customer, 'customer')->get('/checkout')->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Checkout')
+                ->where('prefill.inside', false));
+    }
+
     // ── Coupons on the checkout page ─────────────────────────────────────────
 
-    public function test_the_checkout_page_exposes_coupon_state_and_applies_one_in_place(): void
+    public function test_the_checkout_page_shows_a_coupon_applied_on_the_cart_and_can_undo_it(): void
     {
         \App\Models\Coupon::create([
             'code' => 'WELCOME10', 'type' => 'percent', 'value' => 10, 'applies_to' => 'all', 'is_active' => true,
         ]);
         $this->addToCart($this->product(['price' => 1000]));
 
+        // No box to type one into here (owner, 2026-09-23) — only the remove,
+        // so the checkout never offers an apply url.
         $this->get('/checkout')->assertOk()
             ->assertInertia(fn ($page) => $page->component('Checkout')
                 ->where('coupon', null)
-                ->has('urls.couponApply')
+                ->missing('urls.couponApply')
                 ->has('urls.couponRemove'));
 
-        // Applying from the checkout page returns to the checkout page
-        // (back()), now carrying the coupon and the reduced total.
-        $this->from('/checkout')->post('/cart/coupon', ['code' => 'welcome10'])
-            ->assertRedirect('/checkout');
+        $this->from('/cart')->post('/cart/coupon', ['code' => 'welcome10'])
+            ->assertRedirect('/cart');
 
+        // It still travels to the checkout, which says so and shows the
+        // reduced total.
         $this->get('/checkout')->assertOk()
             ->assertInertia(fn ($page) => $page->component('Checkout')
                 ->where('coupon.code', 'WELCOME10')
                 ->where('summary.sub', fn ($v) => (float) $v === 900.0));
+
+        $this->from('/checkout')->delete('/cart/coupon')->assertRedirect('/checkout');
+
+        $this->get('/checkout')->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Checkout')
+                ->where('coupon', null)
+                ->where('summary.sub', fn ($v) => (float) $v === 1000.0));
     }
 }

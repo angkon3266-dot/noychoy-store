@@ -129,7 +129,11 @@ class CheckoutController extends Controller
                 'phone' => old('phone', $customer->phone ?? ''),
                 'address' => old('address', $address->address ?? ''),
                 'area' => old('area', $address->area ?? ''),
-                'inside' => (bool) old('is_inside_dhaka', $address->is_inside_dhaka ?? false),
+                // Inside Dhaka by default (owner, 2026-09-23): it is where most
+                // orders go, and the picker now sits above Place order, so the
+                // cheaper zone is the one already selected rather than a box
+                // the customer has to find. A saved address still wins.
+                'inside' => (bool) old('is_inside_dhaka', $address?->is_inside_dhaka ?? true),
             ],
             'loyalty' => ($customer && $loyalty->enabled() && ($custPoints > 0 || $appliedPoints > 0)) ? [
                 'points' => $custPoints,
@@ -168,7 +172,6 @@ class CheckoutController extends Controller
             'urls' => [
                 'store' => route('checkout.store'),
                 'lead' => route('checkout.lead'),
-                'couponApply' => route('cart.coupon'),
                 'couponRemove' => route('cart.coupon.remove'),
             ],
         ])->withViewData(['pageTitle' => 'Checkout']);

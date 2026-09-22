@@ -29,9 +29,9 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     // each message belonged to.
     const err = (k) => errors[k]?.[0];
     // DOM order of the form's fields — decides which one gets focus on failure.
-    const FIELD_ORDER = ['name', 'phone', 'address', 'area', 'is_inside_dhaka', 'is_gift', 'card_message', 'notes'];
-    // `email` and `district` are validated server-side but have no input here;
-    // without this they would fail silently.
+    const FIELD_ORDER = ['name', 'phone', 'address', 'is_inside_dhaka', 'is_gift', 'card_message', 'notes'];
+    // `email`, `district` and `area` are validated server-side but have no
+    // input here; without this they would fail silently.
     const unmapped = Object.keys(errors).filter((k) => !FIELD_ORDER.includes(k));
     const [errorNonce, setErrorNonce] = useState(0);
     // id + invalid flag + describedby, keeping any pre-existing helper id.
@@ -50,7 +50,6 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     // rather than appearing out of nowhere on the confirmation screen. Null
     // until then, so the page starts from the props it was rendered with.
     const [live, setLive] = useState(null);
-    const [code, setCode] = useState('');
     const [couponBusy, setCouponBusy] = useState(false);
     // The order summary starts open (owner, 2026-09-19): the pieces, the
     // savings and the delivery charge are what she is agreeing to pay for, so
@@ -86,18 +85,8 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
         if (flash.success || flash.error) setSummaryOpen(true);
     }, [flash.success, flash.error]);
 
-    // Coupon apply/remove go through Inertia: the server answers with
+    // Removing a coupon goes through Inertia: the server answers with
     // back() → this page re-renders with the new totals + a flash message.
-    const applyCoupon = (e) => {
-        e.preventDefault();
-        if (!code.trim() || couponBusy) return;
-        setCouponBusy(true);
-        router.post(urls.couponApply, { code }, {
-            preserveScroll: true,
-            onSuccess: () => setCode(''),
-            onFinish: () => setCouponBusy(false),
-        });
-    };
     const removeCoupon = () => {
         setCouponBusy(true);
         router.delete(urls.couponRemove, { preserveScroll: true, onFinish: () => setCouponBusy(false) });
@@ -129,15 +118,15 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
 
     const inside = form.data.is_inside_dhaka === '1';
 
-    // Most guests never touch the zone picker, and the default (outside Dhaka)
-    // is the dearer one. If the typed address says Dhaka, pre-select inside —
-    // the customer can still override, and the server charges by the picker.
+    // The picker opens on Inside Dhaka (owner, 2026-09-23), so this is left
+    // only with the returning customer whose saved address is outside Dhaka
+    // and who then types a Dhaka one. She can still override, and the server
+    // charges by the picker either way.
     const zoneTouched = useRef(false);
     useEffect(() => {
         if (zoneTouched.current) return;
-        const text = `${form.data.address} ${form.data.area}`.toLowerCase();
-        if (/\bdhaka\b/.test(text) && form.data.is_inside_dhaka !== '1') form.setData('is_inside_dhaka', '1');
-    }, [form.data.address, form.data.area]);
+        if (/\bdhaka\b/i.test(form.data.address) && form.data.is_inside_dhaka !== '1') form.setData('is_inside_dhaka', '1');
+    }, [form.data.address]);
     // The server is the authority on free delivery (threshold, coupon, offer
     // or a per-customer perk) — mirror its verdict rather than re-deriving it.
     const view = live ? { ...summary, ...live } : summary;
@@ -285,31 +274,6 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                         <textarea {...a11y('address')} value={form.data.address} onChange={(e) => form.setData('address', e.target.value)} onBlur={captureLead} rows={2} className="input" required autoComplete="street-address" />
                         {err('address') && <p id="co-address-error" className="text-xs text-danger-600 mt-1">{err('address')}</p>}
                     </div>
-                    <div data-field="area">
-                        <label className="label" htmlFor="co-area">Area / Thana</label>
-                        <input {...a11y('area')} value={form.data.area} onChange={(e) => form.setData('area', e.target.value)} onBlur={captureLead} className="input" autoComplete="address-level2" />
-                        {err('area') && <p id="co-area-error" className="text-xs text-danger-600 mt-1">{err('area')}</p>}
-                    </div>
-
-                    {/* The summary sits below the form, so the button carries
-                        the total — nobody should have to scroll or open
-                        anything to know what they are agreeing to pay. */}
-                    <div className="pt-1">
-                        <button type="submit" className="btn-primary w-full" disabled={form.processing}>
-                            {form.processing ? 'Placing order…' : <>Place order · {wasPrice}{money(total)}</>}
-                        </button>
-                        {saving && (
-                            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success-700" aria-live="polite">
-                                <Icon name="tag" className="w-4 h-4 shrink-0" />
-                                <span>You're saving {money(saved)}</span>
-                            </p>
-                        )}
-                        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-ink-700/70">
-                            <Icon name="cash" className="w-4 h-4 shrink-0" />
-                            <span>Cash on delivery — no advance payment, we call to confirm.</span>
-                        </p>
-                    </div>
-
                     {/* Free delivery leaves nothing to choose between: the zone
                         still travels with the order, inferred from the address
                         above. */}
@@ -331,6 +295,25 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                         {err('is_inside_dhaka') && <p id="co-is_inside_dhaka-error" className="text-xs text-danger-600 mt-1">{err('is_inside_dhaka')}</p>}
                     </div>
                     )}
+
+                    {/* The summary sits below the form, so the button carries
+                        the total — nobody should have to scroll or open
+                        anything to know what they are agreeing to pay. */}
+                    <div className="pt-1">
+                        <button type="submit" className="btn-primary w-full" disabled={form.processing}>
+                            {form.processing ? 'Placing order…' : <>Place order · {wasPrice}{money(total)}</>}
+                        </button>
+                        {saving && (
+                            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success-700" aria-live="polite">
+                                <Icon name="tag" className="w-4 h-4 shrink-0" />
+                                <span>You're saving {money(saved)}</span>
+                            </p>
+                        )}
+                        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-ink-700/70">
+                            <Icon name="cash" className="w-4 h-4 shrink-0" />
+                            <span>Cash on delivery — no advance payment, we call to confirm.</span>
+                        </p>
+                    </div>
 
                     {/* Gift option. Every string here is editable in
                         Appearance → Gift orders, including the character
@@ -439,31 +422,18 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                 ))}
                             </div>
 
-                            {/* Coupon — same endpoints as the cart page, so a code
-                                entered here or there behaves identically. */}
-                            <div className="mt-4 pt-4 border-t border-ink-100">
-                                {coupon ? (
+                            {/* No coupon box here (owner, 2026-09-23) — a code is
+                                entered on the cart page. One already applied
+                                still says so, so the discount line below is
+                                accounted for and can be undone. */}
+                            {coupon && (
+                                <div className="mt-4 pt-4 border-t border-ink-100">
                                     <div className="flex items-center justify-between text-sm rounded-md bg-success-50 border border-success-200 px-3 py-2">
                                         <span className="text-success-800 inline-flex items-center gap-1.5"><Icon name="tag" className="w-4 h-4 shrink-0" /><span className="min-w-0">Coupon <strong className="font-mono">{coupon.code}</strong> applied</span></span>
                                         <button type="button" onClick={removeCoupon} disabled={couponBusy} className="text-xs text-danger-600 hover:underline disabled:opacity-50">Remove</button>
                                     </div>
-                                ) : (
-                                    <div className="flex gap-2">
-                                        <input
-                                            value={code}
-                                            onChange={(e) => setCode(e.target.value.toUpperCase())}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon(e); }}
-                                            placeholder="Coupon code"
-                                            autoComplete="off"
-                                            className="input py-2 font-mono uppercase"
-                                            aria-label="Coupon code"
-                                        />
-                                        <button type="button" onClick={applyCoupon} disabled={!code.trim() || couponBusy} className="btn-outline whitespace-nowrap disabled:opacity-50">
-                                            {couponBusy ? '…' : 'Apply'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
                             <dl className="space-y-2 text-sm border-t border-ink-100 mt-4 pt-4">
                                 <div className="flex justify-between"><dt className="text-ink-700/70">Subtotal</dt><dd>{view.subtotalText}</dd></div>
