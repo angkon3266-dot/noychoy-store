@@ -184,22 +184,51 @@ class ProductQuickEditTest extends TestCase
         $this->assertSame(0, $product->images()->count());
     }
 
-    // ── Compare-at price, from the quick-edit panel ──────────────────────────
+    // ── Compare-at price, on the row and in the panel ────────────────────────
     //
     // Owner, 2026-09-24: the struck-through price was reachable only through
     // the full editor, which is a page load and a scroll away from a list she
-    // is working down. Blanking the box has to take it off again — the same
-    // field where it is typed is the only obvious place to remove it.
+    // is working down — so it sits in the row itself, beside the price, and
+    // also in the panel with the rest of the pricing. Blanking the box has to
+    // take it off again: the field where it is typed is the only obvious place
+    // to remove it.
 
-    public function test_the_quick_edit_panel_offers_the_compare_at_price(): void
+    public function test_the_row_and_the_panel_both_offer_the_compare_at_price(): void
     {
         $this->product(['compare_at_price' => 900]);
 
-        $this->actingAs($this->admin())
+        $page = $this->actingAs($this->admin())
             ->get(route('admin.products.index'))
             ->assertOk()
             ->assertSee('Compare-at (৳)')
-            ->assertSee('name="compare_at_price"', false);
+            ->assertSee('placeholder="Compare"', false);
+
+        // One box in the row's inline form, one in the quick-edit panel.
+        $this->assertSame(2, substr_count($page->getContent(), 'name="compare_at_price"'));
+    }
+
+    public function test_a_compare_at_price_saves_from_the_row(): void
+    {
+        $product = $this->product();
+
+        $this->actingAs($this->admin())
+            ->patchJson(route('admin.products.quick', $product), ['price' => 550, 'compare_at_price' => 900])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'compare_at_price' => 900.0]);
+
+        $this->assertSame('900.00', $product->fresh()->compare_at_price);
+    }
+
+    public function test_blanking_the_row_box_takes_the_compare_at_price_off(): void
+    {
+        $product = $this->product(['compare_at_price' => 900]);
+
+        $this->actingAs($this->admin())
+            ->patchJson(route('admin.products.quick', $product), ['price' => 550, 'compare_at_price' => ''])
+            ->assertOk()
+            ->assertJson(['compare_at_price' => null]);
+
+        $this->assertNull($product->fresh()->compare_at_price);
     }
 
     public function test_a_compare_at_price_saves_from_the_quick_edit_panel(): void
@@ -229,7 +258,8 @@ class ProductQuickEditTest extends TestCase
 
     public function test_a_save_that_leaves_the_field_out_keeps_the_compare_at_price(): void
     {
-        // The row's own inline form has no compare-at box, and must not wipe one.
+        // A caller that never sends the field — a page opened before the box
+        // existed, still sitting in a tab — must not wipe a price by omission.
         $product = $this->product(['compare_at_price' => 900]);
 
         $this->actingAs($this->admin())

@@ -772,6 +772,7 @@ document.addEventListener('alpine:init', () => {
                 const data = await res.json();
                 this.paintMargin(form, data);
                 this.paintStatus(form, data);
+                this.paintPanel(form, data);
                 this.state = 'saved';
                 setTimeout(() => { if (this.state === 'saved') this.state = 'idle'; }, 2500);
             } catch (e) {
@@ -819,6 +820,24 @@ document.addEventListener('alpine:init', () => {
                 const thumb = row.querySelector('[data-row-thumb]');
                 if (thumb) thumb.src = data.primary_image;
             }
+        },
+
+        /**
+         * The quick-edit panel below carries the same price, compare-at, stock
+         * and status, server-rendered when the page loaded. Left alone, opening
+         * it after a row save and pressing Save would write the old numbers
+         * back — so the panel follows the row, except for a box in use.
+         */
+        paintPanel(form, data) {
+            const panel = form.closest('tr')?.nextElementSibling?.querySelector('form');
+            if (!panel) return;
+
+            [['price', 'price'], ['compare_at_price', 'compare_at_price'], ['stock_quantity', 'stock_quantity'], ['status', 'status']]
+                .forEach(([field, key]) => {
+                    const el = panel.querySelector(`[name="${field}"]`);
+                    if (!el || el === document.activeElement || data[key] === undefined) return;
+                    el.value = data[key] === null ? '' : data[key];
+                });
         },
     }));
 
@@ -896,6 +915,13 @@ document.addEventListener('alpine:init', () => {
 
             const price = row.querySelector('input[name="price"]');
             if (price && data.price !== undefined) price.value = data.price;
+
+            // The row carries the compare-at price too, so it must not be left
+            // showing the old one and write it back on the next row save.
+            const compare = row.querySelector('input[name="compare_at_price"]');
+            if (compare && data.compare_at_price !== undefined) {
+                compare.value = data.compare_at_price === null ? '' : data.compare_at_price;
+            }
 
             const stock = row.querySelector('input[name="stock_quantity"]');
             if (stock && data.stock_quantity !== undefined) stock.value = data.stock_quantity;

@@ -190,7 +190,15 @@
                         <form @submit.prevent="save($event.target)" class="flex items-center gap-1.5 max-lg:flex-wrap">
                             @csrf @method('PATCH')
                             <span class="text-ink-700/50 text-xs">৳</span>
-                            <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Price"
+                            <input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input py-1 w-20 text-xs" title="Selling price"
+                                   @keydown.enter.prevent="save($el.form)">
+                            {{-- The struck-through price, on the row itself
+                                 (owner, 2026-09-24) — she works down the list
+                                 setting them, and the full editor was a page
+                                 load away. Blank means none. --}}
+                            <input name="compare_at_price" type="number" step="0.01" min="0" value="{{ $product->compare_at_price }}"
+                                   class="input py-1 w-20 text-xs" placeholder="Compare"
+                                   title="Compare-at price — shown struck through while it is above the selling price and no live offer covers this product. Leave blank for none."
                                    @keydown.enter.prevent="save($el.form)">
                             <input name="stock_quantity" type="number" value="{{ $product->stock_quantity }}" class="input py-1 w-16 text-xs" title="Stock"
                                    @disabled(!$product->manage_stock) placeholder="∞" @keydown.enter.prevent="save($el.form)">

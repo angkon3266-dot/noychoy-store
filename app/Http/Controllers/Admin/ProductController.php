@@ -639,6 +639,7 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'price' => ['nullable', 'numeric', 'min:0'],
+            'compare_at_price' => ['nullable', 'numeric', 'min:0'],
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
             'status' => ['nullable', 'in:published,draft'],
             // Set the gallery's primary image without opening the full editor.
@@ -650,6 +651,13 @@ class ProductController extends Controller
 
         if (array_key_exists('price', $data) && $data['price'] !== null) {
             $product->price = $data['price'];
+        }
+        // Read whenever the box was submitted, so emptying it takes the
+        // struck-through price off (owner, 2026-09-24). A caller that does not
+        // send the field at all — an older page still open in a tab — leaves
+        // whatever is stored alone.
+        if ($request->has('compare_at_price')) {
+            $product->compare_at_price = filled($data['compare_at_price'] ?? null) ? $data['compare_at_price'] : null;
         }
         if (array_key_exists('stock_quantity', $data) && $data['stock_quantity'] !== null) {
             $product->stock_quantity = $data['stock_quantity'];
@@ -677,6 +685,7 @@ class ProductController extends Controller
             return response()->json([
                 'ok' => true,
                 'price' => (float) $product->price,
+                'compare_at_price' => $product->compare_at_price === null ? null : (float) $product->compare_at_price,
                 'stock_quantity' => (int) $product->stock_quantity,
                 'in_stock' => (bool) $product->in_stock,
                 'status' => $product->status,
