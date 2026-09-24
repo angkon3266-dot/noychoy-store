@@ -35,14 +35,31 @@
             </div>
             <p class="text-xs text-ink-700/60 mb-4">
                 Looks a customer's phone number up across every major Bangladeshi courier to show how
-                many parcels they have accepted versus refused. Checks run only when you press
-                <strong>Check courier history</strong> on an order, and each one uses your plan quota —
-                the result is then kept for {{ \App\Services\BdCourierService::FRESH_HOURS }} hours per number.
+                many parcels they have accepted versus refused. Each check uses your plan quota, and
+                the result is then kept for {{ \App\Services\BdCourierService::FRESH_HOURS }} hours per
+                number — so pressing <strong>Check courier history</strong> again inside that window
+                costs nothing.
             </p>
-            <label class="flex items-center gap-2 text-sm mb-4">
+            <label class="flex items-center gap-2 text-sm mb-3">
                 <input type="checkbox" name="bdcourier_enabled" value="1" @checked($int['bdcourier_enabled'] ?? false)>
                 Enable BDCourier lookups
             </label>
+            <label class="flex items-start gap-2 text-sm mb-1">
+                <input type="checkbox" name="bdcourier_auto_check" value="1" class="mt-0.5" @checked($int['bdcourier_auto_check'] ?? false)>
+                <span>
+                    Check a new order automatically
+                    <span class="block text-xs text-ink-700/55 mt-0.5">
+                        When an order comes in from a number that has never ordered here, look it up
+                        straight away so the risk is on the order page before you open it. A
+                        <strong>repeat buyer is skipped</strong> — their earlier history is shown
+                        instead, so no credit is spent on someone you already have a record for.
+                    </span>
+                </span>
+            </label>
+            <p class="text-[11px] text-ink-700/45 mb-4">
+                With this on, a first order from a new customer costs one credit. Nothing else changes:
+                orders already on the list are still checked by hand.
+            </p>
             <div class="grid sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2"><label class="label">Base URL</label><input name="bdcourier_base_url" value="{{ $int['bdcourier_base_url'] ?? 'https://api.bdcourier.com' }}" class="input"></div>
                 <div class="sm:col-span-2"><label class="label">API Key</label><input name="bdcourier_api_key" value="{{ $int['bdcourier_api_key'] ?? '' }}" class="input" autocomplete="off" placeholder="Sent as: Authorization: Bearer …"></div>

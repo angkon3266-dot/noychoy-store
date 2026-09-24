@@ -342,6 +342,15 @@
                                     @if(! empty($bdRow['reports']))
                                         <div class="text-[10px] text-red-700 mt-0.5" title="{{ count($bdRow['reports']) }} fraud report(s)">⚠️ {{ count($bdRow['reports']) }} report(s)</div>
                                     @endif
+                                    @if($bdRow['stale'] ?? false)
+                                        {{-- Shown rather than hidden: a paid-for answer from months ago
+                                             still says whether the number takes parcels. Dated so nobody
+                                             mistakes it for today's. --}}
+                                        <div class="text-[10px] text-ink-700/40 mt-0.5"
+                                             title="Older than {{ \App\Services\BdCourierService::FRESH_HOURS }} hours — select the row and re-check for current figures">{{ \Illuminate\Support\Carbon::parse($bdRow['checked_at'])->diffForHumans(short: true) }}</div>
+                                    @endif
+                                @elseif($repeat)
+                                    <span class="text-xs text-ink-700/35" title="Returning customer — new orders are not checked automatically. Select the row and press “Check courier history” to look them up.">Repeat buyer</span>
                                 @else
                                     <span class="text-xs text-ink-700/35" title="Select orders and press “Check courier history”">Not checked</span>
                                 @endif

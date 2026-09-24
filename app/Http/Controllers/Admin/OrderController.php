@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\TransitionOrderStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\CheckOrderCourier;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -193,7 +194,7 @@ class OrderController extends Controller
             'maxQuickFilters' => self::MAX_QUICK_FILTERS,
             'orderCounts' => $orderCounts,
             'bdCourierOn' => $bdCourier->isConfigured(),
-            'bdHistory' => $bdCourier->isConfigured() ? $bdCourier->cachedMany($phones) : [],
+            'bdHistory' => $bdCourier->isConfigured() ? $bdCourier->storedMany($phones) : [],
             'processingItems' => $processingItems,
             'processingSerials' => $processingSerials,
             'processingImages' => $processingImages,
@@ -293,8 +294,13 @@ class OrderController extends Controller
         $settled = $courier['delivered'] + $courier['partial'] + $courier['cancelled'] + $courier['returned'];
         $courier['success_rate'] = $settled > 0 ? round(($courier['delivered'] + $courier['partial']) / $settled * 100) : null;
 
-        // BDCourier: render only what a previous click already fetched. Never
-        // call the API here — lookups cost plan quota and this is a page view.
+        // BDCourier: render only what is already stored. Never call the API
+        // here — lookups cost plan quota and this is a page view.
+        //
+        // stored(), not cached(): a result this shop paid for months ago still
+        // says whether the number accepts parcels, and it is the whole point of
+        // skipping a repeat buyer's automatic check that the earlier answer is
+        // here. The panel labels how old it is.
         $bdCourier = app(BdCourierService::class);
 
         // Editing a booked order is allowed (owner's call, 2026-09-17), so the
@@ -313,7 +319,14 @@ class OrderController extends Controller
             'replacedShipments' => $order->shipments->filter->isSuperseded()->sortByDesc('id')->values(),
             'balance' => $steadfast->balance(),
             'bdCourierOn' => $bdCourier->isConfigured(),
-            'bdCourier' => filled($order->customer_phone) ? $bdCourier->cached($order->customer_phone) : null,
+            'bdCourier' => filled($order->customer_phone) ? $bdCourier->stored($order->customer_phone) : null,
+            'bdCourierAuto' => $bdCourier->autoCheckNewOrders(),
+            // Why nothing was looked up on its own, so an empty panel says which
+            // of the reasons applied rather than implying nobody has looked.
+            // Null when automatic checks are off: there is then nothing to explain.
+            'bdCourierSkip' => $bdCourier->autoCheckNewOrders()
+                ? CheckOrderCourier::skipReason($order, $bdCourier)
+                : null,
             // The order that prompts a block is where the owner is when she
             // decides (2026-09-22), so the Customer card blocks and unblocks.
             'blockedPhone' => bd_phone((string) $order->customer_phone) !== ''

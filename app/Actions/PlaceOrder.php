@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\CheckoutException;
+use App\Jobs\CheckOrderCourier;
 use App\Jobs\SendOrderPlacedEffects;
 use App\Models\AbandonedCart;
 use App\Models\Coupon;
@@ -316,6 +317,12 @@ class PlaceOrder
             $order,
             MetaTrackingService::captureClientContext(),
         );
+
+        // A first order from a number the shop has never sold to gets its
+        // BDCourier history looked up on its own, so the COD risk is on the
+        // order page before anyone opens it. Queued, off unless the shop turns
+        // it on, and never for a returning customer — the job decides.
+        CheckOrderCourier::queueFor($order);
 
         $this->cart->clear();
 

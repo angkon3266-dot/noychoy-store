@@ -69,6 +69,7 @@ class IntegrationController extends Controller
             'google_client_secret' => ['nullable', 'string', 'max:200'],
             // BDCourier (COD fraud check)
             'bdcourier_enabled' => ['nullable', 'boolean'],
+            'bdcourier_auto_check' => ['nullable', 'boolean'],
             'bdcourier_base_url' => ['nullable', 'string', 'max:200'],
             'bdcourier_api_key' => ['nullable', 'string', 'max:300'],
             'bdcourier_safe_threshold' => ['nullable', 'numeric', 'between:0,100'],
@@ -91,6 +92,9 @@ class IntegrationController extends Controller
         }
         $int['sms_enabled'] = $request->boolean('sms_enabled');
         $int['bdcourier_enabled'] = $request->boolean('bdcourier_enabled');
+        // Automatic lookups for new orders (owner, 2026-09-24). Spends a credit
+        // without anyone pressing anything, so it is a switch she can find.
+        $int['bdcourier_auto_check'] = $request->boolean('bdcourier_auto_check');
         // Blank means "use the default", so store null rather than 0 — a 0 here
         // would silently mark every customer Safe.
         $int['bdcourier_safe_threshold'] = filled($data['bdcourier_safe_threshold'] ?? null)

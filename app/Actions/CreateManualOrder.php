@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\CheckoutException;
+use App\Jobs\CheckOrderCourier;
 use App\Jobs\SendOrderPlacedEffects;
 use App\Models\AbandonedCart;
 use App\Models\Coupon;
@@ -191,6 +192,13 @@ class CreateManualOrder
             // queue worker's own request: 127.0.0.1, user agent "Symfony",
             // reported to Meta as a website visit (2026-09-17 audit).
             SendOrderPlacedEffects::dispatch($order->fresh('items'), MetaTrackingService::noBrowserContext());
+
+            // And its BDCourier history is looked up on its own, exactly as a
+            // storefront order's is: an order taken on Messenger from someone
+            // the shop has never sold to is the same COD gamble, and she is
+            // often typing it in while the customer is still on the line. The
+            // job waits for this transaction to commit before it runs.
+            CheckOrderCourier::queueFor($order);
 
             // A sale closed on the phone settles the lead exactly as a
             // storefront checkout does. Without this an order she took by hand

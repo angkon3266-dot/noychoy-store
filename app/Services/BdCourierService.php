@@ -19,9 +19,12 @@ use Illuminate\Support\Facades\Log;
  * Deliberately narrow: only POST /courier-check is used. The vendor also
  * exposes plan, connection-test and legacy endpoints — none are wired up.
  *
- * Lookups cost plan quota, so they never happen on their own. An admin presses
+ * Lookups cost plan quota, so a page view never makes one. An admin presses
  * "Check courier history" and the result is stored per phone, which means
  * re-opening the same order (or another order from the same customer) is free.
+ *
+ * The one lookup nobody presses for is a brand-new order from a number the shop
+ * has never sold to — see autoCheckNewOrders() and App\Jobs\CheckOrderCourier.
  *
  * Results live in the `courier_checks` table, not the cache: every deploy runs
  * `optimize:clear`, which flushes the whole cache store and threw away results
@@ -57,10 +60,12 @@ class BdCourierService
      * Stored results for many phones at once, for the orders list. One query,
      * and never an API call — rendering a page must not spend quota.
      *
+     * Age is not a filter here, only a label: see stored().
+     *
      * @param  iterable<string>  $phones
      * @return array<string, array<string, mixed>> keyed by canonical phone
      */
-    public function cachedMany(iterable $phones): array
+    public function storedMany(iterable $phones): array
     {
         $numbers = collect($phones)->filter()->map(fn ($p) => bd_phone((string) $p))->unique()->values();
 
@@ -69,16 +74,23 @@ class BdCourierService
         }
 
         return CourierCheck::whereIn('phone', $numbers)
-            ->where('checked_at', '>', now()->subHours(self::FRESH_HOURS))
             ->get()
             ->mapWithKeys(fn (CourierCheck $c) => [$c->phone => $this->hydrate($c)])
             ->all();
     }
 
-    /** Rebuild the render payload from a stored row. */
+    /**
+     * Rebuild the render payload from a stored row.
+     *
+     * `stale` says the result is older than FRESH_HOURS — worth showing, but
+     * say how old it is rather than presenting it as today's answer.
+     */
     protected function hydrate(CourierCheck $row): array
     {
-        return ($row->payload ?? []) + ['checked_at' => $row->checked_at?->toIso8601String()];
+        return ($row->payload ?? []) + [
+            'checked_at' => $row->checked_at?->toIso8601String(),
+            'stale' => ! $row->isFresh(self::FRESH_HOURS),
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -94,6 +106,22 @@ class BdCourierService
         $c = $this->config();
 
         return ! empty($c['bdcourier_enabled']) && filled($c['bdcourier_api_key'] ?? null);
+    }
+
+    /**
+     * Does a brand-new order look its own phone number up?
+     *
+     * Owner's call, 2026-09-24. Everything else here waits for a click because
+     * a lookup costs a plan credit, and for a while that applied to new orders
+     * too. It is a setting rather than a constant because the credit is real:
+     * switching it off must not need a deploy.
+     *
+     * Which orders actually spend one is App\Jobs\CheckOrderCourier's decision,
+     * not this flag's — a repeat buyer never does.
+     */
+    public function autoCheckNewOrders(): bool
+    {
+        return $this->isConfigured() && ! empty($this->config()['bdcourier_auto_check']);
     }
 
     protected function baseUrl(): string
@@ -117,6 +145,10 @@ class BdCourierService
      * A previously fetched result for this phone, without spending quota.
      * Returns null if it was never looked up, or the stored result has aged out.
      *
+     * This is the "do we have to pay again" question, and only that: it is what
+     * decides whether a bulk run or an automatic check skips a number. To *show*
+     * a customer's record, use stored().
+     *
      * @return array<string, mixed>|null
      */
     public function cached(string $phone): ?array
@@ -124,6 +156,26 @@ class BdCourierService
         $row = CourierCheck::where('phone', bd_phone($phone))->first();
 
         return $row && $row->isFresh(self::FRESH_HOURS) ? $this->hydrate($row) : null;
+    }
+
+    /**
+     * The last result stored for this phone, however old, or null if the number
+     * was never looked up at all.
+     *
+     * Deliberately not cached(): a result that has passed FRESH_HOURS is still
+     * the record the shop paid for, and it still says whether this number
+     * accepts parcels. Hiding it left a returning customer looking like nobody
+     * had ever checked them — which is the case the shop most wants the earlier
+     * answer for, since an automatic check skips repeat buyers on purpose. The
+     * age comes back in `stale` so the page can say how old it is.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function stored(string $phone): ?array
+    {
+        $row = CourierCheck::where('phone', bd_phone($phone))->first();
+
+        return $row ? $this->hydrate($row) : null;
     }
 
     public function forget(string $phone): void

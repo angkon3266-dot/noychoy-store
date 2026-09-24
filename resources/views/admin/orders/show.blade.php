@@ -612,17 +612,42 @@
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="font-semibold">Courier History</h2>
                     @if($bdCourier)
-                        <span class="text-[11px] text-ink-700/45"
-                              title="Cached — press again to refresh">checked {{ \Illuminate\Support\Carbon::parse($bdCourier['checked_at'])->diffForHumans() }}</span>
+                        <span class="text-[11px] {{ ($bdCourier['stale'] ?? false) ? 'text-amber-700' : 'text-ink-700/45' }}"
+                              title="{{ ($bdCourier['stale'] ?? false) ? 'Older than ' . \App\Services\BdCourierService::FRESH_HOURS . ' hours — press to fetch it again' : 'Current — pressing again inside ' . \App\Services\BdCourierService::FRESH_HOURS . ' hours costs nothing' }}">checked {{ \Illuminate\Support\Carbon::parse($bdCourier['checked_at'])->diffForHumans() }}</span>
                     @endif
                 </div>
 
                 @if(! $bdCourier)
-                    <p class="text-sm text-ink-700/60 mb-3">
-                        Check how many parcels <strong>{{ $order->customer_phone }}</strong> has accepted
-                        versus refused across every major courier, before you ship COD.
-                    </p>
+                    {{-- Nothing stored. Say why nobody looked, when the shop has
+                         automatic checks on and this order was passed over. --}}
+                    @if($bdCourierSkip === \App\Jobs\CheckOrderCourier::SKIP_REPEAT)
+                        <p class="text-sm text-ink-700/60 mb-3">
+                            Not checked automatically — <strong>{{ $order->customer_name }}</strong> has
+                            ordered here {{ $insight['total'] }} time{{ $insight['total'] === 1 ? '' : 's' }}
+                            before, so the shop's own record stands in for it: see
+                            <strong>Delivery reliability</strong> on this page. Check anyway if you want
+                            the picture from every other courier too.
+                        </p>
+                    @elseif($bdCourierSkip === null && $bdCourierAuto)
+                        <p class="text-sm text-ink-700/60 mb-3">
+                            First order from <strong>{{ $order->customer_phone }}</strong>, and a number
+                            nobody has sold to before is looked up automatically. If nothing appears here
+                            in a minute or two, press below to do it now.
+                        </p>
+                    @else
+                        <p class="text-sm text-ink-700/60 mb-3">
+                            Check how many parcels <strong>{{ $order->customer_phone }}</strong> has accepted
+                            versus refused across every major courier, before you ship COD.
+                        </p>
+                    @endif
                 @else
+                    @if($bdCourier['stale'] ?? false)
+                        <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                            This is the last check on record, from
+                            {{ \Illuminate\Support\Carbon::parse($bdCourier['checked_at'])->format('d M Y') }}.
+                            It may have moved since — re-check below for today's figures.
+                        </p>
+                    @endif
                     @php [$panelTone, $badgeTone, $noteTone] = $tones[$bdCourier['risk']['tone']] ?? $tones['ink']; @endphp
 
                     <div class="rounded-lg border {{ $panelTone }} px-3 py-3 mb-4">
