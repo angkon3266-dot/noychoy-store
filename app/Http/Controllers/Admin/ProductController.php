@@ -717,6 +717,7 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'price' => ['nullable', 'numeric', 'min:0'],
+            'compare_at_price' => ['nullable', 'numeric', 'min:0'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'transport_cost' => ['nullable', 'numeric', 'min:0'],
             'stock_quantity' => ['nullable', 'integer', 'min:0'],
@@ -737,6 +738,13 @@ class ProductController extends Controller
 
         if (filled($data['price'] ?? null)) {
             $product->price = $data['price'];
+        }
+        // Emptying the box takes the struck-through price off again, so the
+        // field is read whenever it was submitted rather than only when filled
+        // (owner, 2026-09-24). It shows on the storefront only while it is
+        // above the selling price and no live offer covers the piece.
+        if ($request->has('compare_at_price')) {
+            $product->compare_at_price = filled($data['compare_at_price'] ?? null) ? $data['compare_at_price'] : null;
         }
         if ($request->has('cost_price')) {
             $product->cost_price = $data['cost_price'];
@@ -796,6 +804,7 @@ class ProductController extends Controller
                 'ok' => true,
                 'status' => $product->status,
                 'price' => (float) $product->price,
+                'compare_at_price' => $product->compare_at_price === null ? null : (float) $product->compare_at_price,
                 'stock_quantity' => (int) $product->stock_quantity,
                 'primary_image' => $product->images()->where('is_primary', true)->first()?->url,
                 'images' => $product->images()->orderBy('position')->get()

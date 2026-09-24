@@ -167,6 +167,47 @@
             @endif
         </div>
 
+        {{-- Everything she has bought, one line per piece (owner, 2026-09-24) --}}
+        <div class="card p-5">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                <h2 class="font-semibold">Products bought</h2>
+                @if($purchases->isNotEmpty())
+                    <span class="text-xs text-ink-700/50">{{ $purchases->count() }} product{{ $purchases->count() === 1 ? '' : 's' }} · {{ $purchases->sum('quantity') }} piece{{ $purchases->sum('quantity') === 1 ? '' : 's' }}</span>
+                @endif
+            </div>
+
+            @if($purchases->isEmpty())
+                <p class="text-sm text-ink-700/50">Nothing bought yet. Cancelled and returned orders are not counted here.</p>
+            @else
+                <p class="text-xs text-ink-700/45 mb-3">Newest purchase first. Cancelled and returned orders are left out.</p>
+                <ul class="divide-y divide-ink-100 text-sm">
+                    @foreach($purchases as $row)
+                        <li class="flex items-center gap-3 py-2">
+                            <div class="h-10 w-10 shrink-0 overflow-hidden rounded bg-gold-100">
+                                @if($row['product']?->thumbnail)
+                                    <img src="{{ $row['product']->thumbnail }}" alt="" class="h-full w-full object-cover" loading="lazy">
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                @if($row['product'])
+                                    <a href="{{ route('admin.products.edit', $row['product']) }}" class="font-medium text-gold-700 hover:underline">{{ $row['name'] }}</a>
+                                @else
+                                    {{-- No product left to open: it has been deleted since. --}}
+                                    <span class="font-medium">{{ $row['name'] }}</span>
+                                @endif
+                                <p class="text-xs text-ink-700/50">
+                                    {{ $row['quantity'] }} piece{{ $row['quantity'] === 1 ? '' : 's' }} across {{ $row['orders'] }} order{{ $row['orders'] === 1 ? '' : 's' }}
+                                    · last on <a href="{{ route('admin.orders.show', $row['last_order']) }}" class="hover:underline">{{ $row['last_order']->order_number }}</a>,
+                                    {{ store_time($row['last_order']->created_at)?->format('d M Y') }}
+                                </p>
+                            </div>
+                            <div class="shrink-0 text-right tabular-nums">{{ money($row['spent']) }}</div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
         {{-- Orders --}}
         <div class="card overflow-hidden">
             <h2 class="font-semibold p-4 pb-0">Order history</h2>

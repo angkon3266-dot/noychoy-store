@@ -508,6 +508,63 @@
             </div>
         </div>
 
+        {{-- What she bought before, folded away until asked for (owner,
+             2026-09-24). Every other order on this phone number, newest first,
+             each one opening onto its own lines — so a customer on the phone
+             about "the same one as last time" can be answered without leaving
+             this order. --}}
+        @if($insight['orders']->isNotEmpty())
+            @php
+                $pastBadge = fn ($status) => match (true) {
+                    str_contains($status, 'deliver') => 'bg-green-100 text-green-700',
+                    in_array($status, \App\Models\Order::NOT_SALES, true) => 'bg-red-100 text-red-700',
+                    default => 'bg-gold-100 text-gold-800',
+                };
+            @endphp
+            <details class="card p-5 text-sm">
+                <summary class="flex cursor-pointer items-center justify-between gap-2 font-semibold">
+                    <span>Earlier orders</span>
+                    <span class="badge bg-violet-100 text-violet-700">{{ $insight['orders']->count() }}</span>
+                </summary>
+
+                <p class="mt-2 text-xs text-ink-700/50">
+                    Everything else ordered from {{ $order->customer_phone }} — tap one to see what was in it.
+                </p>
+
+                <div class="mt-3 divide-y divide-ink-100">
+                    @foreach($insight['orders'] as $past)
+                        <details class="py-2">
+                            <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                                <span class="font-medium text-gold-700">{{ $past->order_number }}</span>
+                                <span class="text-xs text-ink-700/50">{{ store_time($past->created_at)?->format('d M Y') }}</span>
+                                <span class="badge {{ $pastBadge(strtolower((string) $past->status)) }} capitalize">{{ $statuses[$past->status] ?? $past->status }}</span>
+                                <span class="ml-auto tabular-nums">{{ money($past->total) }}</span>
+                            </summary>
+
+                            <ul class="mt-1.5 space-y-1 pl-1 text-xs text-ink-700/70">
+                                @forelse($past->items as $item)
+                                    <li class="flex justify-between gap-2">
+                                        <span>{{ $item->name }}@if($item->quantity > 1) <span class="text-ink-700/45">× {{ $item->quantity }}</span>@endif</span>
+                                        <span class="tabular-nums shrink-0">{{ money($item->subtotal) }}</span>
+                                    </li>
+                                @empty
+                                    <li class="text-ink-700/45">No lines on this order.</li>
+                                @endforelse
+                            </ul>
+
+                            <a href="{{ route('admin.orders.show', $past) }}" class="mt-1.5 inline-block text-xs text-gold-700 hover:underline">Open this order →</a>
+                        </details>
+                    @endforeach
+                </div>
+
+                @if($order->customer)
+                    <a href="{{ route('admin.customers.show', $order->customer) }}" class="mt-3 inline-block text-xs text-gold-700 hover:underline">
+                        Everything {{ \Illuminate\Support\Str::before($order->customer_name, ' ') ?: 'this customer' }} has bought →
+                    </a>
+                @endif
+            </details>
+        @endif
+
         <!-- Delivery reliability (from this store's own order history) -->
         @php
             $riskStyles = [

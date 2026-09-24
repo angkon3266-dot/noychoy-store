@@ -232,6 +232,14 @@
                               enctype="multipart/form-data" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
                             @csrf
                             <div><label class="label">Selling price (৳)</label><input name="price" type="number" step="0.01" value="{{ $product->price }}" class="input"></div>
+                            {{-- The price the selling price is struck through
+                                 against. Blank takes it off again. A live offer
+                                 on the Offers page still wins over it. --}}
+                            <div>
+                                <label class="label">Compare-at (৳)</label>
+                                <input name="compare_at_price" type="number" step="0.01" min="0" value="{{ $product->compare_at_price }}" class="input" placeholder="None">
+                                <span class="mt-0.5 block text-[11px] text-ink-700/50">Shows struck through while it is above the selling price and no live offer covers this product.</span>
+                            </div>
                             <div>
                                 <label class="label">Status</label>
                                 <select name="status" class="input">

@@ -337,11 +337,12 @@ class CustomerController extends Controller
 
     public function show(Customer $customer, CustomerInsight $insight, BdCourierService $bdCourier)
     {
-        $orders = $customer->orders()->with('shipment')->latest()->get();
+        $orders = $customer->orders()->with(['shipment', 'items.product.images'])->latest()->get();
 
         return view('admin.customers.show', [
             'customer' => $customer,
             'orders' => $orders,
+            'purchases' => $this->purchases($orders),
             'insight' => $customer->phone ? $insight->forPhone($customer->phone) : null,
             'offers' => $customer->offers()->get(),
             'pointLog' => $customer->pointTransactions()->take(20)->get(),
@@ -353,6 +354,49 @@ class CustomerController extends Controller
             'courierCheck' => filled($customer->phone) ? $customer->courierCheck : null,
             'bdCourierOn' => $bdCourier->isConfigured(),
         ]);
+    }
+
+    /**
+     * Every piece this customer has actually bought, one line per product
+     * (owner, 2026-09-24) — "what has she got from us so far", answered without
+     * opening each order in turn.
+     *
+     * Cancelled and returned orders are left out, the rule the spend and order
+     * counts on this page already follow (Order::NOT_SALES): a parcel refused
+     * at the door was never bought.
+     *
+     * Grouped by product where one is still attached and by name otherwise, so
+     * a piece deleted from the catalogue since still reads as what was sold —
+     * the order line keeps the name it was bought under.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Order>  $orders  with `items.product`
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    protected function purchases($orders)
+    {
+        return $orders
+            ->reject(fn ($order) => in_array($order->status, \App\Models\Order::NOT_SALES, true))
+            // The line needs to know which order it came on, and the orders are
+            // already in hand — so the inverse is set rather than queried back.
+            ->flatMap(fn ($order) => $order->items->each(fn ($item) => $item->setRelation('order', $order)))
+            ->groupBy(fn ($item) => $item->product_id ?: 'name:'.\Illuminate\Support\Str::lower($item->name))
+            ->map(function ($lines) {
+                // Newest first within the group, so "last bought" and the name
+                // shown are both taken from the most recent purchase.
+                $lines = $lines->sortByDesc(fn ($line) => $line->order->created_at)->values();
+                $latest = $lines->first();
+
+                return [
+                    'name' => $latest->name,
+                    'product' => $latest->product,
+                    'quantity' => (int) $lines->sum('quantity'),
+                    'spent' => (float) $lines->sum(fn ($line) => (float) $line->subtotal),
+                    'orders' => $lines->pluck('order.id')->unique()->count(),
+                    'last_order' => $latest->order,
+                ];
+            })
+            ->sortByDesc(fn ($row) => $row['last_order']->created_at)
+            ->values();
     }
 
     /** Export customers (name, phone, address, spend…) to an Excel-friendly CSV. */

@@ -309,10 +309,18 @@ class OrderController extends Controller
         $booked = (bool) $order->shipment?->consignment_id;
         $order->load('shipments');
 
+        // What this customer bought before, on the order she is ringing about
+        // (owner, 2026-09-24). The insight already gathered every other order on
+        // the number; their lines are loaded here so the panel can be opened
+        // without leaving the page. Names come off the order line, not the
+        // product, so a piece since deleted still reads as what was sold.
+        $history = $insight->forPhone($order->customer_phone, $order->id);
+        $history['orders']->load('items');
+
         return view('admin.orders.show', [
             'order' => $order,
             'statuses' => Order::STATUSES,
-            'insight' => $insight->forPhone($order->customer_phone, $order->id),
+            'insight' => $history,
             'courier' => $courier,
             'courierDrift' => $booked ? $steadfast->driftFor($order) : [],
             'courierNow' => $booked ? $steadfast->payloadFor($order) : null,
