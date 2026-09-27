@@ -3,6 +3,7 @@
 namespace App\Services\Meta;
 
 use App\Services\Meta\Credentials\MetaCredentialResolver;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -102,6 +103,11 @@ class MetaDiagnostics
             $capi ? 'Enabled — '.lcfirst($creds->capiSourceLabel()).', pixel set.' : 'Disabled, or no pixel/token.',
             $creds->capiAdvice());
 
+        // Switched on is not the same as getting through: the check above stays
+        // green through an expired token or a refused payload, which fail every
+        // event. This one reads how the sends actually went.
+        $checks[] = $this->capiDelivery($capi);
+
         // Feed URL reachability.
         $feedOk = null;
         $feedDetail = null;
@@ -135,6 +141,38 @@ class MetaDiagnostics
         $score = count($scored) ? (int) round($passed / count($scored) * 100) : 0;
 
         return ['checks' => $checks, 'score' => $score, 'api_version' => $apiVersion, 'ran_at' => now()->toIso8601String()];
+    }
+
+    /**
+     * Red while the last send failed and nothing has gone through since, green
+     * once something has, grey while the API is off or has sent nothing yet.
+     */
+    private function capiDelivery(bool $capi): array
+    {
+        $label = 'Conversions API delivery';
+        $failure = $this->tracking->lastFailure();
+        $sent = $this->settings->get('last_event_sent_at');
+        $accepted = $sent ? 'last event accepted '.Carbon::parse($sent)->diffForHumans() : null;
+
+        if (! $capi) {
+            return $this->check('capi_delivery', $label, null, 'Nothing is sent while the Conversions API is off.', '');
+        }
+
+        if ($failure && $failure['ongoing']) {
+            return $this->check('capi_delivery', $label, false,
+                $failure['event'].' failed '.$failure['at']->diffForHumans()
+                .' ('.($failure['status'] ? 'HTTP '.$failure['status'] : 'no answer from Meta').'): '.rtrim($failure['error'], '. ')
+                .' · '.($accepted ?? 'no event accepted yet'),
+                $failure['advice']);
+        }
+
+        if ($accepted) {
+            return $this->check('capi_delivery', $label, true, ucfirst($accepted)
+                .($failure ? ' · last failure '.$failure['at']->diffForHumans().': '.rtrim($failure['error'], '. ') : '')
+                .'.', '');
+        }
+
+        return $this->check('capi_delivery', $label, null, 'No events sent yet.', '');
     }
 
     private function check(string $key, string $label, ?bool $ok, ?string $detail, string $fix): array

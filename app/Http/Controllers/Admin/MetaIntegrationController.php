@@ -15,6 +15,7 @@ use App\Services\Meta\MetaCatalogService;
 use App\Services\Meta\MetaQueueRunner;
 use App\Services\Meta\MetaSettings;
 use App\Services\Meta\MetaStats;
+use App\Services\Meta\MetaTrackingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
@@ -34,11 +35,12 @@ class MetaIntegrationController extends Controller
         private readonly MetaQueueRunner $runner,
     ) {}
 
-    public function index(Request $request)
+    public function index(Request $request, MetaTrackingService $tracking)
     {
         return view('admin.meta.index', [
             'settings' => $this->settings,
             'snapshot' => $this->settings->safeSnapshot(),
+            'capiFailure' => $tracking->lastFailure(),
             'oauthConfigured' => filled(config('meta.oauth.app_id')) && filled(config('meta.oauth.app_secret')),
             'notifications' => $this->notifications(),
             'eligibleCount' => $this->settings->isConfigured() ? $this->catalog->eligibleQuery()->count() : 0,

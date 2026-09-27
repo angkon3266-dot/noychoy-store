@@ -519,14 +519,18 @@ class MetaServerEventQualityTest extends TestCase
                 'cURL error 28: Operation timed out for https://graph.facebook.com/v21.0/1234567890/events?access_token=test-token'
             );
         });
+        // A failure is written to the Meta channel and to laravel.log; on a
+        // bare spy channel() returns null, so hand the spy back to record both.
         Log::spy();
+        Log::shouldReceive('channel')->andReturnSelf();
 
         $result = app(MetaTrackingService::class)->initiateCheckout(['prod-1'], 1500.0, 1, 'IC.timeout', [], [
             'ip' => '203.0.113.9', 'ua' => self::CHROME, 'url' => 'https://noychoy.com/checkout', 'time' => time(),
         ]);
 
         $this->assertNull($result, 'initiateCheckout() is fire-and-forget');
-        Log::shouldHaveReceived('warning')->withArgs(fn ($message, $context = []) => $message === 'Meta CAPI event failed'
+        // Both lines, and both scrubbed.
+        Log::shouldHaveReceived('error')->twice()->withArgs(fn ($message, $context = []) => $message === 'Meta CAPI event failed'
             && ! str_contains((string) ($context['error'] ?? ''), 'test-token')
             && str_contains((string) ($context['error'] ?? ''), '[redacted]'));
     }

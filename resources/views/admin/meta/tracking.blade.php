@@ -20,6 +20,24 @@
      })">
     @include('admin.meta._nav')
 
+    {{-- ── Delivery failure ────────────────────────────────────────────────────
+         While the last send failed and nothing has gone through since. The
+         cards below only say the API is switched on, which stays true through
+         an expired token. --}}
+    @if($capiFailure && $capiFailure['ongoing'])
+        <div class="rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm space-y-1.5">
+            <p><strong>Server events are not reaching Meta.</strong>
+                The last one failed {{ $capiFailure['at']->diffForHumans() }} —
+                {{ $capiFailure['event'] }}, {{ $capiFailure['status'] ? 'HTTP '.$capiFailure['status'] : 'no answer from Meta' }}:
+                <span class="break-words">{{ $capiFailure['error'] }}</span></p>
+            <p>{{ $capiFailure['advice'] }}</p>
+            <p class="text-xs">
+                {{ $lastEventSent ? 'The last event Meta accepted was '.\Illuminate\Support\Carbon::parse($lastEventSent)->diffForHumans().'.' : 'Meta has not accepted an event yet.' }}
+                Every failure is logged in <code>storage/logs/meta-debug-{{ $capiFailure['at']->format('Y-m-d') }}.log</code>@if($capiFailure['fbtrace_id']) · fbtrace_id <code>{{ $capiFailure['fbtrace_id'] }}</code>@endif
+            </p>
+        </div>
+    @endif
+
     {{-- ── Status cards ─────────────────────────────────────────────────────── --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="card p-4">
@@ -40,6 +58,9 @@
         <div class="card p-4">
             <div class="text-xs text-ink-700/50">Last event sent</div>
             <div class="text-lg font-semibold mt-1">{{ $lastEventSent ? \Illuminate\Support\Carbon::parse($lastEventSent)->diffForHumans(null, true) : '—' }}</div>
+            @if($capiFailure)
+                <div class="text-xs mt-1 {{ $capiFailure['ongoing'] ? 'text-red-700' : 'text-ink-700/40' }}">Last failure {{ $capiFailure['at']->diffForHumans() }}</div>
+            @endif
         </div>
     </div>
 

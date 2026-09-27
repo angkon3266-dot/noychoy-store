@@ -42,6 +42,7 @@ class MetaTrackingController extends Controller
             'country' => $this->tracking->country(),
             'countries' => \App\Support\Countries::all(),
             'lastEventSent' => $this->settings->get('last_event_sent_at'),
+            'capiFailure' => $this->tracking->lastFailure(),
             'recent' => $this->recentEvents(),
             'health' => $this->stats->health(),
             'feedUrl' => route('feed.meta'),

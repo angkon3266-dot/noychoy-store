@@ -151,7 +151,24 @@
                     <dt class="text-ink-700/60">Last event sent</dt>
                     <dd class="font-medium">{{ $settings->get('last_event_sent_at') ? \Illuminate\Support\Carbon::parse($settings->get('last_event_sent_at'))->diffForHumans() : '—' }}</dd>
                 </div>
+                @if($capiFailure)
+                    <div class="flex justify-between gap-3">
+                        <dt class="text-ink-700/60">Last failure</dt>
+                        <dd class="font-medium {{ $capiFailure['ongoing'] ? 'text-red-700' : '' }}">{{ $capiFailure['at']->diffForHumans() }}</dd>
+                    </div>
+                @endif
             </dl>
+
+            {{-- "Active" above only means switched on; this is whether anything
+                 is getting through. --}}
+            @if($capiFailure && $capiFailure['ongoing'])
+                <p class="mt-3 text-xs text-red-800 bg-red-50 rounded px-2.5 py-2">
+                    Nothing has reached Meta since —
+                    {{ $capiFailure['event'] }}, {{ $capiFailure['status'] ? 'HTTP '.$capiFailure['status'] : 'no answer' }}:
+                    <span class="break-words">{{ $capiFailure['error'] }}</span>
+                    {{ $capiFailure['advice'] }}
+                </p>
+            @endif
 
             @if($capiSource === \App\Services\Meta\Credentials\MetaCredentials::CAPI_INHERITED)
                 <p class="mt-3 text-xs text-ink-700/70 bg-ink-50 rounded px-2.5 py-2">

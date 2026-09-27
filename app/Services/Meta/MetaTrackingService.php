@@ -6,8 +6,12 @@ use App\Http\Middleware\TrackVisit;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\Meta\Credentials\MetaCredentialResolver;
 use App\Support\MetaIdentity;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -535,7 +539,7 @@ class MetaTrackingService
                 $error = $this->redact($res->json('error.message') ?? 'HTTP '.$res->status(), $token);
 
                 $this->logEvent($eventName, $eventId, $userData, $res->status(), $ms,
-                    $error, $res->json('error.fbtrace_id'), $actionSource);
+                    $error, $res->json('error.fbtrace_id'), $actionSource, failure: self::failureKind($res));
 
                 return ['ok' => false, 'status' => $res->status(), 'body' => $res->json() ?? $res->body(),
                     'error' => $error, 'ms' => $ms];
@@ -547,14 +551,16 @@ class MetaTrackingService
             return ['ok' => true, 'status' => $res->status(), 'body' => $res->json(), 'error' => null, 'ms' => $ms];
         } catch (\Throwable $e) {
             // Scrubbed as well as kept out of the URL: the message is written
-            // to laravel.log and shown on the admin Test panel, and neither is
-            // a place a live access token belongs.
+            // to the logs and shown on the admin Test panel, and neither is a
+            // place a live access token belongs.
             $error = $this->redact($e->getMessage(), $token);
+            $ms = (int) round((microtime(true) - $started) * 1000);
 
-            $this->logEvent($eventName, $eventId, [], 0, (int) round((microtime(true) - $started) * 1000), $error, null, $actionSource);
+            // $userData rather than [], so a timeout's line carries the same
+            // fields as every other one — key names only, as always.
+            $this->logEvent($eventName, $eventId, $userData, 0, $ms, $error, null, $actionSource, failure: self::failureKind($e));
 
-            return ['ok' => false, 'status' => 0, 'body' => null, 'error' => $error,
-                'ms' => (int) round((microtime(true) - $started) * 1000)];
+            return ['ok' => false, 'status' => 0, 'body' => null, 'error' => $error, 'ms' => $ms];
         }
     }
 
@@ -599,8 +605,11 @@ class MetaTrackingService
      * Only the *names* of the user_data keys are recorded — never their values,
      * hashed or otherwise. A SHA-256 of an email is still a stable identifier
      * for that person, so a log full of them is a log full of PII.
+     *
+     * A failed call passes Meta's $error and the $failure's kind
+     * ({@see failureKind()}), and goes on to {@see logFailure()}.
      */
-    protected function logEvent(string $event, string $eventId, array $userData, int $status, int $ms, ?string $error = null, ?string $trace = null, string $actionSource = 'website'): void
+    protected function logEvent(string $event, string $eventId, array $userData, int $status, int $ms, ?string $error = null, ?string $trace = null, string $actionSource = 'website', ?string $failure = null): void
     {
         $matchKeys = array_values(array_diff(
             array_keys($userData),
@@ -633,14 +642,112 @@ class MetaTrackingService
         }
 
         if ($error !== null) {
-            Log::warning('Meta CAPI event failed', $line + ['error' => $error]);
+            $this->logFailure($line + ['error' => $error, 'failure' => $failure ?? 'http-'.$status]);
 
             return;
         }
 
         // Successes are the noisy case — one per page view. Keep them out of
         // laravel.log and in the Meta channel, which rotates on a short window.
-        Log::channel('meta-debug')->info('Meta CAPI event sent', $line);
+        self::quietly(fn () => Log::channel('meta-debug')->info('Meta CAPI event sent', $line));
+    }
+
+    /**
+     * Minutes before laravel.log hears about the same kind of failure again.
+     * An expired token fails every page view the same way: the Meta channel
+     * keeps each one, and laravel.log gets one line per kind per quarter hour
+     * instead of one per view burying everything else in the file.
+     */
+    private const FAILURE_LOG_MINUTES = 15;
+
+    /** Where the last failure waits for the admin's Meta pages ({@see lastFailure()}). */
+    private const LAST_FAILURE_KEY = 'meta.capi.last_failure';
+
+    /**
+     * A send Meta did not accept, written down where somebody will find it.
+     *
+     * This used to be a Log::warning on the default channel, and production
+     * runs LOG_LEVEL=error — so an expired token or a refused payload left
+     * nothing behind but a gap where the "sent" lines had been. Now every
+     * failure goes to the Meta channel beside the successes (its own level, so
+     * LOG_LEVEL never reaches it); laravel.log gets an error for the first of
+     * each kind in FAILURE_LOG_MINUTES; and the latest is kept for the admin's
+     * Meta pages, because the owner does not read logs.
+     */
+    private function logFailure(array $line): void
+    {
+        self::quietly(fn () => Log::channel('meta-debug')->error('Meta CAPI event failed', $line));
+
+        self::quietly(fn () => Cache::put(self::LAST_FAILURE_KEY, [
+            // Plain values only: the cache will not unserialize an object.
+            'at' => now()->getTimestamp(),
+            'event' => $line['event'],
+            'status' => $line['status'],
+            'failure' => $line['failure'],
+            'error' => $line['error'],
+            'fbtrace_id' => $line['fbtrace_id'] ?? null,
+        ], now()->addWeek()));
+
+        if (self::firstOfItsKind($line['failure'])) {
+            self::quietly(fn () => Log::error('Meta CAPI event failed', $line + [
+                'repeats' => 'logged to meta-debug only for the next '.self::FAILURE_LOG_MINUTES.' minutes',
+            ]));
+        }
+    }
+
+    /**
+     * Whether a failure is the first of its kind in FAILURE_LOG_MINUTES, and so
+     * the one laravel.log is told about. add() writes only a missing key — on
+     * Redis atomically — so of a burst from concurrent requests exactly one
+     * gets through. With no cache to ask, every failure does: a noisy log beats
+     * a silent one.
+     */
+    private static function firstOfItsKind(string $failure): bool
+    {
+        try {
+            return Cache::add('meta.capi.failure_logged.'.$failure, true, now()->addMinutes(self::FAILURE_LOG_MINUTES));
+        } catch (\Throwable) {
+            return true;
+        }
+    }
+
+    /**
+     * Write something down without the writing being able to throw. send()
+     * promises its callers never to throw, and a timeout's writes run in its
+     * catch block with nothing behind them: a log file the web server cannot
+     * open would escape from there into an order job — and from the try block
+     * it would turn a send Meta accepted into one reported as failed.
+     */
+    private static function quietly(\Closure $write): void
+    {
+        try {
+            $write();
+        } catch (\Throwable) {
+            // Nowhere left to say so.
+        }
+    }
+
+    /**
+     * A failure's kind as a short, stable key: the HTTP status with Meta's error
+     * code and subcode ("http-400-190-463" is an expired token), or the
+     * exception with cURL's error number ("ConnectionException-curl-28" is a
+     * timeout). It keys the laravel.log throttle, so it is never built from the
+     * message — Meta's token errors end "The current time is …", and a key that
+     * changes every second would hold nothing back.
+     */
+    private static function failureKind(Response|\Throwable $cause): string
+    {
+        if ($cause instanceof \Throwable) {
+            return class_basename($cause)
+                .(preg_match('/cURL error (\d+)/', $cause->getMessage(), $m) ? '-curl-'.$m[1] : '');
+        }
+
+        return implode('-', array_filter([
+            'http',
+            $cause->status(),
+            (int) $cause->json('error.code'),
+            (int) $cause->json('error.error_subcode'),
+        ]));
     }
 
     /**
@@ -669,6 +776,48 @@ class MetaTrackingService
     }
 
     // ── Diagnostics / test panel support ─────────────────────────────────────
+
+    /**
+     * The last send Meta did not accept, for the admin's Meta pages: when, which
+     * event, the HTTP status (0 when Meta never answered), Meta's message, what
+     * to do about it, and whether anything has gone through since — `ongoing`
+     * is true while nothing has. Null when none is on record: one is kept for a
+     * week, and every deploy clears the cache.
+     *
+     * @return array{at:Carbon,event:string,status:int,failure:string,error:string,fbtrace_id:?string,ongoing:bool,advice:string}|null
+     */
+    public function lastFailure(): ?array
+    {
+        $failure = Cache::get(self::LAST_FAILURE_KEY);
+
+        if (! is_array($failure) || ! is_int($failure['at'] ?? null)) {
+            return null;
+        }
+
+        $sent = $this->settings->get('last_event_sent_at');
+
+        return array_merge($failure, [
+            'at' => Carbon::createFromTimestamp($failure['at']),
+            'ongoing' => ! $sent || Carbon::parse($sent)->getTimestamp() <= $failure['at'],
+            'advice' => $this->failureAdvice((string) ($failure['failure'] ?? '')),
+        ]);
+    }
+
+    /** What to do about a failure of this kind, in the owner's terms. */
+    private function failureAdvice(string $failure): string
+    {
+        // 190 is an invalid or expired token, 102 an expired session, 10 and
+        // 200–299 a missing permission. A new token fixes each of them.
+        if (preg_match('/^http-\d+-(10|102|190|2\d\d)(-|$)/', $failure)) {
+            return app(MetaCredentialResolver::class)->resolve()->capiAdvice();
+        }
+
+        if (! str_starts_with($failure, 'http-')) {
+            return 'The server could not reach graph.facebook.com. That usually passes by itself; if it lasts, ask the host whether outbound connections to Facebook are blocked.';
+        }
+
+        return 'Meta answered with an error, and its message says what was wrong. If that is not enough, Meta support can trace the request from its fbtrace_id.';
+    }
 
     /**
      * Validate the CAPI access token via Graph debug_token.
