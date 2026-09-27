@@ -137,6 +137,29 @@ class SecurityHeadersTest extends TestCase
     }
 
     /**
+     * The check above kept passing while no Chrome visitor's Pixel event
+     * reached Meta (found 2026-09-27): www.facebook.com was in the policy — in
+     * connect-src — but fbevents.js sends an event whose URL tops 2,048
+     * characters by submitting a hidden form into a hidden iframe, and every
+     * event had grown past that. Neither form-action nor frame-src named the
+     * host, so the browser refused each send while the script loaded cleanly.
+     * Checked per directive, because "somewhere in the header" is what missed it.
+     */
+    public function test_the_pixel_can_post_its_events_to_meta(): void
+    {
+        $csp = $this->get('/_test/ping')->headers->get('Content-Security-Policy');
+
+        foreach (['connect-src', 'form-action', 'frame-src'] as $name) {
+            $this->assertContains('https://www.facebook.com', $this->directive($csp, $name),
+                "{$name} must allow https://www.facebook.com, or Pixel events are dropped in the browser.");
+        }
+
+        // Widening form-action for Meta must not reopen it to everyone.
+        $this->assertNotContains('https:', $this->directive($csp, 'form-action'));
+        $this->assertNotContains('*', $this->directive($csp, 'form-action'));
+    }
+
+    /**
      * Fonts and shipping-label barcodes both used to pull a third-party script
      * or stylesheet — Google Fonts and a jsDelivr-hosted barcode library. Both
      * were dropped in favour of self-hosted fonts and a text-only tracking
@@ -177,5 +200,18 @@ class SecurityHeadersTest extends TestCase
 
         $res->assertHeader('Content-Security-Policy-Report-Only');
         $this->assertFalse($res->headers->has('Content-Security-Policy'));
+    }
+
+    /** The sources of one CSP directive, or [] when it is absent. */
+    private function directive(string $csp, string $name): array
+    {
+        foreach (explode(';', $csp) as $part) {
+            $tokens = preg_split('/\s+/', trim($part));
+            if ($tokens[0] === $name) {
+                return array_slice($tokens, 1);
+            }
+        }
+
+        return [];
     }
 }

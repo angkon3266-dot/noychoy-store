@@ -77,8 +77,8 @@ return [
     | in Blade. Removing either would take a nonce pass over every view and a
     | switch to Alpine's CSP build — a rewrite, not a hardening step. What the
     | policy still buys with them in place is real: no third-party script host,
-    | no <object>/<embed>, no <base> takeover, no form posting off-site, no
-    | framing by anyone else.
+    | no <object>/<embed>, no <base> takeover, no form posting off-site (bar
+    | the Pixel's own endpoint, see form-action), no framing by anyone else.
     |
     */
 
@@ -156,13 +156,26 @@ return [
                 'https://www.youtube.com',      // product / home-block videos
                 'https://www.youtube-nocookie.com',
                 'https://player.vimeo.com',
+                'https://www.facebook.com',     // Pixel's POST lands in a hidden iframe — see form-action
             ],
 
             'worker-src' => ["'self'", 'blob:'], // service worker (push + PWA)
 
             'object-src' => ["'none'"],
             'base-uri' => ["'self'"],
-            'form-action' => ["'self'"],
+
+            // The Meta Pixel's other delivery route. fbevents.js sends an event
+            // as an image GET only while its URL stays under 2,048 characters;
+            // past that, on Chrome, it submits a hidden <form> into a hidden
+            // <iframe> pointed at www.facebook.com/tr/ — so it needs this and
+            // frame-src, not connect-src. What the script adds by itself (48
+            // `expv2[n]` experiment flags, plus the page's title, description
+            // and structured data) puts every event at 2,700-3,600 characters.
+            // With 'self' alone here, each Chrome visitor's PageView,
+            // ViewContent, AddToCart and Purchase was dropped in the browser
+            // while the script loaded, the page looked healthy and CAPI kept
+            // reporting (found 2026-09-27).
+            'form-action' => ["'self'", 'https://www.facebook.com'],
             'frame-ancestors' => ["'self'"],
         ],
 
