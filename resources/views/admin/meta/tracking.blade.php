@@ -14,6 +14,7 @@
         testBase: @js(url('admin/meta/tracking/test')),
         diagnosticsUrl: @js(route('admin.meta.tracking.diagnostics')),
         validateUrl: @js(route('admin.meta.tracking.validate-token')),
+        liveUrl: @js(route('admin.meta.tracking.live')),
         pixelId: @js($pixelId),
         pixelEnabled: @js($pixelEnabled),
         recent: @js($recent),
@@ -62,6 +63,47 @@
                 <div class="text-xs mt-1 {{ $capiFailure['ongoing'] ? 'text-red-700' : 'text-ink-700/40' }}">Last failure {{ $capiFailure['at']->diffForHumans() }}</div>
             @endif
         </div>
+    </div>
+
+    {{-- ── What Meta received ──────────────────────────────────────────────────
+         The only view of the storefront Pixel this admin has: the Pixel runs in
+         shoppers' browsers and reports straight to Meta, so these are Meta's own
+         counts, fetched after the page loads (see MetaReceivedEvents). --}}
+    <div class="card p-5">
+        <div class="flex items-center justify-between gap-3 flex-wrap mb-2">
+            <h3 class="font-semibold">What Meta received from the store — last 24 hours</h3>
+            <span class="text-xs text-ink-700/50" x-show="live && live.ok">Meta’s own figures · checked <span x-text="live && new Date(live.fetched_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })"></span></span>
+        </div>
+        <p x-show="liveLoading" class="text-sm text-ink-700/50">Asking Meta…</p>
+        <p x-show="live && !live.ok" class="text-sm text-amber-700" x-text="live && live.error"></p>
+        <template x-if="live && live.ok">
+            <div>
+                <p x-show="live.browser_total > 0" class="text-sm text-green-700 mb-3">
+                    ✅ The browser Pixel is reaching Meta. Latest hour with browser events:
+                    <span class="font-medium" x-text="hourRange(live.last_browser_hour)"></span>.
+                </p>
+                <p x-show="live.browser_total === 0" class="text-sm text-red-700 mb-3">
+                    ❌ Meta received no browser Pixel events in the last 24 hours<span x-show="live.server_total > 0"> — only the server’s copies</span>.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left text-ink-700/50 border-b border-ink-100">
+                            <tr><th class="py-1.5 pr-3">Event</th><th class="pr-3">From shoppers’ browsers (Pixel)</th><th class="pr-3">From the server (Conversions API)</th></tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="row in live.events" :key="row.event">
+                                <tr class="border-b border-ink-50">
+                                    <td class="py-1.5 pr-3 font-medium" x-text="row.event"></td>
+                                    <td class="pr-3" x-text="row.browser.toLocaleString()"></td>
+                                    <td class="pr-3" x-text="row.server.toLocaleString()"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-ink-700/50 mt-2">Meta publishes each hour about an hour late. Most events arrive from both sides and Meta merges each pair on its event ID, so the columns count copies received, not separate shoppers. PageView and Search come from the browser only.</p>
+            </div>
+        </template>
     </div>
 
     {{-- ── Settings ─────────────────────────────────────────────────────────── --}}
@@ -165,10 +207,14 @@
         </template>
     </div>
 
-    {{-- ── Event debugger (recent test events) ──────────────────────────────── --}}
+    {{-- ── Test event log ──────────────────────────────────────────────────────
+         Only the samples sent from the panel above. It had Pixel and Dedup
+         columns from when this page also fired the browser Pixel; since that
+         stopped (2026-09-08) they could never tick, and on 2026-09-27 the owner
+         read them as the storefront Pixel being dead. --}}
     <div class="card p-5">
-        <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
-            <h3 class="font-semibold">Event debugger</h3>
+        <div class="flex items-center justify-between gap-3 flex-wrap mb-1">
+            <h3 class="font-semibold">Test event log</h3>
             <div class="flex gap-2 text-sm">
                 <select x-model="filterEvent" class="input py-1 text-sm">
                     <option value="">All events</option>
@@ -181,10 +227,11 @@
                 </select>
             </div>
         </div>
+        <p class="text-xs text-ink-700/50 mb-3">Samples sent from the Test events panel above, from the server only. Nothing is fired from this browser, so this log says nothing about the Pixel on your store — for that, see “What Meta received” at the top.</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="text-left text-ink-700/50 border-b border-ink-100">
-                    <tr><th class="py-1.5 pr-3">Event</th><th class="pr-3">Event ID</th><th class="pr-3">SKU</th><th class="pr-3">Pixel</th><th class="pr-3">CAPI</th><th class="pr-3">Dedup</th><th class="pr-3">HTTP</th><th class="pr-3">When</th></tr>
+                    <tr><th class="py-1.5 pr-3">Event</th><th class="pr-3">Event ID</th><th class="pr-3">SKU</th><th class="pr-3">Sent to Meta</th><th class="pr-3">HTTP</th><th class="pr-3">When</th></tr>
                 </thead>
                 <tbody>
                     <template x-for="(e, i) in filteredRecent" :key="i">
@@ -192,14 +239,12 @@
                             <td class="py-1.5 pr-3 font-medium" x-text="e.event"></td>
                             <td class="pr-3"><code class="text-[11px]" x-text="(e.event_id||'').slice(0,18)+'…'"></code></td>
                             <td class="pr-3" x-text="e.sku"></td>
-                            <td class="pr-3" x-text="e.browser_sent ? '✅' : '—'"></td>
                             <td class="pr-3" x-text="e.ok ? '✅' : '❌'"></td>
-                            <td class="pr-3" x-text="e.deduplicated ? '✅' : '—'"></td>
                             <td class="pr-3" x-text="e.status"></td>
                             <td class="pr-3 text-ink-700/50" x-text="new Date(e.at).toLocaleString()"></td>
                         </tr>
                     </template>
-                    <template x-if="!filteredRecent.length"><tr><td colspan="8" class="py-3 text-ink-700/40">No events recorded yet — send a test event above.</td></tr></template>
+                    <template x-if="!filteredRecent.length"><tr><td colspan="6" class="py-3 text-ink-700/40">No test events sent yet.</td></tr></template>
                 </tbody>
             </table>
         </div>
@@ -257,6 +302,25 @@
             tokenLoading: false,
             diag: null,
             diagLoading: false,
+            live: null,
+            liveLoading: false,
+
+            init() { this.loadLive(); },
+
+            async loadLive() {
+                this.liveLoading = true;
+                try { const r = await fetch(this.liveUrl, { headers: { Accept: 'application/json' } }); this.live = await r.json(); }
+                catch (e) { this.live = { ok: false, error: 'Could not load Meta’s figures: ' + e }; }
+                this.liveLoading = false;
+            },
+
+            // "8–9 PM" in the viewer's own clock, for an hour Meta reports.
+            hourRange(iso) {
+                if (!iso) return '';
+                const from = new Date(iso), to = new Date(from.getTime() + 3600e3);
+                const t = (d) => d.toLocaleTimeString([], { hour: 'numeric' });
+                return from.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ', ' + t(from) + '–' + t(to);
+            },
 
             get filteredRecent() {
                 return this.recent.filter((e) => {

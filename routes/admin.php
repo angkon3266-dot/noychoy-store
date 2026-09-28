@@ -455,6 +455,7 @@ Route::middleware('admin')->group(function () {
             Route::post('tracking/save', [MetaTrackingController::class, 'save'])->name('tracking.save');
             Route::post('tracking/test/{event}', [MetaTrackingController::class, 'test'])->name('tracking.test')->where('event', '[A-Za-z]+');
             Route::get('tracking/diagnostics', [MetaTrackingController::class, 'diagnostics'])->name('tracking.diagnostics');
+            Route::get('tracking/live', [MetaTrackingController::class, 'live'])->name('tracking.live');
             Route::get('tracking/validate-token', [MetaTrackingController::class, 'validateToken'])->name('tracking.validate-token');
 
             // Production Mode OAuth ("Connect with Facebook").

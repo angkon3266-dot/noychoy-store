@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Services\Meta\MetaDiagnostics;
+use App\Services\Meta\MetaReceivedEvents;
 use App\Services\Meta\MetaSettings;
 use App\Services\Meta\MetaStats;
 use App\Services\Meta\MetaTrackingService;
@@ -95,7 +96,11 @@ class MetaTrackingController extends Controller
         return back()->with('success', 'Tracking settings saved.');
     }
 
-    /** Fire one real CAPI test event (browser Pixel fires the same id client-side). */
+    /**
+     * Send one Conversions API test event carrying the Test Event Code. Server
+     * side only: the admin never fires the browser Pixel, so a test says
+     * nothing about the Pixel on the storefront — live() does.
+     */
     public function test(Request $request, string $event)
     {
         abort_unless(in_array($event, self::TEST_EVENTS, true), 404);
@@ -110,6 +115,12 @@ class MetaTrackingController extends Controller
         $this->pushRecent($result);
 
         return response()->json($result);
+    }
+
+    /** What Meta received from the storefront in the last 24 hours, browser against server (JSON). */
+    public function live(MetaReceivedEvents $received)
+    {
+        return response()->json($received->lastDay());
     }
 
     /** Live end-to-end diagnostics + overall health score (JSON). */
