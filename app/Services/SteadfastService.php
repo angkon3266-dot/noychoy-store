@@ -592,6 +592,103 @@ class SteadfastService
     }
 
     /**
+     * Move an order along for a courier state that is still in flight.
+     *
+     * "in_review" is Steadfast's just-booked state. We already recorded that
+     * ourselves as `booked` when the consignment was created, and calling it
+     * "shipped" would pull the order off the label queue before anyone had
+     * printed the label. "pending" is the state that means the courier actually
+     * has the parcel and is moving it.
+     *
+     * An order the customer already received through a replaced consignment is
+     * not dragged back to "shipped" by the unused one's movement.
+     *
+     * @return bool True if the order's status moved.
+     */
+    public function applyCourierProgress(Order $order, ?string $raw, string $by): bool
+    {
+        if ($order->replacedConsignmentDelivered()) {
+            return false;
+        }
+
+        $progress = match (strtolower(trim((string) $raw))) {
+            'hold' => 'processing',
+            'pending' => 'shipped',
+            default => null,
+        };
+
+        if (! $progress || $order->status === $progress) {
+            return false;
+        }
+
+        return app(TransitionOrderStatus::class)->handle($order, $progress, "Steadfast update: {$raw}", $by);
+    }
+
+    /**
+     * Ask Steadfast what became of the order's current consignment, record it,
+     * and let the order follow: a settled outcome (delivered / partially
+     * delivered / cancelled) moves it for good, and an in-flight one moves it
+     * along. The customer is texted when the outcome settles.
+     *
+     * The webhook alone was not enough. Most of Steadfast's callbacks are
+     * `tracking_update` and `return_status` notifications ("Assigned to rider
+     * for delivery.") that carry no delivery status at all. The one carrying the
+     * final "delivered" was often never received, so on 2026-09-29 thirteen
+     * delivered and partially delivered orders were still sitting at
+     * "shipped". The webhook calls this for every status-less callback, and
+     * `steadfast:sync` sweeps every open consignment on a schedule.
+     *
+     * Uncached. The 10-minute cache in deliveryStatus() is for page loads, and
+     * a callback is by definition news the cache has not seen yet.
+     *
+     * @param  bool  $notify  False for a catch-up run, where texting "delivered"
+     *                         days after the fact would only confuse.
+     * @return bool True if the order's status moved.
+     */
+    public function syncCurrentConsignment(Order $order, string $by, bool $notify = true): bool
+    {
+        $shipment = $order->shipment()->first();
+        if (! $shipment?->consignment_id || $shipment->isSuperseded() || ! $this->isConfigured()) {
+            return false;
+        }
+
+        $raw = $this->statusByConsignmentId((string) $shipment->consignment_id)['delivery_status'] ?? null;
+        if (! is_string($raw) || $raw === '') {
+            return false;
+        }
+
+        if ($shipment->status !== $raw) {
+            $shipment->update(['status' => $raw]);
+        }
+        Cache::forget("sf_status_{$shipment->consignment_id}");
+
+        if ($this->applyCourierVerdict($order, $raw, $by)) {
+            if ($notify) {
+                $this->notifySettled($order);
+            }
+
+            return true;
+        }
+
+        return $this->applyCourierProgress($order, $raw, $by);
+    }
+
+    /** Text the customer the settled outcome the order has just moved to. */
+    public function notifySettled(Order $order): void
+    {
+        $final = $order->fresh();
+        $template = match ($final->status) {
+            'delivered' => 'order_delivered',
+            'cancelled' => 'order_cancelled',
+            default => null,
+        };
+
+        if ($template) {
+            app(SmsService::class)->sendTemplate($template, $final);
+        }
+    }
+
+    /**
      * Steadfast's reason for refusing a booking, as one readable sentence.
      *
      * Validation failures come back as {"status": 400, "errors": {"invoice":

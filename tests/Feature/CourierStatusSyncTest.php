@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\Shipment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -204,5 +205,78 @@ class CourierStatusSyncTest extends TestCase
 
         $this->assertSame($historyAfterFirst, $order->fresh()->history()->count());
         $this->assertSame('delivered', $order->fresh()->status);
+    }
+
+    // ── Callbacks without a status, and the scheduled sweep ─────────────────
+
+    /** Steadfast answers status_by_cid with these, keyed by consignment id. */
+    protected function fakeSteadfast(array $statuses): void
+    {
+        Setting::put('integrations', [
+            'steadfast_webhook_secret' => 'sec',
+            'steadfast_api_key' => 'k', 'steadfast_secret_key' => 's',
+        ]);
+
+        Http::fake(function ($request) use ($statuses) {
+            $cid = basename(parse_url($request->url(), PHP_URL_PATH));
+
+            return Http::response(['status' => 200, 'delivery_status' => $statuses[$cid] ?? 'pending']);
+        });
+    }
+
+    public function test_a_tracking_update_callback_reads_the_live_status_and_delivers_the_order(): void
+    {
+        $order = $this->orderWithShipment('pending');
+        $order->update(['status' => 'shipped']);
+        $this->fakeSteadfast([$order->shipment->consignment_id => 'delivered']);
+
+        $this->postJson('/webhooks/steadfast?token=sec', [
+            'notification_type' => 'tracking_update',
+            'consignment_id' => (int) $order->shipment->consignment_id,
+            'invoice' => $order->order_number,
+            'tracking_message' => 'Assigned to rider for delivery.',
+        ])->assertOk();
+
+        $this->assertSame('delivered', $order->fresh()->status);
+        $this->assertSame('delivered', $order->fresh()->shipment->status);
+    }
+
+    public function test_the_sync_command_moves_every_open_order_to_its_courier_outcome(): void
+    {
+        $delivered = $this->orderWithShipment('pending');
+        $partial = $this->orderWithShipment('partial_delivered_approval_pending');
+        $cancelled = $this->orderWithShipment('pending');
+        $pickedUp = $this->orderWithShipment('in_review');
+        foreach ([$delivered, $partial, $cancelled] as $o) {
+            $o->update(['status' => 'shipped']);
+        }
+        $pickedUp->update(['status' => 'booked']);
+
+        $this->fakeSteadfast([
+            $delivered->shipment->consignment_id => 'delivered',
+            $partial->shipment->consignment_id => 'partial_delivered',
+            $cancelled->shipment->consignment_id => 'cancelled',
+            $pickedUp->shipment->consignment_id => 'pending',
+        ]);
+
+        $this->artisan('steadfast:sync')->assertSuccessful();
+
+        $this->assertSame('delivered', $delivered->fresh()->status);
+        $this->assertSame('partially_delivered', $partial->fresh()->status);
+        $this->assertSame('cancelled', $cancelled->fresh()->status);
+        $this->assertSame('shipped', $pickedUp->fresh()->status);
+    }
+
+    public function test_the_sync_command_leaves_a_still_travelling_order_alone(): void
+    {
+        $order = $this->orderWithShipment('pending');
+        $order->update(['status' => 'shipped']);
+        $this->fakeSteadfast([$order->shipment->consignment_id => 'pending']);
+        $history = $order->history()->count();
+
+        $this->artisan('steadfast:sync')->assertSuccessful();
+
+        $this->assertSame('shipped', $order->fresh()->status);
+        $this->assertSame($history, $order->fresh()->history()->count());
     }
 }

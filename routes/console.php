@@ -94,3 +94,8 @@ Schedule::command('reviews:request')->dailyAt('11:30')->name('reviews-request')-
 // Runs at a quiet hour because the first pass over a long-neglected table is
 // the expensive one. Retention windows live in config/retention.php.
 Schedule::command('logs:prune')->dailyAt('04:10')->name('logs-prune')->withoutOverlapping();
+
+// Hourly: follow every open Steadfast consignment to its live status, so a
+// delivered, partially delivered or cancelled parcel moves its order even when
+// the courier's webhook for it never arrived (most never do).
+Schedule::command('steadfast:sync')->hourly()->name('steadfast-sync')->withoutOverlapping();

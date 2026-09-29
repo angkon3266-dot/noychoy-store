@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\TransitionOrderStatus;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Shipment;
-use App\Services\SmsService;
 use App\Services\SteadfastService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +16,7 @@ use Illuminate\Support\Facades\Log;
  */
 class SteadfastWebhookController extends Controller
 {
-    public function handle(Request $request, SmsService $sms, SteadfastService $steadfast)
+    public function handle(Request $request, SteadfastService $steadfast)
     {
         // Shared-secret check — fail CLOSED. A secret must be configured
         // ("steadfast_webhook_secret" in admin → Integrations) and match, or the
@@ -84,7 +82,7 @@ class SteadfastWebhookController extends Controller
         if (! $this->speaksForOrder($order, $shipment, $invoice)) {
             if ($shipment?->isSuperseded() && ! $wasSettled
                 && $steadfast->applyReplacedDelivery($order, $shipment, $deliveryStatus, 'Steadfast webhook')) {
-                $this->notifySettled($order, $sms);
+                $steadfast->notifySettled($order);
 
                 return response()->json(['message' => 'ok'], 200);
             }
@@ -98,49 +96,35 @@ class SteadfastWebhookController extends Controller
             return response()->json(['message' => 'ok'], 200);
         }
 
+        // A tracking_update or return_status notification ("Assigned to rider
+        // for delivery.") carries no delivery status. Treat it as a prompt to
+        // ask Steadfast directly: the delivery_status callback that should
+        // settle the order often never arrives, and this is how the order still
+        // finds out.
+        if ($deliveryStatus === '') {
+            try {
+                $steadfast->syncCurrentConsignment($order, 'Steadfast webhook');
+            } catch (\Throwable $e) {
+                // The scheduled sweep (steadfast:sync) will catch it up.
+                Log::error('Steadfast webhook: live status lookup failed', [
+                    'order' => $order->order_number, 'error' => $e->getMessage(),
+                ]);
+            }
+
+            return response()->json(['message' => 'ok'], 200);
+        }
+
         // Settled courier outcomes (delivered / cancelled / partial) move the
         // order by themselves — see Order::statusForCourierStatus(). In-flight
         // states just track progress and never force a final status. A
         // cancellation is held back once a replaced consignment was delivered.
-        $moved = $steadfast->applyCourierVerdict($order, $deliveryStatus, 'Steadfast webhook');
-
-        // Nor does the unused consignment's movement drag an order the customer
-        // already received back to "shipped".
-        if (! $moved && ! $order->replacedConsignmentDelivered()) {
-            // "in_review" is Steadfast's just-booked state — we already recorded
-            // that ourselves as `booked` when the consignment was created, and
-            // calling it "shipped" here would pull the order off the label queue
-            // before anyone had printed the label. "pending" is the one that
-            // means the courier actually has it and is moving.
-            $progress = match ($deliveryStatus) {
-                'hold' => 'processing',
-                'pending' => 'shipped',
-                default => null,
-            };
-            if ($progress && $order->status !== $progress) {
-                app(TransitionOrderStatus::class)->handle(
-                    $order, $progress, "Steadfast update: {$deliveryStatus}", 'Steadfast webhook',
-                );
-            }
-        }
-
-        // Notify the customer once the outcome is settled.
-        if ($moved) {
-            $this->notifySettled($order, $sms);
+        if ($steadfast->applyCourierVerdict($order, $deliveryStatus, 'Steadfast webhook')) {
+            $steadfast->notifySettled($order);
+        } else {
+            $steadfast->applyCourierProgress($order, $deliveryStatus, 'Steadfast webhook');
         }
 
         return response()->json(['message' => 'ok'], 200);
-    }
-
-    /** Text the customer the settled outcome the order has just moved to. */
-    protected function notifySettled(Order $order, SmsService $sms): void
-    {
-        $final = $order->fresh();
-        if ($final->status === 'delivered') {
-            $sms->sendTemplate('order_delivered', $final);
-        } elseif ($final->status === 'cancelled') {
-            $sms->sendTemplate('order_cancelled', $final);
-        }
     }
 
     /**
