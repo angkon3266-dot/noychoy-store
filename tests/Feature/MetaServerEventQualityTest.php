@@ -124,6 +124,20 @@ class MetaServerEventQualityTest extends TestCase
         $this->assertSame([], $this->sentEvents(), 'a crawler has no Pixel twin and must not reach Meta');
     }
 
+    public function test_a_script_naming_no_browser_engine_sends_no_view_content_and_is_not_a_visitor(): void
+    {
+        $product = $this->product();
+        $agent = 'Mozilla/5.0 (compatible; LeadGenCheck/1.0)';
+
+        $this->withHeader('User-Agent', $agent)
+            ->get('/product/'.$product->slug)->assertOk();
+
+        // Each of its requests carried a fresh visitor from one address: to
+        // Meta, one IP "associated with multiple users".
+        $this->assertSame([], $this->sentEvents());
+        $this->assertTrue(TrackVisit::isBot($agent), 'the dashboard would count it as a visitor');
+    }
+
     public function test_a_real_browser_still_sends_its_view_content(): void
     {
         $product = $this->product();
@@ -193,6 +207,16 @@ class MetaServerEventQualityTest extends TestCase
             'Mozilla/5.0 (Windows NT 6.1; WOW64) SkypeUriPreview Preview/0.5 skype-url-preview@microsoft.com',
             'Mozilla/5.0 (compatible; ViberBot/1.0; +https://developers.viber.com)',
             'Viber/8.7.2.190 CFNetwork/897.15 Darwin/17.5.0',
+            // Scripts that name no engine at all (production, 2026-09-28).
+            'Mozilla/5.0 (compatible; LeadGenCheck/1.0)',
+            'Mozilla/5.0 (compatible; SiteAuditor/2.3; +https://example.com/about)',
+            // A scraping proxy stamping its exit address on a Chrome string.
+            'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 [ip:93.41.125.186]',
+            // Meta's own ads crawler and web indexer, caught by "crawl" in the
+            // URL they carry — plain and dressed as Chrome.
+            'meta-externalads/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 (compatible; meta-externalads/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 (compatible; meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))',
         ] as $agent) {
             $this->assertTrue(MetaTrackingService::isMachineAgent($agent), "not recognised as a machine: {$agent}");
         }
@@ -206,6 +230,11 @@ class MetaServerEventQualityTest extends TestCase
             'Mozilla/5.0 (Linux; Android 12; CUBOT P60 Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.127 Mobile Safari/537.36 Instagram 348.0.0.40.99 Android',
             // A browser opened from Viber names the app too, but not first.
             'Mozilla/5.0 (Linux; Android 14; SM-S921B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.0.0 Mobile Safari/537.36 Viber/27.7.0.0',
+            // The "(compatible; …)"-only rule must not touch real browsers,
+            // which all name an engine after the brackets.
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0',
+            'Mozilla/5.0 (Linux; Android 16; 2312DRA50C Build/BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/143.0.7499.192 Mobile Safari/537.36[FBAN/EMA;FBLC/en_US;FBAV/480.0.0.12.108;]',
         ] as $agent) {
             $this->assertFalse(MetaTrackingService::isMachineAgent($agent), "a shopper taken for a machine: {$agent}");
         }

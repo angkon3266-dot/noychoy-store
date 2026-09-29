@@ -37,8 +37,20 @@ class TrackVisit
      * WhatsApp and Viber fetch link previews under the app's own name, so
      * those two are anchored to the start of the string. Any browser a shopper
      * opens a shared link in sends Mozilla/5.0 first, and is not caught.
+     *
+     * A user agent that is nothing but "Mozilla/5.0 (compatible; Name/1.0)"
+     * is a script: every browser names its engine (AppleWebKit, Gecko) after
+     * the brackets. "LeadGenCheck/1.0" came in that shape on 2026-09-28 —
+     * a hundred product pages in an hour from one address, each a server
+     * ViewContent with a fresh visitor, which is what Meta's "client IP
+     * associated with multiple users" diagnostic reports. MSIE is spared by
+     * name; it is the one browser that used the shape.
+     *
+     * "[ip:93.41.125.186]" on the end of an otherwise ordinary Chrome string
+     * is a scraping proxy stamping its exit address — 248 product pages in
+     * September, 79 of them in one hour from one address. No browser writes it.
      */
-    public const BOT_PATTERN = '/(?<![a-z])bot|(?<!cu)bot(?![a-z])|^WhatsApp\/|^Viber\/|crawl|spider|slurp|facebookexternalhit|preview|monitor|curl|wget|headless|lighthouse|pingdom|uptime/i';
+    public const BOT_PATTERN = '/(?<![a-z])bot|(?<!cu)bot(?![a-z])|^WhatsApp\/|^Viber\/|crawl|spider|slurp|facebookexternalhit|preview|monitor|curl|wget|headless|lighthouse|pingdom|uptime|^Mozilla\/5\.0 \(compatible; (?!MSIE)[^)]*\)$|\[ip:/i';
 
     /** Whether a user agent is one of the crawlers above. */
     public static function isBot(?string $userAgent): bool
