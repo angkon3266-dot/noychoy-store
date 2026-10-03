@@ -941,6 +941,109 @@ document.addEventListener('alpine:init', () => {
     }));
 
     /**
+     * Admin → Appearance → Hero slider: reorder the saved slides.
+     *
+     * Drag a row by its ⠿ grip, or nudge it with the ▲/▼ arrows. Either way
+     * the rows move on the page and every row's hidden "position" is
+     * renumbered; the order is saved with the rest of the form. Rows keep their
+     * stored index as the form key, so link edits and removals still land on
+     * the right slide.
+     *
+     * Pointer events rather than HTML5 drag-and-drop, for the same reasons as
+     * imageGrid below: Firefox and touch screens. Only the grip starts a drag,
+     * so the link box can still be clicked into and selected as normal.
+     */
+    window.Alpine.data('heroSlideOrder', () => ({
+        drag: null,
+        from: null,
+
+        init() {
+            const list = this.$root;
+            list.addEventListener('pointerdown', (e) => this.onDown(e), { passive: false });
+            list.addEventListener('pointermove', (e) => this.onMove(e), { passive: false });
+            list.addEventListener('pointerup', () => this.onUp());
+            list.addEventListener('pointercancel', () => this.onUp());
+        },
+
+        rows() {
+            return Array.from(this.$root.querySelectorAll(':scope > [data-slide-row]'));
+        },
+
+        move(row, dir) {
+            const sibling = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+            if (!sibling) return;
+            dir < 0 ? sibling.before(row) : sibling.after(row);
+            this.renumber();
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        },
+
+        renumber() {
+            const rows = this.rows();
+            rows.forEach((row, n) => {
+                row.querySelector('[data-slide-pos]').value = n;
+                row.querySelector('[data-slide-up]').disabled = n === 0;
+                row.querySelector('[data-slide-down]').disabled = n === rows.length - 1;
+            });
+        },
+
+        onDown(e) {
+            const grip = e.target.closest('[data-slide-grip]');
+            if (!grip || (e.pointerType === 'mouse' && e.button !== 0)) return;
+
+            e.preventDefault();
+            this.from = { y: e.clientY, row: grip.closest('[data-slide-row]'), id: e.pointerId };
+        },
+
+        onMove(e) {
+            if (!this.from) return;
+
+            if (!this.drag) {
+                if (Math.abs(e.clientY - this.from.y) < 4) return;
+
+                this.drag = this.from.row;
+                this.drag.classList.add('opacity-50', 'ring-2', 'ring-gold-500');
+                document.body.style.userSelect = 'none';
+                try {
+                    this.$root.setPointerCapture(this.from.id);
+                } catch (err) {
+                    // Pointer already released; the drag still works without capture.
+                }
+            }
+
+            e.preventDefault();
+
+            // Before the first row whose middle sits below the pointer, else last.
+            const others = this.rows().filter((row) => row !== this.drag);
+            const next = others.find((row) => {
+                const box = row.getBoundingClientRect();
+                return e.clientY < box.top + box.height / 2;
+            });
+            if (next) {
+                if (next.previousElementSibling !== this.drag) next.before(this.drag);
+            } else if (others.length && others[others.length - 1].nextElementSibling !== this.drag) {
+                others[others.length - 1].after(this.drag);
+            }
+        },
+
+        onUp() {
+            if (this.drag) {
+                this.drag.classList.remove('opacity-50', 'ring-2', 'ring-gold-500');
+                this.renumber();
+            }
+            if (this.from) {
+                try {
+                    this.$root.releasePointerCapture(this.from.id);
+                } catch (err) {
+                    // Already gone.
+                }
+            }
+            document.body.style.userSelect = '';
+            this.drag = null;
+            this.from = null;
+        },
+    }));
+
+    /**
      * Admin: the product editor's image gallery.
      *
      * Starring or deleting an image used to submit a hidden form, which reloaded

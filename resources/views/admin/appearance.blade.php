@@ -399,26 +399,16 @@
             $slides = collect($home['hero_slides'] ?? []);
         @endphp
         @if($slides->isNotEmpty())
-            {{-- ↑/↓ move the row on the page and renumber every row's hidden
-                 position; the order is saved with the rest of the form. --}}
-            <div class="space-y-3 mb-3" x-data="{
-                    move(row, dir) {
-                        const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
-                        if (! sib) return;
-                        dir < 0 ? sib.before(row) : sib.after(row);
-                        const rows = [...row.parentNode.children];
-                        rows.forEach((r, n) => {
-                            r.querySelector('[data-slide-pos]').value = n;
-                            r.querySelector('[data-slide-up]').disabled = n === 0;
-                            r.querySelector('[data-slide-down]').disabled = n === rows.length - 1;
-                        });
-                        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    }
-                 }">
+            {{-- Drag a row by its ⠿ grip or nudge it with ▲/▼ — heroSlideOrder in
+                 app.js renumbers every row's hidden position, and the order is
+                 saved with the rest of the form. --}}
+            <p class="text-xs text-ink-700/50 mb-2">Drag ⠿ or use the arrows to change the order, then Save.</p>
+            <div class="space-y-3 mb-3" x-data="heroSlideOrder">
                 @foreach($slides as $i => $s)
                     @php $isVideo = filled($s['video'] ?? null); @endphp
-                    <div class="flex items-center gap-3 rounded-lg border border-ink-100 p-2" data-slide-row>
+                    <div class="flex items-center gap-3 rounded-lg border border-ink-100 bg-white p-2" data-slide-row>
                         <input type="hidden" name="hero_slides[{{ $i }}][position]" value="{{ $loop->index }}" data-slide-pos>
+                        <span data-slide-grip class="shrink-0 cursor-grab active:cursor-grabbing touch-none select-none px-1 text-lg leading-none text-ink-700/40 hover:text-ink-900" title="Drag to reorder">⠿</span>
                         <div class="flex flex-col shrink-0">
                             <button type="button" data-slide-up @click="move($el.closest('[data-slide-row]'), -1)" class="w-7 h-6 rounded text-ink-700/60 hover:bg-ink-100 hover:text-ink-900 leading-none disabled:opacity-30" @disabled($loop->first) title="Move up">▲</button>
                             <button type="button" data-slide-down @click="move($el.closest('[data-slide-row]'), 1)" class="w-7 h-6 rounded text-ink-700/60 hover:bg-ink-100 hover:text-ink-900 leading-none disabled:opacity-30" @disabled($loop->last) title="Move down">▼</button>
@@ -434,7 +424,7 @@
                             <span class="text-xs text-ink-700/50 shrink-0 w-14">{{ $vmeta['type'] ?? 'video' }}</span>
                         @else
                             @php $simg = \Illuminate\Support\Str::startsWith($s['image'],['http','/']) ? $s['image'] : \Illuminate\Support\Facades\Storage::disk('public')->url($s['image']); @endphp
-                            <img src="{{ $simg }}" class="w-24 h-14 object-cover rounded shrink-0" alt="">
+                            <img src="{{ $simg }}" class="w-24 h-14 object-cover rounded shrink-0" alt="" draggable="false">
                         @endif
                         <input name="hero_slides[{{ $i }}][link]" value="{{ $s['link'] ?? '' }}" class="input flex-1" placeholder="Link when clicked (optional)">
                         <label class="flex items-center gap-1 text-xs text-red-600"><input type="checkbox" name="hero_slides[{{ $i }}][remove]" value="1"> Remove</label>
