@@ -70,15 +70,7 @@ class ProductPageData
                     'alt' => $i->alt,
                 ])->values(),
                 'videos' => array_values($product->galleryVideos()),
-                'sections' => collect($product->content_sections ?? [])->map(function ($s) {
-                    // Story images are up to 1600px; the 900 variant is plenty
-                    // for a half-width column.
-                    if (! empty($s['image'])) {
-                        $s['image'] = image_variant($s['image'], 900) ?: $s['image'];
-                    }
-
-                    return $s;
-                })->all(),
+                'sections' => StorySections::for($product),
                 'specs' => collect($product->customFieldList())->where('show', true)->values()
                     ->map(fn ($s) => ['label' => $s['label'], 'value' => $s['value']]),
                 'available' => $product->isAvailable(),

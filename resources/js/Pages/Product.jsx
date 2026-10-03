@@ -66,7 +66,7 @@ export default function Product(props) {
                 <BuyBox {...props} ladderQuote={ladder.quote} purchase={purchase} onOpenReviews={openReviews} />
             </div>
 
-            <StorySections sections={product.sections} />
+            <StorySections sections={product.sections} name={product.name} />
             <Description text={product.description} />
             <Details specs={product.specs} />
             <Care text={props.care} />
@@ -955,28 +955,149 @@ function StockNotify({ productId }) {
     );
 }
 
-/* ── Below-the-fold sections ──────────────────────────────────────────────── */
-function StorySections({ sections }) {
+/* ── Story rows ───────────────────────────────────────────────────────────────
+   Large heading + short paragraph beside a photo or the product video, sides
+   alternating — the .com store's "Product story rows". Each row is its own
+   <section>, so the scroll-reveal fades them in one at a time. The picture
+   comes resolved from App\Support\Storefront\StorySections. */
+function StorySections({ sections, name }) {
     if (!sections?.length) return null;
     return (
-        <section className="mt-12 space-y-12 sm:space-y-20">
+        <div className="mt-14 sm:mt-20 space-y-14 md:space-y-[72px]">
             {sections.map((s, i) => {
-                const imageLeft = (s.layout || 'right') === 'left';
+                const alt = s.heading || name;
                 return (
-                    <div key={i} className="grid md:grid-cols-2 gap-6 md:gap-12 items-center">
-                        {s.image && (
-                            <div className={imageLeft ? 'md:order-1' : 'md:order-2'}>
-                                <img src={s.image} alt={s.heading || ''} loading="lazy" className="w-full rounded-xl object-cover shadow-sm" />
+                    <section key={i} className="grid md:grid-cols-2 gap-6 md:gap-12 lg:gap-20 items-center">
+                        {s.media && (
+                            // First in the DOM, so a phone always shows the picture
+                            // above its copy; only wider screens swap sides.
+                            <div className={`relative overflow-hidden rounded-xl bg-gold-100 ${s.layout === 'left' ? '' : 'md:order-2'}`}>
+                                {s.media.type === 'video'
+                                    ? <StoryVideo media={s.media} alt={alt} />
+                                    : <StoryImage media={s.media} alt={alt} />}
                             </div>
                         )}
-                        <div className={`${imageLeft ? 'md:order-2' : 'md:order-1'} ${!s.image ? 'md:col-span-2 text-center max-w-2xl mx-auto' : ''}`}>
-                            {s.heading && <h2 className="font-display text-2xl sm:text-3xl font-semibold mb-3">{s.heading}</h2>}
-                            {s.body && <p className="text-ink-700/75 leading-relaxed whitespace-pre-line">{s.body}</p>}
+                        <div className={s.media ? 'max-w-[520px] md:px-6' : 'md:col-span-2 text-center max-w-2xl mx-auto'}>
+                            {s.heading && <h2 className="font-display font-normal text-ink-900 text-[2.25rem] sm:text-5xl lg:text-[3.25rem] leading-[1.1] mb-3.5">{s.heading}</h2>}
+                            {s.body && <p className="text-base leading-[1.75] tracking-[0.03em] text-ink-900/75 whitespace-pre-line">{s.body}</p>}
                         </div>
-                    </div>
+                    </section>
                 );
             })}
-        </section>
+        </div>
+    );
+}
+
+const STORY_SIZES = '(min-width: 1280px) 584px, (min-width: 768px) 46vw, 100vw';
+
+/** Never taller than square: a portrait shot crops a little top and bottom
+ *  rather than pushing its copy half a screen away. */
+const storyRatio = (w, h) => (w && h ? Math.max(1, w / h) : 1);
+
+function StoryImage({ media, alt }) {
+    const [ratio, setRatio] = useState(1);
+    return (
+        <div className="relative w-full" style={{ aspectRatio: ratio }}>
+            <img src={media.src} srcSet={media.srcset || undefined} sizes={STORY_SIZES} alt={alt} loading="lazy" decoding="async"
+                onLoad={(e) => setRatio(storyRatio(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight))}
+                className="absolute inset-0 h-full w-full object-cover" />
+        </div>
+    );
+}
+
+/** Plays by itself unless the visitor asked for less motion or less data. */
+function storyAutoplay() {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+    const c = navigator.connection;
+    return !(c && (c.saveData || /2g$/.test(c.effectiveType || '')));
+}
+
+/**
+ * The product's own clip, muted and looped, playing only while it is on
+ * screen. The file (median ~4 MB) is not touched until the row is near the
+ * viewport, and then only its metadata, so the box can take the clip's shape
+ * before anyone sees it. On Save-Data or 2G it waits for a tap instead.
+ */
+function StoryVideo({ media, alt }) {
+    const box = useRef(null);
+    const video = useRef(null);
+    const inView = useRef(false);
+    const userPaused = useRef(false);
+    const wantPlay = useRef(false);
+    const [auto] = useState(storyAutoplay);
+    const [src, setSrc] = useState(null);
+    const [ratio, setRatio] = useState(1);
+    const [shown, setShown] = useState(false);     // first frame decoded — fade the clip over the poster
+    const [playing, setPlaying] = useState(false);
+
+    const play = useCallback(() => { video.current?.play().catch(() => {}); }, []);
+
+    useEffect(() => {
+        const el = box.current;
+        if (!el) return undefined;
+        if (!('IntersectionObserver' in window)) {
+            inView.current = true;
+            if (auto) setSrc(media.src);
+            return undefined;
+        }
+        const near = new IntersectionObserver(([e]) => {
+            if (!e.isIntersecting) return;
+            setSrc(media.src);
+            near.disconnect();
+        }, { rootMargin: '600px 0px' });
+        // On the ratio, not isIntersecting: a slow scroll out crosses 0.35
+        // while still intersecting, and would never pause.
+        const seen = new IntersectionObserver(([e]) => {
+            inView.current = e.isIntersecting && e.intersectionRatio >= 0.35;
+            if (!inView.current) video.current?.pause();
+            else if (auto && !userPaused.current) play();
+        }, { threshold: [0, 0.35] });
+        if (auto) near.observe(el);
+        seen.observe(el);
+        return () => { near.disconnect(); seen.disconnect(); };
+    }, [media.src, auto, play]);
+
+    // A source that arrives after the row came into view (or after a tap on
+    // Save-Data) starts playing as soon as it is attached.
+    useEffect(() => {
+        if (src && (wantPlay.current || (auto && inView.current && !userPaused.current))) play();
+    }, [src, auto, play]);
+
+    const toggle = () => {
+        const v = video.current;
+        if (!v) return;
+        if (!src) {
+            wantPlay.current = true;
+            userPaused.current = false;
+            setSrc(media.src);
+        } else if (v.paused) {
+            userPaused.current = false;
+            play();
+        } else {
+            userPaused.current = true;
+            v.pause();
+        }
+    };
+
+    return (
+        <div ref={box} className="relative w-full" style={{ aspectRatio: ratio }}>
+            {media.poster && (
+                <img src={media.poster.src} srcSet={media.poster.srcset || undefined} sizes={STORY_SIZES} alt="" loading="lazy" decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover" />
+            )}
+            <video ref={video} src={src || undefined} muted loop playsInline preload="metadata" aria-label={alt} tabIndex={-1}
+                onLoadedMetadata={(e) => setRatio(storyRatio(e.currentTarget.videoWidth, e.currentTarget.videoHeight))}
+                onLoadedData={() => setShown(true)}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${shown ? 'opacity-100' : 'opacity-0'}`} />
+            <button type="button" onClick={toggle} aria-label={playing ? 'Pause video' : 'Play video'}
+                className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full border border-white/50 bg-ink-900/70 text-white backdrop-blur-sm transition hover:bg-ink-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                {playing
+                    ? <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>
+                    : <PlayGlyph className="w-4 h-4" />}
+            </button>
+        </div>
     );
 }
 

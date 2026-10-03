@@ -82,6 +82,16 @@
         @if($body = plain_copy(strip_tags((string) ($product->description ?: $product->short_description))))
             <p style="margin:0 0 1rem;white-space:pre-line">{{ Str::limit($body, 1200) }}</p>
         @endif
+        {{-- The story rows are the one block of copy written for this piece
+             alone; React draws them, so crawlers need them here too. --}}
+        @foreach(\App\Models\ContentTemplate::cleanSections($product->content_sections ?? []) as $story)
+            @if($story['heading'] !== '')
+                <h2 style="font-family:var(--font-serif,Georgia,serif);font-size:1.25rem;margin:1.25rem 0 .35rem">{{ $story['heading'] }}</h2>
+            @endif
+            @if($story['body'] !== '')
+                <p style="margin:0 0 1rem">{{ $story['body'] }}</p>
+            @endif
+        @endforeach
     @else
         {{-- Only a page's own copy, never the meta description: repeating the
              description as body text is thin duplication, and on the homepage

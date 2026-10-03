@@ -1603,14 +1603,25 @@ document.addEventListener('alpine:init', () => {
     }));
 
     // Editorial "story sections" builder — used on the product form and in the
-    // content-template manager. Manages an array of {image,heading,body,layout}.
+    // content-template manager. Manages an array of
+    // {media,image,heading,body,layout}, where media is 'auto' (the product's
+    // own video / Nth photo — App\Support\Storefront\StorySections), 'image'
+    // (uploaded) or 'none'. Sections saved before that choice existed read as
+    // image / none, the same rule ContentTemplate::cleanSections applies.
+    const storySection = (s) => ({ ...s, media: s.media || (s.image ? 'image' : 'none') });
+
     window.Alpine.data('sectionBuilder', (initial, opts) => ({
-        sections: Array.isArray(initial) ? initial : [],
+        sections: Array.isArray(initial) ? initial.map(storySection) : [],
         uploadUrl: opts.uploadUrl,
         saveUrl: opts.saveUrl || null,
         csrf: opts.csrf,
         add() {
-            this.sections.push({ image: '', heading: '', body: '', layout: this.sections.length % 2 ? 'left' : 'right' });
+            // Picture first, then alternating — the storefront's rhythm.
+            this.sections.push({ media: 'auto', image: '', heading: '', body: '', layout: this.sections.length % 2 ? 'right' : 'left' });
+        },
+        // What an 'auto' section will show, for the builder's preview box.
+        autoLabel(i) {
+            return i === 0 ? 'Product video (or 1st photo)' : `Product photo ${i + 1}`;
         },
         remove(i) { this.sections.splice(i, 1); },
         move(i, dir) {
@@ -1628,18 +1639,18 @@ document.addEventListener('alpine:init', () => {
             try {
                 const r = await fetch(this.uploadUrl, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
                 const d = await r.json();
-                if (d.url) this.sections[i].image = d.url;
+                if (d.url) Object.assign(this.sections[i], { image: d.url, media: 'image' });
             } catch (_) { alert('Image upload failed.'); }
             e.target.value = '';
         },
         // Pick this section's image from the shared media library instead of uploading.
         pickLibrary(i) {
-            this.$store.mediaLib.openWith((url) => { this.sections[i].image = url; }, 'sections');
+            this.$store.mediaLib.openWith((url) => { Object.assign(this.sections[i], { image: url, media: 'image' }); }, 'sections');
         },
         applyTemplate(e) {
             const raw = e.target.selectedOptions[0] && e.target.selectedOptions[0].dataset.sections;
             if (raw && confirm('Replace the current sections with this template?')) {
-                this.sections = JSON.parse(raw);
+                this.sections = JSON.parse(raw).map(storySection);
             }
             e.target.value = '';
         },
