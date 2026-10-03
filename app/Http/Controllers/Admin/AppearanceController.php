@@ -367,7 +367,10 @@ class AppearanceController extends Controller
                 ->map(fn ($i) => (int) $i)->filter()->values()->all();
         }
 
-        // Hero slides: edit links / remove existing, then append new uploads
+        // Hero slides: edit links / remove / reorder existing, then append new
+        // uploads. Rows keep their stored index as the form key (so edits land
+        // on the right slide); the up/down arrows only rewrite each row's
+        // "position", and a slide without one stays where it was.
         $slides = collect($home['hero_slides'] ?? []);
         $edits = $request->input('hero_slides', []);
         $slides = $slides->reject(fn ($s, $i) => ! empty($edits[$i]['remove']))
@@ -377,7 +380,9 @@ class AppearanceController extends Controller
                 }
 
                 return $s;
-            });
+            })
+            ->sortBy(fn ($s, $i) => is_numeric($edits[$i]['position'] ?? null) ? (int) $edits[$i]['position'] : $i)
+            ->values();
         if ($request->hasFile('hero_slide_images')) {
             foreach ($request->file('hero_slide_images') as $file) {
                 if ($file && $file->isValid()) {

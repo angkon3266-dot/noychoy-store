@@ -159,6 +159,58 @@ class HeroSlideshowTest extends TestCase
         $this->assertSame('hero/a.jpg', $slides[0]['image']);
     }
 
+    public function test_slides_are_saved_in_the_order_the_arrows_left_them(): void
+    {
+        Setting::put('home_content', ['hero_slides' => [
+            ['image' => 'hero/a.jpg', 'link' => '/a'],
+            ['video' => 'https://vimeo.com/12345', 'link' => ''],
+            ['image' => 'hero/c.jpg', 'link' => ''],
+        ]]);
+
+        // "c" moved to the top, the video removed; the link edit on "a" still
+        // lands on "a" because rows keep their stored index as the form key.
+        $this->actingAs($this->admin())->post('/admin/appearance', $this->baseAppearancePayload() + [
+            'hero_slides' => [
+                0 => ['position' => '1', 'link' => '/a-edited'],
+                1 => ['position' => '2', 'remove' => '1'],
+                2 => ['position' => '0', 'link' => ''],
+            ],
+            'hero_slide_urls' => ['hero/new.jpg'],
+        ]);
+
+        $slides = Setting::get('home_content', [])['hero_slides'];
+
+        $this->assertSame(['hero/c.jpg', 'hero/a.jpg', 'hero/new.jpg'], array_column($slides, 'image'));
+        $this->assertSame('/a-edited', $slides[1]['link']);
+    }
+
+    public function test_slides_without_a_position_keep_their_stored_order(): void
+    {
+        Setting::put('home_content', ['hero_slides' => [
+            ['image' => 'hero/a.jpg', 'link' => ''],
+            ['image' => 'hero/b.jpg', 'link' => ''],
+        ]]);
+
+        $this->actingAs($this->admin())->post('/admin/appearance', $this->baseAppearancePayload());
+
+        $this->assertSame(['hero/a.jpg', 'hero/b.jpg'],
+            array_column(Setting::get('home_content', [])['hero_slides'], 'image'));
+    }
+
+    public function test_the_appearance_page_offers_move_arrows_on_each_slide(): void
+    {
+        Setting::put('home_content', ['hero_slides' => [
+            ['image' => 'hero/a.jpg', 'link' => ''],
+            ['image' => 'hero/b.jpg', 'link' => ''],
+        ]]);
+
+        $this->actingAs($this->admin())->get('/admin/appearance')
+            ->assertOk()
+            ->assertSee('name="hero_slides[0][position]" value="0"', false)
+            ->assertSee('name="hero_slides[1][position]" value="1"', false)
+            ->assertSee('title="Move up"', false);
+    }
+
     // ── Rendering on the homepage ────────────────────────────────────────────
 
     public function test_a_youtube_slide_renders_as_a_muted_looping_embed(): void

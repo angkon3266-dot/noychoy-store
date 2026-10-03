@@ -399,10 +399,30 @@
             $slides = collect($home['hero_slides'] ?? []);
         @endphp
         @if($slides->isNotEmpty())
-            <div class="space-y-3 mb-3">
+            {{-- ↑/↓ move the row on the page and renumber every row's hidden
+                 position; the order is saved with the rest of the form. --}}
+            <div class="space-y-3 mb-3" x-data="{
+                    move(row, dir) {
+                        const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+                        if (! sib) return;
+                        dir < 0 ? sib.before(row) : sib.after(row);
+                        const rows = [...row.parentNode.children];
+                        rows.forEach((r, n) => {
+                            r.querySelector('[data-slide-pos]').value = n;
+                            r.querySelector('[data-slide-up]').disabled = n === 0;
+                            r.querySelector('[data-slide-down]').disabled = n === rows.length - 1;
+                        });
+                        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                 }">
                 @foreach($slides as $i => $s)
                     @php $isVideo = filled($s['video'] ?? null); @endphp
-                    <div class="flex items-center gap-3 rounded-lg border border-ink-100 p-2">
+                    <div class="flex items-center gap-3 rounded-lg border border-ink-100 p-2" data-slide-row>
+                        <input type="hidden" name="hero_slides[{{ $i }}][position]" value="{{ $loop->index }}" data-slide-pos>
+                        <div class="flex flex-col shrink-0">
+                            <button type="button" data-slide-up @click="move($el.closest('[data-slide-row]'), -1)" class="w-7 h-6 rounded text-ink-700/60 hover:bg-ink-100 hover:text-ink-900 leading-none disabled:opacity-30" @disabled($loop->first) title="Move up">▲</button>
+                            <button type="button" data-slide-down @click="move($el.closest('[data-slide-row]'), 1)" class="w-7 h-6 rounded text-ink-700/60 hover:bg-ink-100 hover:text-ink-900 leading-none disabled:opacity-30" @disabled($loop->last) title="Move down">▼</button>
+                        </div>
                         @if($isVideo)
                             @php $vmeta = video_meta($s['video']); @endphp
                             <div class="w-24 h-14 rounded bg-ink-900 shrink-0 grid place-items-center relative overflow-hidden">
