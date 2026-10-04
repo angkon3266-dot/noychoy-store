@@ -21,6 +21,7 @@ use App\Services\Meta\Credentials\MetaCredentialResolver;
 use App\Services\Meta\Credentials\SingleStoreCredentialResolver;
 use App\Services\SystemConfig\ConfigApplier;
 use App\Services\SystemConfig\SystemConfigRepository;
+use App\Support\QueueFallback;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -133,6 +134,12 @@ class AppServiceProvider extends ServiceProvider
 
         // Rebuild caches after a configuration restore/import.
         Event::listen(ConfigurationRestored::class, RebuildConfigurationCache::class);
+
+        // While the scheduler cron is missing, web requests keep the queue
+        // moving once their response has gone out (App\Support\QueueFallback).
+        if (! $this->app->runningInConsole()) {
+            $this->app->terminating(fn () => app(QueueFallback::class)->afterResponse());
+        }
 
         // Apply admin-managed SMTP settings to the live mailer (overrides .env / cached config).
         app(MailConfigurator::class)->apply();

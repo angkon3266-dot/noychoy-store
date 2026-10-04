@@ -1543,6 +1543,41 @@ class OrderController extends Controller
         return back()->with('success', "Order {$order->order_number} moved to Trash.");
     }
 
+    /**
+     * Move the selected orders that are Booked with courier to Shipped — the
+     * parcels handed to the rider in one go, instead of one dropdown per row
+     * (owner, 4 Oct 2026). Anything else in the selection is left alone. Same
+     * effects as the single change: TransitionOrderStatus, and the
+     * order_shipped SMS only when asked for.
+     */
+    public function bulkShipped(Request $request, SmsService $sms)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'notify' => ['nullable', 'boolean'],
+        ]);
+
+        $orders = Order::whereIn('id', $data['ids'])->get();
+        $booked = $orders->where('status', 'booked');
+
+        foreach ($booked as $order) {
+            app(TransitionOrderStatus::class)->handle($order, 'shipped', null, auth()->user()->name);
+
+            if ($request->boolean('notify')) {
+                $sms->sendTemplate('order_shipped', $order->fresh());
+            }
+        }
+
+        $skipped = $orders->count() - $booked->count();
+        if ($booked->isEmpty()) {
+            return back()->with('error', 'None of the selected orders is Booked with courier, so nothing moved.');
+        }
+
+        return back()->with('success', $booked->count().' order(s) marked Shipped.'
+            .($skipped ? " {$skipped} skipped — only orders Booked with courier move." : ''));
+    }
+
     /** Move several selected orders to Trash at once. */
     public function bulkDelete(Request $request)
     {

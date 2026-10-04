@@ -145,6 +145,7 @@ Route::middleware('admin')->group(function () {
     Route::post('orders/bulk-steadfast', [OrderController::class, 'bulkSteadfast'])->name('orders.bulk-steadfast');
     Route::post('orders/merge', [OrderController::class, 'merge'])->name('orders.merge');
     Route::post('orders/bulk-delete', [OrderController::class, 'bulkDelete'])->name('orders.bulk-delete');
+    Route::post('orders/bulk-shipped', [OrderController::class, 'bulkShipped'])->name('orders.bulk-shipped');
     Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
     Route::post('orders/{order}/restore', [OrderController::class, 'restore'])->name('orders.restore')->withTrashed();
     Route::delete('orders/{order}/force', [OrderController::class, 'forceDelete'])->name('orders.force-delete')->withTrashed();

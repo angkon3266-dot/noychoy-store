@@ -4,6 +4,7 @@ use App\Jobs\Meta\RefreshMetaToken;
 use App\Jobs\Meta\RetryFailedMetaSyncs;
 use App\Jobs\Meta\VerifyCatalogSync;
 use App\Services\NotificationService;
+use App\Support\QueueFallback;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -26,6 +27,11 @@ Schedule::command('queue:work '.env('QUEUE_CONNECTION', 'database')
     ->everyMinute()
     ->name('meta-queue-drain')
     ->withoutOverlapping();
+
+// Every minute: prove the cron is firing. Without this heartbeat, web requests
+// drain the queue themselves and the admin warns that the cron is missing
+// (App\Support\QueueFallback).
+Schedule::call(fn () => QueueFallback::beat())->everyMinute()->name('scheduler-heartbeat');
 
 // Hourly: re-queue any product stuck in a failed sync state.
 Schedule::job(new RetryFailedMetaSyncs)->hourly()->name('meta-retry-failed')->withoutOverlapping();

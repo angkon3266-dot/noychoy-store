@@ -15,9 +15,14 @@
         '{total}' => money($order->total),
     ]);
 @endphp
+{{-- bookedIds: the rows on this page that are Booked with courier — the only
+     ones "Mark shipped" moves, and what "Select booked" ticks. --}}
 <div x-data="{ sel: [], pageIds: [{{ $orders->pluck('id')->implode(',') }}],
+               bookedIds: [{{ $orders->where('status', 'booked')->pluck('id')->implode(',') }}],
                get allChecked(){ return this.pageIds.length && this.sel.length === this.pageIds.length },
-               toggleAll(e){ this.sel = e.target.checked ? [...this.pageIds] : [] } }">
+               get selBooked(){ return this.sel.filter(id => this.bookedIds.includes(id)) },
+               toggleAll(e){ this.sel = e.target.checked ? [...this.pageIds] : [] },
+               selectBooked(){ this.sel = [...new Set([...this.sel, ...this.bookedIds])] } }">
 
     @if($courierBalance !== null)
         {{-- Courier wallet. This is the screen orders are booked from, so a
@@ -189,6 +194,17 @@
          class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3">
         <span class="text-sm font-medium"><span x-text="sel.length"></span> selected</span>
 
+        <form action="{{ route('admin.orders.bulk-shipped') }}" method="POST" class="inline-flex items-center gap-2"
+              x-show="selBooked.length"
+              onsubmit="return confirm('Mark the selected Booked-with-courier orders as Shipped?')">
+            @csrf
+            <template x-for="id in selBooked" :key="id"><input type="hidden" name="ids[]" :value="id"></template>
+            <button class="btn-primary py-2 text-sm">📦 Mark <span x-text="selBooked.length"></span> shipped</button>
+            <label class="flex items-center gap-1 text-xs text-ink-700/70" title="Sends each customer the order_shipped SMS">
+                <input type="checkbox" name="notify" value="1"> SMS customers
+            </label>
+        </form>
+
         <form action="{{ route('admin.orders.bulk-steadfast') }}" method="POST" class="inline"
               onsubmit="return confirm('Send the selected orders to Steadfast? Orders already booked are skipped.')">
             @csrf
@@ -251,6 +267,12 @@
             <span class="text-ink-700/55">Value</span>
             <span class="ml-1.5 font-semibold tabular-nums text-gold-700">{{ money($pageTotals['value']) }}</span>
         </div>
+        @if(! $trashed && ($bookedOnPage = $orders->where('status', 'booked')->count()))
+            <button type="button" class="btn-outline py-1 px-2.5 text-xs" @click="selectBooked()"
+                    title="Tick every order on this page that is Booked with courier">
+                ☑ Select booked ({{ $bookedOnPage }})
+            </button>
+        @endif
         <span class="text-xs text-ink-700/45 ml-auto">
             {{ $queueLabel }}@if($orders->hasPages()) · this page of {{ number_format($orders->total()) }}@endif
         </span>

@@ -45,10 +45,36 @@ class SendOrderPlacedEffects implements ShouldQueue
 
     public function __construct(public Order $order, public array $clientContext = []) {}
 
+    /**
+     * Past this, the customer's "order received" SMS and email and the staff
+     * alert are skipped: a confirmation that arrives hours late — after a
+     * stalled queue, as on 3 Oct 2026 — confuses more than it reassures, and
+     * staff have long since seen the order. The Meta Purchase event still goes
+     * (Meta accepts it for seven days). Owner's choice, 4 Oct 2026.
+     */
+    public const MESSAGES_STALE_AFTER_MINUTES = 120;
+
     public function handle(SmsService $sms, MetaTrackingService $capi): void
     {
         $order = $this->order->fresh('items') ?? $this->order;
 
+        $late = $order->created_at?->lt(now()->subMinutes(self::MESSAGES_STALE_AFTER_MINUTES));
+        if ($late) {
+            // Error level: production keeps nothing below it, and a late run
+            // means the queue was stuck.
+            Log::error('Order confirmation ran late; customer SMS/email and staff alert skipped.', [
+                'order' => $order->order_number,
+                'minutes_late' => (int) $order->created_at->diffInMinutes(now()),
+            ]);
+        } else {
+            $this->sendMessages($order, $sms);
+        }
+
+        $this->sendPurchaseEvent($order, $capi);
+    }
+
+    private function sendMessages(Order $order, SmsService $sms): void
+    {
         try {
             // Staff alert first — it's the one thing someone is waiting on.
             app(\App\Services\NotificationService::class)->alertAdminsNewOrder($order);
@@ -72,7 +98,10 @@ class SendOrderPlacedEffects implements ShouldQueue
                 report($e);
             }
         }
+    }
 
+    private function sendPurchaseEvent(Order $order, MetaTrackingService $capi): void
+    {
         try {
             // Deduplicated with the browser Pixel via order_number as event_id.
             //
