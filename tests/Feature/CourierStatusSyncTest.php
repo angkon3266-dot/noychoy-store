@@ -7,6 +7,9 @@ use App\Models\Product;
 use App\Models\Setting;
 use App\Models\Shipment;
 use App\Models\User;
+use App\Jobs\SendReviewRequest;
+use App\Services\SmsService;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -62,6 +65,21 @@ class CourierStatusSyncTest extends TestCase
             'consignment_id' => $order->shipment->consignment_id,
             'delivery_status' => $status,
         ])->assertOk();
+    }
+
+    /** Every SMS template sent from here on, by key. */
+    protected function captureSms(): \ArrayObject
+    {
+        $sent = new \ArrayObject;
+        $this->mock(SmsService::class, function ($mock) use ($sent) {
+            $mock->shouldReceive('sendTemplate')->andReturnUsing(function ($key) use ($sent) {
+                $sent[] = $key;
+
+                return true;
+            });
+        });
+
+        return $sent;
     }
 
     protected function admin(): User
@@ -128,6 +146,48 @@ class CourierStatusSyncTest extends TestCase
         $html = $this->actingAs($this->admin())->get('/admin/orders?status=all')->assertOk()->getContent();
 
         $this->assertStringContainsString('confirmed by courier', $html);
+    }
+
+    // ── What the customer hears at settlement (owner's rule, 4 Oct 2026) ────
+
+    public function test_a_courier_confirmed_delivery_asks_for_a_review_at_once_and_sends_no_delivered_text(): void
+    {
+        Queue::fake();
+        Setting::put('review_request_enabled', true);
+        $order = $this->orderWithShipment();
+        $sent = $this->captureSms();
+
+        $this->webhook($order, 'delivered');
+
+        $this->assertSame('delivered', $order->fresh()->status);
+        $this->assertSame([], $sent->getArrayCopy(), 'no "order delivered" SMS');
+        Queue::assertPushed(SendReviewRequest::class, 1);
+        $this->assertNotNull($order->fresh()->review_request_sent_at);
+    }
+
+    public function test_a_courier_confirmed_delivery_asks_nothing_while_review_requests_are_off(): void
+    {
+        Queue::fake();
+        $order = $this->orderWithShipment();
+        $sent = $this->captureSms();
+
+        $this->webhook($order, 'delivered');
+
+        $this->assertSame('delivered', $order->fresh()->status);
+        $this->assertSame([], $sent->getArrayCopy());
+        Queue::assertNotPushed(SendReviewRequest::class);
+        $this->assertNull($order->fresh()->review_request_sent_at);
+    }
+
+    public function test_a_courier_cancellation_texts_nobody(): void
+    {
+        $order = $this->orderWithShipment();
+        $sent = $this->captureSms();
+
+        $this->webhook($order, 'cancelled');
+
+        $this->assertSame('cancelled', $order->fresh()->status);
+        $this->assertSame([], $sent->getArrayCopy());
     }
 
     // ── Cancelled / partial: auto, but still editable ───────────────────────

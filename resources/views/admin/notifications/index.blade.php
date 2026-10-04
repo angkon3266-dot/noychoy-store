@@ -128,7 +128,7 @@
                 <h2 class="font-semibold">Post-delivery review requests</h2>
                 <span class="badge {{ $settings['review_request_enabled'] ? 'bg-green-100 text-green-700' : 'bg-ink-100 text-ink-700' }} text-[10px]">{{ $settings['review_request_enabled'] ? 'Active' : 'Off' }}</span>
             </div>
-            <p class="text-sm text-ink-700/60 mb-3">Asks the buyer to rate what they bought, a few days after the courier confirms delivery. Sends by SMS, plus email when we have one. Runs daily via the scheduler.
+            <p class="text-sm text-ink-700/60 mb-3">Asks the buyer to rate what they bought the moment Steadfast confirms the parcel was delivered — the only text a customer gets after the order-received one. Sends by SMS, plus email when we have one. The nightly pass only catches up courier-confirmed deliveries that were missed; an order marked delivered by hand is never asked.
                 <strong>{{ number_format($reviewRequestDue) }}</strong> order(s) are due right now.</p>
             <p class="text-xs text-warning-800 bg-warning-50 border border-warning-200 rounded p-2 mb-3">
                 The link makes each SMS about two segments, so it costs roughly double a normal one.
@@ -139,7 +139,7 @@
                 @csrf
                 <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="review_request_enabled" value="1" x-model="on"> Enable post-delivery review requests</label>
                 <div class="grid grid-cols-2 gap-2">
-                    <div><label class="label text-xs">Ask this many days after delivery</label><input type="number" name="review_request_delay_days" value="{{ $settings['review_request_delay_days'] }}" min="1" max="60" class="input py-1.5 text-sm" required></div>
+                    <div><label class="label text-xs">Catch-up: no sooner than (days after delivery)</label><input type="number" name="review_request_delay_days" value="{{ $settings['review_request_delay_days'] }}" min="1" max="60" class="input py-1.5 text-sm" required></div>
                     <div><label class="label text-xs">Skip orders delivered longer ago than (days)</label><input type="number" name="review_request_max_days" value="{{ $settings['review_request_max_days'] }}" min="2" max="365" class="input py-1.5 text-sm" required></div>
                     <div class="col-span-2"><label class="label text-xs">Max orders per run</label><input type="number" name="review_request_per_run" value="{{ $settings['review_request_per_run'] }}" min="1" max="500" class="input py-1.5 text-sm" required></div>
                 </div>

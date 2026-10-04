@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Models\Shipment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
@@ -62,7 +63,26 @@ class ReviewRequestTest extends TestCase
         // Eloquent stamps created_at on insert, so back-date it afterwards.
         $history->forceFill(['created_at' => now()->subDays($daysAgo)])->saveQuietly();
 
+        // The courier confirmed it: only such deliveries are ever asked.
+        Shipment::create([
+            'order_id' => $order->id, 'courier' => 'steadfast', 'consignment_id' => '77'.$order->id,
+            'cod_amount' => $order->total, 'status' => 'delivered',
+        ]);
+
         return $order;
+    }
+
+    public function test_an_order_marked_delivered_by_hand_is_never_asked(): void
+    {
+        Queue::fake();
+        Setting::put('review_request_enabled', true);
+        $order = $this->deliveredOrder(5);
+        $order->shipments()->delete();
+
+        $this->artisan('reviews:request');
+
+        Queue::assertNothingPushed();
+        $this->assertNull($order->fresh()->review_request_sent_at);
     }
 
     public function test_it_sends_nothing_while_the_automation_is_off(): void

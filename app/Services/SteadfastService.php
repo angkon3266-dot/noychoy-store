@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ReviewRequests;
 use App\Actions\TransitionOrderStatus;
 use App\Models\Order;
 use App\Models\Setting;
@@ -641,7 +642,7 @@ class SteadfastService
      * Uncached. The 10-minute cache in deliveryStatus() is for page loads, and
      * a callback is by definition news the cache has not seen yet.
      *
-     * @param  bool  $notify  False for a catch-up run, where texting "delivered"
+     * @param  bool  $notify  False for a catch-up run, where asking for a review
      *                         days after the fact would only confuse.
      * @return bool True if the order's status moved.
      */
@@ -664,7 +665,7 @@ class SteadfastService
 
         if ($this->applyCourierVerdict($order, $raw, $by)) {
             if ($notify) {
-                $this->notifySettled($order);
+                $this->afterSettled($order);
             }
 
             return true;
@@ -673,18 +674,18 @@ class SteadfastService
         return $this->applyCourierProgress($order, $raw, $by);
     }
 
-    /** Text the customer the settled outcome the order has just moved to. */
-    public function notifySettled(Order $order): void
+    /**
+     * What the customer hears once the courier has settled the order.
+     *
+     * Nothing for a cancellation, and no "your order has been delivered" text:
+     * the owner's rule (4 Oct 2026) is that after the order-received SMS the
+     * only text a customer gets is the review request, sent the moment
+     * Steadfast confirms delivery (App\Support\ReviewRequests).
+     */
+    public function afterSettled(Order $order): void
     {
-        $final = $order->fresh();
-        $template = match ($final->status) {
-            'delivered' => 'order_delivered',
-            'cancelled' => 'order_cancelled',
-            default => null,
-        };
-
-        if ($template) {
-            app(SmsService::class)->sendTemplate($template, $final);
+        if (($order->fresh() ?? $order)->status === 'delivered') {
+            ReviewRequests::askNow($order);
         }
     }
 

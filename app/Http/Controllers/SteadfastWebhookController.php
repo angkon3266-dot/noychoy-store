@@ -82,7 +82,7 @@ class SteadfastWebhookController extends Controller
         if (! $this->speaksForOrder($order, $shipment, $invoice)) {
             if ($shipment?->isSuperseded() && ! $wasSettled
                 && $steadfast->applyReplacedDelivery($order, $shipment, $deliveryStatus, 'Steadfast webhook')) {
-                $steadfast->notifySettled($order);
+                $steadfast->afterSettled($order);
 
                 return response()->json(['message' => 'ok'], 200);
             }
@@ -119,7 +119,7 @@ class SteadfastWebhookController extends Controller
         // states just track progress and never force a final status. A
         // cancellation is held back once a replaced consignment was delivered.
         if ($steadfast->applyCourierVerdict($order, $deliveryStatus, 'Steadfast webhook')) {
-            $steadfast->notifySettled($order);
+            $steadfast->afterSettled($order);
         } else {
             $steadfast->applyCourierProgress($order, $deliveryStatus, 'Steadfast webhook');
         }

@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 class SyncSteadfastStatuses extends Command
 {
     protected $signature = 'steadfast:sync {--days=45 : Only consignments booked within this many days}
-        {--no-sms : Do not text customers (for catching up a backlog)}';
+        {--no-sms : Do not ask delivered customers for a review (for catching up a backlog)}';
 
     protected $description = 'Move orders to delivered / partially delivered / cancelled from their live Steadfast status.';
 

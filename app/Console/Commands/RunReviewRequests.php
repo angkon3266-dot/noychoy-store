@@ -8,20 +8,26 @@ use App\Models\Setting;
 use Illuminate\Console\Command;
 
 /**
- * Ask buyers to review the pieces in an order the courier delivered.
+ * Catch-up for the post-delivery review request.
  *
  *   php artisan reviews:request --dry     (list who would be asked)
  *   php artisan reviews:request
  *
+ * Since 4 Oct 2026 the request itself goes the moment Steadfast confirms a
+ * delivery (SteadfastService::afterSettled → App\Support\ReviewRequests). This
+ * nightly pass only picks up courier-confirmed deliveries that were missed —
+ * the automation was off at the time, or the send reached nobody and was
+ * un-stamped. An order marked delivered by hand is never asked.
+ *
  * Off by default. This sends paid SMS, so the day it is switched on every
- * order already sitting at `delivered` inside the max-age window becomes due
- * at once — hence the window and the per-run cap. Dry-run first.
+ * courier-delivered order inside the max-age window becomes due at once —
+ * hence the window and the per-run cap. Dry-run first.
  */
 class RunReviewRequests extends Command
 {
     protected $signature = 'reviews:request {--dry : List the orders that would be asked, without sending}';
 
-    protected $description = 'Ask buyers to review the pieces in an order the courier delivered.';
+    protected $description = 'Catch up review requests for courier-confirmed deliveries that were missed.';
 
     public function handle(): int
     {
@@ -67,8 +73,10 @@ class RunReviewRequests extends Command
     }
 
     /**
-     * Orders whose delivery landed inside the asking window and that have not
-     * been asked yet.
+     * Orders the courier confirmed delivered inside the asking window and that
+     * have not been asked yet. "Confirmed" means a Steadfast consignment of the
+     * order reads delivered (not partial, not awaiting approval) — a status
+     * someone set by hand does not count.
      *
      * The delivery time is read straight out of order_status_history, which
      * TransitionOrderStatus already writes on every status change — so orders
@@ -84,6 +92,10 @@ class RunReviewRequests extends Command
             ->whereNull('review_request_sent_at')
             ->whereNotNull('customer_phone')
             ->whereDoesntHave('customer', fn ($q) => $q->where('blacklisted', true))
+            ->whereHas('shipments', fn ($q) => $q
+                ->where('status', 'like', '%delivered%')
+                ->where('status', 'not like', '%partial%')
+                ->where('status', 'not like', '%approval_pending'))
             ->whereExists(fn ($q) => $q->selectRaw('1')
                 ->from('order_status_history')
                 ->whereColumn('order_status_history.order_id', 'orders.id')

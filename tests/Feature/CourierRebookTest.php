@@ -512,7 +512,7 @@ class CourierRebookTest extends TestCase
         $this->assertSame('delivered', $order->status);
         $this->assertNotNull(Shipment::where('consignment_id', '55501')->first()->delivered_after_superseded_at);
         $this->assertTrue($order->history()->where('note', 'like', '%#55501%')->where('note', 'like', '%#55502 appears unused%')->exists());
-        $this->assertSame(['order_delivered'], $sms->getArrayCopy());
+        $this->assertSame([], $sms->getArrayCopy(), 'a courier-confirmed delivery sends no "delivered" text — the review request carries the news');
 
         // The owner tidies up the unused consignment.
         $this->webhook(['consignment_id' => 55502, 'invoice' => '40001-2', 'delivery_status' => 'cancelled']);
@@ -521,7 +521,7 @@ class CourierRebookTest extends TestCase
         $this->assertSame('delivered', $order->status);
         $this->assertSame(8, $product->fresh()->stock_quantity, 'delivered stock went back on the shelf');
         $this->assertSame(50, (int) $order->points_redeemed, 'the points the customer spent were refunded');
-        $this->assertSame(['order_delivered'], $sms->getArrayCopy(), 'the customer was texted a cancellation');
+        $this->assertSame([], $sms->getArrayCopy(), 'the customer was texted a cancellation');
         $this->assertDatabaseHas('order_status_history', [
             'order_id' => $order->id, 'status' => 'delivered',
             'note' => 'Consignment #55502 cancelled at the courier; #55501 was delivered — order left as it is',
