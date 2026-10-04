@@ -69,8 +69,11 @@ class QueueFallback
                 return;
             }
 
-            // One drain per minute for the whole site, whichever request gets here first.
-            if (! Cache::add(self::LOCK, 1, 60) || ! $this->hasWaitingJobs()) {
+            // One drain per minute for the whole site, whichever request gets
+            // here first — but only a request with something to drain takes
+            // the lock. An idle request holding it would make the order placed
+            // ten seconds later wait out the minute as well.
+            if (! $this->hasWaitingJobs() || ! Cache::add(self::LOCK, 1, 60)) {
                 return;
             }
 

@@ -13,6 +13,12 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Every minute, and first: prove the cron is firing. Without this heartbeat,
+// web requests drain the queue themselves and the admin warns that the cron is
+// missing (App\Support\QueueFallback). It runs before the queue drain so a
+// slow drain can never make a healthy cron look dead.
+Schedule::call(fn () => QueueFallback::beat())->everyMinute()->name('scheduler-heartbeat');
+
 // ── Meta catalog maintenance ────────────────────────────────────────────────
 // Every minute: drain the Meta sync queue. This shared host has no long-running
 // queue daemon, so without this the batch jobs dispatched by "Sync all" / "Full
@@ -27,11 +33,6 @@ Schedule::command('queue:work '.env('QUEUE_CONNECTION', 'database')
     ->everyMinute()
     ->name('meta-queue-drain')
     ->withoutOverlapping();
-
-// Every minute: prove the cron is firing. Without this heartbeat, web requests
-// drain the queue themselves and the admin warns that the cron is missing
-// (App\Support\QueueFallback).
-Schedule::call(fn () => QueueFallback::beat())->everyMinute()->name('scheduler-heartbeat');
 
 // Hourly: re-queue any product stuck in a failed sync state.
 Schedule::job(new RetryFailedMetaSyncs)->hourly()->name('meta-retry-failed')->withoutOverlapping();

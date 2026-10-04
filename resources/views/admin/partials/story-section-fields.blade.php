@@ -17,7 +17,7 @@
                 <div class="relative aspect-square rounded bg-ink-100 overflow-hidden mb-1 grid place-items-center text-center border-2 border-dashed transition"
                      :class="over === i ? 'border-gold-500 bg-gold-50' : 'border-transparent'"
                      @dragover.prevent="over = i" @dragenter.prevent="over = i"
-                     @dragleave.prevent="over = null" @drop.prevent="drop(i, $event)"
+                     @dragleave.prevent="if (! $el.contains($event.relatedTarget)) over = null" @drop.prevent="drop(i, $event)"
                      title="Drop an image or a video here">
                     <template x-if="preview(i)?.type === 'image'">
                         <img :src="preview(i).src" class="absolute inset-0 w-full h-full object-cover" alt="">
