@@ -23,6 +23,10 @@ use Illuminate\Support\Collection;
  * Photos follow the gallery order (`position`), so reordering the gallery
  * reorders the story too. YouTube / Vimeo links are not used: an iframe cannot
  * play muted in the background the way the row needs.
+ *
+ * A row set to its own media (`image`) can hold a picture or a video file
+ * dropped in the builder (4 Oct 2026); a video plays like the product's own,
+ * with the row's product photo as its poster.
  */
 class StorySections
 {
@@ -46,9 +50,21 @@ class StorySections
 
     private static function media(array $section, int $row, Collection $photos, ?array $video): ?array
     {
+        // The row's own product photo: what an `auto` row shows, and the
+        // poster for a video dropped onto the row.
+        $rowPhoto = $photos->get($row) ?? $photos->first();
+
         return match ($section['media']) {
             'none' => null,
-            'image' => $section['image'] !== '' ? static::photo($section['image']) : null,
+            'image' => match (true) {
+                $section['image'] === '' => null,
+                static::isVideo($section['image']) => [
+                    'type' => 'video',
+                    'src' => $section['image'],
+                    'poster' => $rowPhoto ? static::photo($rowPhoto) : null,
+                ],
+                default => static::photo($section['image']),
+            },
             default => $row === 0 && $video
                 ? [
                     'type' => 'video',
@@ -58,8 +74,14 @@ class StorySections
                     // a tap.
                     'poster' => $photos->isNotEmpty() ? static::photo($photos->first()) : null,
                 ]
-                : (($url = $photos->get($row) ?? $photos->first()) ? static::photo($url) : null),
+                : ($rowPhoto ? static::photo($rowPhoto) : null),
         };
+    }
+
+    /** A section's own media can be a video file dropped in the builder. */
+    public static function isVideo(string $url): bool
+    {
+        return (bool) preg_match('/\.(mp4|webm|mov|m4v)(\?.*)?$/i', $url);
     }
 
     /** Story images sit in a half-width column; the 900 variant is plenty. */

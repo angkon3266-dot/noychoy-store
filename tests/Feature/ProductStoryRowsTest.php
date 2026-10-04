@@ -110,6 +110,52 @@ class ProductStoryRowsTest extends TestCase
             );
     }
 
+    public function test_a_video_dropped_on_a_row_plays_with_that_rows_photo_as_poster(): void
+    {
+        $product = $this->product([
+            ['media' => 'auto', 'image' => '', 'heading' => 'One', 'body' => '', 'layout' => 'left'],
+            ['media' => 'image', 'image' => 'https://noychoy.test/storage/sections/clip.mp4', 'heading' => 'Two', 'body' => '', 'layout' => 'right'],
+        ]);
+
+        $this->get(route('product.show', $product))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('product.sections.1.media.type', 'video')
+                ->where('product.sections.1.media.src', 'https://noychoy.test/storage/sections/clip.mp4')
+                ->where('product.sections.1.media.poster.src', $this->photo('b.webp')),
+            );
+    }
+
+    public function test_the_builder_takes_a_video_and_refuses_anything_else(): void
+    {
+        Storage::fake('public');
+        $admin = \App\Models\User::create(['name' => 'Owner', 'email' => 'o@t.local', 'password' => bcrypt('x'), 'role' => 'admin']);
+
+        $url = $this->actingAs($admin)
+            ->postJson(route('admin.products.section-video'), ['video' => \Illuminate\Http\UploadedFile::fake()->create('clip.mp4', 900, 'video/mp4')])
+            ->assertOk()->json('url');
+        $this->assertStringContainsString('/sections/', $url);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.products.section-video'), ['video' => \Illuminate\Http\UploadedFile::fake()->create('notes.pdf', 10, 'application/pdf')])
+            ->assertUnprocessable();
+    }
+
+    public function test_the_product_form_hands_the_builder_its_own_photos_and_video(): void
+    {
+        $product = $this->product($this->rows(), videos: ['product-videos/clip.mp4']);
+        $admin = \App\Models\User::create(['name' => 'Owner', 'email' => 'o@t.local', 'password' => bcrypt('x'), 'role' => 'admin']);
+
+        $html = $this->actingAs($admin)->get(route('admin.products.edit', $product))->assertOk()->getContent();
+
+        // The builder's own x-data, not the gallery further down the page.
+        $start = strpos($html, 'sectionBuilder(');
+        $builder = substr($html, $start, strpos($html, 'saveUrl', $start) - $start);
+
+        $this->assertStringContainsString(route('admin.products.section-video'), $builder);
+        $this->assertStringContainsString('clip.mp4', $builder);
+        $this->assertStringContainsString('b.webp', $builder);
+    }
+
     public function test_sections_saved_before_the_media_choice_keep_their_old_meaning(): void
     {
         // Stored by the old builder: no `media` key at all.

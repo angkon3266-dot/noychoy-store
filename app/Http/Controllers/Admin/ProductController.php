@@ -578,6 +578,20 @@ class ProductController extends Controller
         return response()->json(['url' => Storage::disk('public')->url($path)]);
     }
 
+    /**
+     * AJAX: upload one story-section video (dropped on, or chosen for, a
+     * section's picture box), return its URL. Same formats and cap as the
+     * gallery videos; kept beside the section images.
+     */
+    public function uploadSectionVideo(Request $request)
+    {
+        $request->validate(['video' => ['required', 'file', 'mimes:mp4,webm,mov,m4v', 'max:51200']]);
+
+        $path = $request->file('video')->store('sections', 'public');
+
+        return response()->json(['url' => Storage::disk('public')->url($path)]);
+    }
+
     /** Save a product's current sections as a reusable content template. */
     public function saveAsTemplate(Request $request, Product $product)
     {

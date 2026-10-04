@@ -6,7 +6,7 @@
 <div class="grid lg:grid-cols-3 gap-6">
     {{-- Builder (create / edit) --}}
     <div class="lg:col-span-2 card p-6"
-         x-data="sectionBuilder(@js($editing->sections ?? []), { uploadUrl: '{{ route('admin.products.section-image') }}', csrf: '{{ csrf_token() }}' })">
+         x-data="sectionBuilder(@js($editing->sections ?? []), { uploadUrl: '{{ route('admin.products.section-image') }}', videoUploadUrl: '{{ route('admin.products.section-video') }}', csrf: '{{ csrf_token() }}' })">
         <h2 class="font-semibold mb-3">{{ $editing ? 'Edit template' : 'New template' }}</h2>
 
         <form action="{{ $editing ? route('admin.content-templates.update', $editing) : route('admin.content-templates.store') }}" method="POST" class="space-y-4">

@@ -435,13 +435,17 @@
             <div class="card p-6 space-y-4"
                  x-data="sectionBuilder(@js($product->content_sections ?? []), {
                      uploadUrl: '{{ route('admin.products.section-image') }}',
+                     videoUploadUrl: '{{ route('admin.products.section-video') }}',
                      csrf: '{{ csrf_token() }}',
+                     {{-- What an "auto" row shows: the saved gallery, in order, and the first uploaded video. --}}
+                     photos: @js($product->exists ? $product->images->map(fn ($i) => image_variant($i->url) ?: $i->url)->values() : []),
+                     video: @js($product->exists ? (collect($product->galleryVideos())->firstWhere('type', 'file')['src'] ?? null) : null),
                      @if($product->exists) saveUrl: '{{ route('admin.products.save-template', $product) }}', @endif
                  })">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h2 class="font-semibold">Story sections</h2>
-                        <p class="text-xs text-ink-700/60">Heading + short text rows under the buy box, beside the product's video or photos. Keep headings to about 3 words and text to about 30.</p>
+                        <p class="text-xs text-ink-700/60">Heading + short text rows under the buy box, beside the product's video or photos. Keep headings to about 3 words and text to about 30. Drop an image or a video onto a box to use it instead.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <select @change="applyTemplate($event)" class="input py-1.5 text-sm w-auto">

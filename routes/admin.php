@@ -107,6 +107,7 @@ Route::middleware('admin')->group(function () {
 
     // Product-page story sections (builder helpers) + reusable template library
     Route::post('products/section-image', [ProductController::class, 'uploadSectionImage'])->name('products.section-image');
+    Route::post('products/section-video', [ProductController::class, 'uploadSectionVideo'])->name('products.section-video');
     Route::post('products/{product}/save-template', [ProductController::class, 'saveAsTemplate'])->name('products.save-template');
     Route::get('content-templates', [ContentTemplateController::class, 'index'])->name('content-templates.index');
     Route::post('content-templates', [ContentTemplateController::class, 'store'])->name('content-templates.store');

@@ -1713,18 +1713,37 @@ document.addEventListener('alpine:init', () => {
     // image / none, the same rule ContentTemplate::cleanSections applies.
     const storySection = (s) => ({ ...s, media: s.media || (s.image ? 'image' : 'none') });
 
+    const isVideoUrl = (url) => /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url || '');
+
     window.Alpine.data('sectionBuilder', (initial, opts) => ({
         sections: Array.isArray(initial) ? initial.map(storySection) : [],
         uploadUrl: opts.uploadUrl,
+        videoUploadUrl: opts.videoUploadUrl,
         saveUrl: opts.saveUrl || null,
         csrf: opts.csrf,
+        // The product's own media, gallery order: what 'auto' rows show. Empty
+        // on the content-templates page, which has no product.
+        photos: opts.photos || [],
+        video: opts.video || null,
+        over: null,        // index of the box a file is being dragged over
+        uploading: null,   // index of the box whose file is uploading
         add() {
             // Picture first, then alternating — the storefront's rhythm.
             this.sections.push({ media: 'auto', image: '', heading: '', body: '', layout: this.sections.length % 2 ? 'right' : 'left' });
         },
-        // What an 'auto' section will show, for the builder's preview box.
+        // What an 'auto' section will show, when there is nothing to preview.
         autoLabel(i) {
             return i === 0 ? 'Product video (or 1st photo)' : `Product photo ${i + 1}`;
+        },
+        // What the box shows: {type: 'image'|'video', src}, or null for a label.
+        // Mirrors StorySections: row 1 the product video, row N photo N, else photo 1.
+        preview(i) {
+            const s = this.sections[i];
+            if (s.media === 'image' && s.image) return { type: isVideoUrl(s.image) ? 'video' : 'image', src: s.image };
+            if (s.media !== 'auto') return null;
+            if (i === 0 && this.video) return { type: 'video', src: this.video };
+            const src = this.photos[i] || this.photos[0];
+            return src ? { type: 'image', src } : null;
         },
         remove(i) { this.sections.splice(i, 1); },
         move(i, dir) {
@@ -1733,18 +1752,43 @@ document.addEventListener('alpine:init', () => {
             const s = this.sections;
             [s[i], s[j]] = [s[j], s[i]];
         },
-        async upload(i, e) {
+        upload(i, e) {
             const file = e.target.files[0];
-            if (!file) return;
-            const fd = new FormData();
-            fd.append('image', file);
-            fd.append('_token', this.csrf);
-            try {
-                const r = await fetch(this.uploadUrl, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
-                const d = await r.json();
-                if (d.url) Object.assign(this.sections[i], { image: d.url, media: 'image' });
-            } catch (_) { alert('Image upload failed.'); }
             e.target.value = '';
+            if (file) this.uploadFile(i, file);
+        },
+        // A file or a link dropped on a section's picture box.
+        drop(i, e) {
+            this.over = null;
+            const file = e.dataTransfer?.files?.[0];
+            if (file) return this.uploadFile(i, file);
+            const url = (e.dataTransfer?.getData('text/uri-list') || e.dataTransfer?.getData('text/plain') || '').split('\n')[0].trim();
+            if (/^https?:\/\//i.test(url)) Object.assign(this.sections[i], { image: url, media: 'image' });
+        },
+        async uploadFile(i, file) {
+            const isVideo = file.type.startsWith('video/') || isVideoUrl(file.name);
+            if (!isVideo && !file.type.startsWith('image/')) {
+                alert('Drop an image or a video (MP4, WebM, MOV).');
+                return;
+            }
+            const fd = new FormData();
+            fd.append(isVideo ? 'video' : 'image', file);
+            fd.append('_token', this.csrf);
+            this.uploading = i;
+            try {
+                const r = await fetch(isVideo ? this.videoUploadUrl : this.uploadUrl, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+                const d = await r.json().catch(() => ({}));
+                if (r.ok && d.url) {
+                    Object.assign(this.sections[i], { image: d.url, media: 'image' });
+                } else {
+                    const why = d.errors ? Object.values(d.errors).flat()[0] : (r.status === 413 ? 'The file is too large for this server.' : d.message);
+                    alert(`${isVideo ? 'Video' : 'Image'} upload failed${why ? ': ' + why : '.'}`);
+                }
+            } catch (_) {
+                alert(`${isVideo ? 'Video' : 'Image'} upload failed.`);
+            } finally {
+                this.uploading = null;
+            }
         },
         // Pick this section's image from the shared media library instead of uploading.
         pickLibrary(i) {
