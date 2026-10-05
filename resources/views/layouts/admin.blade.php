@@ -480,19 +480,6 @@
             </div>
         </header>
 
-        {{-- The cron that runs the scheduler stopped once (3 Oct 2026) and
-             nobody could tell. The queue now drains itself on page visits
-             (App\Support\QueueFallback), but the timed jobs still need it. --}}
-        @if(auth()->user()?->can('system-config.access') && ! \App\Support\QueueFallback::schedulerRunning())
-            @php $cronAge = \App\Support\QueueFallback::schedulerAge(); @endphp
-            <div class="m-4 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">
-                <p class="font-medium">Scheduled tasks are not running — the server's cron
-                    {{ $cronAge === null ? 'has not fired since the last deploy' : 'last fired '.now()->subSeconds($cronAge)->diffForHumans() }}.</p>
-                <p class="mt-1">Orders still get their SMS and courier checks (the site works through its queue as pages are visited), but the hourly and daily jobs — Steadfast status sync, abandoned-cart reminders, Meta catalogue checks — are paused. In cPanel → Cron Jobs, run this every minute; if it is already there, ask the host why it is not firing:</p>
-                <code class="mt-1 block break-all text-xs">/opt/alt/php83/usr/bin/php {{ base_path('artisan') }} schedule:run >> /dev/null 2>&1</code>
-            </div>
-        @endif
-
         {{-- Wrapped so admin-ajax.js can swap it after a background submit
              without reloading the page. --}}
         <div id="admin-flash">

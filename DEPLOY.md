@@ -184,6 +184,14 @@ queue:work database --queue=default --stop-when-empty --max-time=50 --sleep=1
 - `--max-time=50` — never overruns the next minute's tick.
 - `withoutOverlapping()` — two workers can't pile up.
 
+**If the cron goes missing** (it vanished from cPanel on 3 Oct 2026 and cannot
+be re-added over SSH), the site stands in for it: after a page has been sent,
+a request that finds no scheduler heartbeat for 3+ minutes drains the queue and
+runs whatever scheduled task came due since the scheduler last ran — once,
+however many of its minutes nobody visited (`App\Support\QueueFallback`). It
+needs visitors, so night-time tasks can run late; the cron is still the real
+fix. The last web run is recorded under the `scheduler:web-report` cache key.
+
 That worker drains the **`default`** queue, which is where *every* job in this
 app lands: order confirmation SMS, invoice emails, Meta Conversions API events,
 Meta catalog syncs, knowledge-file syncs. Adding a second `queue:work` cron would

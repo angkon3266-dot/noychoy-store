@@ -135,8 +135,9 @@ class AppServiceProvider extends ServiceProvider
         // Rebuild caches after a configuration restore/import.
         Event::listen(ConfigurationRestored::class, RebuildConfigurationCache::class);
 
-        // While the scheduler cron is missing, web requests keep the queue
-        // moving once their response has gone out (App\Support\QueueFallback).
+        // While the scheduler cron is missing, web requests do its work — the
+        // queue and the due tasks — once their response has gone out
+        // (App\Support\QueueFallback).
         if (! $this->app->runningInConsole()) {
             $this->app->terminating(fn () => app(QueueFallback::class)->afterResponse());
         }

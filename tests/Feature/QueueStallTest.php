@@ -8,10 +8,13 @@ use App\Services\Meta\MetaTrackingService;
 use App\Services\NotificationService;
 use App\Services\SmsService;
 use App\Support\QueueFallback;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,8 +22,9 @@ use Tests\TestCase;
 
 /**
  * What happens when the cron that runs the scheduler stops (3 Oct 2026):
- * the queue drains itself from web requests, and order confirmations that
- * run hours late skip the customer messages but still send the Meta event.
+ * web requests drain the queue and run the timed tasks themselves, and order
+ * confirmations that run hours late skip the customer messages but still send
+ * the Meta event.
  */
 class QueueStallTest extends TestCase
 {
@@ -30,6 +34,10 @@ class QueueStallTest extends TestCase
     {
         parent::setUp();
         config(['queue.default' => 'database']);
+
+        // The real schedule would start courier syncs and SMS passes from
+        // here whenever a test happened to land on their minute.
+        $this->app->instance(Schedule::class, new Schedule);
     }
 
     private function queueProbe(): void
@@ -83,17 +91,133 @@ class QueueStallTest extends TestCase
         $this->assertGreaterThanOrEqual(600, QueueFallback::schedulerAge());
     }
 
-    public function test_super_admins_see_the_missing_cron_banner(): void
+    public function test_links_made_while_standing_in_point_at_the_store_not_the_requested_host(): void
     {
-        $owner = \App\Models\User::create(['name' => 'Owner', 'email' => 'o@t.local', 'password' => bcrypt('x'), 'role' => 'admin']);
-        if (! $owner->can('system-config.access')) {
-            $this->markTestSkipped('This role cannot reach System Config.');
-        }
+        config(['app.url' => 'https://noychoy.com']);
 
-        $this->actingAs($owner)->get('/admin')->assertSee('Scheduled tasks are not running');
+        // Steadfast still posts its webhook to the old domain, and that
+        // request is the one that drains the review request it queued.
+        $this->app['url']->setRequest(Request::create('https://meridianeclat.shop/webhooks/steadfast', 'POST'));
+        dispatch((new QueueStallLinkJob)->onConnection('database'));
 
+        app(QueueFallback::class)->afterResponse();
+
+        $this->assertStringStartsWith('https://noychoy.com/r/10151/', Cache::get('queue-stall-link'));
+    }
+
+    // ── The timed tasks ─────────────────────────────────────────────────────
+
+    private function task(string $name): \Illuminate\Console\Scheduling\CallbackEvent
+    {
+        return app(Schedule::class)->call(fn () => Cache::increment('ran:'.$name))->name($name);
+    }
+
+    private function ran(string $name): int
+    {
+        return (int) Cache::get('ran:'.$name, 0);
+    }
+
+    private function requestAt(string $time): void
+    {
+        $this->travelTo(Carbon::parse($time));
+        app(QueueFallback::class)->afterResponse();
+    }
+
+    public function test_without_a_cron_a_request_runs_the_tasks_that_are_due(): void
+    {
+        $this->task('minutely')->everyMinute();
+        $this->task('hourly')->hourly();
+
+        $this->requestAt('2026-10-05 10:17:20');
+
+        $this->assertSame(1, $this->ran('minutely'));
+        $this->assertSame(0, $this->ran('hourly'));
+    }
+
+    public function test_a_task_whose_minute_nobody_visited_runs_once_at_the_next_request(): void
+    {
+        $this->task('hourly')->hourly();
+        $this->task('daily')->dailyAt('11:30');
+
+        $this->requestAt('2026-10-05 10:58:10');
+        $this->assertSame(0, $this->ran('hourly'));
+
+        // Nobody visits at 11:00 or at 11:30.
+        $this->requestAt('2026-10-05 11:42:05');
+        $this->assertSame(1, $this->ran('hourly'));
+        $this->assertSame(1, $this->ran('daily'));
+
+        $this->requestAt('2026-10-05 11:43:05');
+        $this->assertSame(1, $this->ran('hourly'));
+        $this->assertSame(1, $this->ran('daily'));
+    }
+
+    public function test_tasks_due_after_the_crons_last_beat_still_run(): void
+    {
+        $this->task('hourly')->hourly();
+
+        $this->travelTo(Carbon::parse('2026-10-05 10:55:00'));
         QueueFallback::beat();
-        $this->actingAs($owner)->get('/admin')->assertDontSee('Scheduled tasks are not running');
+
+        $this->requestAt('2026-10-05 11:09:30');
+
+        $this->assertSame(1, $this->ran('hourly'));
+    }
+
+    public function test_a_long_silence_is_not_replayed(): void
+    {
+        $this->task('daily')->dailyAt('11:30');
+
+        $this->requestAt('2026-10-01 09:00:00');
+        $this->requestAt('2026-10-05 10:00:00');
+
+        $this->assertSame(0, $this->ran('daily'));
+    }
+
+    public function test_a_minute_runs_once_however_many_requests_arrive(): void
+    {
+        $this->task('minutely')->everyMinute();
+
+        $this->requestAt('2026-10-05 10:17:05');
+        $this->requestAt('2026-10-05 10:17:40');
+        $this->assertSame(1, $this->ran('minutely'));
+
+        $this->requestAt('2026-10-05 10:18:01');
+        $this->assertSame(2, $this->ran('minutely'));
+    }
+
+    public function test_while_the_cron_is_running_requests_leave_the_tasks_to_it(): void
+    {
+        $this->task('minutely')->everyMinute();
+        QueueFallback::beat();
+
+        app(QueueFallback::class)->afterResponse();
+
+        $this->assertSame(0, $this->ran('minutely'));
+    }
+
+    public function test_the_web_never_beats_the_heartbeat_or_runs_the_crons_own_drain(): void
+    {
+        app(Schedule::class)->call(fn () => QueueFallback::beat())->everyMinute()->name('scheduler-heartbeat');
+        $this->task('meta-queue-drain')->everyMinute();
+
+        app(QueueFallback::class)->afterResponse();
+
+        $this->assertNull(QueueFallback::schedulerAge());
+        $this->assertSame(0, $this->ran('meta-queue-drain'));
+    }
+
+    public function test_a_failing_task_does_not_stop_the_rest(): void
+    {
+        app(Schedule::class)->call(fn () => throw new \RuntimeException('gateway down'))->everyMinute()->name('broken');
+        $this->task('after')->everyMinute();
+
+        app(QueueFallback::class)->afterResponse();
+
+        $this->assertSame(1, $this->ran('after'));
+        $report = Cache::get(QueueFallback::SCHEDULE_REPORT)['ran'];
+        $this->assertStringStartsWith('failed', $report['broken']);
+        $this->assertSame('ok', $report['after']);
     }
 
     // ── Late confirmations ──────────────────────────────────────────────────
@@ -140,6 +264,17 @@ class QueueStallTest extends TestCase
     public function test_an_on_time_confirmation_still_messages_everyone(): void
     {
         $this->confirm($this->order(minutesAgo: 1), expectMessages: true);
+    }
+}
+
+/** A queued job that builds the review short link a delivery texts out. */
+class QueueStallLinkJob implements ShouldQueue
+{
+    use Dispatchable, Queueable;
+
+    public function handle(): void
+    {
+        Cache::put('queue-stall-link', route('order.review.short', ['orderNumber' => '10151', 'token' => 'f2cab04754be820f']));
     }
 }
 
