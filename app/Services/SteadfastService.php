@@ -250,7 +250,10 @@ class SteadfastService
         // Delivery also marks a cash-on-delivery order paid, and payloadFor()
         // sends a paid order as COD 0 — so without this every delivered COD
         // order read "COD ৳1,000 → ৳0" and offered to book it again.
-        if (in_array(Order::statusForCourierStatus($shipment->status), ['delivered', 'partially_delivered'], true)
+        // A partial delivery settles the parcel too (it maps to cancelled, so
+        // the courier's own wording is checked).
+        if (Order::statusForCourierStatus($shipment->status) === 'delivered'
+            || str_contains(strtolower((string) $shipment->status), 'partial')
             || in_array($order->status, ['delivered', 'partially_delivered'], true)) {
             return [];
         }

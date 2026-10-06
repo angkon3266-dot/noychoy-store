@@ -118,8 +118,19 @@ class NotificationController extends Controller
             'audience' => ['required', 'in:all,segment'],
             'segment_id' => ['nullable', 'required_if:audience,segment', 'exists:customer_segments,id'],
             'coupon_code' => ['nullable', 'string', 'max:40'],
-            'scheduled_at' => ['nullable', 'date', 'after:now'],
+            'scheduled_at' => ['nullable', 'date'],
         ]);
+
+        // The picker sends a wall-clock time with no zone, and the admin types
+        // Dhaka time. Read as UTC (the app's zone), a send set for 8 pm went
+        // out at 2 am.
+        if (filled($data['scheduled_at'] ?? null)) {
+            $at = \Illuminate\Support\Carbon::parse($data['scheduled_at'], config('store.timezone') ?: config('app.timezone'))->utc();
+            if ($at->isPast()) {
+                return back()->withInput()->withErrors(['scheduled_at' => 'Pick a time in the future (shop time).']);
+            }
+            $data['scheduled_at'] = $at;
+        }
 
         // Attach a real offer: embed the coupon code in the message + point the
         // push at the shop so recipients can redeem it.

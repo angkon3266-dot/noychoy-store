@@ -279,4 +279,5 @@ Route::post('/assistant/chat', [AssistantController::class, 'chat'])
 // Catalog (slug routes last so they don't shadow the above)
 Route::get('/collection/{collection:slug}', [CatalogController::class, 'collection'])->name('collection.show');
 Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');
-Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->name('product.show');
+// withTrashed: an archived product's old links redirect to the shop, not a 404.
+Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->withTrashed()->name('product.show');

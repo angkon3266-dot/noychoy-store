@@ -109,6 +109,9 @@ final class DashboardBlocks
         'delivery_outcomes' => ['title' => 'Delivery outcomes', 'span' => 'third', 'needs' => 'operations', 'legacy_panel' => 'operations'],
         'running_out' => ['title' => 'Running out soon', 'span' => 'third', 'needs' => 'operations', 'legacy_panel' => 'operations'],
         'dead_stock' => ['title' => 'Dead stock', 'span' => 'third', 'needs' => 'operations', 'legacy_panel' => 'operations'],
+        // Phone / tablet / computer, browsers and apps (owner, 2026-10-06).
+        // Last, so it fills the third the two stock cards leave in their row.
+        'devices' => ['title' => 'Devices & browsers', 'span' => 'third', 'needs' => 'devices'],
     ];
 
     /** @return array<string, array{title:string, span:string, needs?:string, legacy_panel?:string}> */

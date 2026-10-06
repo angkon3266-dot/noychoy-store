@@ -215,7 +215,8 @@ class PlaceOrder
             }
 
             // Where this buyer came from, read off their own visit history.
-            $attribution = Visit::attributionFor(request()->cookie('visitor_token'));
+            $attribution = Visit::attributionFor(request()->cookie('visitor_token'))
+                + Visit::deviceForOrder(request()->userAgent());
 
             $order = $this->createWithUniqueNumber($attribution + [
                 'customer_id' => $customer->id,

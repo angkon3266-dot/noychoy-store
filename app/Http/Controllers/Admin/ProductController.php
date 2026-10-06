@@ -841,6 +841,31 @@ class ProductController extends Controller
         return back()->with('success', $product->name.' updated.');
     }
 
+    /**
+     * What to do with a product that has sold out (owner, 6 Oct 2026), asked
+     * from the bell and the product's page: take it off the shop, or keep it
+     * up and take pre-orders. A model save either way, so the Meta catalogue
+     * hears about it (a draft is deleted there; a pre-order stays "in stock").
+     */
+    public function soldOut(Request $request, Product $product, string $choice)
+    {
+        if ($choice === 'draft') {
+            $product->update(['status' => 'draft']);
+            $message = $product->name.' moved to draft — it is off the shop, and its old links now open the shop.';
+        } else {
+            $product->update(['is_preorder' => true]);
+            $message = $product->name.' is taking pre-orders. Add an expected date or a note on its page if you like.';
+        }
+
+        \App\Services\AdminAlerts::flush();
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'message' => $message]);
+        }
+
+        return back()->with('success', $message);
+    }
+
     /** Bulk actions on selected products. */
     public function bulk(Request $request)
     {
@@ -868,8 +893,13 @@ class ProductController extends Controller
         $count = (clone $query)->count();
 
         match ($data['action']) {
-            'publish' => $query->update(['status' => 'published']),
-            'draft' => $query->update(['status' => 'draft']),
+            // One save per product, not a mass update: a status change has to
+            // reach the model observers — the Meta catalogue (a draft is
+            // deleted there at once), the assistant's notes and the homepage
+            // cache. A mass update skipped them, so bulk-drafted products
+            // stayed in Meta's API catalogue.
+            'publish' => $query->get()->each->update(['status' => 'published']),
+            'draft' => $query->get()->each->update(['status' => 'draft']),
             'feature' => $query->update(['is_featured' => true]),
             'unfeature' => $query->update(['is_featured' => false]),
             'bestseller' => $query->update(['is_bestseller' => true]),

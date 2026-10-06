@@ -100,7 +100,7 @@ class CourierStatusSyncTest extends TestCase
         return [
             'delivered' => ['delivered', 'delivered'],
             'cancelled' => ['cancelled', 'cancelled'],
-            'partial delivery is its own outcome' => ['partial_delivered', 'partially_delivered'],
+            'a partial delivery is a cancellation' => ['partial_delivered', 'cancelled'],
             'in review' => ['in_review', null],
             'pending' => ['pending', null],
             'hold' => ['hold', null],
@@ -207,19 +207,20 @@ class CourierStatusSyncTest extends TestCase
         $this->assertSame('processing', $order->fresh()->status);
     }
 
-    public function test_a_partial_delivery_is_not_treated_as_a_cancellation(): void
+    public function test_a_partial_delivery_is_a_cancellation(): void
     {
-        // The courier handed over some of the parcel and collected money for
-        // it. Booking that as a cancellation put the whole order's stock back
-        // on the shelf and erased the collected revenue from every report, so
-        // it now gets its own status for the owner to settle deliberately.
+        // Owner, 6 Oct 2026: "partial delivered means cancelled — return the
+        // stock and don't add that money in the profit". In practice the
+        // customer refuses the piece and pays the rider only the delivery
+        // charge. The shipment keeps the courier's own word for it.
         $order = $this->orderWithShipment();
         $this->webhook($order, 'partial_delivered');
 
         $order = $order->fresh()->load('shipment');
-        $this->assertSame('partially_delivered', $order->status);
+        $this->assertSame('cancelled', $order->status);
+        $this->assertSame('partial_delivered', $order->shipment->status);
         $this->assertFalse($order->isStatusLocked());
-        $this->assertFalse((bool) $order->stock_restored, 'stock was released for a parcel that was partly delivered');
+        $this->assertTrue((bool) $order->stock_restored, 'a partial delivery puts the stock back');
     }
 
     public function test_a_courier_cancellation_still_returns_stock(): void
@@ -322,7 +323,7 @@ class CourierStatusSyncTest extends TestCase
         $this->artisan('steadfast:sync')->assertSuccessful();
 
         $this->assertSame('delivered', $delivered->fresh()->status);
-        $this->assertSame('partially_delivered', $partial->fresh()->status);
+        $this->assertSame('cancelled', $partial->fresh()->status, 'a partial delivery is a cancellation');
         $this->assertSame('cancelled', $cancelled->fresh()->status);
         $this->assertSame('shipped', $pickedUp->fresh()->status);
     }

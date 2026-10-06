@@ -159,7 +159,7 @@ class CatalogController extends Controller
                 \App\Models\OrderItem::query()
                     ->join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->whereNull('orders.deleted_at')
-                    ->whereNotIn('orders.status', ['cancelled', 'returned'])
+                    ->whereNotIn('orders.status', \App\Models\Order::NOT_SALES)
                     ->whereColumn('order_items.product_id', 'products.id')
                     ->selectRaw('COALESCE(SUM(order_items.quantity), 0)')
             ),
@@ -283,7 +283,21 @@ class CatalogController extends Controller
 
     public function show(Request $request, Product $product)
     {
-        abort_unless($product->status === 'published', 404);
+        // A product taken down — drafted or archived — still has links out
+        // there: ad site links, old posts, shared chats. In the first week of
+        // Oct 2026 shoppers followed them into an error page 150+ times, most
+        // from paid Facebook ads. Send them to the whole shop instead, keeping
+        // the ad's tracking so the visit is still credited to it. Temporary
+        // (302): a draft can come back.
+        if ($product->trashed() || $product->status !== 'published') {
+            $tracking = array_filter(
+                $request->query(),
+                fn ($value, $key) => is_string($value) && (str_starts_with($key, 'utm_') || in_array($key, ['fbclid', 'gclid', 'ttclid'], true)),
+                ARRAY_FILTER_USE_BOTH,
+            );
+
+            return redirect()->route('shop', $tracking);
+        }
 
         $product->load(['images', 'variants' => fn ($q) => $q->where('is_active', true), 'category', 'categories', 'approvedReviews']);
 

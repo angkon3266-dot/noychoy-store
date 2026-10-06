@@ -11,7 +11,7 @@ class Visit extends Model
 
     protected $fillable = [
         'visitor_token', 'event', 'path', 'product_id', 'value', 'referrer_host',
-        'source', 'campaign', 'medium', 'content', 'ad_id',
+        'source', 'campaign', 'medium', 'content', 'ad_id', 'device', 'os', 'browser',
     ];
 
     protected $casts = ['value' => 'decimal:2'];
@@ -57,6 +57,11 @@ class Visit extends Model
             // Same treatment for the money column, which arrived later still.
             if (! static::valueColumnReady()) {
                 unset($row['value']);
+            }
+
+            // …and for what it was browsed on (6 Oct 2026).
+            if (static::deviceColumnsReady('visits')) {
+                $row += \App\Support\DeviceDetector::parse(request()->userAgent());
             }
 
             static::create($row);
@@ -154,6 +159,29 @@ class Visit extends Model
     protected static function valueColumnReady(): bool
     {
         return static::schemaFlag(self::VALUE_READY_KEY, 'visits', 'value');
+    }
+
+    /** Has the device migration reached this table ('visits' or 'orders')? */
+    public static function deviceColumnsReady(string $table): bool
+    {
+        return static::schemaFlag($table.'.device_ready', $table, 'device');
+    }
+
+    /**
+     * What an order is being placed on, for stamping onto it — read off the
+     * checkout request itself, the one device that certainly placed it.
+     *
+     * @return array{device?:?string, browser?:?string}
+     */
+    public static function deviceForOrder(?string $userAgent): array
+    {
+        if (! static::deviceColumnsReady('orders')) {
+            return [];
+        }
+
+        $parsed = \App\Support\DeviceDetector::parse($userAgent);
+
+        return ['device' => $parsed['device'], 'browser' => $parsed['browser']];
     }
 
     /**

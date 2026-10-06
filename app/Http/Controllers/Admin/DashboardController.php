@@ -126,16 +126,19 @@ class DashboardController extends Controller
 
     public function index(DashboardAnalytics $analytics, DashboardInsights $insights, Request $request)
     {
-        $today = now()->startOfDay();
 
         // The window every time-based figure below reports on. Live queue
         // counts (pending/processing/shipped), stock and the customer base are
         // deliberately NOT filtered: they describe the state of the shop right
         // now, and "0 pending" because you picked "Today" would be a lie.
-        $range = DateRange::fromRequest($request);
+        // Opens on Today (owner, 6 Oct 2026): the dashboard is checked through
+        // the day, and "how is today going" is the first question.
+        $range = DateRange::fromRequest($request, 'today');
+        $todayRange = DateRange::preset('today');
 
-        // Orders that count as "real sales" (exclude cancelled / returned).
-        $sold = fn () => $range->constrain(Order::whereNotIn('status', ['cancelled', 'returned']));
+        // Orders that count as "real sales" — not cancelled, returned, or
+        // partially delivered (which this shop counts as cancelled).
+        $sold = fn () => $range->constrain(Order::whereNotIn('status', Order::NOT_SALES));
 
         $deliveredPeriod = $sold()->where('status', 'delivered')->sum('total');
         $salesPeriod = $sold()->sum('total');
@@ -164,9 +167,8 @@ class DashboardController extends Controller
             'revenue_period' => $deliveredPeriod,
             // Today's figures stay pinned to today whatever the filter says —
             // they are the "how is it going right now" pair.
-            'orders_today' => Order::whereDate('created_at', $today)->count(),
-            'sales_today' => Order::whereNotIn('status', ['cancelled', 'returned'])
-                ->whereDate('created_at', $today)->sum('total'),
+            'orders_today' => $todayRange->constrain(Order::query())->count(),
+            'sales_today' => $todayRange->constrain(Order::whereNotIn('status', Order::NOT_SALES))->sum('total'),
             'pending' => Order::where('status', 'pending')->count(),
             'processing' => Order::where('status', 'processing')->count(),
             // "Gone to the courier" — booking used to write `shipped` directly,
@@ -194,7 +196,7 @@ class DashboardController extends Controller
         $dailyMax = max(1, $daily->max('total'));
 
         // Top products in the window, by units sold on non-cancelled orders.
-        $inRange = fn ($q) => $range->constrain($q->whereNotIn('status', ['cancelled', 'returned']));
+        $inRange = fn ($q) => $range->constrain($q->whereNotIn('status', Order::NOT_SALES));
 
         // Best-selling categories in the window, by units sold.
         $topCategories = OrderItem::query()
@@ -275,6 +277,7 @@ class DashboardController extends Controller
             // collect(), not null: the chart @foreaches this directly.
             'series' => $want('series') ? $safe(fn () => $analytics->funnelByDay($range), collect()) : null,
             'sources' => $want('sources') ? $safe(fn () => $analytics->trafficSources($range), collect()) : null,
+            'devices' => $want('devices') ? $safe(fn () => $analytics->devices($range)) : null,
             'ads' => $want('ads') ? $safe(fn () => $analytics->adPerformance($range), collect()) : null,
             'viewedNotSold' => $want('viewedNotSold') ? $safe(fn () => $analytics->viewedNotSold($range), collect()) : null,
             'retention' => $want('retention') ? $safe(fn () => $analytics->retention($range)) : null,
@@ -317,7 +320,7 @@ class DashboardController extends Controller
 
         // Unique visitors: all-time as the headline, plus the chosen window.
         $stats['visitors_total'] = (int) $safe(fn () => Visit::distinct()->count('visitor_token'), 0);
-        $stats['visitors_today'] = (int) $safe(fn () => Visit::whereDate('created_at', $today)->distinct()->count('visitor_token'), 0);
+        $stats['visitors_today'] = (int) $safe(fn () => $todayRange->constrain(Visit::query())->distinct()->count('visitor_token'), 0);
         $stats['visitors_period'] = (int) $safe(fn () => $range->constrain(Visit::query())->distinct()->count('visitor_token'), 0);
 
         return view('admin.dashboard', compact(
@@ -337,14 +340,14 @@ class DashboardController extends Controller
      */
     protected function revenueSeries(DateRange $range): Collection
     {
-        $byDay = $range->constrain(Order::whereNotIn('status', ['cancelled', 'returned']))
-            ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'))
+        $byDay = $range->constrain(Order::whereNotIn('status', Order::NOT_SALES))
+            ->select(DB::raw(DateRange::localDate('created_at').' as d'), DB::raw('SUM(total) as t'))
             ->groupBy('d')->pluck('t', 'd');
 
         $start = $range->start ?? Carbon::parse(
             Order::min('created_at') ?: now()
-        )->startOfDay();
-        $end = $range->end ?? now()->endOfDay();
+        )->setTimezone(DateRange::timezone())->startOfDay();
+        $end = $range->end ?? now(DateRange::timezone())->endOfDay();
 
         $days = max(1, (int) $start->diffInDays($end) + 1);
         $buckets = (int) max(1, ceil($days / 30));   // at most 30 bars

@@ -23,9 +23,9 @@ class DashboardAnalytics
     /** Orders that count as real sales. */
     protected function sold()
     {
-        // partially_delivered stays IN: the courier collected money on those
-        // parcels, and excluding them would understate real revenue.
-        return Order::whereNotIn('status', ['cancelled', 'returned']);
+        // Cancelled, returned and partially delivered (a cancellation for this
+        // shop) are not sales.
+        return Order::whereNotIn('status', Order::NOT_SALES);
     }
 
     /**
@@ -108,7 +108,7 @@ class DashboardAnalytics
         $query = OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->whereNull('orders.deleted_at')
-            ->whereNotIn('orders.status', ['cancelled', 'returned']);
+            ->whereNotIn('orders.status', Order::NOT_SALES);
 
         $row = $range->constrain($query, 'orders.created_at')
             ->selectRaw('COALESCE(SUM(order_items.subtotal), 0) as revenue')
@@ -296,7 +296,7 @@ class DashboardAnalytics
         return collect($this->remember('series.'.$range->cacheKey(), function () use ($range) {
             $perDay = fn (?string $event) => $range->constrain(Visit::query())
                 ->when($event, fn ($q) => $q->where('event', $event))
-                ->selectRaw('DATE(created_at) as d, COUNT(DISTINCT visitor_token) as c')
+                ->selectRaw(DateRange::localDate('created_at').' as d, COUNT(DISTINCT visitor_token) as c')
                 ->groupBy('d')->pluck('c', 'd');
 
             $series = [
@@ -305,7 +305,7 @@ class DashboardAnalytics
                 'carted' => $perDay('cart_add'),
                 'checkout' => $perDay('checkout_start'),
                 'orders' => $range->constrain($this->sold())
-                    ->selectRaw('DATE(created_at) as d, COUNT(*) as c')
+                    ->selectRaw(DateRange::localDate('created_at').' as d, COUNT(*) as c')
                     ->groupBy('d')->pluck('c', 'd'),
             ];
 
@@ -315,8 +315,8 @@ class DashboardAnalytics
             $earliest = collect([Visit::min('created_at'), Order::min('created_at')])
                 ->filter()->map(fn ($t) => Carbon::parse($t))->min();
 
-            $start = $range->start ?? ($earliest ?: now())->copy()->startOfDay();
-            $end = $range->end ?? now()->endOfDay();
+            $start = $range->start ?? ($earliest ?: now())->copy()->setTimezone(DateRange::timezone())->startOfDay();
+            $end = $range->end ?? now(DateRange::timezone())->endOfDay();
 
             return $this->bucketDays($start, $end, $series);
         }, $range->cacheSeconds()));
@@ -370,6 +370,75 @@ class DashboardAnalytics
      *
      * @return \Illuminate\Support\Collection<int, array{channel:string,label:string,visitors:int,orders:int,revenue:float,rate:?float,sites:array,campaigns:array}>
      */
+    /**
+     * What the shop is browsed and bought on (owner, 6 Oct 2026): phone,
+     * tablet or computer, with each one's carts, checkouts and orders, then
+     * the browsers and apps (Facebook's in-app browser is most ad traffic)
+     * and the systems. Visitors are counted once per device; tracking began on
+     * 6 Oct 2026, so earlier visits and orders sit outside these figures and
+     * `untracked` says how many.
+     *
+     * @return array{devices: array<int, array{key:string, label:string, visitors:int, share:?float, carted:int, checkout:int, orders:int, revenue:float, rate:?float}>, browsers: array<int, array{name:string, visitors:int, share:?float}>, systems: array<int, array{name:string, visitors:int, share:?float}>, tracked:int, untracked:int}
+     */
+    public function devices(DateRange $range): array
+    {
+        return $this->remember('devices.'.$range->cacheKey(), function () use ($range) {
+            $visits = fn () => $range->constrain(Visit::query())->whereNotNull('device');
+
+            $per = fn (string $column, ?string $event = null) => $visits()
+                ->when($event, fn ($q) => $q->where('event', $event))
+                ->selectRaw("{$column} as k, COUNT(DISTINCT visitor_token) as c")
+                ->groupBy('k')->pluck('c', 'k')->map(fn ($c) => (int) $c);
+
+            $visitors = $per('device');
+            $tracked = (int) $visitors->sum();
+            $untracked = (int) $range->constrain(Visit::query())->whereNull('device')->distinct()->count('visitor_token');
+
+            $carted = $per('device', 'cart_add');
+            $checkout = $per('device', 'checkout_start');
+
+            $orders = Visit::deviceColumnsReady('orders')
+                ? $range->constrain($this->sold())->whereNotNull('device')
+                    ->selectRaw('device as k, COUNT(*) as orders, COALESCE(SUM(total), 0) as revenue')
+                    ->groupBy('k')->get()->keyBy('k')
+                : collect();
+
+            $share = fn (int $n) => $tracked > 0 ? round($n / $tracked * 100, 1) : null;
+
+            $devices = collect(\App\Support\DeviceDetector::DEVICES)
+                ->map(function ($label, $key) use ($visitors, $carted, $checkout, $orders, $share) {
+                    $v = (int) ($visitors[$key] ?? 0);
+                    $o = (int) ($orders[$key]->orders ?? 0);
+
+                    return [
+                        'key' => $key,
+                        'label' => $label,
+                        'visitors' => $v,
+                        'share' => $share($v),
+                        'carted' => (int) ($carted[$key] ?? 0),
+                        'checkout' => (int) ($checkout[$key] ?? 0),
+                        'orders' => $o,
+                        'revenue' => round((float) ($orders[$key]->revenue ?? 0), 2),
+                        'rate' => $v > 0 ? round($o / $v * 100, 1) : null,
+                    ];
+                })
+                ->filter(fn ($row) => $row['visitors'] > 0 || $row['orders'] > 0)
+                ->sortByDesc('visitors')->values()->all();
+
+            $top = fn (string $column) => $per($column)->sortDesc()->take(6)
+                ->map(fn ($n, $name) => ['name' => (string) $name, 'visitors' => $n, 'share' => $share($n)])
+                ->values()->all();
+
+            return [
+                'devices' => $devices,
+                'browsers' => $top('browser'),
+                'systems' => $top('os'),
+                'tracked' => $tracked,
+                'untracked' => $untracked,
+            ];
+        }, $range->cacheSeconds());
+    }
+
     public function trafficSources(DateRange $range, int $limit = 8): \Illuminate\Support\Collection
     {
         return collect($this->remember('src.'.$range->cacheKey().'.'.$limit, function () use ($range, $limit) {
@@ -693,7 +762,7 @@ class DashboardAnalytics
                 OrderItem::query()
                     ->join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->whereNull('orders.deleted_at')
-                    ->whereNotIn('orders.status', ['cancelled', 'returned']),
+                    ->whereNotIn('orders.status', Order::NOT_SALES),
                 'orders.created_at',
             )
                 ->whereNotNull('order_items.product_id')
@@ -746,7 +815,7 @@ class DashboardAnalytics
                 ->get(['customer_id', 'total', 'created_at']);
 
             $firstOrderAt = Order::whereIn('customer_id', $orders->pluck('customer_id')->unique())
-                ->whereNotIn('status', ['cancelled', 'returned'])
+                ->whereNotIn('status', Order::NOT_SALES)
                 ->selectRaw('customer_id, MIN(created_at) as first_at')
                 ->groupBy('customer_id')->pluck('first_at', 'customer_id');
 
@@ -765,7 +834,7 @@ class DashboardAnalytics
             $clv = (float) (clone $buyers)->avg('total_spent');
 
             // Average gap between a customer's 1st and 2nd order (repeat speed).
-            $seconds = Order::whereNotIn('status', ['cancelled', 'returned'])
+            $seconds = Order::whereNotIn('status', Order::NOT_SALES)
                 ->whereNotNull('customer_id')
                 ->selectRaw('customer_id, MIN(created_at) as a, MAX(created_at) as b, COUNT(*) as c')
                 ->groupBy('customer_id')->having('c', '>', 1)->get();
@@ -819,7 +888,7 @@ class DashboardAnalytics
                 OrderItem::query()
                     ->join('orders', 'orders.id', '=', 'order_items.order_id')
                     ->whereNull('orders.deleted_at')
-                    ->whereNotIn('orders.status', ['cancelled', 'returned']),
+                    ->whereNotIn('orders.status', Order::NOT_SALES),
                 'orders.created_at',
             )
                 ->whereNotNull('order_items.product_id')

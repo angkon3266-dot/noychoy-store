@@ -74,6 +74,9 @@ Route::middleware('admin')->group(function () {
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate');
     Route::patch('products/{product}/quick', [ProductController::class, 'quickUpdate'])->name('products.quick');
+    // A sold-out product's answer from the bell or its page: draft | preorder.
+    Route::post('products/{product}/sold-out/{choice}', [ProductController::class, 'soldOut'])
+        ->whereIn('choice', ['draft', 'preorder'])->name('products.sold-out');
     Route::post('products/{product}/quick-media', [ProductController::class, 'quickMedia'])->name('products.quick-media');
     Route::post('products/bulk', [ProductController::class, 'bulk'])->name('products.bulk');
     Route::post('products/bulk-serials', [ProductController::class, 'bulkSerials'])->name('products.bulk-serials');

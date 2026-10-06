@@ -114,9 +114,8 @@ class OrderController extends Controller
                     // pieces never belong in a "to prepare" count — most
                     // visibly on the All view, where months of finished sales
                     // would otherwise swamp the handful still to pack.
-                    // `partially_delivered` is deliberately NOT excluded: part
-                    // of that parcel came back and somebody still has to
-                    // settle it.
+                    // Cancelled orders (a partial delivery is one) stay in:
+                    // their pieces come back and have to be put away.
                     ->where('status', '!=', 'delivered');
             })
             ->select('product_id', 'name', DB::raw('SUM(quantity) as qty'), DB::raw('COUNT(DISTINCT order_id) as orders'))
@@ -422,7 +421,7 @@ class OrderController extends Controller
             // back on the shelf (stock_restored), and adjusting again here
             // would invent inventory that does not exist.
             $holdsStock = ! $order->stock_restored
-                && ! in_array($order->status, ['cancelled', 'returned'], true);
+                && ! in_array($order->status, Order::NOT_SALES, true);
 
             $kept = [];
 
@@ -1612,7 +1611,7 @@ class OrderController extends Controller
 
             // If deleting released this order's stock and it's back as an active
             // order, re-reserve it. (Cancelled/returned orders keep stock freed.)
-            if ($order->stock_restored && ! in_array($order->status, ['cancelled', 'returned'], true)) {
+            if ($order->stock_restored && ! in_array($order->status, Order::NOT_SALES, true)) {
                 $this->adjustStock($order, -1);
                 $order->update(['stock_restored' => false]);
             }
@@ -1643,7 +1642,7 @@ class OrderController extends Controller
      */
     protected function releaseStockOnDelete(Order $order): void
     {
-        if (! $order->stock_restored && ! in_array($order->status, ['cancelled', 'returned'], true)) {
+        if (! $order->stock_restored && ! in_array($order->status, Order::NOT_SALES, true)) {
             $this->adjustStock($order, +1);
             $order->update(['stock_restored' => true]);
         }
@@ -1782,7 +1781,7 @@ class OrderController extends Controller
                 .' replaces '.$previous->consignment_id.' (COD '.money($shipment->cod_amount).')';
             $fromLabel = Order::STATUSES[$from] ?? $from;
 
-            $reopens = in_array($from, ['cancelled', 'returned'], true) && ! $locked;
+            $reopens = in_array($from, Order::NOT_SALES, true) && ! $locked;
 
             if (in_array($from, Order::PRE_BOOKING_STATUSES, true) || $reopens) {
                 // The shared action, so stock, payment and history move exactly as
@@ -1799,7 +1798,7 @@ class OrderController extends Controller
                 $order->history()->create(['status' => $from, 'note' => $note, 'created_by' => $by]);
                 $statusLine = 'The order stays '.$fromLabel.'.';
 
-                if (in_array($from, ['cancelled', 'returned'], true)) {
+                if (in_array($from, Order::NOT_SALES, true)) {
                     $statusLine .= ' It was not moved to Booked because the courier had confirmed the earlier'
                         .' consignment as delivered — change the status by hand if this parcel replaces it.';
                 }

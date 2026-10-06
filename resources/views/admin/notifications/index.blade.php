@@ -2,6 +2,10 @@
 @section('title', 'Notifications')
 @section('heading', 'Member notifications')
 
+@section('flash')
+    @if($errors->any())<div class="m-4 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">Not sent — {{ $errors->first() }}</div>@endif
+@endsection
+
 @php
     $sum = $analytics->summary();
 @endphp
@@ -315,7 +319,7 @@
                             </td>
                             <td class="px-4 py-3 text-xs">
                                 @if($n->sent_at)<span class="text-green-700">Sent {{ $n->sent_at->diffForHumans() }}</span>
-                                @elseif($n->scheduled_at)<span class="text-amber-600">Scheduled {{ $n->scheduled_at->format('d M, H:i') }}</span>
+                                @elseif($n->scheduled_at)<span class="text-amber-600">Scheduled {{ $n->scheduled_at->copy()->setTimezone(config('store.timezone') ?: config('app.timezone'))->format('d M, H:i') }}</span>
                                 @else<span class="text-ink-700/50">Draft</span>@endif
                             </td>
                             <td class="px-4 py-3 text-right tabular-nums">{{ $n->sent_at ? number_format($m['recipients']) : '—' }}</td>

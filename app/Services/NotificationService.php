@@ -98,12 +98,20 @@ class NotificationService
             'tag' => 'notif-'.$n->id,
         ];
 
-        $ids = $query->pluck('id');
-        $ids->chunk(500)->each(function ($chunk) use ($payload) {
-            \App\Jobs\SendWebPush::dispatch($chunk->all(), $payload);
-        });
+        // A member's tap goes through their account, which marks it read. A
+        // guest has no account, and that route sent every guest who tapped to
+        // the sign-in page — so a guest's push opens the link itself (or the
+        // shop when there is none).
+        $guestPayload = ['url' => $n->url ?: route('home')] + $payload;
 
-        return $this->lastPushQueued = $ids->count();
+        $rows = $query->get(['id', 'customer_id']);
+        foreach ([[$rows->whereNotNull('customer_id'), $payload], [$rows->whereNull('customer_id'), $guestPayload]] as [$group, $body]) {
+            $group->pluck('id')->chunk(500)->each(function ($chunk) use ($body) {
+                \App\Jobs\SendWebPush::dispatch($chunk->values()->all(), $body);
+            });
+        }
+
+        return $this->lastPushQueued = $rows->count();
     }
 
     /**

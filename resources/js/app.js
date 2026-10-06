@@ -139,24 +139,55 @@ document.addEventListener('alpine:init', () => {
     // ── Admin: live notification bell ────────────────────────────────────────
     // Shared hosting gives us no websocket, so the panel polls a small JSON
     // endpoint instead of making the admin reload the page to see a new order.
-    // Polling pauses while the tab is hidden so a forgotten tab costs nothing.
+    //
+    // It keeps polling in a background tab (the browser slows it to about once
+    // a minute): a new order is announced with a chime and a system pop-up
+    // precisely when the admin is looking at something else. Until 6 Oct 2026
+    // it only polled a visible tab, so the pop-up could only ever appear on a
+    // screen the admin was already watching.
     window.Alpine.data('adminAlerts', (config) => ({
         bell: false,
         unread: config.unread || 0,
-        items: [],
+        items: config.items || [],
         latestOrderId: config.latestOrderId || 0,
         toast: '',
+        toastOrder: false,
         pulse: false,
+        busy: false,
+        sound: (() => { try { return localStorage.getItem('adminOrderSound') !== 'off'; } catch (e) { return true; } })(),
+        canAskDesktop: 'Notification' in window && Notification.permission === 'default',
         _timer: null,
+        _audio: null,
 
         start() {
             this.poll();
-            this._timer = setInterval(() => {
-                if (!document.hidden) this.poll();
-            }, 25000);
+            this._timer = setInterval(() => this.poll(), 25000);
             // Catch up immediately when the admin comes back to the tab.
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden) this.poll();
+            });
+            // A browser only lets a page make sound after it has been clicked
+            // or typed in, so the chime is unlocked on the first one.
+            const unlock = () => this.audio(true);
+            document.addEventListener('pointerdown', unlock, { once: true });
+            document.addEventListener('keydown', unlock, { once: true });
+        },
+
+        csrf() {
+            return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        },
+
+        post(url, body = {}) {
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': this.csrf(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(body),
+                keepalive: true,
             });
         },
 
@@ -179,20 +210,121 @@ document.addEventListener('alpine:init', () => {
                     this.flash();
                 }
                 this.items = data.items || [];
-            } catch (e) { /* offline or a blip — the next tick tries again */ }
+            } catch (e) { /* offline, a blip, or a lapsed login — the next tick tries again */ }
+        },
+
+        /** Mark read in the background, then go where the alert points. */
+        open(a) {
+            if (!a.read) {
+                a.read = true;
+                this.unread = Math.max(0, this.unread - 1);
+                this.post(config.read, { key: a.key }).catch(() => {});
+            }
+            this.bell = false;
+            if (a.url) window.location.href = a.url;
+        },
+
+        async readAll() {
+            this.items.forEach((a) => { a.read = true; });
+            this.unread = 0;
+            try { await this.post(config.readAll); } catch (e) {}
+        },
+
+        /** An answer given in the bell — e.g. draft a sold-out product. */
+        async run(a, act) {
+            if (this.busy) return;
+            this.busy = true;
+            try {
+                const res = await this.post(act.url);
+                if (!res.ok) throw new Error(res.status);
+                const data = await res.json().catch(() => ({}));
+                this.items = this.items.filter((i) => i.key !== a.key);
+                if (!a.read) this.unread = Math.max(0, this.unread - 1);
+                this.say(data.message || act.done || 'Done');
+                this.poll();
+            } catch (e) {
+                this.say('That did not go through — open the product and try there.');
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        say(text, order = false) {
+            this.toast = text;
+            this.toastOrder = order;
+            clearTimeout(this._toastTimer);
+            this._toastTimer = setTimeout(() => { this.toast = ''; }, 8000);
         },
 
         /** A new order deserves more than a silent badge. */
         announce(data) {
-            this.toast = 'New order received' + (data.orders ? ` · ${data.orders} today` : '');
-            this.flash();
-            try {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    new Notification('New order', { body: 'A new order just came in.' });
-                }
-            } catch (e) { /* notifications are a bonus, never a requirement */ }
+            this.say('New order received' + (data.orders ? ` · ${data.orders} today` : ''), true);
             clearTimeout(this._toastTimer);
             this._toastTimer = setTimeout(() => { this.toast = ''; }, 12000);
+            this.flash();
+            this.chime();
+            this.desktop('New order', data.orders ? `${data.orders} orders today so far.` : 'A new order just came in.');
+        },
+
+        /** A system pop-up. Phones only show one through the service worker. */
+        async desktop(title, body) {
+            try {
+                if (!('Notification' in window) || Notification.permission !== 'granted') return;
+                // A device signed up for order alerts (Admin → Notifications)
+                // gets the server's push for this order already — one pop-up
+                // is enough.
+                if (localStorage.getItem('adminPush')) return;
+                const options = { body, tag: 'new-order', renotify: true, data: { url: '/admin/orders' } };
+                const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration('/') : null;
+                if (reg) {
+                    await reg.showNotification(title, options);
+                } else {
+                    new Notification(title, options);
+                }
+            } catch (e) { /* notifications are a bonus, never a requirement */ }
+        },
+
+        async askDesktop() {
+            try {
+                await Notification.requestPermission();
+            } catch (e) {}
+            this.canAskDesktop = 'Notification' in window && Notification.permission === 'default';
+        },
+
+        toggleSound() {
+            this.sound = !this.sound;
+            try { localStorage.setItem('adminOrderSound', this.sound ? 'on' : 'off'); } catch (e) {}
+            if (this.sound) this.chime();
+        },
+
+        audio(resume = false) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            this._audio = this._audio || new Ctx();
+            if (resume && this._audio.state === 'suspended') this._audio.resume().catch(() => {});
+            return this._audio;
+        },
+
+        /** Two soft rising notes — no sound file to download or cache. */
+        chime() {
+            if (!this.sound) return;
+            try {
+                const ctx = this.audio(true);
+                if (!ctx) return;
+                [880, 1318.5].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    const at = ctx.currentTime + i * 0.18;
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.0001, at);
+                    gain.gain.exponentialRampToValueAtTime(0.3, at + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.6);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start(at);
+                    osc.stop(at + 0.65);
+                });
+            } catch (e) { /* sound is a bonus too */ }
         },
 
         flash() {

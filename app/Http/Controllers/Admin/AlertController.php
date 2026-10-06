@@ -29,19 +29,10 @@ class AlertController extends Controller
 
         return response()->json([
             'unread' => $list->reject(fn ($a) => $a['read'])->count(),
-            'orders' => \App\Models\Order::whereDate('created_at', today())->count(),
+            // The shop's day, not UTC's — the toast's "N today".
+            'orders' => \App\Support\DateRange::preset('today')->constrain(\App\Models\Order::query())->count(),
             'latestOrderId' => (int) \App\Models\Order::max('id'),
-            'items' => $list->take(12)->map(fn ($a) => [
-                'key' => $a['key'],
-                'title' => $a['title'],
-                'body' => $a['body'],
-                'level' => $a['level'],
-                'url' => $a['url'],
-                // The product's picture on stock/margin/interest alerts.
-                'image' => $a['image'] ?? null,
-                'read' => (bool) $a['read'],
-                'at' => $a['at']?->diffForHumans(),
-            ])->values(),
+            'items' => AdminAlerts::present($list),
         ]);
     }
 
@@ -54,6 +45,11 @@ class AlertController extends Controller
         ]);
 
         $this->markRead($request, [$data['key']]);
+
+        // The bell marks a row read in the background and navigates itself.
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
 
         // Only ever redirect within this site: `url` is submitted by the
         // browser, and following an arbitrary one would make the admin panel an
@@ -68,6 +64,10 @@ class AlertController extends Controller
     public function readAll(Request $request, AdminAlerts $alerts)
     {
         $this->markRead($request, $alerts->all()->pluck('key')->all());
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
 
         return back()->with('success', 'All notifications marked as read.');
     }

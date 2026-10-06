@@ -25,8 +25,9 @@ use App\Services\PushTemplateService;
 class TransitionOrderStatus
 {
     /** Statuses that free the stock an order had reserved. Returned goods are
-     *  intentionally NOT auto-restocked (they may be damaged / need inspection). */
-    protected const RELEASE_STATUSES = ['cancelled'];
+     *  intentionally NOT auto-restocked (they may be damaged / need inspection).
+     *  A partial delivery is a cancellation for this shop (Order::NOT_SALES). */
+    protected const RELEASE_STATUSES = ['cancelled', 'partially_delivered'];
 
     /**
      * @param  string  $by  Who made the change, for the history entry.
@@ -77,14 +78,14 @@ class TransitionOrderStatus
         }
 
         // A parcel that came back was never paid for.
-        if (in_array($status, ['returned', 'cancelled'], true) && $order->payment_status === 'paid') {
+        if (in_array($status, Order::NOT_SALES, true) && $order->payment_status === 'paid') {
             $order->update(['payment_status' => 'unpaid']);
         }
 
         // Points are earned by a delivery that sticks. If a delivered order is
         // later returned or cancelled, take them back — otherwise a returned
         // parcel leaves the customer holding points for a sale that unwound.
-        if ($from === 'delivered' && in_array($status, ['returned', 'cancelled'], true)) {
+        if ($from === 'delivered' && in_array($status, Order::NOT_SALES, true)) {
             app(LoyaltyService::class)->reverseForOrder($order->fresh('customer'));
             app(LoyaltyService::class)->reverseReferralForOrder($order->fresh('customer'));
         }
@@ -93,7 +94,7 @@ class TransitionOrderStatus
         // earned, and they come back whenever the order unwinds — not only
         // from 'delivered'. A cancellation at any stage otherwise leaves them
         // having paid with points for goods that never shipped.
-        if (in_array($status, ['returned', 'cancelled'], true)) {
+        if (in_array($status, Order::NOT_SALES, true)) {
             app(LoyaltyService::class)->refundRedemptionForOrder($order->fresh('customer'));
         }
 

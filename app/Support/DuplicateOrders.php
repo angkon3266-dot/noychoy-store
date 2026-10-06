@@ -34,7 +34,7 @@ final class DuplicateOrders
     public const WINDOW_MINUTES = 10;
 
     /** An order in these states is over; ordering the same again is a new order. */
-    private const CLOSED = ['cancelled', 'returned'];
+    private const CLOSED = Order::NOT_SALES;
 
     public static function enabled(): bool
     {

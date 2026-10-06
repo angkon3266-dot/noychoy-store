@@ -56,7 +56,11 @@ class AdminAlerts
         return $this->all()
             ->map(fn ($a) => $a + ['read' => $read->has($a['key'])])
             ->sortBy([
-                ['read', false],                                  // unread first
+                // Unread first. In this array form the second element is the
+                // DIRECTION, not the value: `false` meant descending, which
+                // put read alerts on top — and with the bell showing twelve,
+                // the unread ones the badge was counting fell off the end.
+                ['read', 'asc'],
                 fn ($a, $b) => $this->weight($b) <=> $this->weight($a),
             ])
             ->values();
@@ -136,7 +140,7 @@ class AdminAlerts
      * be an object. `image` is the product's picture on alerts about one
      * (owner, 2026-09-19), a plain URL string for the same reason.
      */
-    protected function alert(string $key, string $type, string $level, string $title, string $body, ?string $url, $at = null, ?string $image = null): array
+    protected function alert(string $key, string $type, string $level, string $title, string $body, ?string $url, $at = null, ?string $image = null, array $actions = []): array
     {
         return [
             'key' => $key,
@@ -147,23 +151,66 @@ class AdminAlerts
             'url' => $url,
             'at' => $at ? Carbon::parse($at)->getTimestamp() : null,
             'image' => $image,
+            // Buttons answered right in the bell: [{label, url, done}] — each
+            // url takes a POST, `done` is what to say once it has.
+            'actions' => $actions,
         ];
+    }
+
+    /**
+     * The key for a condition that can last for days (the SMS gateway off, a
+     * token expiring). With a fixed key, reading it once silenced it for good
+     * — weeks later a new outage on the same thing never rang. Dated keys
+     * bring it back once a day for as long as it is still true.
+     */
+    protected function dailyKey(string $key): string
+    {
+        return $key.'.'.now(config('store.timezone') ?: config('app.timezone'))->format('Ymd');
+    }
+
+    /** Alerts as the bell's script reads them: plain values, `at` as "5 minutes ago". */
+    public static function present(Collection $alerts, int $limit = 12): array
+    {
+        return $alerts->take($limit)->map(fn ($a) => [
+            'key' => $a['key'],
+            'title' => $a['title'],
+            'body' => $a['body'],
+            'level' => $a['level'],
+            'url' => $a['url'],
+            // The product's picture on stock/margin/interest alerts.
+            'image' => $a['image'] ?? null,
+            'actions' => $a['actions'] ?? [],
+            'read' => (bool) $a['read'],
+            'at' => $a['at']?->diffForHumans(),
+        ])->values()->all();
     }
 
     // ── Stock ────────────────────────────────────────────────────────────────
 
+    /**
+     * A published product that has sold out asks what to do with it (owner,
+     * 6 Oct 2026): take it off the shop, or keep it up and take pre-orders.
+     * Either answer clears the alert by itself. A pre-order is sellable at
+     * zero stock, so it is not "out" at all.
+     */
     protected function outOfStock(): array
     {
         return $this->guard(fn () => Product::where('status', 'published')
             ->where('manage_stock', true)->where('stock_quantity', '<=', 0)
+            ->where(fn ($q) => $q->where('is_preorder', false)->orWhereNull('is_preorder'))
+            ->whereDoesntHave('category', fn ($q) => $q->where('is_preorder', true))
             ->orderByDesc('updated_at')->limit(self::PER_SOURCE)
             ->with('images')
-            ->get(['id', 'name', 'slug', 'updated_at'])
+            ->get(['id', 'name', 'slug', 'category_id', 'updated_at'])
             ->map(fn ($p) => $this->alert(
                 "stock.out.{$p->id}", 'stock', 'urgent',
-                "{$p->name} is out of stock",
-                'Published and unbuyable — restock it or set it to draft.',
+                "{$p->name} is sold out",
+                'Take it off the shop, or keep it up and take pre-orders?',
                 route('admin.products.edit', $p), $p->updated_at, ProductThumbs::url($p),
+                [
+                    ['label' => 'Move to draft', 'url' => route('admin.products.sold-out', [$p, 'draft']), 'done' => 'Moved to draft'],
+                    ['label' => 'Take pre-orders', 'url' => route('admin.products.sold-out', [$p, 'preorder']), 'done' => 'Taking pre-orders'],
+                ],
             ))->all());
     }
 
@@ -346,7 +393,7 @@ class AdminAlerts
 
                 if ($recent > 0) {
                     $out[] = $this->alert(
-                        'integration.sms.off', 'money', 'urgent',
+                        $this->dailyKey('integration.sms.off'), 'money', 'urgent',
                         'SMS is not sending — '.$recent.' message(s) were dropped',
                         'Order confirmations, review requests and cart reminders are all going nowhere. Check the gateway credentials.',
                         route('admin.system-config.integrations'), now(),
@@ -368,7 +415,7 @@ class AdminAlerts
                 // failing is the gateway, not the customers.
                 if ($total >= 5 && $failed / max(1, $total) > 0.5) {
                     $out[] = $this->alert(
-                        'integration.sms.failing', 'money', 'urgent',
+                        $this->dailyKey('integration.sms.failing'), 'money', 'urgent',
                         $failed.' of '.$total.' SMS failed in the last day',
                         'That is a gateway problem, not bad numbers — customers are not hearing from you.',
                         route('admin.sms.index'), now(),
@@ -384,7 +431,7 @@ class AdminAlerts
 
             if ($unbooked > 0) {
                 $out[] = $this->alert(
-                    'integration.courier.unbooked', 'orders', 'urgent',
+                    $this->dailyKey('integration.courier.unbooked'), 'orders', 'urgent',
                     $unbooked.' order(s) still have no courier consignment',
                     'They have been waiting over a day. Either the booking failed or nobody pressed send.',
                     // Both statuses, because both are counted above — the link
@@ -413,7 +460,7 @@ class AdminAlerts
             }
 
             return [$this->alert(
-                'sms.low', 'money', 'urgent',
+                $this->dailyKey('sms.low'), 'money', 'urgent',
                 'SMS credit is low ('.$amount.')',
                 'Order confirmations and login OTPs stop silently when this runs out.',
                 route('admin.sms.index'), now(),
@@ -451,7 +498,7 @@ class AdminAlerts
                 : 'Automatic renewal has not succeeded yet ('.($days !== null ? $days.' day'.($days === 1 ? '' : 's').' left' : 'a few days left').'). It will keep retrying daily — reconnect now if you would rather not wait.';
 
             return [$this->alert(
-                'meta.token_expiring', 'integration', $health === 'expired' ? 'urgent' : 'warning',
+                $this->dailyKey('meta.token_expiring'), 'integration', $health === 'expired' ? 'urgent' : 'warning',
                 $health === 'expired' ? 'Facebook connection has expired' : 'Facebook connection expires soon',
                 $body,
                 route('admin.meta.index'), now(),

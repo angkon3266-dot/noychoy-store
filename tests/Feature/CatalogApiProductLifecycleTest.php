@@ -68,8 +68,8 @@ class CatalogApiProductLifecycleTest extends TestCase
         $this->assertTrue($product->manage_stock);
         $this->assertNotNull($product->serial, 'createUnique should assign a display serial');
 
-        // A draft never shows on the storefront.
-        $this->get('/product/moonstone-drops')->assertNotFound();
+        // A draft never shows on the storefront; its link lands on the shop.
+        $this->get('/product/moonstone-drops')->assertRedirect(route('shop'));
     }
 
     public function test_rest_rejects_an_unknown_category_with_guidance(): void
@@ -119,7 +119,7 @@ class CatalogApiProductLifecycleTest extends TestCase
 
         $this->mcp('delete_product', ['product' => $slug, 'confirm' => true])->assertOk();
         $this->assertSoftDeleted('products', ['slug' => $slug]);
-        $this->get('/product/'.$slug)->assertNotFound();
+        $this->get('/product/'.$slug)->assertRedirect(route('shop'));
     }
 
     public function test_mcp_delete_requires_explicit_confirmation(): void

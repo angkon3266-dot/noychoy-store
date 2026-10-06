@@ -367,11 +367,6 @@
                 @php
                     $alertList = app(\App\Services\AdminAlerts::class)->for(auth()->user());
                     $alertUnread = $alertList->reject(fn ($a) => $a['read'])->count();
-                    $alertTone = [
-                        'urgent' => 'bg-red-500',
-                        'warning' => 'bg-amber-500',
-                        'info' => 'bg-sky-500',
-                    ];
                 @endphp
                 {{-- Everything wanting attention, in one place. Alerts are derived
                      from live data, so one disappears by itself once it's dealt
@@ -383,7 +378,7 @@
                      inside a drawer that was off the screen. One instance only —
                      a second would poll the feed twice. --}}
                 <div class="relative shrink-0"
-                     x-data="adminAlerts({ feed: '{{ route('admin.alerts.feed') }}', unread: {{ $alertUnread }}, latestOrderId: {{ (int) \App\Models\Order::max('id') }} })"
+                     x-data="adminAlerts({ feed: '{{ route('admin.alerts.feed') }}', read: '{{ route('admin.alerts.read') }}', readAll: '{{ route('admin.alerts.read-all') }}', unread: {{ $alertUnread }}, items: @js(\App\Services\AdminAlerts::present($alertList)), latestOrderId: {{ (int) \App\Models\Order::max('id') }} })"
                      x-init="start()"
                      @click.outside="bell = false" @keydown.escape.window="bell = false">
                     <button type="button" @click="bell = !bell"
@@ -399,77 +394,68 @@
                     </button>
 
                     <div x-show="bell" x-cloak x-transition
-                         class="sb-pop absolute right-0 top-11 z-50 w-[22rem] max-h-[70vh] overflow-y-auto rounded-xl border border-ink-100 bg-white text-ink-900 shadow-2xl">
-                        <div class="flex items-center justify-between px-4 py-2.5 border-b border-ink-100 sticky top-0 bg-white">
+                         class="sb-pop absolute right-0 top-11 z-50 w-[22rem] max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto rounded-xl border border-ink-100 bg-white text-ink-900 shadow-2xl">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-ink-100 sticky top-0 bg-white z-10">
                             <span class="text-sm font-semibold">Notifications</span>
-                            @if($alertUnread > 0)
-                                <form method="POST" action="{{ route('admin.alerts.read-all') }}">
-                                    @csrf
-                                    <button class="text-xs text-gold-700 hover:underline">Mark all read</button>
-                                </form>
-                            @endif
+                            <div class="flex items-center gap-3">
+                                {{-- New orders chime unless this is switched off
+                                     (kept per browser). --}}
+                                <button type="button" @click="toggleSound()" class="text-xs text-ink-700/60 hover:text-ink-900"
+                                        :title="sound ? 'New-order sound is on' : 'New-order sound is off'"
+                                        x-text="sound ? '🔔 Sound on' : '🔕 Sound off'"></button>
+                                <button type="button" x-show="unread > 0" x-cloak @click="readAll()"
+                                        class="text-xs text-gold-700 hover:underline">Mark all read</button>
+                            </div>
                         </div>
 
-                        {{-- Live rows (from the poll). The server-rendered list
-                             below stays as the no-JS / first-paint fallback. --}}
-                        <template x-if="items.length">
-                            <div>
-                                <template x-for="a in items" :key="a.key">
-                                    <form method="POST" action="{{ route('admin.alerts.read') }}" class="block border-b border-ink-50 last:border-0">
-                                        @csrf
-                                        <input type="hidden" name="key" :value="a.key">
-                                        <input type="hidden" name="url" :value="a.url">
-                                        <button class="w-full text-left px-4 py-3 hover:bg-ink-50 transition flex gap-3" :class="a.read && 'opacity-45'">
-                                            <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                                                  :class="a.read ? 'bg-ink-300' : (a.level === 'urgent' ? 'bg-red-500' : (a.level === 'warning' ? 'bg-amber-500' : 'bg-sky-500'))"></span>
-                                            <template x-if="a.image">
-                                                <img :src="a.image" alt="" loading="lazy" class="h-10 w-10 shrink-0 rounded object-cover bg-ink-50">
-                                            </template>
-                                            <span class="min-w-0">
-                                                <span class="block text-sm font-medium" x-text="a.title"></span>
-                                                <span class="block text-xs text-ink-700/60 mt-0.5" x-text="a.body"></span>
-                                                <span class="block text-[11px] text-ink-700/40 mt-1" x-text="a.at"></span>
-                                            </span>
-                                        </button>
-                                    </form>
+                        {{-- Desktop pop-ups need the browser's permission, and
+                             asking has to come from a click. --}}
+                        <button type="button" x-show="canAskDesktop" x-cloak @click="askDesktop()"
+                                class="block w-full text-left px-4 py-2 text-xs bg-gold-50 text-gold-800 hover:bg-gold-100 border-b border-ink-50">
+                            Show new orders as pop-ups on this computer →
+                        </button>
+
+                        <template x-for="a in items" :key="a.key">
+                            <div class="border-b border-ink-50 last:border-0" :class="a.read && 'opacity-45'">
+                                <button type="button" @click="open(a)" class="w-full text-left px-4 pt-3 hover:bg-ink-50 transition flex gap-3"
+                                        :class="a.actions && a.actions.length ? 'pb-1' : 'pb-3'">
+                                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                                          :class="a.read ? 'bg-ink-300' : (a.level === 'urgent' ? 'bg-red-500' : (a.level === 'warning' ? 'bg-amber-500' : 'bg-sky-500'))"></span>
+                                    <template x-if="a.image">
+                                        <img :src="a.image" alt="" loading="lazy" class="h-10 w-10 shrink-0 rounded object-cover bg-ink-50">
+                                    </template>
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-medium" x-text="a.title"></span>
+                                        <span class="block text-xs text-ink-700/60 mt-0.5" x-text="a.body"></span>
+                                        <span class="block text-[11px] text-ink-700/40 mt-1" x-text="a.at"></span>
+                                    </span>
+                                </button>
+                                {{-- Answered right here, e.g. a sold-out product:
+                                     draft it, or take pre-orders. --}}
+                                <template x-if="a.actions && a.actions.length">
+                                    <div class="flex flex-wrap gap-2 px-4 pb-3 pl-9">
+                                        <template x-for="act in a.actions" :key="act.url">
+                                            <button type="button" @click="run(a, act)" :disabled="busy"
+                                                    class="rounded-full border border-gold-300 px-3 py-1 text-xs font-medium text-gold-800 hover:bg-gold-50 disabled:opacity-50"
+                                                    x-text="act.label"></button>
+                                        </template>
+                                    </div>
                                 </template>
                             </div>
                         </template>
 
-                        <div x-show="!items.length">
-                        @forelse($alertList as $a)
-                            <form method="POST" action="{{ route('admin.alerts.read') }}" class="block border-b border-ink-50 last:border-0">
-                                @csrf
-                                <input type="hidden" name="key" value="{{ $a['key'] }}">
-                                <input type="hidden" name="url" value="{{ $a['url'] }}">
-                                <button class="w-full text-left px-4 py-3 hover:bg-ink-50 transition flex gap-3 {{ $a['read'] ? 'opacity-45' : '' }}">
-                                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $a['read'] ? 'bg-ink-300' : ($alertTone[$a['level']] ?? 'bg-ink-400') }}"></span>
-                                    @if(! empty($a['image']))
-                                        <img src="{{ $a['image'] }}" alt="" loading="lazy" class="h-10 w-10 shrink-0 rounded object-cover bg-ink-50">
-                                    @endif
-                                    <span class="min-w-0">
-                                        <span class="block text-sm font-medium">{{ $a['title'] }}</span>
-                                        <span class="block text-xs text-ink-700/60 mt-0.5">{{ $a['body'] }}</span>
-                                        @if($a['at'])
-                                            <span class="block text-[11px] text-ink-700/40 mt-1">{{ $a['at']->diffForHumans() }}</span>
-                                        @endif
-                                    </span>
-                                </button>
-                            </form>
-                        @empty
-                            <p class="px-4 py-8 text-center text-sm text-ink-700/50">Nothing needs your attention.</p>
-                        @endforelse
-                        </div>
+                        <p x-show="!items.length" class="px-4 py-8 text-center text-sm text-ink-700/50">Nothing needs your attention.</p>
                     </div>
 
                     {{-- New-order toast: appears the moment the poll sees an id
-                         higher than the one this page was rendered with. --}}
+                         higher than the one this page was rendered with. Also
+                         says how an answer given in the bell went. --}}
                     <div x-show="toast" x-cloak x-transition
                          class="sb-pop absolute right-0 top-11 z-[60] w-72 rounded-xl bg-ink-900 text-white shadow-2xl px-4 py-3 flex items-start gap-3">
-                        <span class="text-xl leading-none">🛎️</span>
+                        <span class="text-xl leading-none" x-text="toastOrder ? '🛎️' : '✓'"></span>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-semibold" x-text="toast"></p>
-                            <a href="{{ route('admin.orders.index') }}" class="text-xs text-gold-300 hover:underline">Open orders →</a>
+                            <a x-show="toastOrder" href="{{ route('admin.orders.index') }}" class="text-xs text-gold-300 hover:underline">Open orders →</a>
                         </div>
                         <button type="button" @click="toast = ''" class="text-white/50 hover:text-white leading-none">&times;</button>
                     </div>

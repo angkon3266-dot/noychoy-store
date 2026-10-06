@@ -16,7 +16,14 @@ class Order extends Model
     public const SOURCES = ['web', 'chat', 'admin'];
 
     /** Orders that are not sales: no money came in, so no revenue, profit or spend. */
-    public const NOT_SALES = ['cancelled', 'returned'];
+    /**
+     * Orders that are not sales: no revenue, no profit, not in the customer's
+     * spend, stock back on the shelf (except returns, which are inspected).
+     * A partial delivery counts as a cancellation here (owner, 6 Oct 2026) -
+     * in practice the customer refuses the piece and pays only the delivery
+     * charge.
+     */
+    public const NOT_SALES = ['cancelled', 'returned', 'partially_delivered'];
 
     public const STATUSES = [
         'pending' => 'Pending',
@@ -45,7 +52,7 @@ class Order extends Model
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'card_message', 'is_gift', 'source', 'stock_restored',
         'source_channel', 'source_campaign', 'source_content', 'source_referrer', 'first_touch_channel', 'landing_path',
-        'abandoned_cart_id',
+        'abandoned_cart_id', 'device', 'browser',
     ];
 
     protected $casts = [
@@ -100,11 +107,13 @@ class Order extends Model
 
         return match (true) {
             str_contains($s, 'cancel') => 'cancelled',
-            // A partial delivery is NOT a cancellation. Treating it as one put
-            // the whole order's stock back on the shelf and erased the money
-            // the courier actually collected from every report. It gets its own
-            // status so the owner can settle the difference deliberately.
-            str_contains($s, 'partial') => 'partially_delivered',
+            // A partial delivery is a cancellation for this shop (owner, 6 Oct
+            // 2026): the customer refuses the piece and pays the rider only the
+            // delivery charge. From 19 Sep to 6 Oct it had its own status and
+            // was counted as a full sale with its stock still out; now the
+            // order is cancelled, its stock comes back and its money leaves
+            // the reports. The shipment keeps the courier's own wording.
+            str_contains($s, 'partial') => 'cancelled',
             str_contains($s, 'delivered') => 'delivered',
             default => null,
         };

@@ -270,7 +270,7 @@ class MetaTokenRefreshTest extends TestCase
 
         $keys = $this->alerts()->all()->pluck('key')->all();
 
-        $this->assertNotContains('meta.token_expiring', $keys);
+        $this->assertEmpty(array_filter($keys, fn ($k) => str_starts_with($k, 'meta.token_expiring')));
     }
 
     public function test_a_warning_alert_appears_once_renewal_has_not_kept_up(): void
@@ -279,7 +279,8 @@ class MetaTokenRefreshTest extends TestCase
         // has been trying and failing, not "everything is fine, just early".
         $this->connectOauth(5);
 
-        $alert = $this->alerts()->all()->firstWhere('key', 'meta.token_expiring');
+        // Dated since 6 Oct 2026, so a lasting problem rings again each day.
+        $alert = $this->alerts()->all()->first(fn ($a) => str_starts_with($a['key'], 'meta.token_expiring'));
 
         $this->assertNotNull($alert);
         $this->assertSame('warning', $alert['level']);
@@ -289,7 +290,8 @@ class MetaTokenRefreshTest extends TestCase
     {
         $this->connectOauth(-1);
 
-        $alert = $this->alerts()->all()->firstWhere('key', 'meta.token_expiring');
+        // Dated since 6 Oct 2026, so a lasting problem rings again each day.
+        $alert = $this->alerts()->all()->first(fn ($a) => str_starts_with($a['key'], 'meta.token_expiring'));
 
         $this->assertNotNull($alert);
         $this->assertSame('urgent', $alert['level']);
@@ -303,13 +305,13 @@ class MetaTokenRefreshTest extends TestCase
 
         $keys = $this->alerts()->all()->pluck('key')->all();
 
-        $this->assertNotContains('meta.token_expiring', $keys);
+        $this->assertEmpty(array_filter($keys, fn ($k) => str_starts_with($k, 'meta.token_expiring')));
     }
 
     public function test_no_alert_when_nothing_is_connected(): void
     {
         $keys = $this->alerts()->all()->pluck('key')->all();
 
-        $this->assertNotContains('meta.token_expiring', $keys);
+        $this->assertEmpty(array_filter($keys, fn ($k) => str_starts_with($k, 'meta.token_expiring')));
     }
 }

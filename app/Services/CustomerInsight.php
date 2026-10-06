@@ -67,7 +67,11 @@ class CustomerInsight
         $orderStatus = strtolower((string) $order->status);
 
         foreach ([$shipmentStatus, $orderStatus] as $s) {
-            if (str_contains($s, 'deliver') && ! str_contains($s, 'partial')) {
+            // A partial delivery is a cancellation for this shop.
+            if (str_contains($s, 'partial')) {
+                return 'cancelled';
+            }
+            if (str_contains($s, 'deliver')) {
                 return 'delivered';
             }
             if (str_contains($s, 'return')) {

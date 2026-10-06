@@ -156,7 +156,7 @@ class NormalizePhones extends Command
         });
 
         // Totals are derived from orders, so recompute after re-pointing them.
-        $orders = Order::where('customer_id', $keep->id)->whereNotIn('status', ['cancelled', 'returned']);
+        $orders = Order::where('customer_id', $keep->id)->whereNotIn('status', Order::NOT_SALES);
         $keep->forceFill([
             'total_orders' => (clone $orders)->count(),
             'total_spent' => (clone $orders)->sum('total'),

@@ -35,6 +35,22 @@
     </div>
 @endif
 
+{{-- Sold out and still on the shop: the same question the bell asks (owner,
+     6 Oct 2026). Outside the main form — forms cannot nest. --}}
+@if($product->exists && $product->status === 'published' && $product->manage_stock && (int) $product->stock_quantity <= 0 && ! $product->isPreorder())
+    <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 text-sm mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p class="flex-1 min-w-[14rem]"><span class="font-semibold">This product is sold out.</span> Take it off the shop, or keep it up and take pre-orders?</p>
+        <div class="flex gap-2">
+            <form method="POST" action="{{ route('admin.products.sold-out', [$product, 'draft']) }}">@csrf
+                <button class="btn-outline text-sm py-1.5">Move to draft</button>
+            </form>
+            <form method="POST" action="{{ route('admin.products.sold-out', [$product, 'preorder']) }}">@csrf
+                <button class="btn-primary text-sm py-1.5">Take pre-orders</button>
+            </form>
+        </div>
+    </div>
+@endif
+
 @php
     $vType = old('product_type', $product->has_variants ? 'variable' : 'simple');
     $vAttributes = collect(old('attributes', collect($product->options ?? [])->map(fn ($o) => ['name' => $o['name'] ?? '', 'values' => implode(', ', $o['values'] ?? [])])->all()))->values();

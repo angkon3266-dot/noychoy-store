@@ -183,7 +183,7 @@ class HomeController extends Controller
 
         if ($best->count() < $limit) {
             $topIds = OrderItem::query()
-                ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['cancelled', 'returned']))
+                ->whereHas('order', fn ($q) => $q->whereNotIn('status', \App\Models\Order::NOT_SALES))
                 ->whereNotNull('product_id')
                 ->select('product_id', DB::raw('SUM(quantity) as q'))
                 ->groupBy('product_id')->orderByDesc('q')

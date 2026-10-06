@@ -248,6 +248,76 @@ class AdminAlertsTest extends TestCase
         $this->assertNotEmpty($keys);
     }
 
+    public function test_unread_alerts_come_before_read_ones(): void
+    {
+        $admin = $this->admin();
+        $first = $this->product(['name' => 'First Ring', 'manage_stock' => true, 'stock_quantity' => 0]);
+        $second = $this->product(['name' => 'Second Ring', 'manage_stock' => true, 'stock_quantity' => 0]);
+        AdminAlertRead::create(['user_id' => $admin->id, 'alert_key' => "stock.out.{$first->id}", 'created_at' => now()]);
+
+        $list = $this->alerts()->for($admin)->values();
+
+        $this->assertFalse($list->first()['read'], 'an unread alert was sorted below a read one');
+        $this->assertSame("stock.out.{$second->id}", $list->first()['key']);
+    }
+
+    public function test_a_sold_out_product_asks_draft_or_pre_order_and_a_pre_order_is_not_sold_out(): void
+    {
+        $sold = $this->product(['manage_stock' => true, 'stock_quantity' => 0]);
+        $preorder = $this->product(['manage_stock' => true, 'stock_quantity' => 0, 'is_preorder' => true]);
+
+        $alerts = $this->alerts()->all()->keyBy('key');
+
+        $actions = collect($alerts["stock.out.{$sold->id}"]['actions'])->pluck('label')->all();
+        $this->assertSame(['Move to draft', 'Take pre-orders'], $actions);
+        $this->assertFalse($alerts->has("stock.out.{$preorder->id}"));
+    }
+
+    public function test_answering_from_the_bell_drafts_or_opens_pre_orders(): void
+    {
+        $admin = $this->admin();
+        $a = $this->product(['manage_stock' => true, 'stock_quantity' => 0]);
+        $b = $this->product(['manage_stock' => true, 'stock_quantity' => 0]);
+
+        $this->actingAs($admin)->postJson(route('admin.products.sold-out', [$a, 'draft']))->assertOk()->assertJsonPath('ok', true);
+        $this->actingAs($admin)->postJson(route('admin.products.sold-out', [$b, 'preorder']))->assertOk();
+
+        $this->assertSame('draft', $a->fresh()->status);
+        $this->assertTrue((bool) $b->fresh()->is_preorder);
+        $this->assertSame('published', $b->fresh()->status);
+        $this->assertSame([], array_values(array_filter($this->keys($admin), fn ($k) => str_starts_with($k, 'stock.out.'))));
+    }
+
+    public function test_the_product_page_asks_too_while_it_is_sold_out(): void
+    {
+        $p = $this->product(['manage_stock' => true, 'stock_quantity' => 0]);
+
+        $this->actingAs($this->admin())->get(route('admin.products.edit', $p))->assertOk()
+            ->assertSee('This product is sold out.')
+            ->assertSee(route('admin.products.sold-out', [$p, 'preorder']), false);
+
+        $p->update(['stock_quantity' => 4]);
+        $this->actingAs($this->admin())->get(route('admin.products.edit', $p))->assertOk()
+            ->assertDontSee('This product is sold out.');
+    }
+
+    public function test_a_lasting_problem_rings_again_the_next_day(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-06 08:00:00', 'UTC'));
+        $alerts = new class extends AdminAlerts
+        {
+            public function key(string $k): string
+            {
+                return $this->dailyKey($k);
+            }
+        };
+        $today = $alerts->key('sms.low');
+
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-07 08:00:00', 'UTC'));
+
+        $this->assertNotSame($today, $alerts->key('sms.low'));
+    }
+
     public function test_the_bell_renders_in_the_admin_layout(): void
     {
         $this->product(['manage_stock' => true, 'stock_quantity' => 0]);
@@ -255,7 +325,8 @@ class AdminAlertsTest extends TestCase
         $html = $this->actingAs($this->admin())->get('/admin')->assertOk()->getContent();
 
         $this->assertStringContainsString('aria-label="Notifications"', $html);
-        $this->assertStringContainsString('is out of stock', $html);
+        $this->assertStringContainsString('is sold out', $html);
+        $this->assertStringContainsString('Take pre-orders', $html);
     }
 
     protected function order(string $number, string $status): Order

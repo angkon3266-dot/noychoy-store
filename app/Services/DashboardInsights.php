@@ -186,7 +186,7 @@ class DashboardInsights
     /** Orders that count as real sales — the same rule as DashboardAnalytics::sold(). */
     protected function sold()
     {
-        return Order::whereNotIn('orders.status', ['cancelled', 'returned']);
+        return Order::whereNotIn('orders.status', Order::NOT_SALES);
     }
 
     /** Order lines on sold orders in the window, with the order joined on. */
@@ -196,7 +196,7 @@ class DashboardInsights
             OrderItem::query()
                 ->join('orders', 'orders.id', '=', 'order_items.order_id')
                 ->whereNull('orders.deleted_at')
-                ->whereNotIn('orders.status', ['cancelled', 'returned']),
+                ->whereNotIn('orders.status', Order::NOT_SALES),
             'orders.created_at',
         );
     }
@@ -596,7 +596,7 @@ class DashboardInsights
             ->keyBy(fn ($r) => (int) (bool) $r->is_inside_dhaka);
 
         $outcomes = $range->constrain(Order::query())
-            ->whereIn('status', ['delivered', 'cancelled', 'returned'])
+            ->whereIn('status', ['delivered', 'cancelled', 'returned', 'partially_delivered'])
             ->selectRaw('is_inside_dhaka, status, COUNT(*) as n')
             ->groupBy('is_inside_dhaka', 'status')->get()
             ->groupBy(fn ($r) => (int) (bool) $r->is_inside_dhaka);
@@ -609,7 +609,9 @@ class DashboardInsights
 
             $counts = collect($outcomes[$flag] ?? [])->pluck('n', 'status');
             $delivered = (int) ($counts['delivered'] ?? 0);
-            $resolved = $delivered + (int) ($counts['cancelled'] ?? 0) + (int) ($counts['returned'] ?? 0);
+            // A partial delivery is a cancellation for this shop.
+            $resolved = $delivered + (int) ($counts['cancelled'] ?? 0) + (int) ($counts['returned'] ?? 0)
+                + (int) ($counts['partially_delivered'] ?? 0);
 
             $out[$key] = [
                 'orders' => $orders,
@@ -883,7 +885,7 @@ class DashboardInsights
                 ->groupBy('channel')->get()->keyBy('channel');
 
             $outcomes = $range->constrain(Order::query(), 'orders.created_at')
-                ->whereIn('orders.status', ['delivered', 'cancelled', 'returned'])
+                ->whereIn('orders.status', ['delivered', 'cancelled', 'returned', 'partially_delivered'])
                 ->selectRaw("{$channel} as channel, orders.status as status, COUNT(*) as n")
                 ->groupBy('channel', 'orders.status')->get()
                 ->groupBy('channel');
@@ -903,7 +905,8 @@ class DashboardInsights
                 $firstTime = (int) ($s->first_time ?? 0);
 
                 $delivered = (int) ($counts['delivered'] ?? 0);
-                $cancelled = (int) ($counts['cancelled'] ?? 0);
+                // A partial delivery is a cancellation for this shop.
+                $cancelled = (int) ($counts['cancelled'] ?? 0) + (int) ($counts['partially_delivered'] ?? 0);
                 $returned = (int) ($counts['returned'] ?? 0);
                 $resolved = $delivered + $cancelled + $returned;
 
@@ -998,7 +1001,7 @@ class DashboardInsights
             $allTime = OrderItem::query()
                 ->join('orders', 'orders.id', '=', 'order_items.order_id')
                 ->whereNull('orders.deleted_at')
-                ->whereNotIn('orders.status', ['cancelled', 'returned'])
+                ->whereNotIn('orders.status', Order::NOT_SALES)
                 ->whereIn('order_items.product_id', $ids)
                 ->selectRaw('order_items.product_id as product_id, SUM(order_items.quantity) as qty')
                 ->groupBy('order_items.product_id')->pluck('qty', 'product_id');

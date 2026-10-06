@@ -176,6 +176,40 @@ class DashboardRangeTest extends TestCase
     }
 
     /** The stats array the dashboard rendered for a given period. */
+    // ── 6 Oct 2026: opens on Today, in the shop's own day ────────────────────
+
+    public function test_the_dashboard_opens_on_today(): void
+    {
+        $range = $this->actingAs($this->admin())->get('/admin')->assertOk()->viewData('range');
+
+        $this->assertSame('today', $range->key);
+    }
+
+    public function test_today_is_the_shops_day_not_utcs(): void
+    {
+        // 01:30 on 7 Oct in Dhaka is still 6 Oct in UTC.
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-06 19:30:00', 'UTC'));
+
+        $this->order('2026-10-06 18:30:00', 100);   // 00:30 Dhaka, 7 Oct — today
+        $this->order('2026-10-06 17:30:00', 500);   // 23:30 Dhaka, 6 Oct — yesterday
+
+        $today = $this->dashboard('today');
+        $this->assertSame(100.0, (float) $today['sales_period']);
+        $this->assertSame(100.0, (float) $today['sales_today']);
+        $this->assertSame(500.0, (float) $this->dashboard('yesterday')['sales_period']);
+    }
+
+    public function test_a_partially_delivered_order_is_not_a_sale(): void
+    {
+        $this->travelTo(now()->startOfDay()->addHours(12));
+        $this->order(now()->subHour()->toDateTimeString(), 700, 'partially_delivered');
+        $this->order(now()->subHour()->toDateTimeString(), 300, 'delivered');
+
+        $stats = $this->dashboard('today');
+        $this->assertSame(300.0, (float) $stats['sales_period']);
+        $this->assertSame(1, $stats['orders_period']);
+    }
+
     protected function dashboard(string $period, array $extra = []): array
     {
         $response = $this->actingAs($this->admin())
