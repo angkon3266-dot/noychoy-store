@@ -15,7 +15,7 @@ dossier it came from.
 
 ## Working copy
 
-Work from **`E:\G Drive\ClaudeWorkspace\noychoy-store`**. It is the canonical
+Work from **`C:\Users\shami\OneDrive\Desktop\Claude new workspace\noychoy-store`**. It is the canonical
 copy.
 
 A second copy exists at `C:\Users\shami\OneDrive\Desktop\Woo Automation\noychoy-store`.
