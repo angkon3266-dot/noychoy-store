@@ -137,7 +137,14 @@ class CollectionMenuTest extends TestCase
         // compiled to "(published AND pivot) OR primary" and shipped drafts.
         $csv = $this->get('/feed/meta.csv?category=rings')->assertOk()->streamedContent();
 
-        $this->assertStringContainsString('Live ring', $csv);
-        $this->assertStringNotContainsString('Draft ring', $csv);
+        // The draft is listed only to keep it out of ads: archived, never active.
+        $lines = collect(explode("
+", trim($csv)))->map(fn ($l) => str_getcsv($l));
+        $cols = $lines->shift();
+        $rows = $lines->map(fn ($r) => array_combine($cols, array_pad($r, count($cols), '')))->keyBy('title');
+
+        $this->assertSame('active', $rows['Live ring']['status']);
+        $this->assertSame('archived', $rows['Draft ring']['status']);
+        $this->assertSame('out of stock', $rows['Draft ring']['availability']);
     }
 }

@@ -159,4 +159,61 @@ class MetaFeedTest extends TestCase
 
         $this->assertStringEndsWith('/storage/product-videos/necklace.mp4', $row['video[0].url']);
     }
+
+    /**
+     * Leaving a draft out of the file never took it out of the catalogue — an
+     * "update" feed schedule keeps what it stops seeing, so drafts kept showing
+     * in catalogue ads. Every withdrawn product is listed as archived instead.
+     */
+    public function test_drafts_archived_and_deleted_products_go_out_archived(): void
+    {
+        $live = $this->product('Live Ring');
+        $draft = $this->product('Draft Ring', ['status' => 'draft']);
+        $archived = $this->product('Old Ring', ['status' => 'archived']);
+        $deleted = $this->product('Gone Ring');
+        $deleted->delete();
+
+        $rows = collect($this->rows())->keyBy('id');
+
+        $this->assertSame('active', $rows[meta_content_id($live)]['status']);
+        $this->assertSame('in stock', $rows[meta_content_id($live)]['availability']);
+
+        foreach ([$draft, $archived, $deleted] as $p) {
+            $this->assertSame('archived', $rows[meta_content_id($p)]['status'], $p->name);
+            $this->assertSame('out of stock', $rows[meta_content_id($p)]['availability'], $p->name);
+        }
+
+        // Live rows lead the file.
+        $this->assertSame(meta_content_id($live), $rows->keys()->first());
+    }
+
+    public function test_a_draft_variable_product_archives_every_variant_row(): void
+    {
+        $product = $this->product('Draft Bangle', ['has_variants' => true, 'status' => 'draft']);
+        $variant = ProductVariant::create(['product_id' => $product->id, 'attributes' => ['Size' => 'S'], 'price' => 900, 'stock_quantity' => 4]);
+
+        $row = collect($this->rows())->firstWhere('id', meta_content_id($product, $variant));
+
+        $this->assertSame('archived', $row['status']);
+        $this->assertSame('out of stock', $row['availability']);
+    }
+
+    public function test_publishing_a_draft_again_makes_its_row_active(): void
+    {
+        $product = $this->product('Comeback Ring', ['status' => 'draft']);
+        $product->update(['status' => 'published']);
+
+        $this->assertSame('active', collect($this->rows())->firstWhere('id', meta_content_id($product))['status']);
+    }
+
+    public function test_the_google_feed_still_leaves_drafts_out(): void
+    {
+        $this->product('Live Ring');
+        $this->product('Draft Ring', ['status' => 'draft']);
+
+        $xml = $this->get('/feed/google.xml')->assertOk()->streamedContent();
+
+        $this->assertStringContainsString('Live Ring', $xml);
+        $this->assertStringNotContainsString('Draft Ring', $xml);
+    }
 }

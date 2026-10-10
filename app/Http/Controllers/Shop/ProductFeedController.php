@@ -21,8 +21,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Google — RSS 2.0 XML. Paste the URL into Merchant Center → Data sources →
  * Add products from a file → scheduled fetch.
  *
- * Both walk the same products via publishedProducts(), but the field formats
- * are genuinely different and must not be collapsed into one feed.
+ * Both walk the same published products, but the field formats are genuinely
+ * different and must not be collapsed into one feed. The Meta feed also lists
+ * every withdrawn product as `status: archived` — see metaProducts().
  */
 class ProductFeedController extends Controller
 {
@@ -41,7 +42,7 @@ class ProductFeedController extends Controller
         $currency = config('store.currency', 'BDT');
 
         $columns = array_merge([
-            'id', 'item_group_id', 'title', 'description', 'availability', 'condition',
+            'id', 'item_group_id', 'title', 'description', 'availability', 'status', 'condition',
             'price', 'sale_price', 'sale_price_effective_date', 'link', 'image_link', 'additional_image_link',
             'brand', 'product_type', 'custom_label_0', 'custom_label_1', 'google_product_category',
         ], array_map(fn ($i) => "video[{$i}].url", range(0, self::MAX_VIDEOS - 1)));
@@ -55,7 +56,7 @@ class ProductFeedController extends Controller
             $out = fopen('php://output', 'w');
             fputcsv($out, $columns);
 
-            $this->publishedProducts()
+            $this->metaProducts()
                 ->chunk(200, function ($products) use ($out, $brand, $currency) {
                     foreach ($products as $p) {
                         $images = $p->images;
@@ -63,6 +64,10 @@ class ProductFeedController extends Controller
                         if (! $primary) {
                             continue; // Meta requires an image_link
                         }
+
+                        // A draft, archived or deleted product goes out as an
+                        // archived, out-of-stock row, never just left out.
+                        $live = $p->status === 'published' && ! $p->trashed();
 
                         $cats = $p->categories->pluck('name');
                         $additional = $images->where('id', '!=', $primary->id)->take(10)
@@ -78,7 +83,8 @@ class ProductFeedController extends Controller
                             'item_group_id' => '',
                             'title' => $p->name,
                             'description' => feed_description($p),
-                            'availability' => ($p->isAvailable() || $p->isPreorder()) ? 'in stock' : 'out of stock',
+                            'availability' => $live && ($p->isAvailable() || $p->isPreorder()) ? 'in stock' : 'out of stock',
+                            'status' => $live ? 'active' : 'archived',
                             'condition' => 'new',
                         ], $this->metaPrices(offer_pricing()->quote($p), $currency), [
                             'link' => route('product.show', $p),
@@ -102,7 +108,7 @@ class ProductFeedController extends Controller
                                     'id' => meta_content_id($p, $v),
                                     'item_group_id' => meta_content_id($p),
                                     'title' => trim($p->name.' '.$v->label),
-                                    'availability' => ((int) $v->stock_quantity > 0 || $p->isPreorder()) ? 'in stock' : 'out of stock',
+                                    'availability' => $live && ((int) $v->stock_quantity > 0 || $p->isPreorder()) ? 'in stock' : 'out of stock',
                                     'image_link' => $this->absUrl($v->image?->url ?: $primary->url),
                                 ] + $this->metaPrices(offer_pricing()->quote($p, $v), $currency));
                             }
@@ -295,7 +301,33 @@ class ProductFeedController extends Controller
      */
     protected function publishedProducts(): Builder
     {
-        return Product::published()
+        return $this->inRequestedCategory(Product::published());
+    }
+
+    /**
+     * Every product the Meta feed lists: the published ones, plus each draft,
+     * archived or deleted one as an archived row.
+     *
+     * Leaving a withdrawn product out of the file is not enough. A scheduled
+     * feed on an "update" schedule never deletes what it stops seeing, and an
+     * item the API sync or an older feed put there stays in the catalogue —
+     * so drafts kept running in catalogue ads. `status: archived` is the one
+     * signal Meta honours from any source: the item stays in the catalogue
+     * (its ads history intact) but is never shown in an ad. Publishing the
+     * product again flips it back to active at the next fetch.
+     */
+    protected function metaProducts(): Builder
+    {
+        return $this->inRequestedCategory(Product::withTrashed())
+            // Live rows first, so a reader of the file sees the catalogue
+            // before the withdrawn tail.
+            ->orderByRaw("CASE WHEN status = 'published' AND deleted_at IS NULL THEN 0 ELSE 1 END")
+            ->orderBy('id');
+    }
+
+    protected function inRequestedCategory(Builder $query): Builder
+    {
+        return $query
             ->with(['images', 'category', 'categories', 'variants'])
             ->when(request('category'), function ($q, $slug) {
                 $q->where(fn ($w) => $w->whereHas('categories', fn ($c) => $c->where('slug', $slug))
