@@ -205,15 +205,4 @@ class MetaFeedTest extends TestCase
 
         $this->assertSame('active', collect($this->rows())->firstWhere('id', meta_content_id($product))['status']);
     }
-
-    public function test_the_google_feed_still_leaves_drafts_out(): void
-    {
-        $this->product('Live Ring');
-        $this->product('Draft Ring', ['status' => 'draft']);
-
-        $xml = $this->get('/feed/google.xml')->assertOk()->streamedContent();
-
-        $this->assertStringContainsString('Live Ring', $xml);
-        $this->assertStringNotContainsString('Draft Ring', $xml);
-    }
 }

@@ -204,15 +204,36 @@ class GoogleFeedTest extends TestCase
         $this->assertSame('Gold & Pearl <Ring>', $items[0]['title']);
     }
 
-    public function test_draft_products_stay_out_of_the_feed(): void
+    /**
+     * Leaving a draft out of the file is not a reliable way to take it out of
+     * Merchant Center, and Google has no "archived" — so a withdrawn item goes
+     * out of stock and excluded from every destination instead.
+     */
+    public function test_withdrawn_products_are_listed_switched_off(): void
     {
-        $this->product('Live Ring');
-        $this->product('Hidden Ring', ['status' => 'draft']);
+        $live = $this->product('Live Ring');
+        $draft = $this->product('Hidden Ring', ['status' => 'draft']);
+        $deleted = $this->product('Gone Ring');
+        $deleted->delete();
+        $bangle = $this->product('Draft Bangle', ['has_variants' => true, 'status' => 'archived']);
+        $variant = ProductVariant::create(['product_id' => $bangle->id, 'attributes' => ['Size' => 'S'], 'price' => 900, 'stock_quantity' => 4]);
 
-        $titles = collect($this->items())->pluck('title');
+        $items = collect($this->items())->keyBy('g:id');
 
-        $this->assertContains('Live Ring', $titles);
-        $this->assertNotContains('Hidden Ring', $titles);
+        $this->assertSame('in_stock', $items[meta_content_id($live)]['g:availability']);
+        $this->assertArrayNotHasKey('g:excluded_destination', $items[meta_content_id($live)]);
+
+        foreach ([meta_content_id($draft), meta_content_id($deleted), meta_content_id($bangle, $variant)] as $id) {
+            $this->assertSame('out_of_stock', $items[$id]['g:availability'], $id);
+            $this->assertEqualsCanonicalizing(
+                ['Shopping_ads', 'Display_ads', 'Free_listings', 'YouTube_shopping'],
+                $items[$id]['g:excluded_destination'],
+                $id,
+            );
+        }
+
+        // Live items lead the file.
+        $this->assertSame(meta_content_id($live), $items->keys()->first());
     }
 
     /**

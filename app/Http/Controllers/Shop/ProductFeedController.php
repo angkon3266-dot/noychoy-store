@@ -21,9 +21,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Google — RSS 2.0 XML. Paste the URL into Merchant Center → Data sources →
  * Add products from a file → scheduled fetch.
  *
- * Both walk the same published products, but the field formats are genuinely
- * different and must not be collapsed into one feed. The Meta feed also lists
- * every withdrawn product as `status: archived` — see metaProducts().
+ * Both walk the same products via feedProducts() — withdrawn ones included,
+ * switched off — but the field formats are genuinely different and must not
+ * be collapsed into one feed.
  */
 class ProductFeedController extends Controller
 {
@@ -33,6 +33,13 @@ class ProductFeedController extends Controller
      * actually uses rather than padding 20 empty columns onto the whole feed.
      */
     private const MAX_VIDEOS = 3;
+
+    /**
+     * Every Merchant Center destination a withdrawn product is excluded from,
+     * so it shows nowhere: Shopping ads, Performance Max/Display, the free
+     * listings and YouTube.
+     */
+    private const GOOGLE_DESTINATIONS = ['Shopping_ads', 'Display_ads', 'Free_listings', 'YouTube_shopping'];
 
     public function meta(Request $request): StreamedResponse
     {
@@ -56,7 +63,7 @@ class ProductFeedController extends Controller
             $out = fopen('php://output', 'w');
             fputcsv($out, $columns);
 
-            $this->metaProducts()
+            $this->feedProducts()
                 ->chunk(200, function ($products) use ($out, $brand, $currency) {
                     foreach ($products as $p) {
                         $images = $p->images;
@@ -67,7 +74,7 @@ class ProductFeedController extends Controller
 
                         // A draft, archived or deleted product goes out as an
                         // archived, out-of-stock row, never just left out.
-                        $live = $p->status === 'published' && ! $p->trashed();
+                        $live = $this->isLive($p);
 
                         $cats = $p->categories->pluck('name');
                         $additional = $images->where('id', '!=', $primary->id)->take(10)
@@ -157,7 +164,7 @@ class ProductFeedController extends Controller
                 .$this->el('link', rtrim(config('app.url'), '/').'/')
                 .$this->el('description', store_name().' product catalogue'));
 
-            $this->publishedProducts()
+            $this->feedProducts()
                 ->chunk(200, function ($products) use ($out, $brand, $money, $shippingXml) {
                     foreach ($products as $p) {
                         $images = $p->images;
@@ -165,6 +172,11 @@ class ProductFeedController extends Controller
                         if (! $primary) {
                             continue; // Google requires an image_link
                         }
+
+                        // Google has no "archived": a withdrawn product goes
+                        // out of stock and is excluded from every surface.
+                        $live = $this->isLive($p);
+                        $off = $live ? [] : ['g:availability' => 'out_of_stock', 'g:excluded_destination' => self::GOOGLE_DESTINATIONS];
 
                         $base = [
                             // Same id the Meta feed and the Pixel/CAPI use, so
@@ -193,6 +205,7 @@ class ProductFeedController extends Controller
                             'g:color' => null,
                             'g:size' => null,
                             'g:material' => null,
+                            'g:excluded_destination' => null,
                         ];
 
                         // Variable products: one item per variant, grouped under
@@ -207,7 +220,7 @@ class ProductFeedController extends Controller
 
                                 $quote = offer_pricing()->quote($p, $v);
 
-                                $this->googleItem($out, $base, [
+                                $this->googleItem($out, $base, $off + [
                                     'g:id' => meta_content_id($p, $v),
                                     'g:item_group_id' => meta_content_id($p),
                                     'title' => Str::limit(trim($p->name.' '.$v->label), 150, ''),
@@ -236,7 +249,7 @@ class ProductFeedController extends Controller
 
                         $quote = offer_pricing()->quote($p);
 
-                        $this->googleItem($out, $base, [
+                        $this->googleItem($out, $base, $off + [
                             'g:availability' => ($p->isAvailable() || $p->isPreorder()) ? 'in_stock' : 'out_of_stock',
                             'g:price' => $money($quote['was'] ?? $quote['price']),
                             'g:sale_price' => $quote['was'] !== null ? $money($quote['price']) : null,
@@ -291,48 +304,40 @@ class ProductFeedController extends Controller
     }
 
     /**
-     * The published products both feeds walk, including the optional
-     * ?category= filter.
-     *
-     * The closure around the category match is load-bearing: without it the
-     * orWhereHas escapes published(), and ?category=x compiled to
-     * "(published AND pivot-match) OR primary-match" — which fed DRAFT products
-     * to the catalogue.
-     */
-    protected function publishedProducts(): Builder
-    {
-        return $this->inRequestedCategory(Product::published());
-    }
-
-    /**
-     * Every product the Meta feed lists: the published ones, plus each draft,
-     * archived or deleted one as an archived row.
+     * Every product both feeds list: the published ones, plus each draft,
+     * archived or deleted one, which goes out switched off rather than
+     * left out (Meta `status: archived`; Google out of stock and excluded
+     * from every destination).
      *
      * Leaving a withdrawn product out of the file is not enough. A scheduled
      * feed on an "update" schedule never deletes what it stops seeing, and an
      * item the API sync or an older feed put there stays in the catalogue —
-     * so drafts kept running in catalogue ads. `status: archived` is the one
-     * signal Meta honours from any source: the item stays in the catalogue
-     * (its ads history intact) but is never shown in an ad. Publishing the
-     * product again flips it back to active at the next fetch.
+     * so drafts kept running in catalogue ads. An explicit "off" is honoured
+     * whatever put the item there, keeps its ads history, and flips back on at
+     * the next fetch when the product is published again.
+     *
+     * The closure around the ?category= match is load-bearing: without it the
+     * orWhereHas escapes the rest of the query, which once compiled to
+     * "(published AND pivot-match) OR primary-match" and fed DRAFTS as live.
      */
-    protected function metaProducts(): Builder
+    protected function feedProducts(): Builder
     {
-        return $this->inRequestedCategory(Product::withTrashed())
-            // Live rows first, so a reader of the file sees the catalogue
+        return Product::withTrashed()
+            ->with(['images', 'category', 'categories', 'variants'])
+            ->when(request('category'), function ($q, $slug) {
+                $q->where(fn ($w) => $w->whereHas('categories', fn ($c) => $c->where('slug', $slug))
+                    ->orWhereHas('category', fn ($c) => $c->where('slug', $slug)));
+            })
+            // Live items first, so a reader of the file sees the catalogue
             // before the withdrawn tail.
             ->orderByRaw("CASE WHEN status = 'published' AND deleted_at IS NULL THEN 0 ELSE 1 END")
             ->orderBy('id');
     }
 
-    protected function inRequestedCategory(Builder $query): Builder
+    /** Whether a product is on sale in the shop, as opposed to withdrawn. */
+    protected function isLive(Product $product): bool
     {
-        return $query
-            ->with(['images', 'category', 'categories', 'variants'])
-            ->when(request('category'), function ($q, $slug) {
-                $q->where(fn ($w) => $w->whereHas('categories', fn ($c) => $c->where('slug', $slug))
-                    ->orWhereHas('category', fn ($c) => $c->where('slug', $slug)));
-            });
+        return $product->status === 'published' && ! $product->trashed();
     }
 
     /**
