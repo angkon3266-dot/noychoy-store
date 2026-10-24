@@ -23,10 +23,13 @@ class HomePageData
         Collection $sections,
         ?Collection $recentlyViewed = null,
         ?Collection $pickedForYou = null,
+        ?\App\Models\Product $featuredLead = null,
     ): array {
         $recentlyViewed ??= collect();
         $pickedForYou ??= collect();
         $giftProfile = \App\Support\GiftProfile::current();
+        $sections = collect(\App\Support\HomeLayout::withIds($sections->all()));
+        $blocks = $sections->map(fn ($b) => ($out = self::block($b)) ? $out + ['id' => $b['id']] : null)->filter()->values();
 
         return [
             'pageTitle' => home_content('seo_title') ?: 'Fine Jewelry',
@@ -38,12 +41,19 @@ class HomePageData
                 'ctaLink' => home_content('hero_cta_link') ?: route('shop'),
                 'secondaryText' => home_content('hero_secondary_text'),
                 'secondaryLink' => home_content('hero_secondary_link') ?: route('track'),
+                'finderLabel' => home_content('hero_finder_label') ?: 'Shopping for someone?',
                 'slides' => self::heroSlides($featured),
             ],
+            // The sections below the hero, in the order the owner arranged them
+            // (App\Support\HomeLayout): built-in keys and "block:<id>" tokens.
+            'order' => \App\Support\HomeLayout::order($sections->all()),
             'deals' => self::deals(),
             'categoriesSection' => [
                 'show' => (bool) home_content('show_categories'),
                 'title' => home_content('categories_title') ?: 'Shop by category',
+                'eyebrow' => home_content('categories_eyebrow'),
+                'linkLabel' => home_content('categories_link_label'),
+                'link' => home_content('categories_link') ?: route('shop'),
                 'items' => $categories->map(function ($c) {
                     // These used to hand the browser the full 1600px original
                     // for a tile a few hundred pixels wide.
@@ -59,10 +69,7 @@ class HomePageData
                     ];
                 })->values(),
             ],
-            'featured' => [
-                'title' => home_content('featured_title') ?: 'The Signature Edit',
-                'cards' => ProductCardData::collection($featured),
-            ],
+            'featured' => self::featured($featured, $featuredLead),
             'promise' => [
                 'show' => (bool) home_content('show_promise'),
                 'eyebrow' => home_content('promise_eyebrow') ?: 'Our promise',
@@ -78,23 +85,35 @@ class HomePageData
             'newArrivals' => [
                 'show' => (bool) home_content('show_new_arrivals'),
                 'title' => home_content('new_arrivals_title') ?: 'New Arrivals',
+                'eyebrow' => home_content('new_arrivals_eyebrow'),
+                'linkLabel' => home_content('new_arrivals_link_label'),
+                'link' => home_content('new_arrivals_link') ?: route('shop', ['sort' => 'new']),
                 'cards' => ProductCardData::collection($newArrivals),
             ],
             'bestSellers' => [
                 'show' => (bool) home_content('show_best_selling'),
                 'title' => home_content('best_selling_title') ?: 'Best sellers',
-                'cards' => ProductCardData::collection($bestSellers->take(8)),
+                'eyebrow' => home_content('best_selling_eyebrow'),
+                'linkLabel' => home_content('best_selling_link_label'),
+                'link' => home_content('best_selling_link') ?: route('best-sellers'),
+                'cards' => ProductCardData::collection($bestSellers->take(24)),
             ],
             // Per-visitor rows. Both need a real signal before they show: two
             // pieces looked at, four picks — a one-card row reads as broken.
             'recentlyViewed' => [
                 'show' => (bool) home_content('show_recently_viewed') && $recentlyViewed->count() >= 2,
                 'title' => home_content('recently_viewed_title') ?: 'Recently viewed',
+                'eyebrow' => home_content('recently_viewed_eyebrow'),
+                'linkLabel' => 'Keep browsing',
+                'link' => route('shop'),
                 'cards' => ProductCardData::collection($recentlyViewed->take(8)),
             ],
             'pickedForYou' => [
                 'show' => (bool) home_content('show_picked_for_you') && $pickedForYou->count() >= 4,
                 'title' => home_content('picked_for_you_title') ?: 'Picked for you',
+                'eyebrow' => home_content('picked_for_you_eyebrow'),
+                'linkLabel' => 'Browse everything',
+                'link' => route('shop'),
                 'cards' => ProductCardData::collection($pickedForYou->take(8)),
             ],
             'featureStrip' => [
@@ -109,6 +128,7 @@ class HomePageData
             'occasions' => [
                 'show' => (bool) home_content('show_occasions'),
                 'title' => home_content('occasions_title') ?: 'Shop by occasion',
+                'eyebrow' => home_content('occasions_eyebrow'),
                 'subtitle' => home_content('occasions_subtitle'),
                 'items' => collect(home_content('occasions') ?? [])
                     ->filter(fn ($o) => filled($o['label'] ?? null))->take(8)->values()
@@ -131,6 +151,9 @@ class HomePageData
                 'occasions' => collect(\App\Support\GiftProfile::OCCASIONS)->map(fn ($o, $key) => [$key, $o[0]])->values(),
                 'profile' => $giftProfile ? ['for' => $giftProfile['for'] ?? null, 'occasion' => $giftProfile['occasion'] ?? null] : null,
                 'title' => home_content('gift_finder_title') ?: 'Shopping for someone?',
+                'eyebrow' => home_content('gift_finder_eyebrow'),
+                'stepsEyebrow' => home_content('gifting_steps_eyebrow'),
+                'stepsTitle' => home_content('gifting_steps_title'),
                 'budgets' => collect(home_content('gift_budgets') ?? [])->map(function ($b) {
                     $min = $b['min'] ?? null;
                     $max = $b['max'] ?? null;
@@ -153,6 +176,13 @@ class HomePageData
                     : [],
             ],
             'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
+            'membershipBand' => ['show' => (bool) home_content('show_membership')],
+            'reviewsSection' => [
+                'show' => (bool) home_content('show_reviews_band'),
+                'eyebrow' => home_content('reviews_eyebrow'),
+                'title' => home_content('reviews_title'),
+                'caption' => home_content('reviews_caption'),
+            ],
             // Social proof: recent 4–5★ approved reviews, sitewide. Cached like
             // the deals block — it ran two uncached queries on every homepage
             // render for content that changes a few times a week at most.
@@ -161,16 +191,90 @@ class HomePageData
             // objects (cache.serializable_classes = false), so a cached
             // Collection came back as __PHP_Incomplete_Class on every hit and
             // the band silently vanished for everyone after the first visitor.
-            'reviews' => \Illuminate\Support\Facades\Cache::remember('home.reviews.band.v2', 600, fn () => \App\Models\Review::approved()->with('product:id,name,slug')
-                ->where('rating', '>=', 4)->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))
-                ->latest()->take(6)->get()
-                ->map(fn ($r) => [
-                    'author' => $r->author_name,
-                    'rating' => (int) $r->rating,
-                    'quote' => $r->body ?: $r->title,
-                    'product' => $r->product ? ['name' => $r->product->name, 'url' => route('product.show', $r->product->slug)] : null,
-                ])->values()->all()),
-            'blocks' => $sections->map(fn ($b) => self::block($b))->filter()->values(),
+            'reviews' => self::reviewsBand(),
+            'blocks' => $blocks,
+        ];
+    }
+
+    /**
+     * The "Customer love" band. The reviews the owner ticked in the admin, in
+     * that order; with none ticked, the newest 5-star reviews that have words
+     * (owner, 2026-10-24: a mixed 4-star review — "good, but delivery took 5
+     * days" — had been picked automatically and read as a complaint).
+     *
+     * Cached as a plain array: the cache store refuses to unserialize objects
+     * (cache.serializable_classes = false), so a cached Collection came back
+     * as __PHP_Incomplete_Class on every hit and the band silently vanished.
+     */
+    protected static function reviewsBand(): array
+    {
+        $ids = collect(home_content('reviews_ids') ?? [])->map(fn ($i) => (int) $i)->filter()->unique()->values();
+
+        return \Illuminate\Support\Facades\Cache::remember('home.reviews.band.v3.'.md5($ids->toJson()), 600, function () use ($ids) {
+            $query = \App\Models\Review::approved()->with('product:id,name,slug');
+            $reviews = $ids->isNotEmpty()
+                ? $query->whereIn('id', $ids)->get()->sortBy(fn ($r) => $ids->search($r->id))->values()
+                : $query->where('rating', 5)
+                    ->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))
+                    ->latest()->take(6)->get();
+
+            return $reviews->map(fn ($r) => [
+                'author' => $r->author_name,
+                'rating' => (int) $r->rating,
+                'quote' => $r->body ?: $r->title,
+                'product' => $r->product ? ['name' => $r->product->name, 'url' => route('product.show', $r->product->slug)] : null,
+            ])->filter(fn ($r) => filled($r['quote']))->values()->all();
+        });
+    }
+
+    /**
+     * The Featured section: a large tile beside a grid. The tile is the first
+     * product, a product the owner chose, the owner's own image and words, or
+     * nothing (then the grid runs the full width).
+     */
+    protected static function featured(Collection $featured, ?\App\Models\Product $lead): array
+    {
+        $mode = home_content('featured_lead_mode') ?: 'first';
+        $leadImage = theme_asset(home_content('featured_lead_image'));
+        if ($mode === 'custom' && ! $leadImage) {
+            $mode = 'first';    // a custom tile with no picture is not a tile
+        }
+        if ($mode === 'product' && ! $lead) {
+            $mode = 'first';    // the chosen piece is unpublished or gone
+        }
+
+        $tile = null;
+        $rest = $featured;
+        if ($mode === 'custom') {
+            $tile = [
+                'type' => 'custom',
+                'image' => image_variant($leadImage, 900) ?: $leadImage,
+                'srcset' => image_srcset($leadImage),
+                'heading' => home_content('featured_lead_heading'),
+                'text' => home_content('featured_lead_text'),
+                'url' => home_content('featured_lead_link') ?: route('shop'),
+            ];
+        } elseif ($mode === 'product' || ($mode === 'first' && $featured->isNotEmpty())) {
+            $piece = $mode === 'product' ? $lead : $featured->first();
+            $rest = $featured->reject(fn ($p) => $p->id === $piece->id)->values();
+            $tile = ['type' => 'product', 'card' => ProductCardData::make($piece)];
+        }
+        if ($tile) {
+            $tile += [
+                'eyebrow' => home_content('featured_lead_eyebrow'),
+                'button' => home_content('featured_lead_button') ?: 'Discover',
+            ];
+        }
+
+        return [
+            'show' => (bool) home_content('show_featured'),
+            'title' => home_content('featured_title') ?: 'The Signature Edit',
+            'eyebrow' => home_content('featured_eyebrow'),
+            'subtitle' => home_content('featured_subtitle'),
+            'linkLabel' => home_content('featured_link_label'),
+            'link' => home_content('featured_link') ?: route('shop'),
+            'lead' => $tile,
+            'cards' => ProductCardData::collection($rest),
         ];
     }
 
@@ -186,6 +290,12 @@ class HomePageData
                     return null;
                 }
 
+                // Seconds on screen: per slide when set, else the store's
+                // image default, else 15s for a video (a clip cut at six
+                // seconds never gets going).
+                $seconds = (float) ($s['seconds'] ?? 0)
+                    ?: ($video ? 15.0 : ((float) home_content('hero_slide_seconds') ?: 6.5));
+
                 return [
                     'type' => $video ? 'video' : 'image',
                     'video' => $video ? self::heroVideo($video) : null,
@@ -193,6 +303,10 @@ class HomePageData
                     'image900' => $image ? image_variant($image, 900) : null,
                     'link' => filled($s['link'] ?? null) ? $s['link'] : null,
                     'alt' => $s['alt'] ?? '',
+                    'seconds' => max(2.0, min(120.0, $seconds)),
+                    // Videos start muted (browsers only autoplay silent video);
+                    // this puts a speaker button on the slide.
+                    'sound' => $video ? (bool) ($s['sound'] ?? true) : false,
                 ];
             })
             ->filter()->values();
@@ -228,7 +342,7 @@ class HomePageData
 
         $embed = $video['embed'];
         $embed .= $video['type'] === 'youtube'
-            ? (str_contains($embed, '?') ? '&' : '?').'autoplay=1&mute=1&loop=1&playlist='.Str::afterLast($embed, '/').'&controls=0&modestbranding=1&rel=0'
+            ? (str_contains($embed, '?') ? '&' : '?').'autoplay=1&mute=1&loop=1&playlist='.Str::afterLast($embed, '/').'&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1'
             : (str_contains($embed, '?') ? '&' : '?').'autoplay=1&muted=1&loop=1&background=1';
 
         return ['type' => $video['type'], 'embedUrl' => $embed];
@@ -243,6 +357,7 @@ class HomePageData
 
         return [
             'title' => home_content('deals_title') ?: 'Deals of the Day',
+            'eyebrow' => home_content('deals_eyebrow'),
             'subtitle' => home_content('deals_subtitle'),
             'endsAt' => DailyDeals::endsAt()?->getTimestamp(),
             'cards' => $cards->values(),

@@ -13,6 +13,11 @@ export default function HomeBlocks({ blocks }) {
     return blocks.map((block, i) => <Block key={i} block={block} />);
 }
 
+// One block on its own — the homepage places each where the owner put it.
+export function HomeBlock({ block }) {
+    return <Block block={block} />;
+}
+
 const shell = 'mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10';
 
 function SectionHeading({ title, link = null, linkLabel = 'View all', as: Tag = 'section' }) {

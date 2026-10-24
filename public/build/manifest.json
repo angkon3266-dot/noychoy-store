@@ -205,7 +205,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-02vj7eNA.css",
+    "file": "assets/app-CHX5j1sy.css",
     "name": "app",
     "names": [
       "app.css"
@@ -443,7 +443,7 @@
     ]
   },
   "resources/js/Pages/Home.jsx": {
-    "file": "assets/Home-DbsI0uYT.js",
+    "file": "assets/Home-_sNrMi5X.js",
     "name": "Home",
     "src": "resources/js/Pages/Home.jsx",
     "isDynamicEntry": true,
@@ -509,13 +509,13 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DfTxewlB.js",
+    "file": "assets/app-BwqixjfK.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-DePV4fqd.js",
+    "file": "assets/inertia-DLKVgqWH.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,

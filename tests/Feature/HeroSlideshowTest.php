@@ -72,8 +72,12 @@ class HeroSlideshowTest extends TestCase
 
         $this->actingAs($this->admin())->get('/admin/appearance')
             ->assertOk()
-            ->assertSee('Hero slider')
-            ->assertSee('Add a video slide');
+            ->assertSee('Slideshow')
+            ->assertSee('Add a video')
+            // Each slide can be edited in place (homepage builder, 2026-10-24).
+            ->assertSee('name="hero_slide_image_0"', false)
+            ->assertSee('name="hero_slides[1][video]"', false)
+            ->assertSee('name="hero_slides[2][sound]"', false);
     }
 
     // ── Saving slides ────────────────────────────────────────────────────────

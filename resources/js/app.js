@@ -1755,6 +1755,136 @@ document.addEventListener('alpine:init', () => {
         ensure(b) { b.images = b.images || []; b.videos = b.videos || []; b.faqs = b.faqs || []; b.banner = b.banner || { image: '', link: '' }; b.cta = b.cta || this.blankCta(); b.review_ids = (b.review_ids || []).map(Number); return ''; },
     }));
 
+    // ── Admin: the homepage builder (Appearance → Homepage, 2026-10-24) ──
+    // One list of every homepage section in page order — built-in sections
+    // (server-rendered panels) and custom sections (homeBlock below) mixed.
+    // Order is simply the DOM order: each panel carries a hidden
+    // section_order[] input, so the form posts the tokens top to bottom.
+    // Drag by the ⠿ grip or use ▲/▼.
+    window.Alpine.data('homeSections', () => ({
+        drag: null,
+        from: null,
+        newType: 'product_carousel',
+
+        init() {
+            const list = this.$refs.list;
+            list.addEventListener('pointerdown', (e) => this.onDown(e), { passive: false });
+            list.addEventListener('pointermove', (e) => this.onMove(e), { passive: false });
+            list.addEventListener('pointerup', () => this.onUp());
+            list.addEventListener('pointercancel', () => this.onUp());
+            this.renumber();
+        },
+
+        rows() {
+            return Array.from(this.$refs.list.querySelectorAll(':scope > [data-section-row]'));
+        },
+
+        move(row, dir) {
+            const sibling = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+            if (!sibling) return;
+            dir < 0 ? sibling.before(row) : sibling.after(row);
+            this.renumber();
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        },
+
+        renumber() {
+            const rows = this.rows();
+            rows.forEach((row, n) => {
+                const up = row.querySelector('[data-section-up]');
+                const down = row.querySelector('[data-section-down]');
+                if (up) up.disabled = n === 0;
+                if (down) down.disabled = n === rows.length - 1;
+                const num = row.querySelector('[data-section-num]');
+                if (num) num.textContent = String(n + 1).padStart(2, '0');
+            });
+        },
+
+        // A new custom section: clone the hidden panel template, give it its
+        // block data, and put it at the bottom. Alpine starts it on insert.
+        add() {
+            const id = 'b' + Math.random().toString(36).slice(2, 10);
+            const node = this.$refs.blockTpl.content.firstElementChild.cloneNode(true);
+            node.setAttribute('x-data', `homeBlock(${JSON.stringify({ id, type: this.newType, enabled: true, title: '' })}, true)`);
+            this.$refs.list.appendChild(node);
+            this.$nextTick(() => {
+                this.renumber();
+                node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            });
+        },
+
+        onDown(e) {
+            const grip = e.target.closest('[data-section-grip]');
+            if (!grip || (e.pointerType === 'mouse' && e.button !== 0)) return;
+            e.preventDefault();
+            this.from = { y: e.clientY, row: grip.closest('[data-section-row]'), id: e.pointerId };
+        },
+
+        onMove(e) {
+            if (!this.from) return;
+            if (!this.drag) {
+                if (Math.abs(e.clientY - this.from.y) < 4) return;
+                this.drag = this.from.row;
+                this.drag.classList.add('opacity-60', 'ring-2', 'ring-gold-500');
+                document.body.style.userSelect = 'none';
+                try { this.$refs.list.setPointerCapture(this.from.id); } catch (err) { /* released already */ }
+            }
+            e.preventDefault();
+            const others = this.rows().filter((row) => row !== this.drag);
+            const next = others.find((row) => {
+                const box = row.getBoundingClientRect();
+                return e.clientY < box.top + Math.min(box.height, 64) / 2;
+            });
+            if (next) {
+                if (next.previousElementSibling !== this.drag) next.before(this.drag);
+            } else if (others.length && others[others.length - 1].nextElementSibling !== this.drag) {
+                others[others.length - 1].after(this.drag);
+            }
+        },
+
+        onUp() {
+            if (this.drag) {
+                this.drag.classList.remove('opacity-60', 'ring-2', 'ring-gold-500');
+                this.renumber();
+            }
+            if (this.from) {
+                try { this.$refs.list.releasePointerCapture(this.from.id); } catch (err) { /* gone */ }
+            }
+            document.body.style.userSelect = '';
+            this.drag = null;
+            this.from = null;
+        },
+    }));
+
+    // One custom section inside the builder. Its whole shape posts as JSON in
+    // home_blocks[<id>]; image uploads post as block_image[<id>][n],
+    // block_banner[<id>] and block_cta[<id>].
+    window.Alpine.data('homeBlock', (init, isNew = false) => ({
+        open: !!isNew,
+        b: (() => {
+            const b = { enabled: true, title: '', layout: 'single', images: [], videos: [], faqs: [], source: 'new', category_id: '', limit: 10, view_all_link: '', banner: { image: '', link: '' }, cta: { image: '', eyebrow: '', heading: '', subheading: '', button_text: '', button_link: '', align: 'center', height: 'md' }, html: '', review_ids: [], ...(init || {}) };
+            b.images = b.images || []; b.videos = b.videos || []; b.faqs = b.faqs || [];
+            b.banner = b.banner || { image: '', link: '' };
+            b.cta = { image: '', eyebrow: '', heading: '', subheading: '', button_text: '', button_link: '', align: 'center', height: 'md', ...(b.cta || {}) };
+            b.review_ids = (b.review_ids || []).map(Number);
+            return b;
+        })(),
+        labels: { banner: 'Promo banner(s)', cta_banner: 'Image banner with text', product_carousel: 'Product row', banner_carousel: 'Banner + products', video: 'Videos', faq: 'Questions & answers', reviews: 'Customer reviews (hand-picked)', richtext: 'Text / HTML' },
+        get label() { return this.labels[this.b.type] || 'Custom section'; },
+        src(p) { return !p ? '' : (p.startsWith('http') || p.startsWith('/') ? p : '/storage/' + p); },
+        addImage() { this.b.images.push({ image: '', link: '' }); },
+        addVideo() { this.b.videos.push({ title: '', url: '' }); },
+        addFaq() { this.b.faqs.push({ q: '', a: '' }); },
+        // Not "destroy": Alpine calls a method by that name itself whenever a
+        // component leaves the page.
+        removeSection() {
+            if (!confirm('Delete this section? It is removed when you save.')) return;
+            const row = this.$root;
+            const list = row.parentElement;
+            row.remove();
+            list?.dispatchEvent(new CustomEvent('section-removed', { bubbles: true }));
+        },
+    }));
+
     // ── Admin: landing page builder (homepage blocks + landing-only blocks) ──
     window.Alpine.data('landingBuilder', (init) => ({
         blocks: (init && init.blocks) || [],

@@ -154,5 +154,102 @@ return [
         'badge2_text' => 'Delivered via Steadfast',
         'badge3_title' => 'Quality Assured',
         'badge3_text' => 'Handpicked pieces',
+
+        // ── Homepage builder (2026-10-24) ───────────────────────────────────
+        // Everything the React homepage prints, editable from Admin →
+        // Appearance → Homepage. The words below are what the page said when
+        // they were hardcoded, so an untouched store looks exactly the same.
+
+        // Section order: tokens from 'sections' below, plus "block:<id>" for
+        // each custom section. Empty = the order 'sections' is written in,
+        // with custom sections at the end.
+        'section_order' => [],
+
+        // Hero
+        'hero_finder_label' => 'Shopping for someone?',
+        'hero_slide_seconds' => '6.5',          // how long an image slide stays up
+
+        // Small labels above each section heading, and the "view all" links.
+        'categories_eyebrow' => 'Explore',
+        'categories_link_label' => 'View all',
+        'categories_link' => null,              // defaults to the Shop page
+        'picked_for_you_eyebrow' => 'Chosen for you',
+        'occasions_eyebrow' => 'For every moment',
+        'deals_eyebrow' => 'Today only',
+        'show_membership' => true,
+        'recently_viewed_eyebrow' => 'Pick up where you left off',
+        'gift_finder_eyebrow' => 'Gift finder',
+        'gifting_steps_eyebrow' => 'Gifting, made effortless',
+        'gifting_steps_title' => 'Send it straight to them — we handle the rest',
+
+        // Product sections. source: auto | products | collection | category.
+        // "auto" is what each section always did: products ticked Featured,
+        // best sellers by sales, newest first.
+        'best_selling_eyebrow' => 'Most loved',
+        'best_selling_link_label' => 'All best sellers',
+        'best_selling_link' => null,            // defaults to /best-sellers
+        'best_source' => 'auto',
+        'best_limit' => '8',
+        'best_collection_id' => null,
+        'best_category_id' => null,
+        'best_product_ids' => [],
+
+        'new_arrivals_eyebrow' => 'Just in',
+        'new_arrivals_link_label' => "See what's new",
+        'new_arrivals_link' => null,            // defaults to the shop, newest first
+        'new_source' => 'auto',
+        'new_limit' => '8',
+        'new_collection_id' => null,
+        'new_category_id' => null,
+        'new_product_ids' => [],
+
+        'show_featured' => true,
+        'featured_eyebrow' => 'Curated',
+        'featured_subtitle' => 'Our most-loved pieces, chosen for the season.',
+        'featured_link_label' => 'Shop all jewelry',
+        'featured_link' => null,                // defaults to the Shop page
+        'featured_source' => 'auto',
+        'featured_limit' => '7',
+        'featured_collection_id' => null,
+        'featured_category_id' => null,
+        'featured_product_ids' => [],
+        // The large tile. first = the section's first product; product = a
+        // chosen one; custom = your own image and words; none = no large tile.
+        'featured_lead_mode' => 'first',
+        'featured_lead_product_id' => null,
+        'featured_lead_image' => null,
+        'featured_lead_eyebrow' => 'The piece of the season',
+        'featured_lead_heading' => null,        // custom tile heading
+        'featured_lead_text' => null,           // custom tile line under the heading
+        'featured_lead_button' => 'Discover',
+        'featured_lead_link' => null,           // custom tile link (defaults to the Shop page)
+
+        // "Customer love" reviews band. Ticked reviews show in that order;
+        // with none ticked, the newest 5-star reviews that have words.
+        'show_reviews_band' => true,
+        'reviews_eyebrow' => 'Customer love',
+        'reviews_title' => "What they're saying",
+        'reviews_caption' => 'From customers across Bangladesh',
+        'reviews_ids' => [],
+    ],
+
+    // The built-in homepage sections, in their default order. `toggle` is the
+    // home_content key that switches each one on and off. The hero is not
+    // listed: it always opens the page.
+    'sections' => [
+        'ribbon' => ['label' => 'Reassurance ticker', 'toggle' => 'show_feature_strip', 'hint' => 'The slow-moving strip of trust points under the hero.'],
+        'categories' => ['label' => 'Categories', 'toggle' => 'show_categories', 'hint' => 'Tall picture tiles, one per category.'],
+        'picked' => ['label' => 'Picked for you', 'toggle' => 'show_picked_for_you', 'hint' => 'Each visitor sees their own picks. Hides itself until there is enough to show.'],
+        'occasions' => ['label' => 'Shop by occasion', 'toggle' => 'show_occasions', 'hint' => 'A list of occasions; on a computer, hovering one shows its photo.'],
+        'deals' => ['label' => 'Deals of the Day', 'toggle' => 'show_deals', 'hint' => 'One card per running offer under Offers. Hides itself when none are running.'],
+        'membership' => ['label' => 'Membership', 'toggle' => 'show_membership', 'hint' => 'What joining is worth. Its numbers come from the membership settings.'],
+        'best' => ['label' => 'Best sellers', 'toggle' => 'show_best_selling', 'hint' => 'A grid of products.'],
+        'recent' => ['label' => 'Recently viewed', 'toggle' => 'show_recently_viewed', 'hint' => 'Each visitor sees what they looked at. Hides itself until there are two.'],
+        'gift_finder' => ['label' => 'Gift finder', 'toggle' => 'show_gift_finder', 'hint' => 'Occasion chips and budget buttons on a dark panel.'],
+        'featured' => ['label' => 'Featured', 'toggle' => 'show_featured', 'hint' => 'One large tile beside a grid of products.'],
+        'gifting_steps' => ['label' => 'How gifting works', 'toggle' => 'show_gifting_steps', 'hint' => 'Numbered steps.'],
+        'reviews' => ['label' => 'Customer reviews', 'toggle' => 'show_reviews_band', 'hint' => 'Review cards with the average score.'],
+        'promise' => ['label' => 'Our promise', 'toggle' => 'show_promise', 'hint' => 'A photo beside your promise and three short points.'],
+        'new' => ['label' => 'New arrivals', 'toggle' => 'show_new_arrivals', 'hint' => 'A swipeable row of products.'],
     ],
 ];

@@ -18,9 +18,19 @@ class AppearanceController extends Controller
 {
     public function index(StorefrontFilters $filters)
     {
+        $home = home_content();
+        $homeBlocks = \App\Support\HomeLayout::withIds((array) ($home['sections'] ?? []));
+
         return view('admin.appearance', [
             'theme' => theme(),
-            'home' => home_content(),
+            'home' => $home,
+            // The homepage builder: custom sections with ids, every section in
+            // page order, and what its pickers choose from.
+            'homeBlocks' => $homeBlocks,
+            'homeOrder' => \App\Support\HomeLayout::order($homeBlocks, (array) ($home['section_order'] ?? [])),
+            'homeProducts' => \App\Models\Product::published()->with('images')->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'thumb' => $p->thumbnail ? (image_variant($p->thumbnail) ?: $p->thumbnail) : null])->values(),
+            'homeCollections' => \App\Models\Collection::active()->orderBy('name')->get(['id', 'name']),
             'homeTemplates' => config('theme.homepage_templates'),
             'allCategories' => Category::orderBy('name')->get(['id', 'name']),
             // Collections offered to the menu, so an occasion tile can point at
@@ -29,7 +39,7 @@ class AppearanceController extends Controller
                 ->map(fn ($c) => ['name' => $c->name, 'url' => route('collection.show', $c->slug)]),
             // For the section builder's "Customer reviews" block picker.
             'recentReviews' => Review::approved()->with('product:id,name')
-                ->latest()->take(60)->get(['id', 'product_id', 'author_name', 'rating', 'title', 'body']),
+                ->latest()->take(150)->get(['id', 'product_id', 'author_name', 'rating', 'title', 'body']),
             'filterConfig' => $filters->config(),
             'filterAttributes' => $filters->discoverAttributes(),
             'filterCustomFields' => $filters->discoverCustomFields(),
@@ -159,6 +169,30 @@ class AppearanceController extends Controller
             'category_scroller_ids' => ['nullable', 'array'],
             'category_scroller_ids.*' => ['integer'],
             'hero_slides' => ['nullable', 'array'],
+            'hero_slides.*.alt' => ['nullable', 'string', 'max:140'],
+            'hero_slides.*.seconds' => ['nullable', 'numeric', 'min:2', 'max:120'],
+            'hero_slides.*.video' => ['nullable', 'string', 'max:500'],
+
+            // Homepage builder (2026-10-24)
+            'section_order' => ['nullable', 'array', 'max:80'],
+            'section_order.*' => ['nullable', 'string', 'max:60'],
+            'home_blocks' => ['nullable', 'array', 'max:40'],
+            'home_blocks.*' => ['nullable', 'string', 'max:200000'],
+            'hero_trust' => ['nullable', 'array', 'max:3'],
+            'hero_trust.*' => ['nullable', 'string', 'max:60'],
+            'gift_promises' => ['nullable', 'array', 'max:3'],
+            'gift_promises.*.icon' => ['nullable', 'string', 'max:24'],
+            'gift_promises.*.title' => ['nullable', 'string', 'max:60'],
+            'gift_promises.*.text' => ['nullable', 'string', 'max:80'],
+            'gifting_steps' => ['nullable', 'array', 'max:4'],
+            'gifting_steps.*.title' => ['nullable', 'string', 'max:60'],
+            'gifting_steps.*.text' => ['nullable', 'string', 'max:120'],
+            'home_products' => ['nullable', 'array'],
+            'home_products.*' => ['nullable', 'array', 'max:24'],
+            'home_products.*.*' => ['integer'],
+            'reviews_ids' => ['nullable', 'array', 'max:24'],
+            'reviews_ids.*' => ['integer'],
+            'featured_lead_image' => ['nullable', 'image', 'max:4096'],
             'hero_slide_images' => ['nullable', 'array'],
             'hero_slide_images.*' => ['nullable', 'image', 'max:4096'],
             'hero_slide_urls' => ['nullable', 'array'],
@@ -327,12 +361,63 @@ class AppearanceController extends Controller
             $home['promise_image'] = null;
         }
 
+        // Featured section's custom large tile (same upload/library/clear flow).
+        $leadPick = trim((string) $request->input('featured_lead_image_url', ''));
+        if ($request->hasFile('featured_lead_image')) {
+            $home['featured_lead_image'] = $optimizer->storeWebp($request->file('featured_lead_image'), 'branding', 1400, 85);
+        } elseif ($leadPick !== '') {
+            $home['featured_lead_image'] = public_url_to_path($leadPick) ?: $optimizer->storeWebpFromUrl($leadPick, 'branding', 1400, 85);
+        } elseif ($request->boolean('featured_lead_image_cleared')) {
+            $home['featured_lead_image'] = null;
+        }
+
+        // Only known choices for the builder's pick-one settings.
+        foreach (['featured', 'best', 'new'] as $p) {
+            if (! in_array($home[$p.'_source'] ?? 'auto', ['auto', 'products', 'collection', 'category'], true)) {
+                $home[$p.'_source'] = 'auto';
+            }
+        }
+        if (! in_array($home['featured_lead_mode'] ?? 'first', ['first', 'product', 'custom', 'none'], true)) {
+            $home['featured_lead_mode'] = 'first';
+        }
+
+        // Builder lists: the hero's trust points, the gift promises, the gifting
+        // steps, hand-picked products and reviews. Each list's _present marker
+        // lets an emptied list save as empty instead of being ignored.
+        if ($request->has('hero_trust_present')) {
+            $home['hero_trust'] = collect($request->input('hero_trust', []))
+                ->map(fn ($t) => trim((string) $t))->filter()->take(3)->values()->all();
+        }
+        if ($request->has('gift_promises_present')) {
+            $home['gift_promises'] = collect($request->input('gift_promises', []))
+                ->map(fn ($r) => ['icon' => trim((string) ($r['icon'] ?? '')), 'title' => trim((string) ($r['title'] ?? '')), 'text' => trim((string) ($r['text'] ?? ''))])
+                ->filter(fn ($r) => $r['title'] !== '')->take(3)->values()->all();
+        }
+        if ($request->has('gifting_steps_present')) {
+            $home['gifting_steps'] = collect($request->input('gifting_steps', []))
+                ->map(fn ($r) => ['title' => trim((string) ($r['title'] ?? '')), 'text' => trim((string) ($r['text'] ?? ''))])
+                ->filter(fn ($r) => $r['title'] !== '')->take(4)->values()->all();
+        }
+        foreach (array_keys((array) $request->input('home_products_present', [])) as $p) {
+            if (in_array($p, ['featured', 'best', 'new'], true)) {
+                $home[$p.'_product_ids'] = collect($request->input('home_products.'.$p, []))
+                    ->map(fn ($id) => (int) $id)->filter()->unique()->take(24)->values()->all();
+            }
+        }
+        if ($request->has('reviews_ids_present')) {
+            $home['reviews_ids'] = collect($request->input('reviews_ids', []))
+                ->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+        }
+
         // ---- Storefront homepage builder ----
         // Section toggles
         // Only touch a toggle the form actually submitted. The gift-finder
         // checkbox did not exist on this form for a while, so every save was
         // silently writing it false and hiding the section on the storefront.
-        foreach (['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals', 'show_occasions', 'show_gift_finder', 'show_gifting_steps', 'show_recently_viewed', 'show_picked_for_you'] as $t) {
+        $toggles = collect(config('home.sections'))->pluck('toggle')
+            ->merge(['show_feature_strip', 'show_categories', 'show_best_selling', 'show_new_arrivals', 'show_highlights', 'show_promise', 'show_deals', 'show_occasions', 'show_gift_finder', 'show_gifting_steps', 'show_recently_viewed', 'show_picked_for_you'])
+            ->unique();
+        foreach ($toggles as $t) {
             if ($request->has('home_'.$t.'_present')) {
                 $home[$t] = $request->boolean('home_'.$t);
             }
@@ -374,9 +459,30 @@ class AppearanceController extends Controller
         $slides = collect($home['hero_slides'] ?? []);
         $edits = $request->input('hero_slides', []);
         $slides = $slides->reject(fn ($s, $i) => ! empty($edits[$i]['remove']))
-            ->map(function ($s, $i) use ($edits) {
-                if (isset($edits[$i]['link'])) {
-                    $s['link'] = trim((string) $edits[$i]['link']);
+            ->map(function ($s, $i) use ($edits, $request) {
+                $e = $edits[$i] ?? [];
+                if (isset($e['link'])) {
+                    $s['link'] = trim((string) $e['link']);
+                }
+                if (array_key_exists('alt', $e)) {
+                    $s['alt'] = trim((string) $e['alt']);
+                }
+                if (array_key_exists('seconds', $e)) {
+                    $seconds = (float) $e['seconds'];
+                    if ($seconds > 0) {
+                        $s['seconds'] = max(2, min(120, $seconds));
+                    } else {
+                        unset($s['seconds']);
+                    }
+                }
+                if (! empty($e['sound_present'])) {
+                    $s['sound'] = ! empty($e['sound']);
+                }
+                if (filled($s['video'] ?? null) && filled($e['video'] ?? null)) {
+                    $s['video'] = trim((string) $e['video']);
+                }
+                if (filled($s['image'] ?? null) && ($new = $this->replacedSlideImage($request, $i, $s['image']))) {
+                    $s['image'] = $new;
                 }
 
                 return $s;
@@ -442,8 +548,48 @@ class AppearanceController extends Controller
                 ->values()->all();
         }
 
-        // Section builder blocks (JSON) + per-block image uploads
-        $blocks = json_decode((string) $request->input('home_sections_json', ''), true);
+        // Custom sections from the homepage builder: one JSON object per
+        // section, keyed by its id, in page order; uploads keyed by the id.
+        if ($request->has('home_blocks_present')) {
+            $blocks = [];
+            $images = (array) $request->file('block_image', []);
+            $banners = (array) $request->file('block_banner', []);
+            $ctas = (array) $request->file('block_cta', []);
+            foreach ((array) $request->input('home_blocks', []) as $id => $json) {
+                $b = json_decode((string) $json, true);
+                $id = \App\Support\HomeLayout::cleanId($id);
+                if (! is_array($b) || ! $id) {
+                    continue;
+                }
+                $b['id'] = $id;
+                foreach ((array) ($images[$id] ?? []) as $ii => $file) {
+                    if ($file && $file->isValid()) {
+                        $b['images'][$ii]['image'] = $file->store('sections', 'public');
+                    }
+                }
+                if (($file = $banners[$id] ?? null) && $file->isValid()) {
+                    $b['banner']['image'] = $file->store('sections', 'public');
+                }
+                if (($file = $ctas[$id] ?? null) && $file->isValid()) {
+                    $b['cta']['image'] = $file->store('sections', 'public');
+                }
+                $blocks[] = $b;
+            }
+            $home['sections'] = $this->normalizeSections($blocks);
+        }
+
+        // The order of everything under the hero, as the builder posted it.
+        // Only tokens that name a real section survive.
+        if ($request->has('section_order_present')) {
+            $known = collect(\App\Support\HomeLayout::builtins())
+                ->merge(collect($home['sections'] ?? [])->pluck('id')->filter()->map(fn ($id) => 'block:'.$id));
+            $home['section_order'] = collect($request->input('section_order', []))
+                ->map(fn ($t) => (string) $t)->filter(fn ($t) => $known->contains($t))
+                ->unique()->values()->all();
+        }
+
+        // Older form: the whole block list as one JSON string, by position.
+        $blocks = $request->has('home_blocks_present') ? null : json_decode((string) $request->input('home_sections_json', ''), true);
         if (is_array($blocks)) {
             foreach ((array) $request->file('block_image', []) as $bi => $imgs) {
                 foreach ((array) $imgs as $ii => $file) {
@@ -599,6 +745,28 @@ class AppearanceController extends Controller
         return back()->with('success', 'Appearance updated.');
     }
 
+    /**
+     * A new picture for an existing hero slide, from the slide's own media
+     * field (hero_slide_image_<i>): an upload, or a library/remote pick that
+     * differs from the picture it already has. Null keeps the current one.
+     */
+    protected function replacedSlideImage(Request $request, int|string $i, string $current): ?string
+    {
+        $field = 'hero_slide_image_'.$i;
+        $file = $request->file($field);
+        if ($file && $file->isValid() && str_starts_with((string) $file->getMimeType(), 'image/')) {
+            return $file->store('hero', 'public');
+        }
+
+        $url = trim((string) $request->input($field.'_url', ''));
+        if ($url === '' || $url === $current || $url === theme_asset($current)) {
+            return null;
+        }
+        $path = public_url_to_path($url);
+
+        return $path === $current ? null : ($path ?: $url);
+    }
+
     /** Sanitise builder blocks to a known shape before storing. */
     protected function normalizeSections(array $blocks): array
     {
@@ -614,6 +782,7 @@ class AppearanceController extends Controller
                 return null;
             }
             $out = [
+                'id' => \App\Support\HomeLayout::cleanId($b['id'] ?? null) ?? \Illuminate\Support\Str::random(8),
                 'type' => $type,
                 'enabled' => (bool) ($b['enabled'] ?? true),
                 'title' => trim((string) ($b['title'] ?? '')),

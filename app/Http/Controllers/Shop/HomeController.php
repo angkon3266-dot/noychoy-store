@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 class HomeController extends Controller
 {
     /** Cache key for the homepage id-plan (bumped on product/category/appearance saves). */
-    public const CACHE_KEY = 'home.plan.v1';
+    public const CACHE_KEY = 'home.plan.v2';
 
     public function index(Request $request)
     {
@@ -22,7 +22,7 @@ class HomeController extends Controller
         // serialize objects (cache.serializable_classes = false) — then hydrate
         // everything with one indexed whereIn query, so prices/stock stay live.
         $plan = \Illuminate\Support\Facades\Cache::remember(self::CACHE_KEY, 600, function () {
-            $sectionBlocks = collect(home_content('sections') ?? [])
+            $sectionBlocks = collect(\App\Support\HomeLayout::withIds(home_content('sections') ?? []))
                 ->filter(fn ($b) => ($b['enabled'] ?? true) && filled($b['type'] ?? null))
                 ->map(function ($b) {
                     if (in_array($b['type'], ['product_carousel', 'banner_carousel'], true)) {
@@ -32,10 +32,15 @@ class HomeController extends Controller
                     return $b;
                 })->values()->all();
 
+            // Each product section takes its products from wherever the owner
+            // pointed it in Admin → Appearance → Homepage; "auto" is what the
+            // section always did.
             return [
-                'featured' => Product::published()->featured()->latest()->take(8)->pluck('id')->all(),
-                'new' => Product::published()->latest()->take(8)->pluck('id')->all(),
-                'best' => $this->bestSellerIds(8),
+                'featured' => $this->sectionProductIds('featured', fn ($n) => Product::published()->featured()->latest()->take($n)->pluck('id')->all()),
+                'new' => $this->sectionProductIds('new', fn ($n) => Product::published()->latest()->take($n)->pluck('id')->all()),
+                'best' => $this->sectionProductIds('best', fn ($n) => $this->bestSellerIds($n)),
+                'featured_lead' => home_content('featured_lead_mode') === 'product'
+                    ? ((int) home_content('featured_lead_product_id') ?: null) : null,
                 'sections' => $sectionBlocks,
             ];
         });
@@ -48,14 +53,15 @@ class HomeController extends Controller
 
         // One query hydrates every product used anywhere on the page.
         $with = ['images', 'approvedReviews', 'category'];
-        $allIds = collect([$plan['featured'], $plan['new'], $plan['best'], $recentIds, $pickedIds])
+        $allIds = collect([$plan['featured'], $plan['new'], $plan['best'], [$plan['featured_lead'] ?? null], $recentIds, $pickedIds])
             ->flatten()
-            ->merge(collect($plan['sections'])->pluck('product_ids')->flatten()->filter())
-            ->unique()->values();
+            ->merge(collect($plan['sections'])->pluck('product_ids')->flatten())
+            ->filter()->unique()->values();
         $pool = Product::published()->with($with)->whereIn('id', $allIds)->get()->keyBy('id');
         $pick = fn (array $ids) => collect($ids)->map(fn ($id) => $pool->get($id))->filter()->values();
 
         $featured = $pick($plan['featured']);
+        $featuredLead = ($plan['featured_lead'] ?? null) ? $pool->get($plan['featured_lead']) : null;
         $newArrivals = $pick($plan['new']);
         $bestSellers = $pick($plan['best']);
         $recentlyViewed = $pick($recentIds);
@@ -106,7 +112,7 @@ class HomeController extends Controller
         // the old Blade homepage instead.
         if (\App\Support\HomePage::isReact($key)) {
             $data = \App\Support\Storefront\HomePageData::make(
-                $featured, $newArrivals, $bestSellers, $categories, $sections, $recentlyViewed, $pickedForYou,
+                $featured, $newArrivals, $bestSellers, $categories, $sections, $recentlyViewed, $pickedForYou, $featuredLead,
             );
 
             // First hero slide is the LCP element on almost every home visit.
@@ -153,6 +159,27 @@ class HomeController extends Controller
         return view($view, compact(
             'featured', 'newArrivals', 'bestSellers', 'categories', 'highlightCategories', 'sections'
         ));
+    }
+
+    /**
+     * The ordered product ids for one of the homepage's product sections
+     * ("featured", "best", "new"), from the source chosen for it in the admin:
+     * hand-picked products, a collection, a category, or its automatic rule.
+     */
+    protected function sectionProductIds(string $key, \Closure $auto): array
+    {
+        $limit = max(1, min(24, (int) (home_content($key.'_limit') ?: 8)));
+
+        return match (home_content($key.'_source') ?: 'auto') {
+            'products' => collect(home_content($key.'_product_ids') ?? [])
+                ->map(fn ($id) => (int) $id)->filter()->unique()->take($limit)->values()->all(),
+            'collection' => ($collection = \App\Models\Collection::active()->find((int) home_content($key.'_collection_id')))
+                ? app(\App\Services\CollectionService::class)->query($collection)
+                    ->orderByDesc('products.created_at')->take($limit)->pluck('products.id')->all()
+                : [],
+            'category' => $this->sourceProductIds('category', (int) home_content($key.'_category_id') ?: null, $limit),
+            default => $auto($limit),
+        };
     }
 
     /** Resolve a builder block's product source keyword to an ordered id list. */

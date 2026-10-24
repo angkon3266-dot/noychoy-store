@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import Carousel from '../Shared/Carousel';
-import HomeBlocks from '../Shared/HomeBlocks';
+import { HomeBlock } from '../Shared/HomeBlocks';
 import SmartLink from '../Shared/SmartLink';
 import useCountdown from '../Shared/useCountdown';
 import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
@@ -12,36 +12,48 @@ import { t } from '../Shared/i18n';
 // The homepage — editorial, conversion-first and gift-led (redesigned
 // 2026-10-24).
 //
-// Order is deliberate (mobile-first, every step earns the next scroll):
-//   hero → reassurance ribbon → categories → picked for you → shop by
-//   occasion (the gift path) → deals → membership → best sellers → recently
-//   viewed → gift finder by budget → featured edit → how gifting works (off
-//   by default) → customer love → our promise → new arrivals → admin builder
-//   blocks.
-// Every section is admin-toggleable/editable through the same home_content
-// settings the old templates used; copy falls back to sensible defaults.
+// The hero always opens the page. Everything under it comes in the order the
+// owner arranged in Admin → Appearance → Homepage (`order`, built by
+// App\Support\HomeLayout): built-in sections by key, the owner's custom
+// sections as "block:<id>". Every section has an on/off switch and its words,
+// links and products are editable there; copy falls back to sensible defaults.
+const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
+
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks, heroTrust, pickedForYou, recentlyViewed } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, reviewsSection } = props;
+
+    // Per-visitor rows (picked / recent) hide themselves until there is a
+    // real signal; every other section hides when switched off or empty.
+    const sections = {
+        ribbon: () => <Ribbon strip={featureStrip} trust={heroTrust} />,
+        categories: () => <Categories section={categoriesSection} />,
+        picked: () => <CardSection section={pickedForYou} rail />,
+        occasions: () => <Occasions section={occasions} />,
+        deals: () => <Deals deals={deals} />,
+        membership: () => (membershipBand?.show === false ? null : <MembershipBand />),
+        best: () => <CardSection section={bestSellers} />,
+        recent: () => <CardSection section={recentlyViewed} rail />,
+        gift_finder: () => <GiftFinder finder={giftFinder} />,
+        featured: () => <Featured featured={featured} />,
+        gifting_steps: () => <GiftingSteps giftFinder={giftFinder} />,
+        reviews: () => (reviewsSection?.show === false ? null : <ReviewsBand reviews={reviews} section={reviewsSection} />),
+        promise: () => <Promise promise={promise} />,
+        new: () => <CardSection section={newArrivals} rail />,
+    };
+    const blockById = Object.fromEntries(blocks.map((b) => [String(b.id), b]));
+    const keys = order?.length ? order : [...DEFAULT_ORDER, ...blocks.map((b) => `block:${b.id}`)];
+
     return (
         <>
             <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} giftFinder={giftFinder} />
-            <Ribbon strip={featureStrip} trust={heroTrust} />
-            <Categories section={categoriesSection} />
-            {/* Per-visitor rows: what they told the gift finder, loved or looked
-                at. Both hide themselves until there is a real signal. */}
-            <CardSection section={pickedForYou} eyebrow="Chosen for you" viewAll="/shop" viewAllLabel="Browse everything" rail />
-            <Occasions section={occasions} />
-            <Deals deals={deals} />
-            <MembershipBand />
-            <CardSection section={bestSellers} eyebrow="Most loved" viewAll="/best-sellers" viewAllLabel="All best sellers" />
-            <CardSection section={recentlyViewed} eyebrow="Pick up where you left off" viewAll="/shop" viewAllLabel="Keep browsing" rail />
-            <GiftFinder finder={giftFinder} />
-            <Featured featured={featured} />
-            <GiftingSteps giftFinder={giftFinder} />
-            <ReviewsBand reviews={reviews} />
-            <Promise promise={promise} />
-            <CardSection section={newArrivals} eyebrow="Just in" viewAll="/shop?sort=new" viewAllLabel="See what's new" rail />
-            <HomeBlocks blocks={blocks} />
+            {keys.map((key) => {
+                if (key.startsWith('block:')) {
+                    const block = blockById[key.slice(6)];
+                    return block ? <HomeBlock key={key} block={block} /> : null;
+                }
+                const render = sections[key];
+                return render ? <Fragment key={key}>{render()}</Fragment> : null;
+            })}
         </>
     );
 }
@@ -115,6 +127,24 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
     const current = slides[i] || {};
     const showFinder = giftFinder?.show && giftFinder.budgets?.length;
 
+    // Sound: video slides start muted (browsers only autoplay silent video);
+    // the speaker button turns the current one up. Moving to another slide
+    // mutes everything again.
+    const [soundOn, setSoundOn] = useState(false);
+    const frames = useRef({});
+    useEffect(() => { setSoundOn(false); }, [i]);
+    useEffect(() => {
+        Object.entries(frames.current).forEach(([k, frame]) => {
+            if (!frame?.contentWindow) return;
+            const on = soundOn && Number(k) === i;
+            const kind = slides[k]?.video?.type;
+            const msg = kind === 'youtube'
+                ? [{ event: 'command', func: on ? 'unMute' : 'mute', args: [] }, ...(on ? [{ event: 'command', func: 'setVolume', args: [100] }] : [])]
+                : [{ method: 'setVolume', value: on ? 1 : 0 }];
+            msg.forEach((m) => frame.contentWindow.postMessage(JSON.stringify(m), '*'));
+        });
+    }, [soundOn, i]);
+
     // The slide timer is the progress bar's own CSS animation: when it ends,
     // the next slide starts. Pausing the animation pauses the slideshow, and
     // reduced-motion visitors (no animation) simply get no auto-advance.
@@ -123,7 +153,7 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
             {slides.map((_, k) => (
                 <span key={k} className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
                     {k < i && <span className="absolute inset-0 bg-white" />}
-                    {k === i && <span key={`p${i}`} className="story-fill absolute inset-0 bg-white" style={{ '--story-dur': '6.5s' }} onAnimationEnd={() => go(i + 1)} />}
+                    {k === i && <span key={`p${i}`} className="story-fill absolute inset-0 bg-white" style={{ '--story-dur': `${slides[i]?.seconds || 6.5}s` }} onAnimationEnd={() => go(i + 1)} />}
                 </span>
             ))}
         </div>
@@ -150,7 +180,7 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                             {/* Gift entry point: scrolls to the finder below. */}
                             {showFinder ? (
                                 <a href="#gift-finder" className="lux-btn-ghost">
-                                    <Icon name="gift" className="w-4 h-4" strokeWidth={1.6} /> Shopping for someone?
+                                    <Icon name="gift" className="w-4 h-4" strokeWidth={1.6} /> {hero.finderLabel || 'Shopping for someone?'}
                                 </a>
                             ) : hero.secondaryText ? (
                                 <a href={hero.secondaryLink} className="lux-btn-ghost">{hero.secondaryText}</a>
@@ -215,9 +245,22 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                             const cls = `absolute inset-0 block transition-opacity duration-[1200ms] ease-[var(--ease-lux)] ${active ? 'opacity-100' : 'opacity-0 pointer-events-none'}`;
                             if (!mounted.has(k)) return <div key={k} className={cls} aria-hidden="true" />;
                             const inner = s.type === 'video' && s.video?.type === 'file' ? (
-                                <video src={s.video.src} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                                <video src={s.video.src} autoPlay muted={!(soundOn && active)} loop playsInline className="w-full h-full object-cover" />
                             ) : s.type === 'video' ? (
-                                <iframe src={s.video.embedUrl} title={s.alt} className="w-full h-full pointer-events-none" loading="lazy" allow="autoplay" tabIndex={-1} />
+                                // Sized to cover the frame like the photos do: a 16:9
+                                // player in a portrait frame would otherwise sit in
+                                // black bars. The container's own size drives it.
+                                <div className="absolute inset-0 overflow-hidden [container-type:size] bg-ink-900">
+                                    <iframe
+                                        ref={(el) => { frames.current[k] = el; }}
+                                        src={s.video.embedUrl}
+                                        title={s.alt || 'Video'}
+                                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[max(100cqw,177.78cqh)] h-[max(100cqh,56.25cqw)] pointer-events-none"
+                                        {...(k > 0 ? { loading: 'lazy' } : {})}
+                                        allow="autoplay; encrypted-media; picture-in-picture"
+                                        tabIndex={-1}
+                                    />
+                                </div>
                             ) : (
                                 <img
                                     src={s.image}
@@ -254,8 +297,23 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                                     <span className="grid place-items-center w-8 h-8 rounded-full bg-white text-ink-900"><Arrow className="w-3.5 h-3.5" /></span>
                                 </SmartLink>
                             ) : <span />}
+                            <div className="pointer-events-auto flex items-center gap-2">
+                                {current.type === 'video' && current.sound && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSoundOn(!soundOn)}
+                                        aria-pressed={soundOn}
+                                        aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
+                                        className="grid place-items-center w-11 h-11 rounded-full glass-dark text-white hover:bg-white hover:text-ink-900 transition-colors"
+                                    >
+                                        <svg aria-hidden="true" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                            <path d="M11 5L6 9H3v6h3l5 4V5z" />
+                                            {soundOn ? <path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" /> : <path d="M16 9l5 6M21 9l-5 6" />}
+                                        </svg>
+                                    </button>
+                                )}
                             {many && (
-                                <div className="pointer-events-auto flex items-center gap-2">
+                                <>
                                     <span className="hidden sm:inline text-white/90 text-[12px] tabular-nums tracking-[0.12em] mr-1">{String(i + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span>
                                     <button type="button" onClick={() => go(i - 1)} aria-label="Previous" className="hidden lg:grid place-items-center w-11 h-11 rounded-full glass-dark text-white hover:bg-white hover:text-ink-900 transition-colors">
                                         <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
@@ -263,8 +321,9 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                                     <button type="button" onClick={() => go(i + 1)} aria-label="Next" className="hidden lg:grid place-items-center w-11 h-11 rounded-full glass-dark text-white hover:bg-white hover:text-ink-900 transition-colors">
                                         <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                     </button>
-                                </div>
+                                </>
                             )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -322,7 +381,7 @@ function Categories({ section }) {
     return (
         <section className="py-16 lg:py-24">
             <div className={shell}>
-                <Heading eyebrow="Explore" title={section.title} action={<ViewAll href="/shop">View all</ViewAll>} />
+                <Heading eyebrow={section.eyebrow || 'Explore'} title={section.title} action={<ViewAll href={section.link || '/shop'}>{section.linkLabel || 'View all'}</ViewAll>} />
             </div>
             <div className={`${shell} flex ${layout} gap-3 sm:gap-4 lg:gap-5 overflow-x-auto snap-x snap-mandatory scroll-pl-4 sm:scroll-pl-6 lg:scroll-pl-10 no-scrollbar -mb-2 pb-2`}>
                 {section.items.map((cat, k) => (
@@ -374,7 +433,7 @@ function Occasions({ section }) {
     return (
         <section className="py-16 lg:py-24 bg-mist-50">
             <div className={shell}>
-                <Heading eyebrow="For every moment" title={section.title} subtitle={section.subtitle} />
+                <Heading eyebrow={section.eyebrow || 'For every moment'} title={section.title} subtitle={section.subtitle} />
 
                 {/* Desktop index */}
                 <div className="hidden lg:grid grid-cols-12 gap-12 items-start">
@@ -469,7 +528,7 @@ function DealsInner({ deals }) {
             <div className={shell}>
                 <div className="flex flex-wrap items-end justify-between gap-6 mb-10 lg:mb-14">
                     <div>
-                        <p className="eyebrow flex items-center gap-3"><span className="h-px w-8 bg-ink-900/25" aria-hidden="true" />Today only</p>
+                        <p className="eyebrow flex items-center gap-3"><span className="h-px w-8 bg-ink-900/25" aria-hidden="true" />{deals.eyebrow || 'Today only'}</p>
                         <h2 className="display mt-4 text-[2.1rem] sm:text-5xl lg:text-[3.5rem]">{deals.title}</h2>
                         {deals.subtitle && <p className="mt-3 text-ink-700/75">{deals.subtitle}</p>}
                     </div>
@@ -568,12 +627,12 @@ function MembershipBand() {
 
 /* ── Product rows (best sellers / new arrivals / per-visitor rows) ───────── */
 // `rail` lays the cards out as a swipeable row instead of a grid.
-function CardSection({ section, eyebrow, viewAll, viewAllLabel, rail = false }) {
+function CardSection({ section, rail = false }) {
     if (!section?.show || !section.cards?.length) return null;
     return (
         <section className="py-16 lg:py-24">
             <div className={shell}>
-                <Heading eyebrow={eyebrow} title={section.title} action={<ViewAll href={viewAll}>{viewAllLabel}</ViewAll>} />
+                <Heading eyebrow={section.eyebrow} title={section.title} action={section.link && section.linkLabel ? <ViewAll href={section.link}>{section.linkLabel}</ViewAll> : null} />
                 {rail ? (
                     <Carousel>
                         {section.cards.map((p) => (
@@ -612,7 +671,7 @@ function GiftFinder({ finder }) {
 
                     <div className="relative grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                         <div className="lg:col-span-5">
-                            <p className="eyebrow !text-white/60 flex items-center gap-3"><span className="h-px w-8 bg-white/40" aria-hidden="true" />Gift finder</p>
+                            <p className="eyebrow !text-white/60 flex items-center gap-3"><span className="h-px w-8 bg-white/40" aria-hidden="true" />{finder.eyebrow || 'Gift finder'}</p>
                             <h2 className="display !text-white mt-4 text-[2.4rem] sm:text-5xl lg:text-6xl">{finder.title}</h2>
                             {finder.text && <p className="mt-5 text-white/65 leading-relaxed max-w-md">{finder.text}</p>}
                             {(finder.promises || []).length > 0 && (
@@ -663,39 +722,59 @@ function GiftFinder({ finder }) {
 
 /* ── Featured edit: one hero piece + the rest ───────────────────────────── */
 function Featured({ featured }) {
-    if (!featured?.cards?.length) return null;
-    const [lead, ...rest] = featured.cards;
+    if (!featured || featured.show === false) return null;
+    const lead = featured.lead;
+    const cards = featured.cards || [];
+    if (!lead && !cards.length) return null;
+
+    // The large tile: a product (the first, or one the owner chose) or the
+    // owner's own image and words. With no tile the grid takes the full width.
+    const piece = lead?.type === 'product' ? lead.card : null;
+    const tile = lead && (
+        <SmartLink href={piece ? piece.url : lead.url} className="group lg:col-span-5 relative block overflow-hidden rounded-[28px] bg-mist-100 aspect-[4/5] lg:aspect-auto lg:min-h-full">
+            {(piece ? piece.thumb : lead.image) && (
+                <img
+                    src={piece ? piece.thumb : lead.image} alt="" loading="lazy" decoding="async"
+                    {...((piece ? piece.srcset : lead.srcset) ? { srcSet: piece ? piece.srcset : lead.srcset, sizes: '(min-width: 1024px) 40vw, 100vw' } : {})}
+                    className="absolute inset-0 w-full h-full object-cover transition duration-[1400ms] ease-[var(--ease-lux)] group-hover:scale-105"
+                />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8 text-white">
+                {lead.eyebrow && <p className="text-[11px] tracking-[0.24em] uppercase text-white/70">{lead.eyebrow}</p>}
+                {(piece ? piece.name : lead.heading) && <h3 className="display !text-white text-3xl lg:text-[2.6rem] mt-3">{piece ? piece.name : lead.heading}</h3>}
+                {!piece && lead.text && <p className="mt-3 text-white/80 text-[15px] leading-relaxed max-w-md">{lead.text}</p>}
+                <div className="mt-5 flex items-center justify-between gap-4">
+                    {piece ? (
+                        <span className="text-lg font-semibold">
+                            {piece.price_text}
+                            {piece.on_sale && <span className="ml-2 text-sm font-normal text-white/60 line-through">{piece.compare_text}</span>}
+                        </span>
+                    ) : <span />}
+                    <span className="lux-btn-light !min-h-11 !px-5">{lead.button || 'Discover'} <Arrow /></span>
+                </div>
+            </div>
+        </SmartLink>
+    );
 
     return (
         <section className="py-16 lg:py-24">
             <div className={shell}>
-                <Heading eyebrow="Curated" title={featured.title} subtitle="Our most-loved pieces, chosen for the season." action={<ViewAll href="/shop">Shop all jewelry</ViewAll>} />
-                <div className="grid lg:grid-cols-12 gap-x-5 gap-y-10">
-                    <SmartLink href={lead.url} className="group lg:col-span-5 relative block overflow-hidden rounded-[28px] bg-mist-100 aspect-[4/5] lg:aspect-auto lg:min-h-full">
-                        {lead.thumb && (
-                            <img
-                                src={lead.thumb} alt="" loading="lazy" decoding="async"
-                                {...(lead.srcset ? { srcSet: lead.srcset, sizes: '(min-width: 1024px) 40vw, 100vw' } : {})}
-                                className="absolute inset-0 w-full h-full object-cover transition duration-[1400ms] ease-[var(--ease-lux)] group-hover:scale-105"
-                            />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-transparent" />
-                        <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8 text-white">
-                            <p className="text-[11px] tracking-[0.24em] uppercase text-white/70">The piece of the season</p>
-                            <h3 className="display !text-white text-3xl lg:text-[2.6rem] mt-3">{lead.name}</h3>
-                            <div className="mt-5 flex items-center justify-between gap-4">
-                                <span className="text-lg font-semibold">
-                                    {lead.price_text}
-                                    {lead.on_sale && <span className="ml-2 text-sm font-normal text-white/60 line-through">{lead.compare_text}</span>}
-                                </span>
-                                <span className="lux-btn-light !min-h-11 !px-5">Discover <Arrow /></span>
+                <Heading eyebrow={featured.eyebrow} title={featured.title} subtitle={featured.subtitle} action={featured.link && featured.linkLabel ? <ViewAll href={featured.link}>{featured.linkLabel}</ViewAll> : null} />
+                {tile ? (
+                    <div className="grid lg:grid-cols-12 gap-x-5 gap-y-10">
+                        {tile}
+                        {cards.length > 0 && (
+                            <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-x-3 sm:gap-x-5 gap-y-10">
+                                {cards.slice(0, 6).map((p) => <ProductCard key={p.id} product={p} />)}
                             </div>
-                        </div>
-                    </SmartLink>
-                    <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-x-3 sm:gap-x-5 gap-y-10">
-                        {rest.slice(0, 6).map((p) => <ProductCard key={p.id} product={p} />)}
+                        )}
                     </div>
-                </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 sm:gap-x-5 gap-y-10 lg:gap-y-14">
+                        {cards.map((p) => <ProductCard key={p.id} product={p} />)}
+                    </div>
+                )}
             </div>
         </section>
     );
@@ -708,7 +787,7 @@ function GiftingSteps({ giftFinder }) {
     return (
         <section className="py-16 lg:py-20 bg-mist-50">
             <div className={shell}>
-                <Heading eyebrow="Gifting, made effortless" title="Send it straight to them — we handle the rest" center />
+                <Heading eyebrow={giftFinder.stepsEyebrow || 'Gifting, made effortless'} title={giftFinder.stepsTitle || 'Send it straight to them — we handle the rest'} center />
                 <ol className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
                     {steps.map(({ title, text }, n) => (
                         <li key={title} className="relative pt-6 border-t border-ink-900/15">
@@ -733,7 +812,7 @@ function GiftingSteps({ giftFinder }) {
 }
 
 /* ── Customer love (sitewide recent 4–5★ reviews) ────────────────────────── */
-function ReviewsBand({ reviews }) {
+function ReviewsBand({ reviews, section = {} }) {
     if (!reviews?.length) return null;
     const avg = reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0) / reviews.length;
 
@@ -742,13 +821,13 @@ function ReviewsBand({ reviews }) {
             <div className={shell}>
                 <div className="grid lg:grid-cols-12 gap-10 lg:gap-14">
                     <div className="lg:col-span-4">
-                        <p className="eyebrow flex items-center gap-3"><span className="h-px w-8 bg-ink-900/25" aria-hidden="true" />Customer love</p>
-                        <h2 className="display mt-4 text-[2.1rem] sm:text-5xl lg:text-[3.5rem]">What they're saying</h2>
+                        <p className="eyebrow flex items-center gap-3"><span className="h-px w-8 bg-ink-900/25" aria-hidden="true" />{section.eyebrow || 'Customer love'}</p>
+                        <h2 className="display mt-4 text-[2.1rem] sm:text-5xl lg:text-[3.5rem]">{section.title || "What they're saying"}</h2>
                         <div className="mt-8 flex items-center gap-4">
                             <span className="display text-6xl">{avg.toFixed(1)}</span>
                             <span>
                                 <span className="flex text-gold-500">{[1, 2, 3, 4, 5].map((s) => <Star key={s} className="w-4 h-4" off={s > Math.round(avg)} />)}</span>
-                                <span className="block text-[12px] text-ink-700/70 mt-1">From customers across Bangladesh</span>
+                                {section.caption && <span className="block text-[12px] text-ink-700/70 mt-1">{section.caption}</span>}
                             </span>
                         </div>
                     </div>
