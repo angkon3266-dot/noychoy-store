@@ -1,5 +1,5 @@
 {{-- The hero: always first on the page. --}}
-<x-admin.home-panel title="Hero (top of the page)" hint="Headline, buttons and the photo / video slideshow" :home="$home" fixed>
+<x-admin.home-panel title="Hero (top of the page)" hint="Headline, buttons and the photo / video slideshow" :home="$home" fixed focus="hero">
     @include('admin.appearance.home._texts', ['fields' => [
         'hero_eyebrow' => 'Small text above the headline',
         'hero_highlight' => 'Highlighted words (shown in italics and colour)',

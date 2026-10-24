@@ -6,7 +6,9 @@
     'home' => [],
     'fixed' => false,       // not draggable (the hero always opens the page)
     'open' => false,
+    'focus' => null,        // the homepage section the live preview scrolls to (defaults to the token)
 ])
+@php $focusKey = $focus ?? $token; @endphp
 {{--
     One section of the homepage builder (Admin → Appearance → Homepage).
     Draggable rows carry data-section-row; their order is the order of the
@@ -26,7 +28,7 @@
         @else
             <span class="shrink-0 w-6 text-center text-ink-700/40" title="Always first">★</span>
         @endunless
-        <button type="button" @click="open = !open" class="flex-1 min-w-0 text-left">
+        <button type="button" @click="open = !open; @if($focusKey) if (open) $dispatch('home-focus', @js($focusKey)) @endif" class="flex-1 min-w-0 text-left">
             <span class="block text-sm font-semibold text-ink-900">{{ $title }}</span>
             @if($hint)<span class="block text-xs text-ink-700/55 truncate">{{ $hint }}</span>@endif
         </button>

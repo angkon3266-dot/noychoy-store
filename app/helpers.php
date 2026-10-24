@@ -312,7 +312,9 @@ if (! function_exists('home_content')) {
      */
     function home_content(?string $key = null, $default = null)
     {
-        $saved = Setting::get('home_content', []);
+        // The homepage builder's live preview renders an unsaved draft
+        // (HomeController binds it for the admin who made it).
+        $saved = app()->bound('home_content.preview') ? app('home_content.preview') : Setting::get('home_content', []);
         $merged = array_merge(config('home.defaults', []), is_array($saved) ? $saved : []);
 
         if ($key === null) {

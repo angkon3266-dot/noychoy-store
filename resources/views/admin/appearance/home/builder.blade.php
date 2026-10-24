@@ -7,7 +7,10 @@
 @php
     $blocksById = collect($homeBlocks)->keyBy('id');
 @endphp
-<div class="space-y-4" x-show="tab==='homepage'" x-data="homeSections">
+<div id="home-builder" x-show="tab==='homepage'"
+     x-data="homePreview({ previewUrl: @js(route('admin.appearance.preview')), homeUrl: @js(route('home')) })"
+     class="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(420px,44%)] xl:gap-6 xl:items-start">
+<div class="space-y-4 min-w-0" x-data="homeSections">
     <div class="card p-5 flex flex-wrap items-start justify-between gap-4">
         <div class="max-w-2xl">
             <h2 class="font-semibold">Homepage builder</h2>
@@ -107,3 +110,39 @@
         </div>
     </details>
 </div>
+
+{{-- Live preview: the homepage as the form stands, before Save. --}}
+<aside class="hidden xl:block xl:sticky xl:top-[5.5rem]"
+       :class="open ? '!fixed !inset-0 !z-[90] !block bg-ink-900/70 p-2 sm:p-4' : ''">
+    <div class="card overflow-hidden flex flex-col h-[calc(100vh-7rem)]" :class="open ? '!h-full' : ''">
+        <div class="flex items-center gap-2 px-3 py-2.5 border-b border-ink-100">
+            <span class="text-sm font-semibold text-ink-900">Live preview</span>
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px]"
+                  :class="{ 'bg-green-50 text-green-700': status === 'live', 'bg-amber-50 text-amber-700': status === 'pending' || status === 'updating', 'bg-red-50 text-red-700': status === 'error' }">
+                <span class="w-1.5 h-1.5 rounded-full bg-current" :class="status === 'updating' && 'animate-pulse'"></span>
+                <span x-text="{ live: 'Up to date', pending: 'Changes…', updating: 'Updating…', error: 'Could not update' }[status]"></span>
+            </span>
+            <div class="ml-auto inline-flex rounded-lg bg-ink-50 p-0.5 text-xs">
+                <button type="button" @click="device = 'desktop'" :class="device === 'desktop' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-700/60'" class="px-2.5 py-1 rounded-md">Computer</button>
+                <button type="button" @click="device = 'phone'" :class="device === 'phone' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-700/60'" class="px-2.5 py-1 rounded-md">Phone</button>
+            </div>
+            <a :href="src" target="_blank" class="text-xs text-gold-700 hover:underline px-1" title="Open this preview in a new tab">Open ↗</a>
+            <button type="button" x-show="open" @click="open = false" class="grid place-items-center w-8 h-8 rounded-lg hover:bg-ink-50" aria-label="Close preview">&times;</button>
+        </div>
+        <div x-ref="box" class="relative flex-1 overflow-hidden bg-ink-100/60">
+            <div class="absolute top-0 left-1/2 origin-top" :class="device === 'phone' ? 'mt-3' : ''"
+                 :style="`width:${frameW}px;height:${device === 'phone' ? frameH - 24 : frameH}px;transform:translateX(-50%) scale(${scale})`">
+                <iframe x-ref="frame" :src="src" @load="loaded()" title="Homepage preview"
+                        class="w-full h-full bg-white" :class="device === 'phone' ? 'rounded-[28px] ring-8 ring-ink-900 shadow-2xl' : ''"></iframe>
+            </div>
+        </div>
+        <p class="px-3 py-2 border-t border-ink-100 text-[11px] text-ink-700/55">Updates as you edit — nothing goes live until you press <strong>Save</strong>. Pictures uploaded from your device appear after saving; library picks show straight away.</p>
+    </div>
+</aside>
+
+{{-- Below the wide-screen layout, the preview opens full-screen. --}}
+<button type="button" x-show="!open" @click="open = true" class="xl:hidden fixed bottom-24 left-4 z-40 inline-flex items-center gap-2 rounded-full bg-ink-900 text-white px-4 py-2.5 text-sm shadow-lg">
+    <span class="w-2 h-2 rounded-full" :class="status === 'live' ? 'bg-green-400' : 'bg-amber-400'"></span> Live preview
+</button>
+</div>
+

@@ -3,7 +3,7 @@
 @section('heading', 'Appearance & Theme')
 
 @section('content')
-<form action="{{ route('admin.appearance.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6 max-w-4xl pb-24"
+<form action="{{ route('admin.appearance.update') }}" method="POST" enctype="multipart/form-data" class="space-y-6 pb-24" :class="tab === 'homepage' ? 'max-w-none' : 'max-w-4xl'"
       x-data="{ tab: ({ sections: 'homepage' })[localStorage.getItem('appearanceTab')] || localStorage.getItem('appearanceTab') || 'branding' }"
       x-init="$watch('tab', v => localStorage.setItem('appearanceTab', v))">
     @csrf

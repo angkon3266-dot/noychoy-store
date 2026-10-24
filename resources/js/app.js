@@ -1855,6 +1855,123 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // The builder's live preview (owner, 2026-10-24): the homepage as the
+    // form stands, before Save. Any edit inside the builder posts the form —
+    // without file uploads, which only arrive with a real save — to
+    // /admin/appearance/preview, which keeps the draft under a private token;
+    // the frame then reloads that draft, holding its scroll position, and
+    // opening a section scrolls the frame to it. Desktop or phone width.
+    window.Alpine.data('homePreview', (cfg) => ({
+        device: 'desktop',
+        status: 'live',         // live | pending | updating | error
+        src: cfg.homeUrl,
+        focusKey: null,
+        open: false,            // the full-screen preview below the xl breakpoint
+        timer: null,
+        seq: 0,
+        keep: 0,
+        scale: 1,
+        frameW: 1280,
+        frameH: 800,
+
+        init() {
+            const scope = document.getElementById('home-builder');
+            const kick = (e) => {
+                if (e && e.target && e.target.type === 'file') return;   // uploads show after Save
+                this.schedule();
+            };
+            scope.addEventListener('input', kick);
+            scope.addEventListener('change', kick);
+            // Reordering, adding and removing rows change the DOM, not a value.
+            setTimeout(() => {
+                const list = scope.querySelector('[x-ref="list"]');
+                if (list) new MutationObserver(() => this.schedule()).observe(list, { childList: true });
+                scope.querySelectorAll('[data-slide-row]').forEach((row) => new MutationObserver(() => this.schedule()).observe(row.parentElement, { childList: true }));
+            }, 1000);
+            window.addEventListener('home-focus', (e) => { this.focusKey = e.detail; this.scrollToFocus(); });
+            window.addEventListener('resize', () => this.fit());
+            this.$watch('device', () => this.$nextTick(() => this.fit()));
+            this.$watch('open', () => this.$nextTick(() => this.fit()));
+            this.$nextTick(() => this.fit());
+        },
+
+        schedule() {
+            clearTimeout(this.timer);
+            this.status = 'pending';
+            this.timer = setTimeout(() => this.refresh(), 700);
+        },
+
+        async refresh() {
+            const form = this.$root.closest('form');
+            const lean = new FormData();
+            for (const [k, v] of new FormData(form).entries()) {
+                if (!(v instanceof File)) lean.append(k, v);
+            }
+            const n = ++this.seq;
+            this.status = 'updating';
+            try {
+                const res = await fetch(cfg.previewUrl, { method: 'POST', body: lean, headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                if (n !== this.seq) return;           // a newer edit is on its way
+                if (!res.ok) { this.status = 'error'; return; }
+                const { url } = await res.json();
+                this.keep = this.frameScroll();
+                this.src = url;
+            } catch (err) {
+                if (n === this.seq) this.status = 'error';
+            }
+        },
+
+        frameDoc() {
+            try { return this.$refs.frame.contentDocument; } catch (err) { return null; }
+        },
+
+        frameScroll() {
+            try { return this.$refs.frame.contentWindow.scrollY || 0; } catch (err) { return 0; }
+        },
+
+        loaded() {
+            const doc = this.frameDoc();
+            if (doc) {
+                // Inside the preview every section shows at once (no fade-in on scroll),
+                // and links stay put so the owner does not wander off the draft.
+                const style = doc.createElement('style');
+                style.textContent = '.reveal-init{opacity:1!important;animation:none!important} html{scroll-behavior:auto!important}';
+                doc.head.appendChild(style);
+                doc.addEventListener('click', (e) => { if (e.target.closest('a')) e.preventDefault(); }, true);
+            }
+            // The page draws after its script runs; give it a beat, then put
+            // the reader back where they were.
+            setTimeout(() => {
+                try { this.$refs.frame.contentWindow.scrollTo(0, this.keep); } catch (err) { /* cross-origin never */ }
+                if (this.status !== 'pending') this.status = 'live';
+            }, 350);
+        },
+
+        scrollToFocus() {
+            const doc = this.frameDoc();
+            if (!doc || !this.focusKey) return;
+            const el = doc.querySelector(`[data-home-section="${CSS.escape(this.focusKey)}"]`);
+            if (!el) return;
+            const win = this.$refs.frame.contentWindow;
+            const header = doc.querySelector('header');
+            win.scrollTo({ top: el.getBoundingClientRect().top + win.scrollY - (header ? header.offsetHeight : 0), behavior: 'smooth' });
+            el.style.transition = 'box-shadow .4s';
+            el.style.boxShadow = 'inset 0 0 0 3px rgba(242,140,26,.85)';
+            setTimeout(() => { el.style.boxShadow = ''; }, 1400);
+        },
+
+        // The frame renders at a real device width and is scaled to fit the panel.
+        fit() {
+            const box = this.$refs.box;
+            if (!box) return;
+            const w = box.clientWidth || 1;
+            const h = box.clientHeight || 1;
+            this.frameW = this.device === 'phone' ? 390 : 1280;
+            this.scale = Math.min(1, w / this.frameW);
+            this.frameH = Math.round(h / this.scale);
+        },
+    }));
+
     // One custom section inside the builder. Its whole shape posts as JSON in
     // home_blocks[<id>]; image uploads post as block_image[<id>][n],
     // block_banner[<id>] and block_cta[<id>].

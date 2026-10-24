@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
@@ -45,14 +45,18 @@ export default function Home(props) {
 
     return (
         <>
-            <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} giftFinder={giftFinder} />
+            {/* data-home-section lets the admin's live preview scroll to the
+                section being edited. */}
+            <div data-home-section="hero">
+                <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} giftFinder={giftFinder} />
+            </div>
             {keys.map((key) => {
                 if (key.startsWith('block:')) {
                     const block = blockById[key.slice(6)];
-                    return block ? <HomeBlock key={key} block={block} /> : null;
+                    return block ? <div key={key} data-home-section={key}><HomeBlock block={block} /></div> : null;
                 }
                 const render = sections[key];
-                return render ? <Fragment key={key}>{render()}</Fragment> : null;
+                return render ? <div key={key} data-home-section={key}>{render()}</div> : null;
             })}
         </>
     );

@@ -376,6 +376,7 @@ Route::middleware('admin')->group(function () {
     // Appearance / theme
     Route::get('appearance', [AppearanceController::class, 'index'])->name('appearance');
     Route::post('appearance', [AppearanceController::class, 'update'])->name('appearance.update');
+    Route::post('appearance/preview', [AppearanceController::class, 'preview'])->name('appearance.preview');
 
     // Navigation menu builder
     Route::get('menu', [MenuController::class, 'index'])->name('menu');

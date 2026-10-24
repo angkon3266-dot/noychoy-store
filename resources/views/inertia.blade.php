@@ -113,8 +113,12 @@
         .logo-center { height: {{ (int) (theme('header_center_height') ?: 32) }}px; width: auto; }
         .menu-ico { height: {{ (int) (theme('menu_icon_height') ?: 28) }}px; width: {{ (int) (theme('menu_icon_height') ?: 28) }}px; }
     </style>
-    @include('partials.meta-pixel')
-    @include('partials.google-tag')
+    {{-- A homepage-builder preview is the owner looking at a draft: nothing
+         reaches Meta or Google from it. --}}
+    @unless($noTracking ?? false)
+        @include('partials.meta-pixel')
+        @include('partials.google-tag')
+    @endunless
 </head>
 <body class="min-h-screen" data-shop>
     {{-- @inertia expanded by hand so the crawlable shell can sit INSIDE the
@@ -125,7 +129,9 @@
          would replace both this and the shell. --}}
     <script data-page="app" type="application/json">{!! json_encode($page, JSON_HEX_TAG) !!}</script>
     <div id="app">@include('partials.seo-body')</div>
-    @include('partials.web-push')
-    @include('partials.ai-chat')
+    @unless($noTracking ?? false)
+        @include('partials.web-push')
+        @include('partials.ai-chat')
+    @endunless
 </body>
 </html>

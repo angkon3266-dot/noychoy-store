@@ -14,14 +14,30 @@ class HomeController extends Controller
     /** Cache key for the homepage id-plan (bumped on product/category/appearance saves). */
     public const CACHE_KEY = 'home.plan.v2';
 
+    /** Cache prefix for the homepage builder's unsaved live-preview drafts. */
+    public const PREVIEW_KEY = 'home.preview.';
+
     public function index(Request $request)
     {
+        // The homepage builder's live preview (Admin → Appearance → Homepage):
+        // an unsaved draft, opened only by the admin who made it. Everything
+        // below reads home_content(), which then reads the draft.
+        app()->forgetInstance('home_content.preview');   // a draft never outlives its own request
+        $preview = false;
+        if (filled($token = $request->query('home_preview')) && auth('web')->check()) {
+            $draft = \Illuminate\Support\Facades\Cache::get(self::PREVIEW_KEY.$token);
+            if (is_array($draft) && ($draft['user'] ?? null) === auth('web')->id()) {
+                app()->instance('home_content.preview', $draft['home']);
+                $preview = true;
+            }
+        }
+
         // The expensive part of the homepage is DECIDING what to show (several
         // product queries incl. a SUM over order_items for auto-bestsellers).
         // We cache that decision as plain ids — the app's cache store refuses to
         // serialize objects (cache.serializable_classes = false) — then hydrate
         // everything with one indexed whereIn query, so prices/stock stay live.
-        $plan = \Illuminate\Support\Facades\Cache::remember(self::CACHE_KEY, 600, function () {
+        $buildPlan = function () {
             $sectionBlocks = collect(\App\Support\HomeLayout::withIds(home_content('sections') ?? []))
                 ->filter(fn ($b) => ($b['enabled'] ?? true) && filled($b['type'] ?? null))
                 ->map(function ($b) {
@@ -43,7 +59,10 @@ class HomeController extends Controller
                     ? ((int) home_content('featured_lead_product_id') ?: null) : null,
                 'sections' => $sectionBlocks,
             ];
-        });
+        };
+        // A preview decides from the draft every time; the shared plan cache
+        // only ever holds the saved homepage.
+        $plan = $preview ? $buildPlan() : \Illuminate\Support\Facades\Cache::remember(self::CACHE_KEY, 600, $buildPlan);
 
         // Per-visitor rows — decided OUTSIDE the shared plan cache (they come
         // from this session's history, loves and gift-finder answers), but
@@ -119,9 +138,13 @@ class HomeController extends Controller
             $lcp = collect($data['hero']['slides'] ?? [])->first();
             $lcpImage = ($lcp && ($lcp['type'] ?? null) === 'image') ? $lcp['image'] : null;
 
-            return \Inertia\Inertia::render('Home', $data + [
+            $page = \Inertia\Inertia::render('Home', $data + [
                 'seoTitle' => home_content('seo_title'),
+                'preview' => $preview,
             ])->withViewData([
+                // A preview is the owner looking at a draft: no Pixel, no
+                // Google tag, no push prompt, no chat — nothing reaches Meta.
+                'noTracking' => $preview,
                 // Default in config/home.php, overridable in Admin → Appearance
                 // → Homepage content (a field that until now was silently
                 // discarded on save).
@@ -141,6 +164,16 @@ class HomeController extends Controller
                     ? $lcp['image900'].' 900w, '.$lcpImage.' 1600w' : null,
                 'preloadSizes' => '(min-width: 1024px) 50vw, 100vw',
             ]);
+
+            if (! $preview) {
+                return $page;
+            }
+
+            // Never cached by LiteSpeed or the browser: a draft is private.
+            return $page->toResponse($request)
+                ->header('Cache-Control', 'no-store, private')
+                ->header('X-LiteSpeed-Cache-Control', 'no-cache')
+                ->header('X-Robots-Tag', 'noindex');
         }
 
         $view = config('theme.homepage_templates.'.$key.'.view');

@@ -230,4 +230,48 @@ class HomepageBuilderTest extends TestCase
         $this->assertSame([['title' => 'Pick', 'text' => 'Any piece']], $home['gifting_steps']);
         $this->assertSame([], $home['gift_promises']);
     }
+
+    // ── Live preview ─────────────────────────────────────────────────────────
+
+    public function test_the_live_preview_shows_a_draft_without_saving_it(): void
+    {
+        Setting::put('home_content', ['featured_title' => 'Saved title']);
+
+        $url = $this->actingAs($this->admin())
+            ->postJson('/admin/appearance/preview', ['home' => ['featured_title' => 'Draft title'], 'home_show_featured_present' => 1])
+            ->assertOk()->json('url');
+
+        // Nothing saved.
+        $this->assertSame('Saved title', Setting::get('home_content')['featured_title']);
+
+        // The draft renders for its admin — untracked and never cached.
+        $response = $this->get($url)->assertOk()
+            ->assertHeader('X-LiteSpeed-Cache-Control', 'no-cache')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('preview', true)
+                ->where('featured.title', 'Draft title')
+                ->where('featured.show', false));
+        $this->assertStringNotContainsString('fbq(', $response->getContent());
+
+        // The live homepage still shows what is saved.
+        $this->get('/')->assertInertia(fn (Assert $page) => $page->where('featured.title', 'Saved title')->where('preview', false));
+    }
+
+    public function test_a_preview_link_is_useless_to_anyone_else(): void
+    {
+        $url = $this->actingAs($this->admin())
+            ->postJson('/admin/appearance/preview', ['home' => ['featured_title' => 'Draft title']])
+            ->json('url');
+
+        auth('web')->logout();
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('preview', false)
+            ->where('featured.title', 'Featured'));
+    }
+
+    public function test_only_admins_can_make_a_preview(): void
+    {
+        $status = $this->postJson('/admin/appearance/preview', ['home' => ['featured_title' => 'X']])->status();
+        $this->assertContains($status, [302, 401, 403]);
+    }
 }

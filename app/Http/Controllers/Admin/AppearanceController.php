@@ -314,6 +314,184 @@ class AppearanceController extends Controller
             }
         }
 
+        $home = $this->buildHomeContent($request, $optimizer, $data);
+        Setting::put('home_content', $home);
+
+        // Booleans (checkboxes)
+        foreach (['announcement_enabled', 'pinned_enabled', 'pinned_dismissible', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'show_delivery_estimate', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo', 'gift_enabled'] as $bool) {
+            $current[$bool] = $request->boolean($bool);
+        }
+
+        // Trust strip badges: keep only rows with a title.
+        if (array_key_exists('trust_badges', $data)) {
+            $current['trust_badges'] = collect($data['trust_badges'] ?? [])
+                ->map(fn ($b) => [
+                    'icon' => trim((string) ($b['icon'] ?? '')),
+                    'title' => trim((string) ($b['title'] ?? '')),
+                    'text' => trim((string) ($b['text'] ?? '')),
+                ])
+                ->filter(fn ($b) => $b['title'] !== '')
+                ->values()->all();
+        }
+
+        // Product page points. The editor always posts its heading field, so
+        // its presence says the card was on the page — an empty list then
+        // means "show nothing", not "field missing".
+        if ($request->has('pdp_points_heading')) {
+            $current['pdp_points_heading'] = trim((string) $request->input('pdp_points_heading'));
+            $current['pdp_points'] = \App\Support\Storefront\PdpPoints::clean($data['pdp_points'] ?? []);
+        }
+
+        // Announcement messages: one per line -> array
+        if (array_key_exists('announcement_messages', $data)) {
+            $current['announcement_messages'] = collect(preg_split('/\r\n|\r|\n/', (string) $data['announcement_messages']))
+                ->map(fn ($l) => trim($l))->filter()->values()->all();
+            unset($data['announcement_messages']);
+        }
+
+        // Scalars
+        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'pdp_care_text', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_copyright',
+            'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
+            'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
+            'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',
+            'card_border_inset', 'card_logo_height'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $current[$key] = $data[$key];
+            }
+        }
+
+        // Social accounts, already turned into full addresses above.
+        foreach (array_keys(SocialLinks::PLATFORMS) as $platform) {
+            if (array_key_exists($key = SocialLinks::key($platform), $data)) {
+                $current[$key] = $data[$key];
+            }
+        }
+
+        // Footer "Shop" categories (ordered). The _present marker lets an empty
+        // selection clear the list (fall back to auto) rather than being ignored.
+        if ($request->has('footer_category_ids_present')) {
+            $current['footer_category_ids'] = collect($request->input('footer_category_ids', []))
+                ->map(fn ($i) => (int) $i)->filter()->values()->all();
+        }
+
+        Setting::put('theme', $current);
+
+        // ---- Storefront filters ----
+        $sf = Setting::get('storefront_filters', []);
+        $sf = is_array($sf) ? $sf : [];
+        $sf['attributes'] = array_values(array_filter((array) $request->input('filter_attributes', [])));
+        $sf['custom_fields'] = array_values(array_filter((array) $request->input('filter_custom_fields', [])));
+        // Which categories appear as a filter option in the sidebar (admin choice).
+        $sf['categories'] = array_values(array_filter(array_map('intval', (array) $request->input('filter_categories', []))));
+        $sf['category'] = $request->boolean('filter_category');
+        $sf['colors'] = $request->boolean('filter_colors');
+        $sf['tags'] = $request->boolean('filter_tags');
+        $sf['price'] = $request->boolean('filter_price');
+        $sf['in_stock'] = $request->boolean('filter_in_stock');
+        $sf['on_sale'] = $request->boolean('filter_on_sale');
+        $ranges = collect(preg_split('/\r\n|\r|\n/', (string) $request->input('filter_price_ranges', '')))
+            ->map(fn ($l) => array_map('trim', explode('-', $l)))
+            ->filter(fn ($r) => count($r) === 2 && is_numeric($r[0]) && is_numeric($r[1]))
+            ->map(fn ($r) => [(float) $r[0], (float) $r[1]])->values()->all();
+        if ($ranges) {
+            $sf['price_ranges'] = $ranges;
+        }
+        Setting::put('storefront_filters', $sf);
+
+        // ---- Per-page filter overrides (global default + per-page overrides) ----
+        // The Appearance UI submits a JSON map { "<pageKey>": { enabled, ...cfg } }.
+        // Only enabled pages are kept; everything else inherits the global default.
+        $overrides = json_decode((string) $request->input('filter_overrides_json', ''), true);
+        if (is_array($overrides)) {
+            $clean = [];
+            foreach ($overrides as $pageKey => $ov) {
+                if (! is_array($ov) || empty($ov['enabled'])) {
+                    continue;
+                }
+                $clean[$pageKey] = [
+                    'enabled' => true,
+                    'categories' => array_values(array_filter(array_map('intval', (array) ($ov['categories'] ?? [])))),
+                    'attributes' => array_values(array_filter((array) ($ov['attributes'] ?? []))),
+                    'custom_fields' => array_values(array_filter((array) ($ov['custom_fields'] ?? []))),
+                    'category' => ! empty($ov['category']),
+                    'colors' => ! empty($ov['colors']),
+                    'tags' => ! empty($ov['tags']),
+                    'price' => ! empty($ov['price']),
+                    'in_stock' => ! empty($ov['in_stock']),
+                    'on_sale' => ! empty($ov['on_sale']),
+                ];
+            }
+            Setting::put('storefront_filter_overrides', $clean);
+        }
+
+        // ---- Discover page tiles (image + name + link) ----
+        $tiles = json_decode((string) $request->input('discover_tiles_json', ''), true);
+        if (is_array($tiles)) {
+            foreach ((array) $request->file('discover_image', []) as $i => $file) {
+                if ($file && $file->isValid()) {
+                    $tiles[$i]['image'] = $optimizer->storeWebp($file, 'discover', 800, 85);
+                }
+            }
+            $tiles = collect($tiles)
+                ->map(fn ($t) => [
+                    'image' => trim((string) ($t['image'] ?? '')),
+                    'name' => trim((string) ($t['name'] ?? '')),
+                    'link' => trim((string) ($t['link'] ?? '')),
+                ])
+                ->filter(fn ($t) => $t['image'] !== '')
+                ->values()->all();
+            Setting::put('discover_tiles', $tiles);
+        }
+
+        // Homepage content/sections may have changed — rebuild its cache.
+        Cache::forget(HomeController::CACHE_KEY);
+
+        return back()->with('success', 'Appearance updated.');
+    }
+
+    /**
+     * The homepage builder's live preview: the form as it stands, unsaved.
+     * The draft is kept for half an hour under a random token that only this
+     * admin can open (HomeController), and nothing is written to the store.
+     */
+    public function preview(Request $request, ImageOptimizer $optimizer)
+    {
+        $data = $request->validate([
+            'home' => ['nullable', 'array'],
+            'home.*' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $token = \Illuminate\Support\Str::random(40);
+        Cache::put(HomeController::PREVIEW_KEY.$token, [
+            'user' => auth('web')->id(),
+            'home' => $this->buildHomeContent($request, $optimizer, $data, true),
+        ], now()->addMinutes(30));
+
+        return response()->json(['url' => route('home', ['home_preview' => $token])]);
+    }
+
+    /**
+     * The homepage settings this request describes, on top of what is saved.
+     *
+     * Shared by update() and preview(). A dry run (the builder's live
+     * preview) stores nothing, deletes nothing and downloads nothing: a
+     * library pick is used where it is, a remote picture is shown from its own
+     * address, and device uploads only arrive with a real save.
+     */
+    protected function buildHomeContent(Request $request, ImageOptimizer $optimizer, array $data, bool $dryRun = false): array
+    {
+        $delete = function (?string $path) use ($dryRun) {
+            if (! $dryRun && filled($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        };
+        $fetch = fn (string $url, ...$args) => $dryRun ? $url : $optimizer->storeWebpFromUrl($url, ...$args);
+        $pick = function (string $field) use ($request) {
+            $url = trim((string) $request->input($field.'_url', ''));
+
+            return $url === '' ? null : (public_url_to_path($url) ?: $url);
+        };
+
         // ---- Editable homepage content (stored separately under 'home_content') ----
         $home = Setting::get('home_content', []);
         $home = is_array($home) ? $home : [];
@@ -325,18 +503,18 @@ class AppearanceController extends Controller
         $heroPick = trim((string) $request->input('hero_image_url', ''));
         if ($request->hasFile('hero_image')) {
             if (! empty($home['hero_image']) && ! str_starts_with($home['hero_image'], 'http')) {
-                Storage::disk('public')->delete($home['hero_image']);
+                $delete($home['hero_image']);
             }
             $home['hero_image'] = $optimizer->storeWebp($request->file('hero_image'), 'branding', 1600, 85);
         } elseif ($heroPick !== '') {
-            $path = public_url_to_path($heroPick) ?: $optimizer->storeWebpFromUrl($heroPick, 'branding', 1600, 85);
+            $path = public_url_to_path($heroPick) ?: $fetch($heroPick, 'branding', 1600, 85);
             if (! empty($home['hero_image']) && $home['hero_image'] !== $path && ! str_starts_with($home['hero_image'], 'http')) {
-                Storage::disk('public')->delete($home['hero_image']);
+                $delete($home['hero_image']);
             }
             $home['hero_image'] = $path;
         } elseif (($request->boolean('remove_hero_image') || $request->boolean('hero_image_cleared')) && ! empty($home['hero_image'])) {
             if (! str_starts_with($home['hero_image'], 'http')) {
-                Storage::disk('public')->delete($home['hero_image']);
+                $delete($home['hero_image']);
             }
             $home['hero_image'] = null;
         }
@@ -345,18 +523,18 @@ class AppearanceController extends Controller
         $promisePick = trim((string) $request->input('promise_image_url', ''));
         if ($request->hasFile('promise_image')) {
             if (! empty($home['promise_image']) && ! str_starts_with($home['promise_image'], 'http')) {
-                Storage::disk('public')->delete($home['promise_image']);
+                $delete($home['promise_image']);
             }
             $home['promise_image'] = $optimizer->storeWebp($request->file('promise_image'), 'branding', 1400, 85);
         } elseif ($promisePick !== '') {
-            $path = public_url_to_path($promisePick) ?: $optimizer->storeWebpFromUrl($promisePick, 'branding', 1400, 85);
+            $path = public_url_to_path($promisePick) ?: $fetch($promisePick, 'branding', 1400, 85);
             if (! empty($home['promise_image']) && $home['promise_image'] !== $path && ! str_starts_with($home['promise_image'], 'http')) {
-                Storage::disk('public')->delete($home['promise_image']);
+                $delete($home['promise_image']);
             }
             $home['promise_image'] = $path;
         } elseif ($request->boolean('promise_image_cleared') && ! empty($home['promise_image'])) {
             if (! str_starts_with($home['promise_image'], 'http')) {
-                Storage::disk('public')->delete($home['promise_image']);
+                $delete($home['promise_image']);
             }
             $home['promise_image'] = null;
         }
@@ -366,7 +544,7 @@ class AppearanceController extends Controller
         if ($request->hasFile('featured_lead_image')) {
             $home['featured_lead_image'] = $optimizer->storeWebp($request->file('featured_lead_image'), 'branding', 1400, 85);
         } elseif ($leadPick !== '') {
-            $home['featured_lead_image'] = public_url_to_path($leadPick) ?: $optimizer->storeWebpFromUrl($leadPick, 'branding', 1400, 85);
+            $home['featured_lead_image'] = public_url_to_path($leadPick) ?: $fetch($leadPick, 'branding', 1400, 85);
         } elseif ($request->boolean('featured_lead_image_cleared')) {
             $home['featured_lead_image'] = null;
         }
@@ -530,8 +708,8 @@ class AppearanceController extends Controller
         if ($request->has('occasions')) {
             $existing = collect($home['occasions'] ?? config('home.defaults.occasions', []));
             $home['occasions'] = collect($request->input('occasions', []))
-                ->map(function ($row, $i) use ($request, $existing) {
-                    $image = resolve_media($request, 'occasion_image_'.$i, 'occasions');
+                ->map(function ($row, $i) use ($request, $existing, $dryRun, $pick) {
+                    $image = $dryRun ? $pick('occasion_image_'.$i) : resolve_media($request, 'occasion_image_'.$i, 'occasions');
 
                     if ($image === null && ! $request->boolean('occasion_image_'.$i.'_cleared')) {
                         $image = $existing[$i]['image'] ?? null;   // untouched row
@@ -611,138 +789,8 @@ class AppearanceController extends Controller
             $home['sections'] = $this->normalizeSections($blocks);
         }
 
-        Setting::put('home_content', $home);
 
-        // Booleans (checkboxes)
-        foreach (['announcement_enabled', 'pinned_enabled', 'pinned_dismissible', 'free_shipping_bar', 'show_recently_viewed', 'show_reviews', 'show_frequently_bought', 'urgency_low_stock', 'show_delivery_estimate', 'sticky_buy_bar', 'exit_intent', 'show_call_button', 'show_whatsapp_button', 'show_messenger_button', 'show_share_button', 'cbar_enabled', 'footer_show_trust', 'card_uppercase', 'card_show_logo', 'gift_enabled'] as $bool) {
-            $current[$bool] = $request->boolean($bool);
-        }
-
-        // Trust strip badges: keep only rows with a title.
-        if (array_key_exists('trust_badges', $data)) {
-            $current['trust_badges'] = collect($data['trust_badges'] ?? [])
-                ->map(fn ($b) => [
-                    'icon' => trim((string) ($b['icon'] ?? '')),
-                    'title' => trim((string) ($b['title'] ?? '')),
-                    'text' => trim((string) ($b['text'] ?? '')),
-                ])
-                ->filter(fn ($b) => $b['title'] !== '')
-                ->values()->all();
-        }
-
-        // Product page points. The editor always posts its heading field, so
-        // its presence says the card was on the page — an empty list then
-        // means "show nothing", not "field missing".
-        if ($request->has('pdp_points_heading')) {
-            $current['pdp_points_heading'] = trim((string) $request->input('pdp_points_heading'));
-            $current['pdp_points'] = \App\Support\Storefront\PdpPoints::clean($data['pdp_points'] ?? []);
-        }
-
-        // Announcement messages: one per line -> array
-        if (array_key_exists('announcement_messages', $data)) {
-            $current['announcement_messages'] = collect(preg_split('/\r\n|\r|\n/', (string) $data['announcement_messages']))
-                ->map(fn ($l) => trim($l))->filter()->values()->all();
-            unset($data['announcement_messages']);
-        }
-
-        // Scalars
-        foreach (['primary', 'accent', 'background', 'text', 'font_heading', 'font_heading_src', 'font_body', 'font_body_src', 'homepage_template', 'announcement_bg', 'announcement_color', 'announcement_link', 'announcement_speed', 'pinned_text', 'pinned_link', 'pinned_link_label', 'pinned_bg', 'pinned_color', 'pinned_until', 'whatsapp_number', 'messenger_url', 'low_stock_threshold', 'delivery_days_min', 'delivery_days_max', 'delivery_days_inside_min', 'delivery_days_inside_max', 'pdp_care_text', 'logo_align', 'logo_height_desktop', 'logo_height_mobile', 'header_center_height', 'header_center_link', 'menu_icon_rotation', 'menu_icon_height', 'products_per_page', 'default_sort', 'cbar_text', 'cbar_code', 'cbar_link', 'cbar_link_label', 'cbar_bg', 'cbar_color', 'footer_brand', 'footer_about', 'footer_copyright',
-            'card_w', 'card_h', 'card_font', 'card_font_custom', 'card_font_scale', 'card_line_height',
-            'card_letter_spacing', 'card_gap', 'card_padding', 'card_align', 'card_valign',
-            'card_text_color', 'card_bg', 'card_border', 'card_border_color', 'card_border_width',
-            'card_border_inset', 'card_logo_height'] as $key) {
-            if (array_key_exists($key, $data)) {
-                $current[$key] = $data[$key];
-            }
-        }
-
-        // Social accounts, already turned into full addresses above.
-        foreach (array_keys(SocialLinks::PLATFORMS) as $platform) {
-            if (array_key_exists($key = SocialLinks::key($platform), $data)) {
-                $current[$key] = $data[$key];
-            }
-        }
-
-        // Footer "Shop" categories (ordered). The _present marker lets an empty
-        // selection clear the list (fall back to auto) rather than being ignored.
-        if ($request->has('footer_category_ids_present')) {
-            $current['footer_category_ids'] = collect($request->input('footer_category_ids', []))
-                ->map(fn ($i) => (int) $i)->filter()->values()->all();
-        }
-
-        Setting::put('theme', $current);
-
-        // ---- Storefront filters ----
-        $sf = Setting::get('storefront_filters', []);
-        $sf = is_array($sf) ? $sf : [];
-        $sf['attributes'] = array_values(array_filter((array) $request->input('filter_attributes', [])));
-        $sf['custom_fields'] = array_values(array_filter((array) $request->input('filter_custom_fields', [])));
-        // Which categories appear as a filter option in the sidebar (admin choice).
-        $sf['categories'] = array_values(array_filter(array_map('intval', (array) $request->input('filter_categories', []))));
-        $sf['category'] = $request->boolean('filter_category');
-        $sf['colors'] = $request->boolean('filter_colors');
-        $sf['tags'] = $request->boolean('filter_tags');
-        $sf['price'] = $request->boolean('filter_price');
-        $sf['in_stock'] = $request->boolean('filter_in_stock');
-        $sf['on_sale'] = $request->boolean('filter_on_sale');
-        $ranges = collect(preg_split('/\r\n|\r|\n/', (string) $request->input('filter_price_ranges', '')))
-            ->map(fn ($l) => array_map('trim', explode('-', $l)))
-            ->filter(fn ($r) => count($r) === 2 && is_numeric($r[0]) && is_numeric($r[1]))
-            ->map(fn ($r) => [(float) $r[0], (float) $r[1]])->values()->all();
-        if ($ranges) {
-            $sf['price_ranges'] = $ranges;
-        }
-        Setting::put('storefront_filters', $sf);
-
-        // ---- Per-page filter overrides (global default + per-page overrides) ----
-        // The Appearance UI submits a JSON map { "<pageKey>": { enabled, ...cfg } }.
-        // Only enabled pages are kept; everything else inherits the global default.
-        $overrides = json_decode((string) $request->input('filter_overrides_json', ''), true);
-        if (is_array($overrides)) {
-            $clean = [];
-            foreach ($overrides as $pageKey => $ov) {
-                if (! is_array($ov) || empty($ov['enabled'])) {
-                    continue;
-                }
-                $clean[$pageKey] = [
-                    'enabled' => true,
-                    'categories' => array_values(array_filter(array_map('intval', (array) ($ov['categories'] ?? [])))),
-                    'attributes' => array_values(array_filter((array) ($ov['attributes'] ?? []))),
-                    'custom_fields' => array_values(array_filter((array) ($ov['custom_fields'] ?? []))),
-                    'category' => ! empty($ov['category']),
-                    'colors' => ! empty($ov['colors']),
-                    'tags' => ! empty($ov['tags']),
-                    'price' => ! empty($ov['price']),
-                    'in_stock' => ! empty($ov['in_stock']),
-                    'on_sale' => ! empty($ov['on_sale']),
-                ];
-            }
-            Setting::put('storefront_filter_overrides', $clean);
-        }
-
-        // ---- Discover page tiles (image + name + link) ----
-        $tiles = json_decode((string) $request->input('discover_tiles_json', ''), true);
-        if (is_array($tiles)) {
-            foreach ((array) $request->file('discover_image', []) as $i => $file) {
-                if ($file && $file->isValid()) {
-                    $tiles[$i]['image'] = $optimizer->storeWebp($file, 'discover', 800, 85);
-                }
-            }
-            $tiles = collect($tiles)
-                ->map(fn ($t) => [
-                    'image' => trim((string) ($t['image'] ?? '')),
-                    'name' => trim((string) ($t['name'] ?? '')),
-                    'link' => trim((string) ($t['link'] ?? '')),
-                ])
-                ->filter(fn ($t) => $t['image'] !== '')
-                ->values()->all();
-            Setting::put('discover_tiles', $tiles);
-        }
-
-        // Homepage content/sections may have changed — rebuild its cache.
-        Cache::forget(HomeController::CACHE_KEY);
-
-        return back()->with('success', 'Appearance updated.');
+        return $home;
     }
 
     /**

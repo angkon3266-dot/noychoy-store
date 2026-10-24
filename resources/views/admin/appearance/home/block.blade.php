@@ -14,7 +14,7 @@
             <button type="button" data-section-down @click="move($el.closest('[data-section-row]'), 1)" class="w-6 h-5 rounded text-[11px] text-ink-700/60 hover:bg-ink-100 hover:text-ink-900 leading-none disabled:opacity-30" title="Move down">▼</button>
         </div>
         <span data-section-num class="shrink-0 w-6 text-xs tabular-nums text-ink-700/40"></span>
-        <button type="button" @click="open = !open" class="flex-1 min-w-0 text-left">
+        <button type="button" @click="open = !open; if (open) $dispatch('home-focus', 'block:' + b.id)" class="flex-1 min-w-0 text-left">
             <span class="block text-sm font-semibold text-ink-900"><span x-text="b.title || label"></span> <span class="ml-1 rounded bg-gold-100 text-gold-800 text-[10px] font-medium px-1.5 py-0.5 align-middle">Custom</span></span>
             <span class="block text-xs text-ink-700/55 truncate" x-text="label"></span>
         </button>
