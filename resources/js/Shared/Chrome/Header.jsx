@@ -44,8 +44,8 @@ export default function Header() {
     }, [searchOpen, openMenu]);
 
     const logoAlignClass = logo.align === 'center'
-        ? 'absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0'
-        : (logo.align === 'right' ? 'ml-auto md:ml-0' : '');
+        ? 'absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0'
+        : (logo.align === 'right' ? 'ml-auto lg:ml-0' : '');
 
     // No display utility in here: each use says grid / hidden sm:grid itself,
     // so two display classes never compete on one element.
@@ -59,11 +59,11 @@ export default function Header() {
             <PinnedMessage config={chrome.pinned} />
             <div className={`relative transition-[background-color,box-shadow] duration-500 ${scrolled || active || searchOpen ? 'glass shadow-[0_1px_0_rgb(0_0_0/0.06),0_12px_30px_-24px_rgb(0_0_0/0.25)]' : 'bg-gold-50 shadow-[0_1px_0_rgb(0_0_0/0.05)]'}`}>
                 <div className="mx-auto max-w-[1440px] px-4 lg:px-10">
-                    <div className={`relative flex items-center gap-2 md:gap-6 transition-[height] duration-500 ${scrolled ? 'h-14 md:h-16' : 'h-16 md:h-[76px]'}`}>
+                    <div className={`relative flex items-center gap-2 lg:gap-6 transition-[height] duration-500 ${scrolled ? 'h-14 lg:h-16' : 'h-16 lg:h-[76px]'}`}>
                         {/* Mobile menu toggle — custom icon with guaranteed SVG fallback */}
                         <button
                             onClick={nav.toggle}
-                            className="md:hidden -ml-2 grid place-items-center w-10 h-10 text-ink-900"
+                            className="lg:hidden -ml-2 grid place-items-center w-10 h-10 text-ink-900"
                             aria-label="Menu"
                             aria-expanded={nav.open}
                         >
@@ -89,27 +89,39 @@ export default function Header() {
                         <SmartLink href={urls.home || '/'} className={`shrink-0 ${logoAlignClass}`} aria-label={`${storeName} — home`}>
                             {logo.desktop || logo.mobile ? (
                                 <>
-                                    {logo.desktop && <img src={logo.desktop} alt={storeName} height={logo.hDesktop} decoding="async" fetchPriority="high" className={`logo-d w-auto hidden md:block transition-transform duration-500 origin-left ${scrolled ? 'scale-[0.86]' : ''}`} />}
-                                    {logo.mobile && <img src={logo.mobile} alt={storeName} height={logo.hMobile} decoding="async" fetchPriority="high" className="logo-m w-auto md:hidden" />}
+                                    {logo.desktop && <img src={logo.desktop} alt={storeName} height={logo.hDesktop} decoding="async" fetchPriority="high" className={`logo-d w-auto hidden lg:block transition-transform duration-500 origin-left ${scrolled ? 'scale-[0.86]' : ''}`} />}
+                                    {logo.mobile && <img src={logo.mobile} alt={storeName} height={logo.hMobile} decoding="async" fetchPriority="high" className="logo-m w-auto lg:hidden" />}
                                 </>
                             ) : (
-                                <span className="font-display text-[1.6rem] md:text-[1.85rem] leading-none tracking-[-0.02em] text-ink-900">
+                                <span className="font-display text-[1.6rem] lg:text-[1.85rem] leading-none tracking-[-0.02em] text-ink-900">
                                     {storeName}
                                 </span>
                             )}
                         </SmartLink>
 
-                        {/* Phone only: the optional centre image. When the cart has a
-                            saving to show, that badge sits beside the bag instead (below),
-                            so it can never land on top of the logo. */}
-                        {!savedText && logo.center && (
-                            <a href={logo.centerLink} className="md:hidden absolute left-1/2 -translate-x-1/2">
+                        {/* Phones and tablets: the centre of the bar. The admin's optional
+                            centre image when one is set; otherwise the animated wordmark
+                            (owner, 2026-10-24), with the cart's saving tucked under it. */}
+                        {!savedText && logo.center ? (
+                            <a href={logo.centerLink} className="lg:hidden absolute left-1/2 -translate-x-1/2">
                                 <img src={logo.center} alt="" height={logo.centerH} decoding="async" className="logo-center w-auto" />
                             </a>
+                        ) : (
+                            <div className="lg:hidden absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none">
+                                <SmartLink href={urls.home || '/'} tabIndex={-1} aria-hidden="true" className="pointer-events-auto">
+                                    <Wordmark name={wordmarkName(urls.home, storeName)} compact={!!savedText} />
+                                </SmartLink>
+                                {savedText && (
+                                    <SmartLink href={urls.cart || '/cart'} className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-ink-900 text-white text-[10px] font-semibold px-2 h-[18px] whitespace-nowrap" aria-label={`${savedText} saved — open cart`} lang={chrome.lang}>
+                                        <Icon name="gift" className="w-2.5 h-2.5 text-gold-400" strokeWidth={2} />
+                                        {chrome.lang === 'bn' ? `${savedText} সাশ্রয়` : `${savedText} saved`}
+                                    </SmartLink>
+                                )}
+                            </div>
                         )}
 
                         {/* Desktop nav */}
-                        <nav className="hidden md:flex flex-1 items-center justify-center gap-1 lg:gap-2 text-[13px] font-medium tracking-[0.04em]" aria-label="Main">
+                        <nav className="hidden lg:flex flex-1 items-center justify-center gap-2 text-[13px] font-medium tracking-[0.04em]" aria-label="Main">
                             {items.map((item, i) => (
                                 <DesktopItem
                                     key={i}
@@ -124,15 +136,7 @@ export default function Header() {
                             ))}
                         </nav>
 
-                        <div className="flex items-center gap-0.5 ml-auto md:ml-0">
-                            {/* Phone only: what the cart has saved so far, as a pill
-                                that opens the cart. */}
-                            {savedText && (
-                                <SmartLink href={urls.cart || '/cart'} className="md:hidden mr-1 inline-flex items-center gap-1 rounded-full bg-ink-900 text-white text-[11px] font-semibold px-2.5 h-7 whitespace-nowrap" aria-label={`${savedText} saved — open cart`} lang={chrome.lang}>
-                                    <Icon name="gift" className="w-3 h-3 text-gold-400" strokeWidth={2} />
-                                    {chrome.lang === 'bn' ? `${savedText} সাশ্রয়` : `${savedText} saved`}
-                                </SmartLink>
-                            )}
+                        <div className="flex items-center gap-0.5 ml-auto lg:ml-0">
                             {menu.cta && (
                                 <a href={menu.cta.url} className="hidden lg:inline-flex items-center gap-2 mr-2 rounded-full border border-ink-900/15 px-4 h-9 text-[12px] font-medium tracking-[0.06em] uppercase text-ink-900 hover:bg-ink-900 hover:text-white hover:border-ink-900 transition-colors duration-300">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gold-500" aria-hidden="true" />
@@ -200,6 +204,43 @@ export default function Header() {
     );
 }
 
+/**
+ * "Noychoy.com" — the site's own address, read from the home URL so it follows
+ * the domain rather than being typed in. Falls back to the store name where
+ * there is no real domain (localhost, an IP).
+ */
+function wordmarkName(home, storeName) {
+    try {
+        const host = new URL(home).hostname.replace(/^www\./, '');
+        if (host.includes('.') && !/^[\d.]+$/.test(host)) return host.charAt(0).toUpperCase() + host.slice(1);
+    } catch {
+        // no usable URL — the store name below
+    }
+    return storeName;
+}
+
+// The wordmark: the brand's navy and orange drifting through the letters, a
+// band of light passing over them every twelve seconds, and a small glint at
+// the end of the name as the light leaves. All of it in app.css (.wordmark),
+// and all of it still for reduced-motion visitors.
+function Wordmark({ name, compact = false }) {
+    const dot = name.indexOf('.');
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const tld = dot > 0 ? name.slice(dot) : '';
+
+    return (
+        <span className="relative inline-flex items-baseline whitespace-nowrap">
+            <span className={`wordmark font-display tracking-[-0.01em] leading-none ${compact ? 'text-[1.05rem]' : 'text-[1.3rem] sm:text-[1.45rem]'}`}>
+                {base}
+                {tld && <span className="italic text-[0.78em] tracking-[0.02em]">{tld}</span>}
+            </span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="wordmark-glint absolute -top-1.5 -right-2.5 w-2.5 h-2.5 text-gold-500">
+                <path fill="currentColor" d="M12 0c.6 5.6 6.4 11.4 12 12-5.6.6-11.4 6.4-12 12-.6-5.6-6.4-11.4-12-12C5.6 11.4 11.4 5.6 12 0z" />
+            </svg>
+        </span>
+    );
+}
+
 function isCurrent(href, url) {
     if (!href) return false;
     try {
@@ -246,7 +287,7 @@ function MegaPanel({ item, onClose }) {
     const arrow = <Icon name="chevronRight" className="w-3.5 h-3.5 opacity-0 -translate-x-2 transition duration-300 group-hover/l:opacity-100 group-hover/l:translate-x-0" strokeWidth={2} />;
 
     return (
-        <div className="hidden md:block absolute inset-x-0 top-full pop-in">
+        <div className="hidden lg:block absolute inset-x-0 top-full pop-in">
             <div className="bg-gold-50 border-t border-ink-900/5 shadow-[0_40px_80px_-40px_rgb(0_0_0/0.35)]">
                 <div className="mx-auto max-w-[1440px] px-10 py-10 grid grid-cols-12 gap-10">
                     <div className="col-span-4 lg:col-span-3">

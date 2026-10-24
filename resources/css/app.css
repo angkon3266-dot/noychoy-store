@@ -355,6 +355,40 @@ html {
 @keyframes slow-spin { to { transform: rotate(360deg); } }
 .slow-spin { animation: slow-spin 24s linear infinite; }
 
+/* The phone/tablet header wordmark ("Noychoy.com", owner 2026-10-24).
+   Two layers clipped to the letters: underneath, the brand's accent (navy) and
+   primary (orange) repeating across twice the text's width, drifting one full
+   period per cycle so the loop is seamless; on top, a narrow band of light
+   that crosses left to right in the first fifth of the cycle and then waits
+   off-stage. One keyframe drives both, so they never fall out of step, and
+   the glint fires as the light leaves the last letter. */
+.wordmark {
+    background-image:
+        linear-gradient(105deg, transparent 42%, rgb(255 255 255 / 0.95) 50%, transparent 58%),
+        linear-gradient(90deg, var(--accent), var(--brand), var(--accent), var(--brand), var(--accent));
+    background-size: 300% 100%, 200% 100%;
+    background-repeat: no-repeat, repeat;
+    background-position: 100% 0, 0% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: wordmark-shine 12s linear infinite;
+    padding: 0.08em 0.04em 0.12em;   /* room for the italic and the descender inside the clip */
+}
+@keyframes wordmark-shine {
+    0%   { background-position: 100% 0, 0% 0; }
+    20%  { background-position: 0% 0, 20% 0; }
+    100% { background-position: 0% 0, 100% 0; }
+}
+.wordmark-glint { opacity: 0; transform-origin: center; animation: wordmark-glint 12s var(--ease-lux) infinite; }
+@keyframes wordmark-glint {
+    0%, 14%  { opacity: 0; transform: scale(0.3) rotate(0deg); }
+    21%      { opacity: 1; transform: scale(1) rotate(45deg); }
+    30%      { opacity: 0; transform: scale(0.4) rotate(90deg); }
+    100%     { opacity: 0; transform: scale(0.3) rotate(90deg); }
+}
+
 /* Product cards: the lift lives on the image well, not the whole card. */
 [data-shop] .lux-card-media { transition: box-shadow .5s var(--ease-lux); }
 [data-shop] .group:hover .lux-card-media { box-shadow: 0 24px 50px -28px rgb(0 0 0 / 0.35); }
@@ -365,5 +399,7 @@ html {
     .reveal-in, .kenburns, .rise-in, .pop-in, .slow-spin { animation: none !important; }
     .story-fill { animation: none !important; transform: scaleX(1); }
     .marquee-track { animation: none; }
+    .wordmark { animation: none; background-position: 100% 0, 25% 0; }
+    .wordmark-glint { animation: none; opacity: 0.8; transform: none; }
     .lux-btn:hover, .lux-btn-light:hover, [data-shop] .btn-primary:hover, [data-shop] .btn-dark:hover { transform: none; }
 }

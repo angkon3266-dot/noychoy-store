@@ -88,7 +88,7 @@ export default function MobileDrawer() {
         // panel below: on this element it claimed a modal was open on every
         // page of the site.
         <div
-            className={`md:hidden fixed inset-0 z-[100] ${open ? '' : 'pointer-events-none'}`}
+            className={`lg:hidden fixed inset-0 z-[100] ${open ? '' : 'pointer-events-none'}`}
             inert={!open}
             aria-hidden={!open}
         >
