@@ -57,7 +57,10 @@ class RunAbandonedCartSms extends Command
             // Stamped before dispatch so a crash costs one silent miss rather
             // than a duplicate paid message; the job clears it if the gateway
             // refused, so an outage does not exclude anyone permanently.
-            $cart->forceFill(['sms_reminded_at' => now()])->saveQuietly();
+            // Quietly, without updated_at: that column is the due window, and
+            // bumping it made a cart look freshly abandoned on every retry, so
+            // a dead gateway kept the same carts in the queue for days.
+            $cart->stampQuietly(['sms_reminded_at' => now()]);
             SendAbandonedCartSms::dispatch($cart);
         }
 

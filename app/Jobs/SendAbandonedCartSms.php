@@ -67,8 +67,10 @@ class SendAbandonedCartSms implements ShouldQueue
         }
 
         if (! $ok) {
-            // Un-stamp so a gateway outage does not permanently exclude them.
-            $cart->forceFill(['sms_reminded_at' => null])->saveQuietly();
+            // Un-stamp so a gateway outage does not permanently exclude them —
+            // without touching updated_at, so the retry still ends when the
+            // cart ages out of the max-hours window instead of looping forever.
+            $cart->stampQuietly(['sms_reminded_at' => null]);
 
             Log::warning('Abandoned-cart SMS was not accepted; un-stamped for retry.', [
                 'cart' => $cart->id,

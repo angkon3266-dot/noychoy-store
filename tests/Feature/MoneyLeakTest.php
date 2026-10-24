@@ -234,6 +234,41 @@ class MoneyLeakTest extends TestCase
         Queue::assertPushed(\App\Jobs\SendAbandonedCartSms::class, 1);
     }
 
+    public function test_a_dead_gateway_does_not_keep_an_old_cart_looking_freshly_abandoned(): void
+    {
+        // Production, Oct 2026: the gateway stopped answering, and every failed
+        // attempt stamped then un-stamped the cart with a plain save — bumping
+        // updated_at, the runner's whole due window. Carts from days earlier
+        // stayed "just abandoned" and were retried every 90 minutes forever,
+        // ready to text the shopper about a week-old cart once SMS came back.
+        Setting::put('integrations', [
+            'sms_enabled' => true, 'sms_base_url' => 'https://sms.test',
+            'sms_api_key' => 'key', 'sms_secret_key' => 'secret', 'sms_caller_id' => 'NoyChoy',
+        ]);
+        Setting::put('abandoned_sms_enabled', true);
+        Setting::put('abandoned_sms_delay_minutes', 60);
+        Setting::put('abandoned_sms_max_hours', 3);
+        \Illuminate\Support\Facades\Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('No route to host'));
+
+        $cart = AbandonedCart::create([
+            'session_id' => 'sess-dead', 'phone' => '01799999999',
+            'items' => [], 'subtotal' => 3000, 'item_count' => 1, 'recovered' => false,
+        ]);
+        $cart->forceFill(['updated_at' => now()->subHours(2)])->saveQuietly();
+        $left = $cart->fresh()->updated_at;
+
+        // The sync queue runs the job inline: picked, sent, refused, un-stamped.
+        $this->artisan('sms:abandoned-cart');
+
+        $cart->refresh();
+        $this->assertNull($cart->sms_reminded_at, 'a refused send must be un-stamped so it is retried');
+        $this->assertTrue($left->equalTo($cart->updated_at), 'a retry must not move the abandoned time');
+
+        // Past the max-hours window it is no longer chased, outage or not.
+        $this->travel(2)->hours();
+        $this->assertFalse(\App\Console\Commands\RunAbandonedCartSms::dueQuery(60, 3)->whereKey($cart->id)->exists());
+    }
+
     public function test_a_recovered_cart_is_never_chased(): void
     {
         Queue::fake();
