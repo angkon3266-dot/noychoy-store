@@ -34,6 +34,10 @@ class ProductCardData
             'thumb' => $p->thumbnail,
             'thumb450' => image_variant($p->thumbnail),
             'srcset' => image_srcset($p->thumbnail),
+            // The second photo, cross-faded in on hover. Only read when the
+            // images are already loaded (every storefront listing eager-loads
+            // them), so a card never costs an extra query for it.
+            'hover' => self::hoverImage($p),
             // Raw, for the AddToCart pixel value and the ladder hint's arrow.
             'price' => $quote['price'],
             'price_text' => money($quote['price']),
@@ -55,6 +59,19 @@ class ProductCardData
             'add_url' => route('cart.add', $p),
             'buynow_url' => route('cart.buynow', $p),
         ];
+    }
+
+    protected static function hoverImage(Product $p): ?string
+    {
+        if (! $p->relationLoaded('images') || $p->images->count() < 2) {
+            return null;
+        }
+
+        $primary = $p->images->firstWhere('is_primary', true) ?? $p->images->first();
+        $second = $p->images->sortBy('position')->first(fn ($im) => $im->id !== $primary->id);
+        $url = $second?->url;
+
+        return $url ? (image_variant($url, 900) ?: $url) : null;
     }
 
     /** @param  iterable<Product>  $products */

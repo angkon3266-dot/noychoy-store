@@ -58,19 +58,23 @@ export default function Product(props) {
     }, []);
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10 pt-4 lg:pt-8 pb-8">
             <Breadcrumb product={product} />
 
-            <div className="grid lg:grid-cols-2 gap-10">
-                <Gallery product={product} img={purchase.img} setImg={purchase.setImg} variantId={purchase.variantId} />
-                <BuyBox {...props} ladderQuote={ladder.quote} purchase={purchase} onOpenReviews={openReviews} />
+            <div className="grid lg:grid-cols-12 gap-8 lg:gap-14 xl:gap-20 items-start">
+                <div className="lg:col-span-7">
+                    <Gallery product={product} img={purchase.img} setImg={purchase.setImg} variantId={purchase.variantId} />
+                </div>
+                <div className="lg:col-span-5 lg:sticky lg:top-28">
+                    <BuyBox {...props} ladderQuote={ladder.quote} purchase={purchase} onOpenReviews={openReviews} />
+                </div>
             </div>
 
             <StorySections sections={product.sections} name={product.name} />
             <Description text={product.description} />
             <Details specs={product.specs} />
             <Care text={props.care} />
-            <div className="max-w-3xl mt-6 border-t border-ink-100 pt-4">
+            <div className="max-w-3xl mt-6 border-t border-ink-900/[0.08] pt-4">
                 <ShareButton url={product.url} title={product.name} label="Share" />
             </div>
             <Reviews {...props} reviewsOpen={reviewsOpen} setReviewsOpen={setReviewsOpen} writeOpen={writeOpen} setWriteOpen={setWriteOpen} />
@@ -306,14 +310,14 @@ function Breadcrumb({ product }) {
     const home = props.chrome?.urls?.home || '/';
 
     return (
-        <nav aria-label="Breadcrumb" className="text-sm text-ink-700/70 mb-6">
-            <a href={home} className="hover:text-gold-700">Home</a>{' / '}
+        <nav aria-label="Breadcrumb" className="text-[12px] tracking-[0.04em] text-ink-700/60 mb-5 lg:mb-8 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <a href={home} className="hover:text-ink-900 transition-colors">Home</a><span aria-hidden="true" className="text-ink-900/25">/</span>
             {product.category && (
                 <>
-                    <Link href={product.category.url} className="hover:text-gold-700">{product.category.name}</Link>{' / '}
+                    <Link href={product.category.url} className="hover:text-ink-900 transition-colors">{product.category.name}</Link><span aria-hidden="true" className="text-ink-900/25">/</span>
                 </>
             )}
-            <span className="text-ink-800">{product.name}</span>
+            <span className="text-ink-900 truncate max-w-[60vw]">{product.name}</span>
         </nav>
     );
 }
@@ -415,7 +419,7 @@ function Gallery({ product, img, setImg, variantId }) {
     return (
         <div onKeyDown={total > 1 ? onKey : undefined}>
             <div
-                className="aspect-square overflow-hidden rounded-2xl bg-gold-100 group relative focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+                className="aspect-square overflow-hidden rounded-[22px] lg:rounded-[28px] bg-mist-100 group relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-900"
                 tabIndex={total > 1 ? 0 : undefined}
             >
                 {total > 0 ? (
@@ -439,7 +443,7 @@ function Gallery({ product, img, setImg, variantId }) {
                                     className="h-full w-full object-cover cursor-zoom-in"
                                     onClick={() => setZoom(s.url)}
                                 />
-                                <span className="absolute bottom-3 right-3 rounded-full bg-white/80 p-2 text-ink-700 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                                <span className="absolute bottom-4 right-4 grid place-items-center w-10 h-10 rounded-full glass text-ink-900 opacity-0 group-hover:opacity-100 transition pointer-events-none">
                                     <Icon name="zoomIn" className="w-4 h-4" />
                                 </span>
                             </div>
@@ -465,22 +469,22 @@ function Gallery({ product, img, setImg, variantId }) {
                         ))}
                     </div>
                 ) : (
-                    <div className="flex h-full items-center justify-center text-gold-300">No image</div>
+                    <div className="flex h-full items-center justify-center text-ink-300">No image</div>
                 )}
 
                 {total > 1 && active > 0 && (
                     <button type="button" onClick={() => scrollTo(active - 1)} aria-label="Previous"
-                        className="hidden md:grid place-items-center absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow border border-ink-100 text-lg text-ink-900 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition hover:bg-white">‹</button>
+                        className="hidden md:grid place-items-center absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full glass shadow-[0_10px_30px_-12px_rgb(0_0_0/0.35)] text-ink-900 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition hover:scale-105"><Icon name="chevronRight" className="w-4 h-4 rotate-180" strokeWidth={2} /></button>
                 )}
                 {total > 1 && active < total - 1 && (
                     <button type="button" onClick={() => scrollTo(active + 1)} aria-label="Next"
-                        className="hidden md:grid place-items-center absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 shadow border border-ink-100 text-lg text-ink-900 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition hover:bg-white">›</button>
+                        className="hidden md:grid place-items-center absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full glass shadow-[0_10px_30px_-12px_rgb(0_0_0/0.35)] text-ink-900 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition hover:scale-105"><Icon name="chevronRight" className="w-4 h-4" strokeWidth={2} /></button>
                 )}
 
                 {/* Hidden while a video plays: its play/pause control lives in
                     exactly this corner. */}
                 {total > 1 && playing === null && (
-                    <span className="absolute bottom-3 left-3 z-10 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium tabular-nums text-ink-800 pointer-events-none">
+                    <span className="absolute bottom-4 left-4 z-10 rounded-full glass px-3 py-1 text-[11px] font-medium tracking-[0.1em] tabular-nums text-ink-900 pointer-events-none">
                         {active + 1} / {total}
                     </span>
                 )}
@@ -493,14 +497,14 @@ function Gallery({ product, img, setImg, variantId }) {
             </div>
 
             {zoom && (
-                <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4" onClick={() => setZoom(null)}>
-                    <img src={zoom} alt={product.name} className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
-                    <button type="button" aria-label="Close image" className="absolute top-4 right-4 text-white text-3xl leading-none">×</button>
+                <div className="fixed inset-0 z-[80] bg-ink-900/90 backdrop-blur-md flex items-center justify-center p-4 pop-in" onClick={() => setZoom(null)}>
+                    <img src={zoom} alt={product.name} className="max-h-[90vh] max-w-[92vw] rounded-[20px] object-contain" />
+                    <button type="button" aria-label="Close image" className="absolute top-5 right-5 grid place-items-center w-11 h-11 rounded-full bg-white/10 text-white hover:bg-white hover:text-ink-900 transition-colors"><Icon name="close" className="w-5 h-5" strokeWidth={1.8} /></button>
                 </div>
             )}
 
             {total > 1 && (
-                <div className="mt-4 grid grid-cols-5 gap-3">
+                <div className="mt-3 lg:mt-4 grid grid-cols-5 sm:grid-cols-6 gap-2 lg:gap-3">
                     {images.map((image, i) => (
                         <button
                             key={image.id}
@@ -508,7 +512,7 @@ function Gallery({ product, img, setImg, variantId }) {
                             onClick={() => scrollTo(i)}
                             aria-label={`View photo ${i + 1}`}
                             aria-current={active === i ? 'true' : undefined}
-                            className={`aspect-square overflow-hidden rounded-lg bg-gold-100 ring-2 ${active === i ? 'ring-gold-500' : 'ring-transparent'}`}
+                            className={`aspect-square overflow-hidden rounded-xl bg-mist-100 transition duration-300 ${active === i ? 'ring-2 ring-ink-900 ring-offset-2 ring-offset-gold-50' : 'opacity-60 hover:opacity-100'}`}
                         >
                             <img src={image.thumb || image.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                         </button>
@@ -522,7 +526,7 @@ function Gallery({ product, img, setImg, variantId }) {
                                 onClick={() => scrollTo(i)}
                                 aria-label={`View video ${j + 1}`}
                                 aria-current={active === i ? 'true' : undefined}
-                                className={`relative aspect-square overflow-hidden rounded-lg bg-ink-900 ring-2 hover:ring-gold-500 ${active === i ? 'ring-gold-500' : 'ring-transparent'}`}
+                                className={`relative aspect-square overflow-hidden rounded-xl bg-ink-900 transition duration-300 ${active === i ? 'ring-2 ring-ink-900 ring-offset-2 ring-offset-gold-50' : 'opacity-70 hover:opacity-100'}`}
                             >
                                 {v.thumb && <img src={v.thumb} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover opacity-80" />}
                                 <span className="absolute inset-0 grid place-items-center">
@@ -579,7 +583,8 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
 
     return (
         <div>
-            <h1 className="font-display text-3xl font-semibold">{product.name}</h1>
+            {product.category && <p className="eyebrow mb-4">{product.category.name}</p>}
+            <h1 className="display text-[2.1rem] sm:text-[2.6rem] lg:text-5xl">{product.name}</h1>
 
             {/* Five grey stars under a heading say "nobody bought this"; with no
                 reviews yet the line is just the invitation. */}
@@ -588,12 +593,12 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                     <span className="flex text-gold-500">
                         {[1, 2, 3, 4, 5].map((i) => <Star key={i} off={i > Math.round(reviews.avg)} />)}
                     </span>
-                    <span className="text-ink-700/70 group-hover:text-gold-700">
+                    <span className="text-ink-700/70 group-hover:text-ink-900 underline-offset-4 group-hover:underline">
                         {reviews.avg} · {reviews.count} review{reviews.count > 1 ? 's' : ''}
                     </span>
                 </a>
             ) : (
-                <a href="#reviews" onClick={() => onOpenReviews?.(true)} className="mt-2 inline-block text-sm text-ink-700/70 hover:text-gold-700">Be the first to review</a>
+                <a href="#reviews" onClick={() => onOpenReviews?.(true)} className="mt-3 inline-block text-sm text-ink-700/70 hover:text-ink-900 lux-link">Be the first to review</a>
             )}
 
             <div className="flex items-center gap-4 flex-wrap">
@@ -601,12 +606,12 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                 <ShareButton url={product.url} title={product.name} label="Share" />
             </div>
 
-            <div className="mt-4 flex items-baseline gap-3 flex-wrap">
-                <span className="text-2xl font-semibold text-gold-700">{purchase.priceText()}</span>
+            <div className="mt-6 pt-6 border-t border-ink-900/[0.08] flex items-baseline gap-3 flex-wrap">
+                <span className="text-[1.9rem] leading-none font-semibold tracking-[-0.02em] text-ink-900">{purchase.priceText()}</span>
                 {purchase.compareText() && (
                     <>
                         <span className="text-ink-500 line-through">{purchase.compareText()}</span>
-                        <span className="badge bg-danger-100 text-danger-700">Save {purchase.discountPct}%</span>
+                        <span className="rounded-full bg-gold-500 px-2.5 py-1 text-[11px] font-semibold text-ink-900">Save {purchase.discountPct}%</span>
                     </>
                 )}
                 {purchase.offerPercent > 0 && (
@@ -616,17 +621,17 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
 
             {/* The reward ladder on the price — one line, not a panel. */}
             {ladderText && (
-                <p className="mt-2 flex items-start gap-1.5 text-[13px] font-medium leading-snug text-gold-800" lang={lang} aria-live="polite">
-                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px text-gold-700" strokeWidth={1.8} />
+                <p className="mt-3 flex items-start gap-1.5 text-[13px] font-medium leading-snug text-ink-800" lang={lang} aria-live="polite">
+                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px text-gold-600" strokeWidth={1.8} />
                     <span>{ladderText}</span>
                 </p>
             )}
 
-            {product.short_description && <p className="mt-3 text-[15px] leading-relaxed text-ink-700/80">{product.short_description}</p>}
+            {product.short_description && <p className="mt-5 text-[15px] leading-relaxed text-ink-700/80">{product.short_description}</p>}
 
             {/* Quantity / bundle offer tiers */}
             {offerTiers.length > 0 && (
-                <div className={`mt-5 rounded-xl border p-4 ${allPreorder ? 'border-promo-200 bg-promo-50/60' : 'border-gold-200 bg-gold-50/60'}`}>
+                <div className={`mt-6 rounded-[20px] p-4 sm:p-5 ${allPreorder ? 'border border-promo-200 bg-promo-50/60' : 'bg-mist-50 border border-ink-900/[0.06]'}`}>
                     <p className="text-sm font-semibold text-ink-800 flex items-center gap-1.5">
                         <Icon name={allPreorder ? 'calendar' : 'gift'} className="w-4 h-4 shrink-0" />
                         {allPreorder ? 'Pre-order offer' : hasBundle ? 'Buy more, save more' : 'Offer on this piece'}
@@ -639,16 +644,16 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                                     key={i}
                                     type="button"
                                     onClick={() => purchase.setQty(Math.max(purchase.qty, tier.min_qty))}
-                                    className={`relative w-full text-left rounded-lg border px-3 py-2.5 text-sm transition ${tier.preorder_only ? 'border-promo-300' : (tier.highlight ? 'border-gold-400 shadow-sm' : 'border-ink-100')} ${applied ? 'border-success-500 bg-success-50' : 'hover:border-gold-300 bg-white'}`}
+                                    className={`relative w-full text-left rounded-2xl border px-4 py-3 text-sm transition-colors duration-300 ${tier.preorder_only ? 'border-promo-300' : (tier.highlight ? 'border-ink-900/40' : 'border-ink-900/10')} ${applied ? '!border-ink-900 bg-white ring-1 ring-ink-900' : 'hover:border-ink-900/50 bg-white'}`}
                                 >
                                     {tier.badge && (
-                                        <span className={`absolute -top-2 right-3 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${tier.preorder_only ? 'bg-promo-600' : 'bg-gold-600'}`}>
+                                        <span className={`absolute -top-2.5 right-4 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${tier.preorder_only ? 'bg-promo-600 text-white' : 'bg-gold-500 text-ink-900'}`}>
                                             {tier.badge}
                                         </span>
                                     )}
                                     <span className="flex items-center justify-between gap-3">
                                         <span className="font-medium">{tier.label}</span>
-                                        {applied && <span className="text-xs text-success-700 font-medium shrink-0 inline-flex items-center gap-1"><Icon name="check" className="w-3.5 h-3.5" />applied</span>}
+                                        {applied && <span className="text-xs text-ink-900 font-medium shrink-0 inline-flex items-center gap-1"><span className="grid place-items-center w-4 h-4 rounded-full bg-ink-900 text-white"><Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} /></span>applied</span>}
                                     </span>
                                     <span className="mt-0.5 block text-xs text-ink-700/70">
                                         {tier.min_qty >= 2
@@ -678,7 +683,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                                         <OfferCountdown ends={o.ends} lang={lang} />
                                     </span>
                                 )}
-                                {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-gold-700 underline">Register to unlock</a></>}
+                                {o.members_only && !ui.isMember && <> · <a href={ui.registerUrl} className="text-ink-900 underline underline-offset-2">Register to unlock</a></>}
                             </span>
                         </li>
                     ))}
@@ -690,9 +695,9 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                 <ul className="mt-3 flex flex-col gap-2">
                     {myOffers.map((o, i) => (
                         <li key={i} className="flex items-start gap-2 text-[13px] text-ink-800">
-                            <Icon name="gift" className="w-3.5 h-3.5 text-gold-700 mt-[3px] shrink-0" strokeWidth={2} />
+                            <Icon name="gift" className="w-3.5 h-3.5 text-gold-600 mt-[3px] shrink-0" strokeWidth={2} />
                             <span>
-                                <span className="mr-1.5 inline-block rounded-full bg-gold-700 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.reward}</span>
+                                <span className="mr-1.5 inline-block rounded-full bg-ink-900 px-1.5 py-[2px] text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white align-[1px]">{o.reward}</span>
                                 <strong className="font-semibold">{o.title}</strong>
                                 {o.message && <span className="text-ink-700/70"> — {o.message}</span>}
                                 <span className="text-ink-700/70">{o.until ? ` · until ${o.until}` : ''}</span>
@@ -723,12 +728,12 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
 
             {/* "Why buy from us" — product, else category, else store-wide list */}
             {pdpPoints?.items?.length > 0 && (
-                <div className="mt-6">
-                    {pdpPoints.heading && <p className="mb-3 text-[15px] font-semibold text-ink-900">{pdpPoints.heading}</p>}
-                    <ul className="space-y-2.5">
+                <div className="mt-7">
+                    {pdpPoints.heading && <p className="mb-3 eyebrow">{pdpPoints.heading}</p>}
+                    <ul className="grid gap-2.5">
                         {pdpPoints.items.map((b, i) => (
                             <li key={i} className="flex items-start gap-3 text-sm leading-snug text-ink-800">
-                                <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5 shrink-0 text-gold-700" />
+                                <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5 shrink-0 text-ink-900" />
                                 <span className="pt-px">{b.title}{b.text ? <span className="text-ink-700/70"> — {b.text}</span> : null}</span>
                             </li>
                         ))}
@@ -737,17 +742,17 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             )}
 
             {/* Quantity */}
-            <div className="mt-5">
-                <span className="label">Quantity</span>
-                <div className="inline-flex items-center rounded-md border border-ink-100">
-                    <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="px-3 py-2.5">−</button>
-                    <span className="w-10 text-center">{purchase.qty}</span>
-                    <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="px-3 py-2.5">+</button>
+            <div className="mt-7 flex items-center justify-between gap-4">
+                <span className="eyebrow">Quantity</span>
+                <div className="inline-flex items-center rounded-full border border-ink-900/15 h-12">
+                    <button type="button" onClick={() => purchase.setQty(Math.max(1, purchase.qty - 1))} aria-label="Decrease quantity" className="grid place-items-center w-12 h-full text-lg text-ink-900 rounded-full hover:bg-ink-900/[0.05]">−</button>
+                    <span className="w-8 text-center font-medium tabular-nums" aria-live="polite">{purchase.qty}</span>
+                    <button type="button" onClick={() => purchase.setQty(purchase.qty + 1)} aria-label="Increase quantity" className="grid place-items-center w-12 h-full text-lg text-ink-900 rounded-full hover:bg-ink-900/[0.05]">+</button>
                 </div>
             </div>
 
             {preorder && (
-                <div className="mt-5 rounded-xl border border-promo-200 bg-promo-50 p-4">
+                <div className="mt-6 rounded-[20px] border border-promo-200 bg-promo-50 p-4 sm:p-5">
                     <p className="text-sm font-semibold text-promo-800 flex items-center gap-1.5"><Icon name="calendar" className="w-4 h-4 shrink-0" />Pre-order item</p>
                     <p className="text-sm text-promo-700/80 mt-1">
                         {preorder.note}
@@ -759,11 +764,11 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             {/* Actions */}
             {(product.available || preorder) ? (
                 <>
-                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline w-full">
+                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline w-full !min-h-14 text-[14px]">
                             {preorder ? 'Add pre-order to cart' : 'Add to cart'}
                         </button>
-                        <button type="button" onClick={buyNow} disabled={!purchase.canBuy || buying} className={`w-full ${preorder ? 'inline-flex items-center justify-center rounded-md bg-promo-600 px-4 py-2.5 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}>
+                        <button type="button" onClick={buyNow} disabled={!purchase.canBuy || buying} className={`w-full !min-h-14 text-[14px] ${preorder ? 'inline-flex items-center justify-center rounded-full bg-promo-600 px-4 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}>
                             {buying ? 'Taking you to checkout…' : (preorder ? 'Book now (Pre-order)' : 'Buy now')}
                         </button>
                     </div>
@@ -772,13 +777,13 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                 </>
             ) : (
                 <>
-                    <button disabled className="btn-dark w-full mt-5 opacity-60">Sold out</button>
+                    <button disabled className="btn-dark w-full mt-5 !min-h-14 opacity-60">Sold out</button>
                     {ui.webPushReady && <StockNotify productId={product.id} />}
                 </>
             )}
 
             {ui.whatsapp && (
-                <a href={ui.whatsapp.url} target="_blank" rel="noopener" className="mt-3 flex items-center justify-center gap-2 rounded-md border border-[#25D366]/40 bg-[#25D366]/10 px-4 py-2.5 text-sm font-medium text-[#128C7E] hover:bg-[#25D366]/20 transition">
+                <a href={ui.whatsapp.url} target="_blank" rel="noopener" className="mt-2.5 flex items-center justify-center gap-2 rounded-full border border-[#25D366]/35 bg-[#25D366]/[0.07] px-4 min-h-12 text-sm font-medium text-[#128C7E] hover:bg-[#25D366]/15 transition">
                     <WhatsApp />
                     Order or ask on WhatsApp
                 </a>
@@ -869,7 +874,7 @@ function AttributePickers({ purchase }) {
                                     type="button"
                                     disabled={!inStock}
                                     onClick={() => purchase.selectAttr(attr.name, val)}
-                                    className={`rounded-md border px-4 py-2 text-sm transition ${isSel ? 'border-gold-500 bg-gold-100 text-gold-800' : 'border-ink-100 hover:border-gold-300'} ${!inStock ? 'opacity-40 line-through cursor-not-allowed' : ''}`}
+                                    className={`rounded-full border min-h-11 px-5 text-sm transition-colors duration-300 ${isSel ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-900/15 text-ink-900 hover:border-ink-900'} ${!inStock ? 'opacity-40 line-through cursor-not-allowed' : ''}`}
                                 >
                                     {val}
                                 </button>
@@ -910,7 +915,7 @@ function LoveButton({ url, loved: initialLoved, count: initialCount }) {
     };
 
     return (
-        <button type="button" onClick={toggle} className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-700/70 hover:text-danger-500 transition" aria-pressed={loved} title={loved ? 'Remove from loved' : 'Love this'}>
+        <button type="button" onClick={toggle} className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-700/80 hover:text-danger-500 transition" aria-pressed={loved} title={loved ? 'Remove from loved' : 'Love this'}>
             <svg className={`w-5 h-5 transition ${loved ? 'text-danger-500' : ''}`} fill={loved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
             <span>{count >= LOVES_SHOWN_FROM ? `Loved by ${count} people` : (loved ? 'Loved' : 'Love')}</span>
         </button>
@@ -971,7 +976,7 @@ function StorySections({ sections, name }) {
                         {s.media && (
                             // First in the DOM, so a phone always shows the picture
                             // above its copy; only wider screens swap sides.
-                            <div className={`relative overflow-hidden rounded-xl bg-gold-100 ${s.layout === 'left' ? '' : 'md:order-2'}`}>
+                            <div className={`relative overflow-hidden rounded-[24px] bg-mist-100 ${s.layout === 'left' ? '' : 'md:order-2'}`}>
                                 {s.media.type === 'video'
                                     ? <StoryVideo media={s.media} alt={alt} />
                                     : <StoryImage media={s.media} alt={alt} />}
@@ -1114,9 +1119,9 @@ function Description({ text }) {
     const [open, setOpen] = useState(false);
     if (!text) return null;
     return (
-        <section className="mt-12 max-w-3xl border-t border-ink-100 pt-8">
+        <section className="mt-16 max-w-3xl border-t border-ink-900/[0.08] pt-8">
             <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
-                <h2 className="font-display text-2xl font-semibold">Description</h2>
+                <h2 className="display text-3xl">Description</h2>
                 <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
             </button>
             {/* Always in the DOM (collapsed via CSS) so search engines index the copy. */}
@@ -1130,10 +1135,10 @@ function Details({ specs }) {
     if (!specs?.length) return null;
     return (
         <section className="mt-10 max-w-3xl">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-700 mb-1">Details</h2>
+            <h2 className="eyebrow mb-2">Details</h2>
             <dl>
                 {specs.map((spec, i) => (
-                    <div key={i} className="grid grid-cols-[8rem_1fr] sm:grid-cols-[10rem_1fr] gap-4 py-3 border-b border-ink-100 text-sm">
+                    <div key={i} className="grid grid-cols-[8rem_1fr] sm:grid-cols-[10rem_1fr] gap-4 py-3.5 border-b border-ink-900/[0.08] text-sm">
                         <dt className="text-ink-700/60">{spec.label}</dt>
                         <dd className="text-ink-900">{spec.value}</dd>
                     </div>
@@ -1153,9 +1158,9 @@ function Care({ text }) {
     const [open, setOpen] = useState(false);
     if (!text) return null;
     return (
-        <section className="mt-10 max-w-3xl border-t border-ink-100 pt-8">
+        <section className="mt-10 max-w-3xl border-t border-ink-900/[0.08] pt-8">
             <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
-                <h2 className="font-display text-2xl font-semibold">Care instructions</h2>
+                <h2 className="display text-3xl">Care instructions</h2>
                 <Icon name="chevronDown" className={`w-6 h-6 shrink-0 text-ink-700/50 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
             </button>
             <RichText text={text} className={`text-[15px] text-ink-700/85 mt-3 ${open ? '' : 'hidden'}`} />
@@ -1186,9 +1191,9 @@ function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpe
     };
 
     return (
-        <section className="mt-16 border-t border-ink-100 pt-10" id="reviews">
+        <section className="mt-16 border-t border-ink-900/[0.08] pt-10" id="reviews">
             <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
-                <h2 className="font-display text-2xl font-semibold flex items-center gap-3">
+                <h2 className="display text-3xl sm:text-4xl flex flex-wrap items-center gap-x-4 gap-y-1">
                     Customer reviews
                     {reviews.count > 0 && (
                         <span className="text-sm font-normal text-ink-700/70 flex items-center gap-1">
@@ -1204,7 +1209,7 @@ function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpe
                 {reviews.perk > 0 && (
                     <div className="md:col-span-3">
                         {ui.isMember ? (
-                            <div className="flex items-start gap-3 rounded-xl border border-gold-200 bg-gold-100/60 px-4 py-3 text-sm text-gold-800">
+                            <div className="flex items-start gap-3 rounded-2xl bg-mist-50 border border-ink-900/[0.06] px-4 py-3 text-sm text-ink-800">
                                 <Icon name="gift" className="w-5 h-5 shrink-0" />
                                 <p><span className="font-semibold">Share a review, earn {reviews.perk.toLocaleString()} bonus points</span>{reviews.photoPerk > 0 ? ` — add a photo for +${reviews.photoPerk.toLocaleString()} more` : ''}. Points are added to your account as soon as your review is approved.</p>
                             </div>
@@ -1234,7 +1239,7 @@ function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpe
                                     <div key={star} className="flex items-center gap-2 text-xs">
                                         <span className="w-6 text-ink-700/70">{star}★</span>
                                         <div className="flex-1 h-2 rounded-full bg-ink-100 overflow-hidden">
-                                            <div className="h-full bg-gold-500" style={{ width: `${reviews.count ? Math.round(n / reviews.count * 100) : 0}%` }} />
+                                            <div className="h-full bg-ink-900" style={{ width: `${reviews.count ? Math.round(n / reviews.count * 100) : 0}%` }} />
                                         </div>
                                         <span className="w-6 text-right text-ink-700/70">{n}</span>
                                     </div>
@@ -1271,10 +1276,10 @@ function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpe
                     {/* Controlled so "Be the first to review" can unfold it; the
                         toggle event keeps the state honest when the summary is
                         tapped. */}
-                    <details open={writeOpen} onToggle={(e) => setWriteOpen(e.currentTarget.open)} className="rounded-xl border border-ink-100 p-5">
+                    <details open={writeOpen} onToggle={(e) => setWriteOpen(e.currentTarget.open)} className="rounded-[20px] border border-ink-900/10 p-5 sm:p-6">
                         <summary className="font-medium cursor-pointer">
                             <span className="inline-flex items-center gap-1.5"><Icon name="pen" className="w-4 h-4 shrink-0" />Write a review</span>
-                            {reviews.perk > 0 && ui.isMember && <span className="badge bg-gold-100 text-gold-800 ml-1">+{reviews.perk.toLocaleString()} points</span>}
+                            {reviews.perk > 0 && ui.isMember && <span className="badge bg-ink-900 text-white ml-1">+{reviews.perk.toLocaleString()} points</span>}
                         </summary>
                         {flash?.success && <p className="mt-3 text-sm text-success-700 bg-success-50 rounded p-2">{flash.success}</p>}
                         {errorMsg && <div className="mt-3 text-sm text-danger-700 bg-danger-50 rounded p-2">{errorMsg}</div>}
@@ -1369,7 +1374,7 @@ function FrequentlyBought({ fbt, ladder, lang = 'en' }) {
 
     return (
         <section className="mt-16">
-            <h2 className="font-display text-2xl font-semibold mb-6">Frequently bought together</h2>
+            <h2 className="display text-3xl sm:text-4xl mb-8">Frequently bought together</h2>
             <div className="grid lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2 flex flex-wrap items-center gap-3">
                     {fbt.items.map((p, i) => (
@@ -1382,7 +1387,7 @@ function FrequentlyBought({ fbt, ladder, lang = 'en' }) {
                                     disabled={!p.selectable}
                                     onChange={(e) => setSel({ ...sel, [p.id]: e.target.checked })}
                                 />
-                                <span className="block aspect-square rounded-lg overflow-hidden bg-gold-100 border border-ink-100">
+                                <span className="block aspect-square rounded-2xl overflow-hidden bg-mist-100">
                                     {p.thumb && <img src={p.thumb} className="h-full w-full object-cover" alt={p.name} loading="lazy" decoding="async" />}
                                 </span>
                                 <span className="mt-1 block text-xs truncate">{p.name}</span>
@@ -1446,8 +1451,8 @@ function FrequentlyBought({ fbt, ladder, lang = 'en' }) {
 function CardStrip({ title, products, cols }) {
     if (!products?.length) return null;
     return (
-        <section className="mt-16">
-            <h2 className="font-display text-2xl font-semibold mb-6">{title}</h2>
+        <section className="mt-20 lg:mt-28">
+            <h2 className="display text-3xl sm:text-4xl lg:text-5xl mb-8 lg:mb-10">{title}</h2>
             <div className={`grid ${cols} gap-x-4 gap-y-8`}>
                 {products.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
@@ -1485,14 +1490,14 @@ function StickyBar({ product, purchase, ui }) {
 
     return (
         <>
-            <div className={`fixed bottom-14 md:bottom-0 inset-x-0 z-40 bg-white border-t border-ink-100 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] transition-transform ${visible ? 'translate-y-0' : 'translate-y-full'}`}>
-                <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
+            <div className={`fixed bottom-14 md:bottom-0 inset-x-0 z-40 glass border-t border-ink-900/[0.06] shadow-[0_-12px_30px_-20px_rgb(0_0_0/0.25)] transition-transform duration-500 ease-[var(--ease-lux)] ${visible ? 'translate-y-0' : 'translate-y-[120%]'}`}>
+                <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10 py-3 flex items-center gap-3">
                     <div className="shrink-0 hidden sm:block">
                         <div className="font-medium text-sm truncate max-w-[14rem]">{product.name}</div>
                     </div>
                     <div className="shrink-0">
                         <div className="text-xs text-ink-700/70">Total</div>
-                        <div className="font-semibold text-gold-700">{money(purchase.price * purchase.qty)}</div>
+                        <div className="font-semibold text-ink-900">{money(purchase.price * purchase.qty)}</div>
                     </div>
                     <button type="button" onClick={addToCart} disabled={!purchase.canBuy} className="btn-outline whitespace-nowrap hidden sm:inline-flex">Add to cart</button>
                     <button
@@ -1508,7 +1513,7 @@ function StickyBar({ product, purchase, ui }) {
                             });
                         }}
                         disabled={!purchase.canBuy || buying}
-                        className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-md bg-promo-600 px-4 py-2.5 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}
+                        className={`flex-1 ${preorder ? 'inline-flex items-center justify-center rounded-full bg-promo-600 px-4 min-h-11 font-medium text-white hover:bg-promo-700 transition disabled:opacity-50' : 'btn-primary'}`}
                     >
                         {preorder ? 'Book now' : 'Buy now'}
                     </button>

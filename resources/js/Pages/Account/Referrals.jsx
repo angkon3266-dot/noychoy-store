@@ -27,13 +27,13 @@ export default function Referrals({ invite }) {
 
     return (
         <AccountShell>
-            <h1 className="font-display text-2xl font-semibold mb-2">Invite friends</h1>
+            <h1 className="display text-3xl sm:text-4xl mb-2">Invite friends</h1>
             <p className="text-sm text-ink-700/70 mb-6">
                 Share your link. When a friend joins and their first order is delivered, <strong className="text-ink-900">you both get {invite.points} points</strong>.
             </p>
 
             {!invite.enabled && (
-                <div className="mb-6 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-4 py-2.5 text-sm">The rewards program is paused right now — your link still works, and points are paid once it is back on.</div>
+                <div className="mb-6 rounded-xl bg-warning-50 border border-warning-200 text-warning-800 px-4 py-2.5 text-sm">The rewards program is paused right now — your link still works, and points are paid once it is back on.</div>
             )}
 
             <div className="card p-5 mb-6">
@@ -60,7 +60,7 @@ export default function Referrals({ invite }) {
                     ['Points earned', invite.stats.points],
                 ].map(([label, value]) => (
                     <div key={label} className="rounded-xl border border-ink-100 p-4 text-center">
-                        <div className="font-display text-2xl font-semibold">{value}</div>
+                        <div className="display text-3xl sm:text-4xl">{value}</div>
                         <div className="text-xs text-ink-700/70 mt-1">{label}</div>
                     </div>
                 ))}

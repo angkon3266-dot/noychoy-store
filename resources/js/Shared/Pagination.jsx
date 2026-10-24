@@ -17,7 +17,7 @@ export default function Pagination({ links = [] }) {
                         key={i}
                         href={link.url}
                         preserveScroll={false}
-                        className={`min-w-[38px] px-3 py-2 rounded-lg text-sm text-center transition ${link.active ? 'bg-gold-600 text-white font-semibold' : 'bg-white border border-ink-100 hover:border-gold-400 hover:text-gold-700'}`}
+                        className={`grid place-items-center min-w-11 h-11 px-3 rounded-full text-[13px] tabular-nums transition-colors duration-300 ${link.active ? 'bg-ink-900 text-white font-semibold' : 'border border-ink-900/10 text-ink-900 hover:border-ink-900'}`}
                     >
                         {label}
                     </Link>

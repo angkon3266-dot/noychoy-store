@@ -23,7 +23,7 @@ export default function Contact({ title, intro, details, submitUrl }) {
 
     return (
         <div className="mx-auto max-w-5xl px-4 py-12">
-            <h1 className="font-display text-3xl font-semibold mb-2">{title}</h1>
+            <h1 className="display text-4xl sm:text-5xl mb-2">{title}</h1>
             <p className="text-ink-700/70 mb-8 max-w-2xl">{intro}</p>
 
             <div className="grid md:grid-cols-2 gap-8">

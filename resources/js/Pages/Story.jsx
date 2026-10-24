@@ -34,9 +34,9 @@ export default function Story({ title, eyebrow, headline, lede, heroImage, body,
                 )}
                 <div className="relative mx-auto max-w-3xl px-4 py-20 sm:py-28 text-center">
                     {eyebrow && (
-                        <p className="uppercase tracking-[0.35em] text-xs text-gold-700 mb-4">{eyebrow}</p>
+                        <p className="eyebrow mb-5">{eyebrow}</p>
                     )}
-                    <h1 className="font-display text-4xl sm:text-6xl font-semibold leading-tight text-ink-900">
+                    <h1 className="display text-5xl sm:text-7xl">
                         {headline || title}
                     </h1>
                     {lede && (
@@ -58,19 +58,19 @@ export default function Story({ title, eyebrow, headline, lede, heroImage, body,
 
             {/* What the shop promises — the footer's trust badges, verbatim. */}
             {promises.length > 0 && (
-                <section className="bg-gold-50/60 py-14 sm:py-16">
+                <section className="bg-mist-50 py-16 sm:py-24">
                     <div className="mx-auto max-w-6xl px-4">
                         <div className="text-center mb-10">
-                            <p className="uppercase tracking-[0.3em] text-xs text-gold-700 mb-3">Our promise</p>
-                            <h2 className="font-display text-3xl sm:text-4xl text-ink-900">
+                            <p className="eyebrow mb-4">Our promise</p>
+                            <h2 className="display text-4xl sm:text-5xl">
                                 What you can count on
-                                <span className="block h-0.5 w-16 bg-gold-500 mt-3 mx-auto"></span>
+                                
                             </h2>
                         </div>
                         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
                             {promises.map((p, i) => (
                                 <div key={i} className="text-center">
-                                    <span className="inline-grid h-12 w-12 place-items-center rounded-full bg-white text-gold-700 shadow-sm mb-3">
+                                    <span className="inline-grid h-14 w-14 place-items-center rounded-full bg-white text-ink-900 mb-4">
                                         <IconOrGlyph value={p.icon} className="w-6 h-6" />
                                     </span>
                                     <h3 className="font-medium text-ink-900">{p.title}</h3>

@@ -5,7 +5,7 @@ import Layout from '../Shared/Chrome/Layout';
 export default function Legal({ title, body }) {
     return (
         <div className="mx-auto max-w-3xl px-4 py-12">
-            <h1 className="font-display text-3xl font-semibold mb-6">{title}</h1>
+            <h1 className="display text-4xl sm:text-5xl mb-6">{title}</h1>
             {/* `.rich-text`, not `prose`: @tailwindcss/typography is not
                 installed, so the prose classes that used to be here emitted no
                 CSS at all and these pages rendered as one wall of text. */}

@@ -94,8 +94,7 @@ export default function MobileDrawer() {
         >
             {/* Dim overlay */}
             <div
-                className={`absolute inset-0 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
-                style={{ background: 'rgba(0,0,0,.45)' }}
+                className={`absolute inset-0 bg-ink-900/35 backdrop-blur-[3px] transition-opacity duration-500 ${open ? 'opacity-100' : 'opacity-0'}`}
                 onClick={close}
             />
 
@@ -107,8 +106,8 @@ export default function MobileDrawer() {
                 aria-modal="true"
                 aria-label="Menu"
                 onKeyDown={(e) => trapTab(e, panelRef.current)}
-                className={`absolute top-0 left-0 h-[100dvh] w-[85%] max-w-[360px] bg-white flex flex-col shadow-2xl outline-none will-change-transform ${open ? 'translate-x-0' : '-translate-x-full'}`}
-                style={{ transition: 'transform .3s cubic-bezier(.22,.61,.36,1)' }}
+                className={`absolute top-0 left-0 h-[100dvh] w-[88%] max-w-[380px] bg-white rounded-r-[28px] flex flex-col shadow-[30px_0_80px_-30px_rgb(0_0_0/0.45)] outline-none will-change-transform ${open ? 'translate-x-0' : '-translate-x-full'}`}
+                style={{ transition: 'transform .5s cubic-bezier(.22,.61,.36,1)' }}
                 onTouchStart={(e) => { touchX.current = e.changedTouches[0].clientX; }}
                 onTouchMove={(e) => {
                     if (touchX.current !== null && e.changedTouches[0].clientX - touchX.current < -60) {
@@ -119,48 +118,48 @@ export default function MobileDrawer() {
                 onTouchEnd={() => { touchX.current = null; }}
             >
                 {/* Logo + close */}
-                <div className="flex items-center justify-between h-16 px-4 border-b border-gold-100 shrink-0">
+                <div className="flex items-center justify-between h-16 px-5 shrink-0">
                     <SmartLink href={urls.home || '/'} onClick={close} className="shrink-0">
                         {(logo.mobile || logo.desktop) ? (
                             <img src={logo.mobile || logo.desktop} alt={storeName} style={{ height: `${logo.hMobile || 32}px` }} className="w-auto" />
                         ) : (
-                            <span className="font-display text-xl font-bold text-gold-700">{storeName}</span>
+                            <span className="font-display text-2xl tracking-[-0.02em] text-ink-900">{storeName}</span>
                         )}
                     </SmartLink>
-                    <button onClick={close} aria-label="Close menu" className="p-2 -mr-2 text-ink-700/70 hover:text-ink-900">
-                        <Icon name="close" className="w-6 h-6" strokeWidth={1.75} />
+                    <button onClick={close} aria-label="Close menu" className="grid place-items-center w-10 h-10 -mr-1 rounded-full bg-mist-100 text-ink-900">
+                        <Icon name="close" className="w-4 h-4" strokeWidth={1.8} />
                     </button>
                 </div>
 
                 {/* Search */}
-                <div className="px-4 py-3 border-b border-gold-50 shrink-0">
+                <div className="px-5 pb-3 shrink-0">
                     <form action={urls.shop || '/shop'} method="GET" role="search" className="relative">
                         <input
                             name="q"
                             aria-label="Search jewelry"
                             placeholder="Search jewelry…"
                             autoComplete="off"
-                            className="w-full rounded-full border border-ink-100 bg-ink-50/60 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/50"
+                            className="w-full rounded-full border-0 bg-mist-100 pl-11 pr-4 h-12 text-[15px] placeholder:text-ink-700/50 focus:outline-none focus:ring-2 focus:ring-ink-900/15"
                         />
-                        <Icon name="search" className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-700/40" strokeWidth={1.75} />
+                        <Icon name="search" className="w-[18px] h-[18px] absolute left-4 top-1/2 -translate-y-1/2 text-ink-700/50" strokeWidth={1.75} />
                     </form>
                 </div>
 
                 {/* Navigation */}
-                <nav aria-label="Main" className="flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-                    <SmartLink href={urls.home || '/'} onClick={close} className="block px-2 py-3 rounded-lg hover:bg-gold-50 border-b border-gold-50">Home</SmartLink>
+                <nav aria-label="Main" className="flex-1 overflow-y-auto overscroll-contain px-5 py-2">
+                    <SmartLink href={urls.home || '/'} onClick={close} className="flex items-center py-3.5 border-b border-ink-900/[0.07] font-display text-[1.6rem] leading-tight tracking-[-0.015em] text-ink-900">Home</SmartLink>
                     {(menu.items || []).map((item, i) => (
                         <MobileItem key={i} item={item} onNavigate={close} />
                     ))}
                     {menu.cta && (
-                        <SmartLink href={menu.cta.url} onClick={close} className="block mt-2 rounded-full bg-gold-600 text-white text-center px-4 py-2.5 font-medium">{menu.cta.label}</SmartLink>
+                        <SmartLink href={menu.cta.url} onClick={close} className="btn-primary w-full mt-5">{menu.cta.label}</SmartLink>
                     )}
 
-                    <div className="mt-3 pt-3 border-t border-ink-100">
-                        <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-700/70">Your account</p>
+                    <div className="mt-6 rounded-[22px] bg-mist-50 p-2">
+                        <p className="px-3 pt-2 pb-1 eyebrow">Your account</p>
                         {acctLinks.map(([href, label, icon]) => (
-                            <a key={label} href={href} onClick={close} className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-gold-50 text-sm">
-                                <Icon name={icon} className="w-5 h-5 text-ink-700/60" strokeWidth={1.6} />
+                            <a key={label} href={href} onClick={close} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white text-[14px] text-ink-900">
+                                <Icon name={icon} className="w-5 h-5 text-ink-700/60" strokeWidth={1.5} />
                                 {label}
                             </a>
                         ))}
@@ -168,14 +167,14 @@ export default function MobileDrawer() {
                 </nav>
 
                 {/* Footer with social icons */}
-                <div className="shrink-0 border-t border-ink-100 px-4 py-3 flex items-center justify-between" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-                    <span className="text-xs text-ink-700/70">{storeName}</span>
+                <div className="shrink-0 border-t border-ink-900/[0.07] px-5 py-3 flex items-center justify-between" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+                    <span className="text-xs text-ink-700/60">{storeName}</span>
                     <div className="flex items-center gap-2">
                         {(footer.socials || []).map(({ platform, label, url }) => {
                             const Glyph = SOCIAL_ICONS[platform];
 
                             return Glyph && (
-                                <a key={platform} href={url} target="_blank" rel="noopener" aria-label={label} className="w-9 h-9 grid place-items-center rounded-full bg-ink-50 text-ink-700/70 hover:text-gold-700">
+                                <a key={platform} href={url} target="_blank" rel="noopener" aria-label={label} className="w-10 h-10 grid place-items-center rounded-full bg-mist-100 text-ink-900">
                                     <Glyph className="w-4.5 h-4.5" />
                                 </a>
                             );
@@ -194,37 +193,37 @@ function MobileItem({ item, onNavigate }) {
 
     if (type === 'link') {
         return (
-            <SmartLink href={item.url} {...(item.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="flex items-center gap-2 px-2 py-3 rounded-lg hover:bg-gold-50 border-b border-gold-50">
+            <SmartLink href={item.url} {...(item.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="flex items-center gap-2 py-3.5 border-b border-ink-900/[0.07] font-display text-[1.6rem] leading-tight tracking-[-0.015em] text-ink-900">
                 {item.label}{badge}
             </SmartLink>
         );
     }
 
     return (
-        <div className="border-b border-gold-50">
+        <div className="border-b border-ink-900/[0.07]">
             {/* Tapping a parent expands its submenu; the category page itself is
                 reached via the "View all …" link at the bottom of the panel. */}
             <button type="button" onClick={() => setSub(!sub)} aria-expanded={sub} aria-label={`Toggle ${item.label}`} className="w-full flex items-center justify-between text-left">
-                <span className="flex items-center gap-2 px-2 py-3">{item.label}{badge}</span>
-                <span className="p-2">
-                    <Icon name="chevronRight" className={`w-4 h-4 transition-transform duration-200 ${sub ? 'rotate-90' : ''}`} strokeWidth={2} />
+                <span className="flex items-center gap-2 py-3.5 font-display text-[1.6rem] leading-tight tracking-[-0.015em] text-ink-900">{item.label}{badge}</span>
+                <span className={`grid place-items-center w-9 h-9 rounded-full transition-colors duration-300 ${sub ? 'bg-ink-900 text-white' : 'bg-mist-100 text-ink-900'}`}>
+                    <Icon name="chevronDown" className={`w-3.5 h-3.5 transition-transform duration-300 ${sub ? 'rotate-180' : ''}`} strokeWidth={2} />
                 </span>
             </button>
             <div className={`grid transition-[grid-template-rows] duration-300 ${sub ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                 <div className="overflow-hidden">
-                    <div className="pb-2 pl-4 space-y-0.5">
+                    <div className="pb-3 pl-1 space-y-0.5">
                         {type === 'mega' ? (item.columns || []).map((col, i) => (
                             <div key={i} className="contents">
-                                {col.heading && <p className="pt-1.5 text-xs font-bold text-gold-700 uppercase tracking-wide">{col.heading}</p>}
+                                {col.heading && <p className="pt-2 eyebrow">{col.heading}</p>}
                                 {col.links.map((l, j) => (
-                                    <SmartLink key={j} href={l.url} {...(l.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="block py-2 text-sm text-ink-700/80">{l.label}</SmartLink>
+                                    <SmartLink key={j} href={l.url} {...(l.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="block py-2 text-[15px] text-ink-700">{l.label}</SmartLink>
                                 ))}
                             </div>
                         )) : (item.children || []).map((child, i) => (
-                            <SmartLink key={i} href={child.url} {...(child.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="block py-2 text-sm text-ink-700/80">{child.label}</SmartLink>
+                            <SmartLink key={i} href={child.url} {...(child.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="block py-2 text-[15px] text-ink-700">{child.label}</SmartLink>
                         ))}
                         {item.url && (
-                            <SmartLink href={item.url} {...(item.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="block py-2 text-sm font-medium text-gold-700">View all {item.label} →</SmartLink>
+                            <SmartLink href={item.url} {...(item.new_tab ? { target: '_blank', rel: 'noopener' } : {})} onClick={onNavigate} className="block py-2 text-[13px] font-medium tracking-[0.06em] uppercase text-ink-900">View all {item.label} →</SmartLink>
                         )}
                     </div>
                 </div>

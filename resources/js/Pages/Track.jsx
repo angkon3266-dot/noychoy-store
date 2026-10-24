@@ -15,7 +15,7 @@ export default function Track({ query, notFound, order, tracking }) {
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-12">
-            <h1 className="font-display text-3xl font-semibold mb-6 text-center">Track your order</h1>
+            <h1 className="display text-4xl sm:text-5xl mb-6 text-center">Track your order</h1>
 
             <form onSubmit={submit} className="card p-6 grid sm:grid-cols-2 gap-4">
                 <div>
@@ -32,8 +32,8 @@ export default function Track({ query, notFound, order, tracking }) {
             {order && (
                 <div className="card p-6 mt-6">
                     <div className="flex items-center justify-between">
-                        <h2 className="font-display text-xl font-semibold">{order.number}</h2>
-                        <span className="badge bg-gold-100 text-gold-800 capitalize">{order.status}</span>
+                        <h2 className="font-display text-2xl tracking-[-0.01em] text-ink-900">{order.number}</h2>
+                        <span className="badge bg-mist-100 text-ink-900 capitalize">{order.status}</span>
                     </div>
 
                     {tracking && (

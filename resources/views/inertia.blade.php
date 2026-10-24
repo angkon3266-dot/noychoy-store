@@ -22,7 +22,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="{{ store_name() }}">
-    <meta name="theme-color" content="#9a6c2e">
+    <meta name="theme-color" content="{{ theme('background', '#ffffff') }}">
     <link rel="apple-touch-icon" href="{{ $fav ?: asset('favicon.ico') }}">
     {{-- The body is client-rendered, so the browser cannot discover the
          largest image until React runs. The server already knows what it will

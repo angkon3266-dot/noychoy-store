@@ -29,7 +29,7 @@ export default function Profile({ profile, genders, languages = {}, reminderDays
 
     return (
         <AccountShell>
-            <h1 className="font-display text-2xl font-semibold mb-6">Profile &amp; security</h1>
+            <h1 className="display text-3xl sm:text-4xl mb-6">Profile &amp; security</h1>
 
             <div className="card p-5 mb-6">
                 <h2 className="font-semibold mb-4">Account information</h2>

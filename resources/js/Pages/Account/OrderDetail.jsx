@@ -8,8 +8,8 @@ export default function OrderDetail({ order, tracking, reorderUrl }) {
             <Link href="/account/orders" className="text-sm text-gold-700 hover:underline">← Back to orders</Link>
             <div className="card p-6 mt-4">
                 <div className="flex items-center justify-between">
-                    <h1 className="font-display text-2xl font-semibold">{order.number}</h1>
-                    <span className="badge bg-gold-100 text-gold-800 capitalize">{order.status}</span>
+                    <h1 className="display text-3xl sm:text-4xl">{order.number}</h1>
+                    <span className="badge bg-mist-100 text-ink-900 capitalize">{order.status}</span>
                 </div>
                 <p className="text-sm text-ink-700/70 mt-1">{order.date}</p>
 

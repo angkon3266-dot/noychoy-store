@@ -73,6 +73,19 @@
     --color-promo-600: #6f5b8e;
     --color-promo-700: #5b4a75;
     --color-promo-800: #47395c;
+
+    /* Neutral "porcelain" surfaces for the storefront redesign (2026-10-24).
+       The gold-* scale follows the admin's brand colour, so on a bright brand
+       (production is orange) every gold-50/100 panel came out peach. These
+       mix the page ground with a whisper of the text colour instead, so image
+       wells, tinted sections and chips read as calm neutrals under any palette
+       the owner picks. */
+    --color-mist-50: color-mix(in oklab, var(--color-ink-900) 2.5%, var(--color-gold-50));
+    --color-mist-100: color-mix(in oklab, var(--color-ink-900) 5%, var(--color-gold-50));
+    --color-mist-200: color-mix(in oklab, var(--color-ink-900) 9%, var(--color-gold-50));
+
+    --ease-lux: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 @layer base {
@@ -188,28 +201,169 @@ html {
 }
 
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(26px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(24px); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 .reveal-init { opacity: 0; }
 .reveal-in {
-    animation: fadeUp 0.7s ease-out both;
+    animation: fadeUp 0.8s var(--ease-lux) both;
     animation-delay: var(--reveal-delay, 0s);
 }
 
-/* Gentle lift on product cards (storefront only, gated by [data-shop]). */
-[data-shop] .group.relative.block {
-    transition: transform 0.35s ease;
+/* ── Storefront design layer (2026-10-24 redesign) ───────────────────────────
+   Everything below is scoped to [data-shop] (the storefront <body>) or uses
+   names the admin never renders, so the admin panel keeps its own look. */
+
+[data-shop] {
+    font-feature-settings: 'kern', 'liga', 'ss01';
+    text-rendering: optimizeLegibility;
 }
-[data-shop] .group.relative.block:hover {
-    transform: translateY(-4px);
+[data-shop] ::selection { background: var(--color-ink-900); color: var(--color-gold-50); }
+[data-shop] h1, [data-shop] h2 { text-wrap: balance; }
+[data-shop] p { text-wrap: pretty; }
+
+/* The house buttons, re-cut for the storefront: ink, pill-shaped, a touch
+   taller. The admin's .btn-primary (gold, square) is untouched. */
+[data-shop] .btn, [data-shop] .btn-primary, [data-shop] .btn-dark, [data-shop] .btn-outline {
+    border-radius: 9999px;
+    min-height: 2.875rem;
+    padding-inline: 1.5rem;
+    letter-spacing: 0.02em;
+    transition: background-color .3s var(--ease-lux), color .3s var(--ease-lux), border-color .3s var(--ease-lux), transform .3s var(--ease-lux), box-shadow .3s var(--ease-lux);
 }
+[data-shop] .btn-primary, [data-shop] .btn-dark {
+    background: var(--color-ink-900);
+    color: #fff;
+    box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--color-ink-900) 70%, transparent);
+}
+[data-shop] .btn-primary:hover, [data-shop] .btn-dark:hover {
+    background: var(--color-ink-800);
+    transform: translateY(-1px);
+}
+[data-shop] .btn-outline {
+    border: 1px solid color-mix(in srgb, var(--color-ink-900) 18%, transparent);
+    color: var(--color-ink-900);
+    background: transparent;
+}
+[data-shop] .btn-outline:hover { border-color: var(--color-ink-900); background: var(--color-ink-900); color: #fff; }
+[data-shop] .input {
+    border-radius: 0.875rem;
+    border-color: color-mix(in srgb, var(--color-ink-900) 12%, transparent);
+    padding-block: 0.8rem;
+    box-shadow: none;
+    transition: border-color .2s, box-shadow .2s;
+}
+[data-shop] .input:focus {
+    border-color: var(--color-ink-900);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-ink-900) 8%, transparent);
+}
+[data-shop] .card {
+    border-radius: 1.25rem;
+    border-color: color-mix(in srgb, var(--color-ink-900) 8%, transparent);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.03);
+}
+
+/* Component classes live in the components layer so a utility on the same
+   element (text-white on a .display heading, say) still wins. */
+@layer components {
+/* Type */
+.eyebrow {
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--color-ink-900) 55%, transparent);
+}
+.display {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1.02;
+    color: var(--color-ink-900);
+}
+.display em, .display i { font-style: italic; }
+
+/* Buttons used by the redesigned pages */
+.lux-btn, .lux-btn-ghost, .lux-btn-light {
+    display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
+    min-height: 3.25rem; padding: 0 1.9rem; border-radius: 9999px;
+    font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+    transition: background-color .35s var(--ease-lux), color .35s var(--ease-lux), border-color .35s var(--ease-lux), transform .35s var(--ease-lux), box-shadow .35s var(--ease-lux);
+    white-space: nowrap;
+}
+.lux-btn { background: var(--color-ink-900); color: #fff; box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--color-ink-900) 80%, transparent); }
+.lux-btn:hover { background: var(--color-ink-800); transform: translateY(-2px); box-shadow: 0 20px 40px -18px color-mix(in srgb, var(--color-ink-900) 80%, transparent); }
+.lux-btn-ghost { border: 1px solid color-mix(in srgb, var(--color-ink-900) 18%, transparent); color: var(--color-ink-900); }
+.lux-btn-ghost:hover { border-color: var(--color-ink-900); background: var(--color-ink-900); color: #fff; }
+.lux-btn-light { background: #fff; color: var(--color-ink-900); }
+.lux-btn-light:hover { background: color-mix(in srgb, #fff 88%, var(--color-gold-500)); transform: translateY(-2px); }
+.lux-btn svg, .lux-btn-ghost svg, .lux-btn-light svg, .lux-arrow svg { transition: transform .35s var(--ease-lux); }
+.lux-btn:hover svg, .lux-btn-ghost:hover svg, .lux-btn-light:hover svg, .lux-arrow:hover svg { transform: translateX(4px); }
+
+/* Underline that draws in from the left */
+.lux-link {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px; background-position: 0 100%; background-repeat: no-repeat;
+    transition: background-size .45s var(--ease-lux);
+    padding-bottom: 2px;
+}
+.lux-link:hover, .lux-link:focus-visible { background-size: 100% 1px; }
+.lux-link-on { background-size: 100% 1px; }
+.lux-link-on:hover { background-size: 0% 1px; }
+
+.glass {
+    background: color-mix(in srgb, #fff 84%, transparent);
+    -webkit-backdrop-filter: saturate(1.6) blur(18px);
+    backdrop-filter: saturate(1.6) blur(18px);
+}
+.glass-dark {
+    background: color-mix(in srgb, var(--color-ink-900) 38%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(16px);
+    backdrop-filter: saturate(1.4) blur(16px);
+}
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Grain — a barely-there texture on the dark bands so flat colour reads as material. */
+.grain { position: relative; isolation: isolate; }
+.grain::after {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .5; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+}
+}
+
+/* Motion primitives */
+@keyframes kenburns { from { transform: scale(1.0); } to { transform: scale(1.09); } }
+.kenburns { animation: kenburns 9s var(--ease-lux) both; }
+
+@keyframes story-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.story-fill { transform-origin: left; animation: story-fill var(--story-dur, 6s) linear both; }
+.story-paused .story-fill { animation-play-state: paused; }
+
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-track { display: flex; width: max-content; animation: marquee var(--marquee-dur, 38s) linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+
+@keyframes rise-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.rise-in { animation: rise-in .9s var(--ease-lux) both; animation-delay: var(--d, 0s); }
+
+@keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+.pop-in { animation: pop-in .28s var(--ease-lux) both; }
+
+@keyframes slow-spin { to { transform: rotate(360deg); } }
+.slow-spin { animation: slow-spin 24s linear infinite; }
+
+/* Product cards: the lift lives on the image well, not the whole card. */
+[data-shop] .lux-card-media { transition: box-shadow .5s var(--ease-lux); }
+[data-shop] .group:hover .lux-card-media { box-shadow: 0 24px 50px -28px rgb(0 0 0 / 0.35); }
 
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
     .reveal-init { opacity: 1 !important; }
-    .reveal-in { animation: none !important; }
-    [data-shop] .group.relative.block { transition: none; }
-    [data-shop] .group.relative.block:hover { transform: none; }
+    .reveal-in, .kenburns, .rise-in, .pop-in, .slow-spin { animation: none !important; }
+    .story-fill { animation: none !important; transform: scaleX(1); }
+    .marquee-track { animation: none; }
+    .lux-btn:hover, .lux-btn-light:hover, [data-shop] .btn-primary:hover, [data-shop] .btn-dark:hover { transform: none; }
 }

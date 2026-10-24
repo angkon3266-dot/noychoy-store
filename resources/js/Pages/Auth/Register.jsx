@@ -33,7 +33,7 @@ export default function Register({ old, invitedBy = null }) {
                 joining was worth. */}
             <ul className="mt-5 space-y-1.5 text-sm text-ink-800">
                 {perks.map((p) => (
-                    <li key={p} className="flex items-start gap-2"><span className="mt-[3px] grid h-4 w-4 shrink-0 place-items-center rounded-full bg-gold-100 text-gold-700 text-[10px]">✓</span><span>{p}</span></li>
+                    <li key={p} className="flex items-start gap-2"><span className="mt-[3px] grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink-900 text-white text-[10px]">✓</span><span>{p}</span></li>
                 ))}
             </ul>
             <form onSubmit={submit} className="mt-6 space-y-4">

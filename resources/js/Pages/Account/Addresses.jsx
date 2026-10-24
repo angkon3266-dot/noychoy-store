@@ -17,7 +17,7 @@ export default function Addresses({ addresses, storeUrl, defaults }) {
     return (
         <AccountShell>
             <div className="flex items-center justify-between mb-6">
-                <h1 className="font-display text-2xl font-semibold">My addresses</h1>
+                <h1 className="display text-3xl sm:text-4xl">My addresses</h1>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -37,7 +37,7 @@ export default function Addresses({ addresses, storeUrl, defaults }) {
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium">{a.name}</span>
                                         {a.label && <span className="badge bg-ink-50 text-ink-700">{a.label}</span>}
-                                        {a.is_default && <span className="badge bg-gold-100 text-gold-800">Default</span>}
+                                        {a.is_default && <span className="badge bg-mist-100 text-ink-900">Default</span>}
                                     </div>
                                     <p className="text-sm text-ink-700/70">{a.phone}</p>
                                     <p className="text-sm text-ink-700/70">{a.line}</p>

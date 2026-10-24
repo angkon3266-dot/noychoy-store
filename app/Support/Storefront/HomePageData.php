@@ -156,7 +156,12 @@ class HomePageData
             // Social proof: recent 4–5★ approved reviews, sitewide. Cached like
             // the deals block — it ran two uncached queries on every homepage
             // render for content that changes a few times a week at most.
-            'reviews' => \Illuminate\Support\Facades\Cache::remember('home.reviews.band', 600, fn () => \App\Models\Review::approved()->with('product:id,name,slug')
+            //
+            // Cached as a plain array: the cache store refuses to unserialize
+            // objects (cache.serializable_classes = false), so a cached
+            // Collection came back as __PHP_Incomplete_Class on every hit and
+            // the band silently vanished for everyone after the first visitor.
+            'reviews' => \Illuminate\Support\Facades\Cache::remember('home.reviews.band.v2', 600, fn () => \App\Models\Review::approved()->with('product:id,name,slug')
                 ->where('rating', '>=', 4)->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))
                 ->latest()->take(6)->get()
                 ->map(fn ($r) => [
@@ -164,7 +169,7 @@ class HomePageData
                     'rating' => (int) $r->rating,
                     'quote' => $r->body ?: $r->title,
                     'product' => $r->product ? ['name' => $r->product->name, 'url' => route('product.show', $r->product->slug)] : null,
-                ])->values()),
+                ])->values()->all()),
             'blocks' => $sections->map(fn ($b) => self::block($b))->filter()->values(),
         ];
     }

@@ -11,7 +11,7 @@ const statusClass = (st) =>
 export default function Reviews({ reviews }) {
     return (
         <AccountShell>
-            <h1 className="font-display text-2xl font-semibold mb-6">My reviews</h1>
+            <h1 className="display text-3xl sm:text-4xl mb-6">My reviews</h1>
 
             {reviews.data.length === 0 && (
                 <div className="card p-6 text-center text-sm text-ink-700/70">

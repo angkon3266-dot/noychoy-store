@@ -30,7 +30,7 @@ export default function GiftLadderBar({ gift, compact = false }) {
 
     if (compact) {
         return (
-            <div className="rounded-md bg-gold-100/70 px-3 py-2 text-xs text-ink-800">
+            <div className="rounded-xl bg-mist-100 px-3 py-2 text-xs text-ink-800">
                 <p className="flex items-start gap-1.5">
                     <Icon name="gift" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
                     <span>{message}</span>

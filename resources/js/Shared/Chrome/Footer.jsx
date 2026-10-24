@@ -16,94 +16,146 @@ export default function Footer({ minimal = false }) {
 
     if (minimal) {
         return (
-            <footer className="mt-16 bg-ink-900 text-gold-100">
-                <div className="mx-auto max-w-7xl px-4 py-5 text-center text-xs text-gold-100/50">{footer.copyright}</div>
+            <footer className="mt-16 border-t border-ink-900/[0.07]">
+                <div className="mx-auto max-w-[1440px] px-4 py-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-ink-700/60">
+                    <span className="inline-flex items-center gap-1.5"><Icon name="shieldCheck" className="w-4 h-4" strokeWidth={1.5} /> Secure checkout · Cash on delivery</span>
+                    <span>{footer.copyright}</span>
+                </div>
             </footer>
         );
     }
 
+    const heading = 'font-sans text-[11px] font-medium uppercase tracking-[0.24em] text-white/45';
+    const link = 'text-[14px] text-white/75 hover:text-white transition-colors';
+    const wordmark = (chrome.storeName || footer.brand || '').trim();
+
     return (
-        <footer className="mt-16 bg-ink-900 text-gold-100">
-            {footer.showTrust && footer.trustBadges?.length > 0 && (
-                <div className="border-b border-white/10">
-                    <div className="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-                        {footer.trustBadges.map((b, i) => (
-                            <div key={i} className="flex items-center justify-center gap-2">
-                                <IconOrGlyph value={b.icon} fallback="check" className="w-6 h-6 text-gold-300 shrink-0" />
-                                <div className="text-left">
-                                    <div className="text-sm font-medium text-gold-100">{b.title}</div>
-                                    {b.text && <div className="text-xs text-gold-100/60">{b.text}</div>}
+        <footer className="mt-20 lg:mt-28 px-2 sm:px-3 pb-2 sm:pb-3">
+            <div className="grain relative overflow-hidden rounded-[28px] lg:rounded-[40px] bg-ink-900 text-white">
+                <div className="pointer-events-none absolute -top-56 left-1/3 w-[700px] h-[700px] rounded-full opacity-25 blur-3xl" style={{ background: 'radial-gradient(circle, var(--color-gold-500), transparent 60%)' }} aria-hidden="true" />
+
+                {footer.showTrust && footer.trustBadges?.length > 0 && (
+                    <div className="relative border-b border-white/10">
+                        <div className="mx-auto max-w-[1440px] px-6 lg:px-12 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+                            {footer.trustBadges.map((b, i) => (
+                                <div key={i} className="flex items-center gap-4 py-6 sm:py-8 sm:px-6 first:sm:pl-0">
+                                    <span className="grid place-items-center w-11 h-11 shrink-0 rounded-full border border-white/15 text-gold-400">
+                                        <IconOrGlyph value={b.icon} fallback="check" className="w-5 h-5" />
+                                    </span>
+                                    <div>
+                                        <div className="text-[14px] font-medium">{b.title}</div>
+                                        {b.text && <div className="text-[12px] text-white/50 mt-0.5">{b.text}</div>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="relative mx-auto max-w-[1440px] px-6 lg:px-12 pt-14 lg:pt-20 pb-10 grid gap-12 lg:grid-cols-12">
+                    <div className="lg:col-span-4">
+                        <p className="font-display text-3xl lg:text-4xl tracking-[-0.02em]">{footer.brand}</p>
+                        {footer.about && <p className="mt-4 text-[14px] leading-relaxed text-white/60 max-w-sm">{footer.about}</p>}
+                        {footer.socials?.length > 0 && (
+                            <div className="mt-7 flex gap-2.5">
+                                {footer.socials.map(({ platform, label, url }) => {
+                                    const Glyph = SOCIAL_ICONS[platform];
+
+                                    return Glyph && (
+                                        <a key={platform} href={url} target="_blank" rel="noopener" aria-label={label} className="grid place-items-center w-11 h-11 rounded-full border border-white/15 text-white/80 hover:bg-white hover:text-ink-900 hover:border-white transition-colors duration-300">
+                                            <Glyph />
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-10">
+                        <div>
+                            <h2 className={heading}>Shop</h2>
+                            <ul className="mt-5 space-y-3">
+                                {(footer.categories || []).map((cat) => (
+                                    <li key={cat.url}><SmartLink href={cat.url} className={link}>{cat.name}</SmartLink></li>
+                                ))}
+                                {urls.shop && <li><SmartLink href={urls.shop} className={link}>Shop all</SmartLink></li>}
+                            </ul>
+                        </div>
+                        <div>
+                            <h2 className={heading}>Help</h2>
+                            <ul className="mt-5 space-y-3">
+                                <li><a href={urls.about} className={link}>Our story</a></li>
+                                <li><a href={urls.track} className={link}>Track your order</a></li>
+                                <li><a href={urls.contact} className={link}>Contact us</a></li>
+                                <li><a href={urls.privacy} className={link}>Privacy Policy</a></li>
+                                <li><a href={urls.terms} className={link}>Terms &amp; Conditions</a></li>
+                                <li><a href={urls.refund} className={link}>Refund Policy</a></li>
+                                {!props.customer && (
+                                    <li>
+                                        <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className={link} lang={lang}>
+                                            {props.chrome?.membership?.pct ? t(lang, 'footer.join', { pct: props.chrome.membership.pct }) : 'Login / Register'}
+                                        </a>
+                                    </li>
+                                )}
+                                {props.customer && <li><a href={urls.account} className={link} lang={lang}>{t(lang, 'footer.account')}</a></li>}
+                            </ul>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                            <h2 className={heading}>Contact</h2>
+                            <ul className="mt-5 space-y-3">
+                                {footer.phone && (
+                                    <li>
+                                        <a href={`tel:+${footer.phone.replace(/\D/g, '')}`} className={`${link} inline-flex items-center gap-2.5`}>
+                                            <Icon name="phone" className="w-4 h-4 text-white/45 shrink-0" />{footer.phone}
+                                        </a>
+                                    </li>
+                                )}
+                                {footer.email && (
+                                    <li>
+                                        <a href={`mailto:${footer.email}`} className={`${link} inline-flex items-center gap-2.5`}>
+                                            <Icon name="mail" className="w-4 h-4 text-white/45 shrink-0" />{footer.email}
+                                        </a>
+                                    </li>
+                                )}
+                                {footer.whatsapp && (
+                                    <li>
+                                        <a href={`https://wa.me/${footer.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className={`${link} inline-flex items-center gap-2.5`}>
+                                            <WhatsApp className="w-4 h-4 text-[#25D366]" />
+                                            WhatsApp
+                                        </a>
+                                    </li>
+                                )}
+                            </ul>
+
+                            <div className="mt-8">
+                                <p className={heading}>{t(lang, 'footer.lang')}</p>
+                                <div className="mt-3 inline-flex rounded-full border border-white/15 p-1" role="group" aria-label={t(lang, 'footer.lang')}>
+                                    <button type="button" onClick={() => setLang('en')} aria-pressed={lang === 'en'} className={`rounded-full px-4 h-8 text-[12px] transition-colors ${lang === 'en' ? 'bg-white text-ink-900' : 'text-white/70 hover:text-white'}`}>English</button>
+                                    <button type="button" onClick={() => setLang('bn')} aria-pressed={lang === 'bn'} lang="bn" className={`rounded-full px-4 h-8 text-[12px] transition-colors ${lang === 'bn' ? 'bg-white text-ink-900' : 'text-white/70 hover:text-white'}`}>বাংলা</button>
                                 </div>
                             </div>
-                        ))}
+                        </div>
                     </div>
                 </div>
-            )}
-            <div className="mx-auto max-w-7xl px-4 py-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                    <div className="font-display text-xl font-bold text-gold-300">{footer.brand}</div>
-                    <p className="mt-3 text-sm text-gold-100/70">{footer.about}</p>
-                    {footer.socials?.length > 0 && (
-                        <div className="mt-4 flex gap-3">
-                            {footer.socials.map(({ platform, label, url }) => {
-                                const Glyph = SOCIAL_ICONS[platform];
 
-                                return Glyph && <a key={platform} href={url} target="_blank" rel="noopener" className="text-gold-100/70 hover:text-white" aria-label={label}><Glyph /></a>;
-                            })}
-                        </div>
-                    )}
+                {/* The signature: the name, set huge and quiet across the foot. */}
+                {wordmark && (
+                    <div className="relative px-4 lg:px-8 select-none" aria-hidden="true">
+                        <p className="font-display text-center leading-[0.8] tracking-[-0.045em] text-white/[0.07] whitespace-nowrap overflow-hidden" style={{ fontSize: `clamp(4rem, ${Math.min(26, 150 / Math.max(4, wordmark.length))}vw, 22rem)` }}>
+                            {wordmark}
+                        </p>
+                    </div>
+                )}
+
+                <div className="relative border-t border-white/10">
+                    <div className="mx-auto max-w-[1440px] px-6 lg:px-12 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-white/45">
+                        <span>{footer.copyright}</span>
+                        <span className="inline-flex items-center gap-2">
+                            <Icon name="cash" className="w-4 h-4" strokeWidth={1.5} />
+                            Cash on delivery across Bangladesh
+                        </span>
+                    </div>
                 </div>
-                <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Shop</h2>
-                    <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
-                        {(footer.categories || []).map((cat) => (
-                            <li key={cat.url}><SmartLink href={cat.url} className="hover:text-white">{cat.name}</SmartLink></li>
-                        ))}
-                    </ul>
-                </div>
-                <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Help</h2>
-                    <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
-                        <li><a href={urls.about} className="hover:text-white">Our story</a></li>
-                        <li><a href={urls.track} className="hover:text-white">Track your order</a></li>
-                        <li><a href={urls.contact} className="hover:text-white">Contact us</a></li>
-                        <li><a href={urls.privacy} className="hover:text-white">Privacy Policy</a></li>
-                        <li><a href={urls.terms} className="hover:text-white">Terms &amp; Conditions</a></li>
-                        <li><a href={urls.refund} className="hover:text-white">Refund Policy</a></li>
-                        {!props.customer && (
-                            <li>
-                                <a href={props.chrome?.membership?.pct ? urls.register : urls.login} className="hover:text-white" lang={lang}>
-                                    {props.chrome?.membership?.pct ? t(lang, 'footer.join', { pct: props.chrome.membership.pct }) : 'Login / Register'}
-                                </a>
-                            </li>
-                        )}
-                        {props.customer && <li><a href={urls.account} className="hover:text-white" lang={lang}>{t(lang, 'footer.account')}</a></li>}
-                        <li className="pt-1">
-                            <span className="text-gold-100/50 mr-2">{t(lang, 'footer.lang')}:</span>
-                            <button type="button" onClick={() => setLang('en')} className={`hover:text-white ${lang === 'en' ? 'text-white font-semibold underline' : ''}`} aria-pressed={lang === 'en'}>English</button>
-                            <span className="mx-1.5 text-gold-100/40">·</span>
-                            <button type="button" onClick={() => setLang('bn')} className={`hover:text-white ${lang === 'bn' ? 'text-white font-semibold underline' : ''}`} aria-pressed={lang === 'bn'} lang="bn">বাংলা</button>
-                        </li>
-                    </ul>
-                </div>
-                <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-gold-300">Contact</h2>
-                    <ul className="mt-3 space-y-2 text-sm text-gold-100/80">
-                        {footer.phone && <li className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-gold-300 shrink-0" />{footer.phone}</li>}
-                        <li className="flex items-center gap-2"><Icon name="mail" className="w-4 h-4 text-gold-300 shrink-0" />{footer.email}</li>
-                        {footer.whatsapp && (
-                            <li>
-                                <a href={`https://wa.me/${footer.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="hover:text-white inline-flex items-center gap-1">
-                                    <WhatsApp className="w-4 h-4 text-[#25D366]" />
-                                    WhatsApp
-                                </a>
-                            </li>
-                        )}
-                    </ul>
-                </div>
-            </div>
-            <div className="border-t border-white/10 py-4 text-center text-xs text-gold-100/50">
-                {footer.copyright}
             </div>
         </footer>
     );

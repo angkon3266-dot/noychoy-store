@@ -11,7 +11,7 @@ export default function AuthCard({ title, subtitle = null, children }) {
     return (
         <div className="mx-auto max-w-md px-4 py-12">
             <div className="card p-8">
-                <h1 className="font-display text-2xl font-semibold text-center">{title}</h1>
+                <h1 className="display text-3xl sm:text-4xl text-center">{title}</h1>
                 {subtitle && <p className="text-center text-sm text-ink-700/70 mt-1">{subtitle}</p>}
 
                 {/* Flash is rendered once, by the Layout; validation errors are

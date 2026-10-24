@@ -17,7 +17,7 @@ export default function AccountShell({ children, wide = false }) {
     const path = url.split('?')[0];
 
     return (
-        <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 lg:py-14 md:py-10">
             <div className="grid md:grid-cols-[220px_1fr] gap-8">
                 <aside className="hidden md:block" aria-label="Account navigation">
                     <div className="card p-3 sticky top-20">

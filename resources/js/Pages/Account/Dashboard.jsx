@@ -92,7 +92,7 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
 
             {/* Recent orders */}
             <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display text-xl font-semibold">Recent orders</h2>
+                <h2 className="font-display text-2xl tracking-[-0.01em] text-ink-900">Recent orders</h2>
                 <Link href="/account/orders" className="text-sm text-gold-700 hover:underline">View all →</Link>
             </div>
             {orders.length ? orders.map((order) => (
@@ -100,7 +100,7 @@ export default function Dashboard({ customer, stats, member, liveOffers, loyalty
                     <div className="flex-1 min-w-0">
                         <Link href={order.url} className="font-medium text-gold-700 hover:underline">#{order.number}</Link>
                         <span className="text-xs text-ink-700/70 ml-2">{order.date}</span>
-                        <div className="text-sm text-ink-700/70">{order.totalText} · <span className="badge bg-gold-100 text-gold-800 capitalize">{order.status}</span></div>
+                        <div className="text-sm text-ink-700/70">{order.totalText} · <span className="badge bg-mist-100 text-ink-900 capitalize">{order.status}</span></div>
                     </div>
                     <button type="button" onClick={() => router.post(order.reorderUrl)} className="btn-outline text-sm py-1.5">Reorder</button>
                 </div>

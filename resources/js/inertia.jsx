@@ -29,8 +29,10 @@ createInertiaApp({
     setup({ el, App, props }) {
         createRoot(el).render(<App {...props} />);
     },
+    // The page-load bar takes the store's own brand colour (set in Admin →
+    // Appearance and written to :root by inertia.blade.php).
     progress: {
-        color: '#b6863a',
+        color: getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#b6863a',
         delay: 150,
     },
 });

@@ -32,7 +32,7 @@ export default function Confirmation({ order, purchase, trackUrl, estimate, stor
                 <div className="mx-auto w-16 h-16 rounded-full bg-success-100 flex items-center justify-center">
                     <svg className="w-8 h-8 text-success-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                 </div>
-                <h1 className="font-display text-3xl font-semibold mt-4">Thank you, {order.name}!</h1>
+                <h1 className="display text-4xl sm:text-5xl mt-4">Thank you, {order.name}!</h1>
                 <p className="text-ink-700/70 mt-2">Your order <strong>{order.number}</strong> has been placed. We'll call you shortly to confirm.</p>
                 {order.isGift && (
                     <div className="mt-4 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm text-left">

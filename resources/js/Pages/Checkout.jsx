@@ -220,7 +220,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-8">
-            <h1 className="font-display text-3xl font-semibold mb-6">Checkout</h1>
+            <h1 className="display text-4xl sm:text-5xl mb-6">Checkout</h1>
 
             {Object.keys(errors).length > 0 && (
                 <div id="checkout-errors" role="alert" tabIndex={-1} className="rounded-md bg-danger-50 border border-danger-200 text-danger-800 px-4 py-3 text-sm mb-6">
@@ -241,7 +241,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                 the button for whoever wants it. */}
             <form onSubmit={submit} className="space-y-6">
                 <div className="card p-6 space-y-4">
-                    <h2 className="font-display text-xl font-semibold">Delivery details</h2>
+                    <h2 className="font-display text-2xl tracking-[-0.01em] text-ink-900">Delivery details</h2>
 
                     <div className="grid sm:grid-cols-2 gap-4">
                         <div data-field="name">
@@ -281,11 +281,11 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                     <div data-field="is_inside_dhaka">
                         <span className="label">Delivery zone</span>
                         <div className="flex gap-3" role="radiogroup" aria-label="Delivery zone">
-                            <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
+                            <label className={`flex-1 cursor-pointer rounded-2xl border px-4 py-3.5 text-sm transition-colors ${inside ? 'border-ink-900 bg-mist-50 ring-1 ring-ink-900' : 'border-ink-900/15 hover:border-ink-900/40'}`}>
                                 <input id="co-is_inside_dhaka" aria-invalid={err('is_inside_dhaka') ? 'true' : undefined} type="radio" name="is_inside_dhaka" value="1" checked={inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '1'); }} className="sr-only" />
                                 Inside Dhaka — ৳{view.shipInside}
                             </label>
-                            <label className={`flex-1 cursor-pointer rounded-md border px-4 py-3 text-sm ${!inside ? 'border-gold-500 bg-gold-100' : 'border-ink-100'}`}>
+                            <label className={`flex-1 cursor-pointer rounded-2xl border px-4 py-3.5 text-sm transition-colors ${!inside ? 'border-ink-900 bg-mist-50 ring-1 ring-ink-900' : 'border-ink-900/15 hover:border-ink-900/40'}`}>
                                 <input type="radio" name="is_inside_dhaka" value="0" checked={!inside} onChange={() => { zoneTouched.current = true; form.setData('is_inside_dhaka', '0'); }} className="sr-only" />
                                 Outside Dhaka — ৳{view.shipOutside}
                             </label>
@@ -461,11 +461,11 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                             )}
 
                             {view.hints.map((hint, i) => (
-                                <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
+                                <div key={i} className="mt-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                             ))}
 
                             {view.coupon_notice && (
-                                <div className="mt-3 rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
+                                <div className="mt-3 rounded-xl bg-mist-50 border border-ink-900/10 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
                                     <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
                                     <span>{view.coupon_notice}</span>
                                 </div>

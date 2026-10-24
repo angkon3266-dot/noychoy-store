@@ -13,17 +13,19 @@ export default function HomeBlocks({ blocks }) {
     return blocks.map((block, i) => <Block key={i} block={block} />);
 }
 
-function SectionHeading({ title, link = null, linkLabel = 'View All' }) {
+const shell = 'mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10';
+
+function SectionHeading({ title, link = null, linkLabel = 'View all', as: Tag = 'section' }) {
     return (
-        <section className="mx-auto max-w-7xl px-4 pt-10 pb-5">
-            <div className="relative text-center border-b border-ink-100 pb-3">
-                <h2 className="inline-block font-display text-2xl sm:text-3xl tracking-wide text-ink-900">
-                    {title}
-                    <span className="block h-0.5 w-16 bg-gold-500 mt-2 mx-auto"></span>
-                </h2>
-                {link && <SmartLink href={link} className="absolute right-0 bottom-3 text-sm text-ink-700/70 hover:text-gold-700 whitespace-nowrap">{linkLabel}</SmartLink>}
-            </div>
-        </section>
+        <Tag className={`${Tag === 'section' ? `${shell} pt-16 lg:pt-24` : ''} pb-8 lg:pb-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-4`}>
+            <h2 className="display text-[2.1rem] sm:text-5xl lg:text-[3.25rem]">{title}</h2>
+            {link && (
+                <SmartLink href={link} className="lux-arrow inline-flex items-center gap-3 text-[12px] font-medium tracking-[0.12em] uppercase text-ink-900 whitespace-nowrap">
+                    <span className="lux-link lux-link-on">{linkLabel}</span>
+                    <span className="grid place-items-center w-9 h-9 rounded-full border border-ink-900/15"><svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg></span>
+                </SmartLink>
+            )}
+        </Tag>
     );
 }
 
@@ -32,11 +34,11 @@ function Block({ block }) {
         case 'banner': {
             const cols = block.layout === 'single' ? 1 : (block.layout === 'dual' ? 2 : 3);
             return (
-                <section className="mx-auto max-w-7xl px-4 py-6">
-                    <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
+                <section className={`${shell} py-6 lg:py-10`}>
+                    <div className={`grid gap-3 sm:gap-5 ${cols === 1 ? '' : (cols === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3')}`}>
                         {block.images.map((im, i) => (
-                            <SmartLink key={i} href={im.link || '#'} aria-label={block.title || 'Shop the collection'} className="block overflow-hidden rounded-2xl group">
-                                <img src={im.image} alt="" className="w-full h-full object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
+                            <SmartLink key={i} href={im.link || '#'} aria-label={block.title || 'Shop the collection'} className="block overflow-hidden rounded-[22px] lg:rounded-[28px] bg-mist-100 group">
+                                <img src={im.image} alt="" className="w-full h-full object-cover transition duration-[1200ms] ease-[var(--ease-lux)] group-hover:scale-[1.04]" loading="lazy" />
                             </SmartLink>
                         ))}
                     </div>
@@ -48,9 +50,9 @@ function Block({ block }) {
             return (
                 <>
                     <SectionHeading title={block.title || 'Products'} link={block.view_all_link} />
-                    <Carousel className="mx-auto max-w-7xl px-4 pb-10">
+                    <Carousel className={`${shell} pb-10`}>
                         {block.cards.map((p) => (
-                            <div key={p.id} className="snap-start shrink-0 w-52 sm:w-60"><ProductCard product={p} /></div>
+                            <div key={p.id} className="snap-start shrink-0 w-[46%] sm:w-[31%] lg:w-[23.4%]"><ProductCard product={p} /></div>
                         ))}
                     </Carousel>
                 </>
@@ -58,24 +60,24 @@ function Block({ block }) {
 
         case 'banner_carousel':
             return (
-                <section className="mx-auto max-w-7xl px-4 py-8">
+                <section className={`${shell} py-14 lg:py-20`}>
                     {/* The heading exists so the blocks below it are not
                         orphaned h3s. When the owner leaves the title blank it
                         stays in the accessibility tree but off the page —
                         putting words there that nobody wrote is a content
                         decision, not an accessibility fix. */}
-                    <h2 className={block.title ? 'font-display text-2xl sm:text-3xl text-ink-900 mb-4' : 'sr-only'}>{block.title || 'Shop the collection'}</h2>
-                    <div className="grid md:grid-cols-[300px_1fr] gap-5 items-stretch">
+                    {block.title ? <SectionHeading as="div" title={block.title} link={block.banner?.link} linkLabel="Shop the edit" /> : <h2 className="sr-only">Shop the collection</h2>}
+                    <div className="grid lg:grid-cols-12 gap-5 lg:gap-6 items-stretch">
                         {block.banner && (
-                            <SmartLink href={block.banner.link || '#'} aria-label={block.title || 'Shop the collection'} className="relative block overflow-hidden rounded-2xl group min-h-[220px]">
-                                <img src={block.banner.image} alt="" className="absolute inset-0 w-full h-full object-cover transition duration-700 group-hover:scale-105" loading="lazy" />
+                            <SmartLink href={block.banner.link || '#'} aria-label={block.title || 'Shop the collection'} className="lg:col-span-4 relative block overflow-hidden rounded-[22px] lg:rounded-[28px] bg-mist-100 group aspect-[16/10] lg:aspect-auto lg:min-h-[420px]">
+                                <img src={block.banner.image} alt="" className="absolute inset-0 w-full h-full object-cover transition duration-[1200ms] ease-[var(--ease-lux)] group-hover:scale-[1.04]" loading="lazy" />
                             </SmartLink>
                         )}
-                        <div className="min-w-0">
+                        <div className={`min-w-0 ${block.banner ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
                             {block.cards.length > 0 && (
                                 <Carousel>
                                     {block.cards.map((p) => (
-                                        <div key={p.id} className="snap-start shrink-0 w-48 sm:w-56"><ProductCard product={p} /></div>
+                                        <div key={p.id} className={`snap-start shrink-0 w-[46%] sm:w-[31%] ${block.banner ? 'lg:w-[31.5%]' : 'lg:w-[23.4%]'}`}><ProductCard product={p} /></div>
                                     ))}
                                 </Carousel>
                             )}
@@ -112,17 +114,17 @@ function Block({ block }) {
             const alignCls = { left: 'text-left', right: 'text-right ml-auto', center: 'text-center mx-auto' }[cta.align];
             const height = { sm: 'min-h-[280px]', md: 'min-h-[420px]', lg: 'min-h-[560px]' }[cta.height] || 'min-h-[420px]';
             return (
-                <section className={`relative w-full ${height} flex overflow-hidden my-6`}>
+                <section className={`relative ${height} flex overflow-hidden my-6 mx-2 sm:mx-3 rounded-[28px] lg:rounded-[40px]`}>
                     {cta.image && <img src={cta.image} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
                     <div className="absolute inset-0 bg-black/40"></div>
                     <div className="relative z-10 mx-auto max-w-7xl w-full px-6 py-12 flex flex-col justify-center">
                         <div className={`max-w-xl ${alignCls}`}>
                             {cta.eyebrow && <p className="uppercase tracking-[0.3em] text-xs text-white/80 mb-3">{cta.eyebrow}</p>}
-                            {cta.heading && <h2 className="font-display text-3xl sm:text-5xl font-semibold text-white leading-tight">{cta.heading}</h2>}
+                            {cta.heading && <h2 className="display text-white text-4xl sm:text-6xl">{cta.heading}</h2>}
                             {cta.subheading && <p className="mt-4 text-white/85 text-lg">{cta.subheading}</p>}
                             {cta.button_text && (
                                 <div className="mt-7">
-                                    <SmartLink href={cta.button_link} className="inline-flex items-center gap-2 rounded-full bg-white text-ink-900 px-8 py-3.5 text-sm tracking-wide hover:bg-gold-100 transition">{cta.button_text}</SmartLink>
+                                    <SmartLink href={cta.button_link} className="lux-btn-light">{cta.button_text}</SmartLink>
                                 </div>
                             )}
                         </div>
@@ -133,19 +135,19 @@ function Block({ block }) {
 
         case 'reviews':
             return (
-                <section className="py-14 bg-gold-50/60">
-                    <div className="mx-auto max-w-7xl px-4">
-                        <div className="text-center mb-10">
-                            <p className="uppercase tracking-[0.3em] text-xs text-gold-700 mb-3">Customer love</p>
-                            <h2 className="font-display text-3xl sm:text-4xl text-ink-900">{block.title || "What they're saying"}</h2>
+                <section className="py-16 lg:py-24 bg-mist-50">
+                    <div className={shell}>
+                        <div className="text-center mb-12">
+                            <p className="eyebrow">Customer love</p>
+                            <h2 className="display mt-4 text-[2.1rem] sm:text-5xl">{block.title || "What they're saying"}</h2>
                         </div>
                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                             {block.items.map((t, i) => (
-                                <div key={i} className="rounded-2xl bg-white border border-ink-100 p-6 shadow-sm flex flex-col">
+                                <div key={i} className="rounded-[24px] bg-white p-7 flex flex-col">
                                     <div className="text-gold-500 tracking-wide mb-3" aria-label={`${t.rating} star review`}>{'★'.repeat(Math.max(1, Math.min(5, t.rating)))}</div>
                                     <p className="font-display italic text-ink-800 leading-relaxed flex-1">“{t.quote}”</p>
                                     <div className="flex items-center gap-3 mt-5">
-                                        <div className="w-10 h-10 rounded-full bg-gold-100 text-gold-700 text-xs font-semibold flex items-center justify-center shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-ink-900 text-white text-xs font-semibold flex items-center justify-center shrink-0">
                                             {t.author.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('')}
                                         </div>
                                         <div className="min-w-0">
@@ -240,18 +242,18 @@ function CountdownBlock({ c }) {
     const { expired, units } = useCountdown(c.endsAt);
     if (expired) return null;
     return (
-        <section className="bg-ink-900 text-white py-10">
+        <section className="grain bg-ink-900 text-white py-14 mx-2 sm:mx-3 rounded-[28px]">
             <div className="mx-auto max-w-4xl px-4 text-center">
                 {c.title && <p className="font-display text-2xl sm:text-3xl mb-5">{c.title}</p>}
                 <div className="flex justify-center gap-3 sm:gap-5">
                     {units.map((u) => (
-                        <div key={u.label} className="min-w-[64px] rounded-xl bg-white/10 px-3 py-3">
+                        <div key={u.label} className="min-w-[72px] rounded-2xl bg-white/[0.07] border border-white/10 px-3 py-3.5">
                             <div className="text-2xl sm:text-3xl font-semibold tabular-nums">{String(u.value).padStart(2, '0')}</div>
                             <div className="text-[10px] uppercase tracking-widest text-white/60 mt-1">{u.label}</div>
                         </div>
                     ))}
                 </div>
-                {c.cta_text && <a href={c.cta_link} className="inline-flex mt-7 rounded-full bg-gold-500 text-ink-900 px-8 py-3.5 text-sm font-medium hover:bg-gold-400 transition">{c.cta_text}</a>}
+                {c.cta_text && <a href={c.cta_link} className="lux-btn-light mt-8">{c.cta_text}</a>}
             </div>
         </section>
     );
@@ -265,11 +267,11 @@ function BuyBoxBlock({ block }) {
             <div className={`grid gap-6 ${block.items.length === 1 ? 'max-w-md mx-auto' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
                 {block.items.map((p, i) => (
                     <div key={i} className="card p-4 text-center">
-                        <SmartLink href={p.url} className="block overflow-hidden rounded-xl bg-gold-100 aspect-square">
+                        <SmartLink href={p.url} className="block overflow-hidden rounded-2xl bg-mist-100 aspect-square">
                             {p.thumb && <img src={p.thumb} alt={p.name} className="w-full h-full object-cover hover:scale-105 transition duration-700" loading="lazy" />}
                         </SmartLink>
                         <h3 className="font-medium mt-4">{p.name}</h3>
-                        <p className="text-gold-700 text-lg font-semibold mt-1">
+                        <p className="text-ink-900 text-lg font-semibold mt-1">
                             {p.price_text}
                             {p.compare_text && <span className="text-ink-500 line-through text-sm ml-1">{p.compare_text}</span>}
                         </p>

@@ -12,7 +12,7 @@ export default function Loved({ products }) {
 
     return (
         <AccountShell wide>
-            <h1 className="font-display text-2xl font-semibold mb-6">Loved items</h1>
+            <h1 className="display text-3xl sm:text-4xl mb-6">Loved items</h1>
 
             {products.data.length === 0 ? (
                 <div className="card p-8 text-center text-sm text-ink-700/70">

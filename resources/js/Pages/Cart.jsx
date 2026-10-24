@@ -55,8 +55,8 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
 
     if (!visibleItems.length) {
         return (
-            <div className="mx-auto max-w-5xl px-4 py-8">
-                <h1 className="font-display text-3xl font-semibold mb-6">Your cart</h1>
+            <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 lg:py-14">
+                <h1 className="display text-4xl sm:text-5xl mb-6">Your cart</h1>
                 <div className="card p-12 text-center">
                     <p className="text-ink-700/70">Your cart is empty.</p>
                     <Link href={urls.shop || '/shop'} className="btn-primary mt-4">Start shopping</Link>
@@ -66,8 +66,8 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
     }
 
     return (
-        <div className="mx-auto max-w-5xl px-4 py-8">
-            <h1 className="font-display text-3xl font-semibold mb-6">Your cart</h1>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 lg:py-14">
+            <h1 className="display text-4xl sm:text-5xl mb-6">Your cart</h1>
 
             <GiftLadderBar gift={giftBar} />
 
@@ -78,7 +78,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                     ) : (
                         <p className="text-sm text-center mb-2">Add <strong>{freeBar.remaining_text}</strong> more to unlock <strong>free delivery!</strong></p>
                     )}
-                    <div className="h-2 rounded-full bg-gold-100 overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-mist-200 overflow-hidden">
                         <div className="h-full bg-accent transition-all" style={{ width: `${freeBar.pct}%` }} />
                     </div>
                 </div>
@@ -92,7 +92,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                     {offersPanel.nearly && (
                         <>
                             <p className="text-sm">Add <strong>{offersPanel.nearly.remaining_text}</strong> more to unlock <strong>{offersPanel.nearly.title}</strong></p>
-                            <div className="h-2 rounded-full bg-gold-100 overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-mist-200 overflow-hidden">
                                 <div className="h-full bg-accent transition-all" style={{ width: `${offersPanel.nearly.pct}%` }} />
                             </div>
                         </>
@@ -107,13 +107,13 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                 <div className="lg:col-span-2 space-y-4">
                     {visibleItems.map((item) => (
                         <div key={item.key} className={`card p-4 flex gap-4 items-center transition-opacity ${busyKey === item.key ? 'opacity-60' : ''}`}>
-                            <div className="w-20 h-20 rounded-lg bg-gold-100 overflow-hidden shrink-0">
+                            <div className="w-20 h-24 rounded-xl bg-mist-100 overflow-hidden shrink-0">
                                 {item.image && <img src={item.image} className="w-full h-full object-cover" alt="" />}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <Link href={item.url} className="font-medium hover:text-gold-700">{item.name}</Link>
                                 {item.attributes && <p className="text-xs text-ink-700/70">{item.attributes}</p>}
-                                <p className="text-sm text-gold-700 font-semibold mt-1">{item.price_text}</p>
+                                <p className="text-sm text-ink-900 font-semibold mt-1">{item.price_text}</p>
                                 {item.offer && (
                                     <p className="mt-1 inline-block badge bg-success-100 text-success-700 text-[11px]">
                                         {item.offer.label} (you save {item.offer.saving_text})
@@ -126,7 +126,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                                     </p>
                                 )}
                             </div>
-                            <div className="inline-flex items-center rounded-md border border-ink-100 bg-white">
+                            <div className="inline-flex items-center rounded-full border border-ink-900/15 bg-white">
                                 <button type="button" onClick={() => updateQty(item.key, item.qty - 1)} className="px-2.5 py-1.5 hover:text-gold-700" aria-label="Decrease quantity">−</button>
                                 <span className="w-8 text-center text-sm">{item.qty}</span>
                                 <button type="button" onClick={() => updateQty(item.key, Math.min(99, item.qty + 1))} className="px-2.5 py-1.5 hover:text-gold-700" aria-label="Increase quantity">+</button>
@@ -140,7 +140,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                 </div>
 
                 <div className="card p-6 h-fit">
-                    <h2 className="font-display text-xl font-semibold mb-4">Summary</h2>
+                    <h2 className="font-display text-2xl tracking-[-0.01em] text-ink-900 mb-4">Summary</h2>
 
                     {coupon ? (
                         <div className="flex justify-between text-sm mb-2">
@@ -197,7 +197,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                     )}
 
                     {memberNudge && (
-                        <a href={urls.register} className="mt-3 flex items-start gap-1.5 rounded-md border border-gold-200 bg-gold-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-gold-100" lang={props.chrome?.lang}>
+                        <a href={urls.register} className="mt-3 flex items-start gap-1.5 rounded-md border border-ink-900/10 bg-mist-50 px-3 py-2.5 text-xs text-ink-800 hover:bg-mist-100" lang={props.chrome?.lang}>
                             <MemberPill />
                             <span className="min-w-0 leading-relaxed">
                                 {t(props.chrome?.lang, 'cart.join', { saving: memberNudge.saving_text, pct: memberNudge.pct })}
@@ -207,14 +207,14 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
                     )}
 
                     {summary.hints.map((hint, i) => (
-                        <div key={i} className="mt-3 rounded-md bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
+                        <div key={i} className="mt-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-800 px-3 py-2 text-xs flex items-center gap-1.5"><Icon name="gift" className="w-3.5 h-3.5 shrink-0" />{hint}</div>
                     ))}
 
                     {/* An exclusive code that lost to a better offer is dropped
                         from the totals; without this the shopper thinks the
                         code she was texted is broken. */}
                     {summary.coupon_notice && (
-                        <div className="mt-3 rounded-md bg-gold-50 border border-gold-200 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
+                        <div className="mt-3 rounded-xl bg-mist-50 border border-ink-900/10 text-ink-800 px-3 py-2 text-xs flex items-start gap-1.5">
                             <Icon name="bulb" className="w-3.5 h-3.5 shrink-0 mt-[1px] text-gold-700" />
                             <span>{summary.coupon_notice}</span>
                         </div>
@@ -227,7 +227,7 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
 
             {suggestions.length > 0 && (
                 <section className="mt-14">
-                    <h2 className="font-display text-2xl font-semibold mb-6">You may also like</h2>
+                    <h2 className="display text-3xl sm:text-4xl mb-6">You may also like</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
                         {suggestions.map((p) => <ProductCard key={p.id} product={p} />)}
                     </div>

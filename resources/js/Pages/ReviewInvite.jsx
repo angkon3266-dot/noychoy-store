@@ -21,14 +21,14 @@ export default function ReviewInvite({ order, items, perk }) {
 
     return (
         <div className="mx-auto max-w-3xl px-4 py-10">
-            <h1 className="font-display text-3xl font-semibold">Rate your order</h1>
+            <h1 className="display text-4xl sm:text-5xl">Rate your order</h1>
             <p className="mt-2 text-ink-700/70">
                 Order <span className="font-mono">{order.number}</span> — thank you, {order.name}.
                 {' '}Your rating is the thing the next shopper reads first.
             </p>
 
             {perk > 0 && (
-                <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1 text-sm text-gold-800">
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-mist-100 px-3 py-1 text-sm text-ink-900">
                     <Icon name="sparkle" className="w-4 h-4 shrink-0" />
                     Earn {perk.toLocaleString()} points for each review we approve
                 </p>
@@ -89,7 +89,7 @@ function ReviewCard({ item, order, done, onDone }) {
             <div className="flex items-start gap-4">
                 {item.image
                     ? <img src={item.image} alt="" className="w-20 h-20 rounded-lg object-cover border border-ink-100 shrink-0" />
-                    : <div className="w-20 h-20 rounded-lg bg-gold-100 shrink-0" />}
+                    : <div className="w-20 h-24 rounded-xl bg-mist-100 shrink-0" />}
                 <div className="min-w-0 flex-1">
                     <a href={item.url} className="font-medium hover:underline">{item.name}</a>
 
