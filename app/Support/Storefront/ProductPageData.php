@@ -50,6 +50,9 @@ class ProductPageData
         // Frequently bought together: this piece first, then up to three more.
         $fbtProducts = collect([$product])->merge($crossSells)->take(4);
 
+        $story = StorySections::for($product);
+        $storyVideos = collect($story)->pluck('media')->filter(fn ($m) => ($m['type'] ?? null) === 'video')->pluck('src')->all();
+
         return [
             'product' => [
                 'id' => $product->id,
@@ -69,8 +72,11 @@ class ProductPageData
                     'thumb' => image_variant($i->url),
                     'alt' => $i->alt,
                 ])->values(),
-                'videos' => array_values($product->galleryVideos()),
-                'sections' => StorySections::for($product),
+                // The story row below plays the product's video, so the
+                // gallery leaves that one out (owner, 2026-10-24); a video
+                // shown nowhere else (a YouTube link) keeps its gallery card.
+                'videos' => array_values(array_filter($product->galleryVideos(), fn ($v) => ! in_array($v['src'] ?? null, $storyVideos, true))),
+                'sections' => $story,
                 'specs' => collect($product->customFieldList())->where('show', true)->values()
                     ->map(fn ($s) => ['label' => $s['label'], 'value' => $s['value']]),
                 'available' => $product->isAvailable(),
@@ -128,6 +134,22 @@ class ProductPageData
             // The folded "Care instructions" section under Details, the same
             // on every product (Appearance); null hides it.
             'care' => filled(theme('pdp_care_text')) ? theme('pdp_care_text') : null,
+            // A product with no reviews yet borrows the store's recent 5-star
+            // reviews of other pieces, the way Shopify review apps do, so the
+            // section never stands empty (owner, 2026-10-24).
+            'storeReviews' => $count > 0 ? [] : \Illuminate\Support\Facades\Cache::remember('pdp.store-reviews.v1', 600, fn () => \App\Models\Review::approved()
+                ->with('product:id,name,slug')->where('rating', 5)
+                ->where(fn ($q) => $q->whereNotNull('body')->orWhereNotNull('title'))
+                ->latest()->take(6)->get()
+                ->map(fn ($r) => [
+                    'rating' => (int) $r->rating,
+                    'author' => $r->author_name,
+                    'verified' => (bool) $r->is_verified_buyer,
+                    'date' => store_time($r->created_at)->format('d M Y'),
+                    'title' => $r->title,
+                    'body' => $r->body,
+                    'product' => $r->product ? ['name' => $r->product->name, 'url' => route('product.show', $r->product->slug)] : null,
+                ])->values()->all()),
             'reviews' => [
                 'avg' => $product->average_rating,
                 'count' => $count,

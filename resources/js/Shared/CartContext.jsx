@@ -22,6 +22,7 @@ export function CartProvider({ children }) {
     const [couponNotice, setCouponNotice] = useState(null);
     const [freeShipping, setFreeShipping] = useState(false);
     const [deliverySavedText, setDeliverySavedText] = useState('');
+    const [pairs, setPairs] = useState([]);
     const [drawer, setDrawer] = useState(false);
     const [toast, setToast] = useState(null);
     const busyRef = useRef(false);
@@ -54,6 +55,7 @@ export function CartProvider({ children }) {
         setCouponNotice(data.coupon_notice || null);
         setFreeShipping(!!data.free_shipping);
         setDeliverySavedText(data.delivery_saved_text || '');
+        setPairs(data.pairs || []);
     }, []);
 
     const showToast = useCallback((msg) => {
@@ -133,7 +135,7 @@ export function CartProvider({ children }) {
 
     return (
         <CartContext.Provider value={{
-            count, savedText, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText,
+            count, savedText, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText, pairs,
             drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, remove, refresh,
         }}>
             {children}

@@ -30,7 +30,22 @@ use Illuminate\Support\Collection;
  */
 class StorySections
 {
+    /**
+     * What the product page shows: only the story row that plays the
+     * product's video, and nothing when no row does (owner, 2026-10-24:
+     * "keep only one row with videos, if videos not available don't add
+     * this"). The other rows were deleted from every product by the
+     * 2026_10_24 migration, and this keeps later edits to the same shape.
+     */
     public static function for(Product $product): array
+    {
+        $row = collect(static::resolve($product))->first(fn ($s) => ($s['media']['type'] ?? null) === 'video');
+
+        return $row ? [$row] : [];
+    }
+
+    /** Every saved row with its media resolved, in order (the admin and the clean-up read this). */
+    public static function resolve(Product $product): array
     {
         $sections = ContentTemplate::cleanSections($product->content_sections ?? []);
         if (! $sections) {

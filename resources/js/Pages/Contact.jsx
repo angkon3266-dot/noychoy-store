@@ -30,9 +30,9 @@ export default function Contact({ title, intro, details, submitUrl }) {
                 <div className="space-y-4">
                     <h2 className="font-display text-lg font-semibold">Reach us</h2>
                     <ul className="space-y-3 text-sm">
-                        {details.phone && <li className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 shrink-0" /> <a href={`tel:${details.phone}`} className="hover:text-gold-700">{details.phone}</a></li>}
                         {details.email && <li className="flex items-center gap-2"><Icon name="mail" className="w-4 h-4 shrink-0" /> <a href={`mailto:${details.email}`} className="hover:text-gold-700">{details.email}</a></li>}
                         {details.whatsapp && <li className="flex items-center gap-2"><Icon name="chat" className="w-4 h-4 shrink-0" /> <a href={`https://wa.me/${details.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" className="hover:text-gold-700">WhatsApp us</a></li>}
+                        {details.messenger && <li className="flex items-center gap-2"><Icon name="chat" className="w-4 h-4 shrink-0" /> <a href={details.messenger} target="_blank" rel="noopener" className="hover:text-gold-700">Message us on Messenger</a></li>}
                         {details.address && <li className="flex items-start gap-2"><Icon name="pin" className="w-4 h-4 shrink-0 mt-0.5" /> <span>{details.address}</span></li>}
                     </ul>
                 </div>

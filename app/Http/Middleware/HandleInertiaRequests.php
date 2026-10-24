@@ -144,7 +144,10 @@ class HandleInertiaRequests extends Middleware
             'ai' => app(\App\Services\Ai\AssistantService::class)->enabled() ? ['label' => 'Ask us anything'] : null,
             'floats' => [
                 'share' => (bool) theme('show_share_button', true),
-                'call' => theme('show_call_button') ? \App\Models\Setting::get('store_phone', config('store.phone')) : null,
+                // No call button on the storefront (owner, 2026-10-24: contact is
+                // WhatsApp, Messenger and email). The phone and the switch stay in
+                // the admin for order SMS, invoices and the courier.
+                'call' => null,
                 'messenger' => theme('show_messenger_button') ? theme('messenger_url') : null,
                 'whatsapp' => theme('show_whatsapp_button') ? theme('whatsapp_number') : null,
             ],
@@ -162,9 +165,11 @@ class HandleInertiaRequests extends Middleware
                 ])->values(),
                 // [{platform, label, url}] — icons come from SOCIAL_ICONS in Icons.jsx.
                 'socials' => \App\Support\SocialLinks::present(),
-                'phone' => \App\Models\Setting::get('store_phone', config('store.phone')),
+                // Contact on the storefront is WhatsApp, Messenger and email
+                // (owner, 2026-10-24); the phone number stays an admin setting.
                 'email' => \App\Models\Setting::get('store_email', config('store.email')),
                 'whatsapp' => theme('whatsapp_number'),
+                'messenger' => theme('messenger_url') ?: null,
                 'copyright' => theme('footer_copyright') ?: '© '.date('Y').' '.store_name().'. All rights reserved.',
             ],
             'urls' => [

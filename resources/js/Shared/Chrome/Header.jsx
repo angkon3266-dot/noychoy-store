@@ -230,9 +230,9 @@ function Wordmark({ name, compact = false }) {
 
     return (
         <span className="relative inline-flex items-baseline whitespace-nowrap">
-            <span className={`wordmark font-display tracking-[-0.01em] leading-none ${compact ? 'text-[1.05rem]' : 'text-[1.3rem] sm:text-[1.45rem]'}`}>
+            <span className={`wordmark font-display leading-none ${compact ? 'text-[1.05rem]' : 'text-[1.3rem] sm:text-[1.45rem]'}`}>
                 {base}
-                {tld && <span className="italic text-[0.78em] tracking-[0.02em]">{tld}</span>}
+                {tld && <span className="italic text-[0.78em]">{tld}</span>}
             </span>
             <svg aria-hidden="true" viewBox="0 0 24 24" className="wordmark-glint absolute -top-1.5 -right-2.5 w-2.5 h-2.5 text-gold-500">
                 <path fill="currentColor" d="M12 0c.6 5.6 6.4 11.4 12 12-5.6.6-11.4 6.4-12 12-.6-5.6-6.4-11.4-12-12C5.6 11.4 11.4 5.6 12 0z" />

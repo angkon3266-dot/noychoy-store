@@ -240,7 +240,41 @@ class CartController extends Controller
                     'ends' => $promo['ends'],
                 ] : null,
             ])->values(),
+            // "Pairs well with" — the frequently-bought-together picks, shown
+            // in the cart drawer since 2026-10-24 instead of on the product page.
+            'pairs' => $this->pairs(),
         ], $extra);
+    }
+
+    /**
+     * Up to four pieces to go with what is in the cart: the admin's
+     * cross-sells for those products first, then what other shoppers bought
+     * alongside them, then best sellers — never something already in the cart,
+     * never something that cannot be bought. Off with the store's "Frequently
+     * bought together" switch.
+     */
+    protected function pairs(): array
+    {
+        if (! theme('show_frequently_bought', true)) {
+            return [];
+        }
+        $inCart = $this->cart->items()->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        if ($inCart->isEmpty()) {
+            return [];
+        }
+
+        $ids = Product::whereIn('id', $inCart)->get(['id', 'cross_sell_ids'])
+            ->flatMap(fn ($p) => (array) ($p->cross_sell_ids ?? []))
+            ->merge(\App\Support\CoPurchase::idsFor($inCart->all(), [], 8)->all())
+            ->merge(Product::published()->bestsellers()->latest()->take(8)->pluck('id'))
+            ->map(fn ($id) => (int) $id)->filter()->unique()
+            ->reject(fn ($id) => $inCart->contains($id))->take(12)->values();
+
+        $products = Product::published()->with('images', 'approvedReviews', 'category')->whereIn('id', $ids)->get()
+            ->filter(fn ($p) => $p->isAvailable())
+            ->sortBy(fn ($p) => $ids->search($p->id))->take(4)->values();
+
+        return \App\Support\Storefront\ProductCardData::collection($products);
     }
 
     /**

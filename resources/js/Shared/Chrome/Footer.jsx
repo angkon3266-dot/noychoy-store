@@ -1,5 +1,5 @@
-import { router, usePage } from '@inertiajs/react';
-import Icon, { IconOrGlyph, SOCIAL_ICONS, WhatsApp } from '../Icons';
+import { usePage } from '@inertiajs/react';
+import Icon, { IconOrGlyph, Messenger, SOCIAL_ICONS, WhatsApp } from '../Icons';
 import SmartLink from '../SmartLink';
 import { t } from '../i18n';
 
@@ -12,7 +12,8 @@ export default function Footer({ minimal = false }) {
     const footer = chrome.footer || {};
     const urls = chrome.urls || {};
     const lang = chrome.lang || 'en';
-    const setLang = (next) => router.post('/lang', { lang: next }, { preserveScroll: true });
+    // The English / বাংলা switch is gone from the footer (owner, 2026-10-24):
+    // it translated a handful of labels and read as doing nothing.
 
     if (minimal) {
         return (
@@ -103,13 +104,6 @@ export default function Footer({ minimal = false }) {
                         <div className="col-span-2 sm:col-span-1">
                             <h2 className={heading}>Contact</h2>
                             <ul className="mt-5 space-y-3">
-                                {footer.phone && (
-                                    <li>
-                                        <a href={`tel:+${footer.phone.replace(/\D/g, '')}`} className={`${link} inline-flex items-center gap-2.5`}>
-                                            <Icon name="phone" className="w-4 h-4 text-white/45 shrink-0" />{footer.phone}
-                                        </a>
-                                    </li>
-                                )}
                                 {footer.email && (
                                     <li>
                                         <a href={`mailto:${footer.email}`} className={`${link} inline-flex items-center gap-2.5`}>
@@ -125,15 +119,15 @@ export default function Footer({ minimal = false }) {
                                         </a>
                                     </li>
                                 )}
+                                {footer.messenger && (
+                                    <li>
+                                        <a href={footer.messenger} target="_blank" rel="noopener" className={`${link} inline-flex items-center gap-2.5`}>
+                                            <Messenger className="w-4 h-4 text-[#0084FF]" />
+                                            Messenger
+                                        </a>
+                                    </li>
+                                )}
                             </ul>
-
-                            <div className="mt-8">
-                                <p className={heading}>{t(lang, 'footer.lang')}</p>
-                                <div className="mt-3 inline-flex rounded-full border border-white/15 p-1" role="group" aria-label={t(lang, 'footer.lang')}>
-                                    <button type="button" onClick={() => setLang('en')} aria-pressed={lang === 'en'} className={`rounded-full px-4 h-8 text-[12px] transition-colors ${lang === 'en' ? 'bg-white text-ink-900' : 'text-white/70 hover:text-white'}`}>English</button>
-                                    <button type="button" onClick={() => setLang('bn')} aria-pressed={lang === 'bn'} lang="bn" className={`rounded-full px-4 h-8 text-[12px] transition-colors ${lang === 'bn' ? 'bg-white text-ink-900' : 'text-white/70 hover:text-white'}`}>বাংলা</button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>

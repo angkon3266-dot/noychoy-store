@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\ContentTemplate;
 use App\Models\Product;
+use App\Support\Storefront\StorySections;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\Fluent\AssertableJson;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -46,6 +48,16 @@ class ProductStoryRowsTest extends TestCase
         ])->all();
     }
 
+    /**
+     * Every saved row with its media resolved. The product page itself now
+     * shows only the video row (owner, 2026-10-24 — see the tests at the
+     * end), but how each row picks its picture or video is unchanged.
+     */
+    private function story(Product $product, \Closure $assert): void
+    {
+        $assert(AssertableJson::fromArray(['product' => ['sections' => StorySections::resolve($product->fresh(['images']))]]));
+    }
+
     private function photo(string $path): string
     {
         return Storage::disk('public')->url('products/'.$path);
@@ -55,8 +67,7 @@ class ProductStoryRowsTest extends TestCase
     {
         $product = $this->product($this->rows(), videos: ['product-videos/clip.mp4']);
 
-        $this->get(route('product.show', $product))->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
+        $this->story($product, fn ($page) => $page
                 ->has('product.sections', 3)
                 ->where('product.sections.0.heading', 'Row 1')
                 ->where('product.sections.0.layout', 'left')
@@ -76,8 +87,7 @@ class ProductStoryRowsTest extends TestCase
         // A YouTube link cannot loop muted in the background, so it is not used.
         $product = $this->product($this->rows(), videos: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
 
-        $this->get(route('product.show', $product))
-            ->assertInertia(fn (Assert $page) => $page
+        $this->story($product, fn ($page) => $page
                 ->where('product.sections.0.media.type', 'image')
                 ->where('product.sections.0.media.src', $this->photo('a.webp')),
             );
@@ -87,8 +97,7 @@ class ProductStoryRowsTest extends TestCase
     {
         $product = $this->product($this->rows(), photos: ['only.webp']);
 
-        $this->get(route('product.show', $product))
-            ->assertInertia(fn (Assert $page) => $page
+        $this->story($product, fn ($page) => $page
                 ->where('product.sections.1.media.src', $this->photo('only.webp'))
                 ->where('product.sections.2.media.src', $this->photo('only.webp')),
             );
@@ -102,8 +111,7 @@ class ProductStoryRowsTest extends TestCase
             ['media' => 'image', 'image' => '', 'heading' => 'Image never chosen', 'body' => '', 'layout' => 'left'],
         ]);
 
-        $this->get(route('product.show', $product))
-            ->assertInertia(fn (Assert $page) => $page
+        $this->story($product, fn ($page) => $page
                 ->where('product.sections.0.media.src', 'https://cdn.example.com/look.jpg')
                 ->where('product.sections.1.media', null)
                 ->where('product.sections.2.media', null),
@@ -117,8 +125,7 @@ class ProductStoryRowsTest extends TestCase
             ['media' => 'image', 'image' => 'https://noychoy.test/storage/sections/clip.mp4', 'heading' => 'Two', 'body' => '', 'layout' => 'right'],
         ]);
 
-        $this->get(route('product.show', $product))
-            ->assertInertia(fn (Assert $page) => $page
+        $this->story($product, fn ($page) => $page
                 ->where('product.sections.1.media.type', 'video')
                 ->where('product.sections.1.media.src', 'https://noychoy.test/storage/sections/clip.mp4')
                 ->where('product.sections.1.media.poster.src', $this->photo('b.webp')),
@@ -164,8 +171,7 @@ class ProductStoryRowsTest extends TestCase
             ['image' => '', 'heading' => 'Had none', 'body' => 'Text only', 'layout' => 'left'],
         ]);
 
-        $this->get(route('product.show', $product))
-            ->assertInertia(fn (Assert $page) => $page
+        $this->story($product, fn ($page) => $page
                 ->where('product.sections.0.media.src', 'https://cdn.example.com/look.jpg')
                 ->where('product.sections.1.media', null),
             );
@@ -280,5 +286,53 @@ class ProductStoryRowsTest extends TestCase
 
         $this->assertNull(Product::find(181)->content_sections);
         $this->assertSame('Edited by the owner', Product::find(182)->content_sections[0]['heading']);
+    }
+
+    // ── 24 Oct 2026: only the video row ──────────────────────────────────────
+
+    public function test_the_product_page_shows_only_the_row_that_plays_the_video(): void
+    {
+        $product = $this->product($this->rows(), videos: ['product-videos/clip.mp4']);
+
+        $this->get(route('product.show', $product))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('product.sections', 1)
+                ->where('product.sections.0.heading', 'Row 1')
+                ->where('product.sections.0.media.type', 'video')
+                // ...and the gallery no longer repeats that video as a card.
+                ->has('product.videos', 0));
+    }
+
+    public function test_a_product_without_a_video_shows_no_story_rows(): void
+    {
+        $product = $this->product($this->rows());
+
+        $this->get(route('product.show', $product))
+            ->assertInertia(fn (Assert $page) => $page->where('product.sections', []));
+    }
+
+    private function trim(): object
+    {
+        return require database_path('migrations/2026_10_24_120000_keep_only_the_video_story_row.php');
+    }
+
+    public function test_the_clean_up_keeps_the_video_row_backs_up_and_can_be_undone(): void
+    {
+        $withVideo = $this->product($this->rows('V'), videos: ['product-videos/clip.mp4']);
+        $withVideo->update(['slug' => 'with-video']);
+        $noVideo = $this->product($this->rows('P'));
+
+        $this->trim()->up();
+
+        $this->assertSame(['V 1'], array_column($withVideo->fresh()->content_sections, 'heading'));
+        $this->assertNull($noVideo->fresh()->content_sections);
+        $this->assertSame(2, \DB::table('product_story_backups')->count());
+
+        $this->trim()->up();   // and twice changes nothing
+        $this->assertSame(2, \DB::table('product_story_backups')->count());
+
+        $this->trim()->down();
+        $this->assertCount(3, $withVideo->fresh()->content_sections);
+        $this->assertCount(3, $noVideo->fresh()->content_sections);
     }
 }

@@ -37,14 +37,12 @@ export default function Product(props) {
     const { gift } = useCart();
     const ladder = useLadderQuote(props, gift);
 
-    // Customer reviews start closed (owner, 2026-09-17), so the state lives
-    // up here: the buy-box star link and "Be the first to review" both point
-    // at #reviews, and following either must land on an open section rather
-    // than a bare heading. A #reviews URL opens it too — on arrival (read
-    // before the first paint, so Inertia's anchor scroll finds it open) and
-    // on a later hash change. "Be the first to review" also unfolds the
+    // Customer reviews start OPEN (owner, 2026-10-24 — they had been folded
+    // since 2026-09-17), right under the story row. The state still lives up
+    // here: the buy-box star link, "Be the first to review" and any #reviews
+    // URL all (re)open it, and "Be the first to review" also unfolds the
     // write-a-review form, since writing is what that link offers.
-    const [reviewsOpen, setReviewsOpen] = useState(() => typeof window !== 'undefined' && window.location.hash === '#reviews');
+    const [reviewsOpen, setReviewsOpen] = useState(true);
     const [writeOpen, setWriteOpen] = useState(false);
     const openReviews = useCallback((write = false) => {
         setReviewsOpen(true);
@@ -70,15 +68,18 @@ export default function Product(props) {
                 </div>
             </div>
 
+            {/* Order (owner, 2026-10-24): the story row (the product video),
+                customer reviews — open — then the description and care notes
+                folded, then more to look at. "Frequently bought together" now
+                lives in the bag (MiniCart's "Pairs beautifully with"). */}
             <StorySections sections={product.sections} name={product.name} />
+            <Reviews {...props} reviewsOpen={reviewsOpen} setReviewsOpen={setReviewsOpen} writeOpen={writeOpen} setWriteOpen={setWriteOpen} />
             <Description text={product.description} />
             <Details specs={product.specs} />
             <Care text={props.care} />
             <div className="max-w-3xl mt-6 border-t border-ink-900/[0.08] pt-4">
                 <ShareButton url={product.url} title={product.name} label="Share" />
             </div>
-            <Reviews {...props} reviewsOpen={reviewsOpen} setReviewsOpen={setReviewsOpen} writeOpen={writeOpen} setWriteOpen={setWriteOpen} />
-            <FrequentlyBought fbt={props.fbt} ladder={ladder.fbt} lang={lang} />
             <CardStrip title="You may also like" products={props.related} cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-5" />
             <CardStrip title="Recently viewed" products={props.recentlyViewed} cols="grid-cols-2 md:grid-cols-4" />
             <StickyBar {...props} purchase={purchase} />
@@ -1168,13 +1169,9 @@ function Care({ text }) {
     );
 }
 
-function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpen: setOpen, writeOpen, setWriteOpen }) {
-    // Closed by default, even with reviews to read (owner, 2026-09-17). It
-    // used to open itself whenever reviews existed, because the buy-box star
-    // link pointed at #reviews and a folded section left shoppers on a heading
-    // with nothing under it. That problem is now solved at the link instead:
-    // the open state lives in Product, and the star link, "Be the first to
-    // review" and any #reviews URL all open the section on the way in.
+function Reviews({ product, reviews, storeReviews = [], ui, flash, reviewsOpen: open, setReviewsOpen: setOpen, writeOpen, setWriteOpen }) {
+    // Open by default (owner, 2026-10-24); the open state lives in Product so
+    // the buy-box star link and "Be the first to review" can reopen it.
     const [rating, setRating] = useState(0);
     const [hover, setHover] = useState(0);
     const { props } = usePage();
@@ -1247,12 +1244,39 @@ function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpe
                             </div>
                         </>
                     ) : (
-                        <p className="text-ink-700/70">No reviews yet. Be the first to review this piece!</p>
+                        <>
+                            <p className="font-display text-xl text-ink-900">No reviews for this piece yet</p>
+                            <p className="text-sm text-ink-700/70 mt-1">Be the first to share how it looks on you.</p>
+                            {storeReviews.length > 0 && (
+                                <p className="text-sm text-ink-700/70 mt-4">Meanwhile, here is what customers say about our other pieces.</p>
+                            )}
+                        </>
                     )}
                 </div>
 
                 {/* List + write form */}
                 <div className="md:col-span-2 space-y-6">
+                    {/* No reviews of its own: the store's recent 5-star reviews
+                        of other pieces, each naming the piece it is about. */}
+                    {reviews.count === 0 && storeReviews.map((review, i) => (
+                        <div key={`s${i}`} className="border-b border-ink-100 pb-5 last:border-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="flex text-gold-500">
+                                    {[1, 2, 3, 4, 5].map((s) => <Star key={s} off={s > review.rating} />)}
+                                </span>
+                                <span className="font-medium text-sm">{review.author}</span>
+                                {review.verified && <span className="badge bg-success-100 text-success-700 text-[10px]">Verified buyer</span>}
+                                <span className="text-xs text-ink-700/70 ml-auto">{review.date}</span>
+                            </div>
+                            {review.title && <p className="font-medium mt-2">{review.title}</p>}
+                            {review.body && <p className="text-sm text-ink-700/80 mt-1">{review.body}</p>}
+                            {review.product && (
+                                <Link href={review.product.url} className="mt-2 inline-flex items-center gap-1 text-xs text-ink-700/70 hover:text-ink-900">
+                                    On <span className="underline underline-offset-2">{review.product.name}</span>
+                                </Link>
+                            )}
+                        </div>
+                    ))}
                     {reviews.items.map((review, i) => (
                         <div key={i} className="border-b border-ink-100 pb-5 last:border-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1307,141 +1331,6 @@ function Reviews({ product, reviews, ui, flash, reviewsOpen: open, setReviewsOpe
                             <p className="text-xs text-ink-700/70">Reviews appear after approval.</p>
                         </form>
                     </details>
-                </div>
-            </div>
-        </section>
-    );
-}
-
-function FrequentlyBought({ fbt, ladder, lang = 'en' }) {
-    const [sel, setSel] = useState(() => {
-        const init = {};
-        (fbt?.items || []).forEach((p) => { init[p.id] = p.selectable; });
-        return init;
-    });
-    const [busy, setBusy] = useState(false);
-    const { refresh } = useCart();
-    if (!fbt) return null;
-
-    const picked = fbt.items.filter((p) => p.selectable && sel[p.id]);
-    const total = picked.reduce((sum, p) => sum + p.price, 0);
-    const none = picked.length === 0;
-
-    // The ladder on the bundle (owner, 2026-09-17): the total used to be the
-    // plain sum, and the cart then took the rungs off — a better price the
-    // shopper only met after deciding. The server quotes every combination of
-    // tickable tiles up front (`fbt.ladder`, kept fresh by useLadderQuote), so
-    // ticking and unticking just picks another entry: the key is the ticked
-    // ids in the order the tiles are shown. Each tile wears its own share of
-    // the saving — the shares add up to the bundle's — and a tile that cannot
-    // be ticked, or a tile the ladder gives nothing, keeps its plain price.
-    const deal = (!none && ladder?.subsets?.[picked.map((p) => p.id).join('-')]) || null;
-    const saving = Math.max(0, Number(deal?.saving) || 0);
-    const shareOf = (p) => (deal && p.selectable && sel[p.id] ? Math.max(0, Number(deal.per_item?.[p.id]) || 0) : 0);
-    const rewarded = saving > 0 || !!deal?.free_delivery_unlocked || !!deal?.gift_unlocked;
-
-    // "Buy now" → server redirects to /checkout (rendered in place);
-    // "Add selected" → server redirects back here with a flash, and the
-    // mini-cart badge refreshes from the new props.
-    //
-    // One Pixel AddToCart for the bundle, its id posted with it so the server's
-    // Conversions API event pairs with it (Meta audit, 2026-09-17): "Add
-    // selected" was the one way into the cart Meta never heard about. The value
-    // is the plain sum of the ticked pieces, the same figure the server sends.
-    const submitBundle = (redirect) => {
-        if (none || busy) return;
-        const eventId = newEventId('AddToCart');
-        if (window.track) {
-            window.track('AddToCart', {
-                content_ids: picked.map((p) => `prod-${p.id}`),
-                contents: picked.map((p) => ({ id: `prod-${p.id}`, quantity: 1, item_price: p.price })),
-                content_type: 'product',
-                value: total,
-                currency: 'BDT',
-            }, { eventID: eventId });
-        }
-        setBusy(true);
-        router.post(fbt.add_many_url, {
-            product_ids: picked.map((p) => p.id),
-            redirect,
-            event_id: eventId,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => { if (!redirect) refresh(); },
-            onFinish: () => setBusy(false),
-        });
-    };
-
-    return (
-        <section className="mt-16">
-            <h2 className="display text-3xl sm:text-4xl mb-8">Frequently bought together</h2>
-            <div className="grid lg:grid-cols-3 gap-6 items-start">
-                <div className="lg:col-span-2 flex flex-wrap items-center gap-3">
-                    {fbt.items.map((p, i) => (
-                        <span key={p.id} className="contents">
-                            <label className="relative block w-32">
-                                <input
-                                    type="checkbox"
-                                    className="absolute top-2 left-2 z-10 h-4 w-4 accent-gold-600"
-                                    checked={!!sel[p.id]}
-                                    disabled={!p.selectable}
-                                    onChange={(e) => setSel({ ...sel, [p.id]: e.target.checked })}
-                                />
-                                <span className="block aspect-square rounded-2xl overflow-hidden bg-mist-100">
-                                    {p.thumb && <img src={p.thumb} className="h-full w-full object-cover" alt={p.name} loading="lazy" decoding="async" />}
-                                </span>
-                                <span className="mt-1 block text-xs truncate">{p.name}</span>
-                                {shareOf(p) > 0 ? (
-                                    <>
-                                        <span className="block text-[11px] text-ink-500 line-through">{p.price_text}</span>
-                                        <span className="block text-xs font-semibold text-gold-700">{money(Math.max(0, p.price - shareOf(p)))}</span>
-                                    </>
-                                ) : (
-                                    <span className="block text-xs font-semibold text-gold-700">{p.price_text}</span>
-                                )}
-                                {p.has_variants && <span className="block text-[10px] text-ink-700/70">choose options on its page</span>}
-                            </label>
-                            {i < fbt.items.length - 1 && <span className="text-2xl text-ink-300">+</span>}
-                        </span>
-                    ))}
-                </div>
-                <div className="card p-5">
-                    {rewarded && <p className="mb-1 text-xs font-semibold text-gold-700" lang={lang}>{t(lang, 'fbt.together')}</p>}
-                    <p className="text-sm text-ink-700/70">Total for selected</p>
-                    {saving > 0 ? (
-                        <>
-                            <p className="mt-0.5 text-sm text-ink-500 line-through">{money(total)}</p>
-                            <p className="text-2xl font-semibold text-gold-700">{money(Math.max(0, total - saving))}</p>
-                        </>
-                    ) : (
-                        <p className="text-2xl font-semibold text-gold-700">{money(total)}</p>
-                    )}
-                    {rewarded && (
-                        <ul className="mt-2 space-y-1 text-[13px] font-medium leading-snug text-success-700" lang={lang}>
-                            {saving > 0 && (
-                                <li className="flex items-start gap-1.5">
-                                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px" strokeWidth={1.8} />
-                                    <span>{t(lang, 'fbt.save', { saving: deal.saving_text || money(saving) })}</span>
-                                </li>
-                            )}
-                            {deal.free_delivery_unlocked && (
-                                <li className="flex items-start gap-1.5">
-                                    <Icon name="truck" className="w-4 h-4 shrink-0 mt-px" strokeWidth={1.8} />
-                                    <span>{t(lang, 'fbt.perk', { perk: rewardLabel(lang, 'Free delivery') })}</span>
-                                </li>
-                            )}
-                            {deal.gift_unlocked && (
-                                <li className="flex items-start gap-1.5">
-                                    <Icon name="gift" className="w-4 h-4 shrink-0 mt-px" strokeWidth={1.8} />
-                                    <span>{t(lang, 'fbt.perk', { perk: rewardLabel(lang, 'Free gift') })}</span>
-                                </li>
-                            )}
-                        </ul>
-                    )}
-                    <div className="mt-3 space-y-2">
-                        <button type="button" className="btn-primary w-full" disabled={none || busy} onClick={() => submitBundle('checkout')}>Buy now</button>
-                        <button type="button" className="btn-outline w-full" disabled={none || busy} onClick={() => submitBundle('')}>Add selected to cart</button>
-                    </div>
                 </div>
             </div>
         </section>

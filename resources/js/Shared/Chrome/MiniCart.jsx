@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
 import { useCart } from '../CartContext';
@@ -13,7 +13,7 @@ import OfferCountdown from '../OfferCountdown';
 export default function MiniCart() {
     const { props } = usePage();
     const urls = props.chrome?.urls || {};
-    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText, remove, cartTrigger } = useCart();
+    const { drawer, setDrawer, count, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText, remove, cartTrigger, pairs } = useCart();
     const panelRef = useRef(null);
 
     useEffect(() => {
@@ -93,6 +93,8 @@ export default function MiniCart() {
                             </button>
                         </div>
                     ))}
+
+                    {items.length > 0 && pairs?.length > 0 && <PairsRow pairs={pairs} onNavigate={() => setDrawer(false)} />}
                 </div>
                 {items.length > 0 && (
                     <div className="border-t border-ink-900/[0.07] px-6 py-5 space-y-3 bg-mist-50 sm:rounded-b-[28px]">
@@ -135,5 +137,66 @@ export default function MiniCart() {
                 )}
             </div>
         </div>
+    );
+}
+
+// "Pairs beautifully with" — the frequently-bought-together picks, moved off
+// the product page into the bag (owner, 2026-10-24). A swipeable row of small
+// cards; a simple piece goes straight into the bag with one tap, a piece with
+// options opens its page.
+function PairsRow({ pairs, onNavigate }) {
+    const { add } = useCart();
+    const [adding, setAdding] = useState(null);
+
+    const quickAdd = async (p) => {
+        if (adding) return;
+        setAdding(p.id);
+        try {
+            await add(p.add_url, { variant_id: '', qty: 1 }, { contentId: `prod-${p.id}`, name: p.name, value: p.price });
+        } finally {
+            setAdding(null);
+        }
+    };
+
+    return (
+        <section className="pt-5 mt-1 border-t border-ink-900/[0.07]" aria-labelledby="pairs-heading">
+            <div className="flex items-baseline justify-between">
+                <h3 id="pairs-heading" className="font-display text-lg tracking-[-0.01em] text-ink-900">Pairs beautifully with</h3>
+                <span className="text-[11px] text-ink-700/50">Swipe</span>
+            </div>
+            <div className="mt-3 -mx-6 px-6 scroll-pl-6 flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-1">
+                {pairs.map((p) => (
+                    <div key={p.id} className="snap-start shrink-0 w-[38%] min-w-[124px]">
+                        <div className="relative">
+                            <SmartLink href={p.url} onClick={onNavigate} className="block overflow-hidden rounded-2xl bg-mist-100 aspect-[4/5]">
+                                {p.thumb && <img src={p.thumb450 || p.thumb} alt="" loading="lazy" className="w-full h-full object-cover transition duration-700 hover:scale-105" />}
+                            </SmartLink>
+                            {p.has_variants ? (
+                                <SmartLink href={p.url} onClick={onNavigate} className="absolute bottom-2 right-2 h-8 px-3 rounded-full bg-white/90 backdrop-blur text-[11px] font-medium text-ink-900 grid place-items-center shadow-sm">Choose</SmartLink>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => quickAdd(p)}
+                                    disabled={adding === p.id}
+                                    aria-label={`Add ${p.name} to the bag`}
+                                    className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-ink-900 text-white grid place-items-center shadow-[0_8px_20px_-8px_rgb(0_0_0/0.6)] transition hover:scale-105 disabled:opacity-60"
+                                >
+                                    {adding === p.id
+                                        ? <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                                        : <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg>}
+                                </button>
+                            )}
+                        </div>
+                        <SmartLink href={p.url} onClick={onNavigate} className="block mt-2">
+                            <span className="block text-[12px] leading-snug text-ink-800 line-clamp-2">{p.name}</span>
+                            <span className="block mt-0.5 text-[13px] font-semibold text-ink-900">
+                                {p.price_text}
+                                {p.on_sale && <span className="ml-1.5 text-[11px] font-normal text-ink-500 line-through">{p.compare_text}</span>}
+                            </span>
+                        </SmartLink>
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 }

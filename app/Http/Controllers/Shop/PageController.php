@@ -93,10 +93,12 @@ class PageController extends Controller
             'title' => $title,
             'intro' => page_content('contact', 'intro'),
             'details' => [
-                'phone' => \App\Models\Setting::get('store_phone', config('store.phone')),
+                // No phone number: contact is WhatsApp, Messenger and email
+                // (owner, 2026-10-24). The number stays in the admin settings.
                 'email' => \App\Models\Setting::get('store_email', config('store.email')),
                 'address' => \App\Models\Setting::get('store_address', config('store.address')),
                 'whatsapp' => theme('whatsapp_number'),
+                'messenger' => theme('messenger_url') ?: null,
             ],
             'submitUrl' => route('page.contact.submit'),
         ])->withViewData([
