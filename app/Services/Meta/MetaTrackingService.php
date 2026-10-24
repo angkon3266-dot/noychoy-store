@@ -111,7 +111,7 @@ class MetaTrackingService
      * deliberately not here: a real order is a real order, whoever's software
      * happened to place the request.
      */
-    private const BROWSER_EVENTS = ['ViewContent', 'AddToCart', 'InitiateCheckout'];
+    private const BROWSER_EVENTS = ['PageView', 'ViewContent', 'AddToCart', 'InitiateCheckout'];
 
     /**
      * Meta's and Google's own fetchers, on top of TrackVisit's crawler list.
@@ -140,6 +140,17 @@ class MetaTrackingService
     private const NO_BROWSER = 'no_browser';
 
     // ── Standard commerce events ─────────────────────────────────────────────
+
+    /**
+     * The server twin of the Pixel's PageView, under the id the page handed
+     * the Pixel (App\Http\Middleware\SendMetaPageView). Built 2026-10-25
+     * for Meta's "Pixel events covered by Conversions API" recommendation:
+     * until then the server had never sent PageView at all.
+     */
+    public function pageView(string $eventId, array $user = [], ?array $context = null): void
+    {
+        $this->send('PageView', $this->hashUser($user), [], $eventId, context: $context, timeout: self::STOREFRONT_TIMEOUT);
+    }
 
     public function viewContent(Product $product, string $eventId, array $user = [], ?array $context = null): void
     {
@@ -236,12 +247,19 @@ class MetaTrackingService
      * `prefetch` is recorded here, while the headers still exist, so the
      * deferred sender can tell a speculative fetch from a visit.
      *
-     * @return array{ip:?string,ua:?string,fbc:?string,fbp:?string,url:string,time:int,external_id:array<int,string>,prefetch:bool}
+     * `ip` prefers the IPv6 address the browser looked up for itself
+     * ({@see MetaIdentity::clientIp()}). `ip6_pending` says that lookup has not
+     * run yet in this browser — a landing page — so the address may still
+     * arrive under `ip6_key` a moment after the page has gone out.
+     *
+     * @return array{ip:?string,ua:?string,fbc:?string,fbp:?string,url:string,time:int,external_id:array<int,string>,prefetch:bool,ip6_pending:bool,ip6_key:?string}
      */
     public static function captureClientContext(): array
     {
+        $ip = MetaIdentity::clientIp();
+
         return [
-            'ip' => request()->ip(),
+            'ip' => $ip,
             'ua' => request()->userAgent(),
             'fbc' => MetaIdentity::fbc(),
             'fbp' => MetaIdentity::fbp(),
@@ -249,6 +267,10 @@ class MetaTrackingService
             'time' => time(),
             'external_id' => MetaIdentity::externalIds(),
             'prefetch' => self::isSpeculative(request()),
+            'ip6_pending' => filled(config('meta.ip6_lookup_url'))
+                && ! MetaIdentity::ipv6LookupDone()
+                && ! str_contains((string) $ip, ':'),
+            'ip6_key' => MetaIdentity::ip6CacheKey(),
         ];
     }
 
@@ -473,7 +495,7 @@ class MetaTrackingService
                 // fbp/fbc/IP/UA are sent as-is — Meta rejects hashed values for
                 // all four.
                 $userData = array_merge(array_filter($userData), array_filter([
-                    'client_ip_address' => $context['ip'] ?? request()->ip(),
+                    'client_ip_address' => $context['ip'] ?? MetaIdentity::clientIp(),
                     'client_user_agent' => $context['ua'] ?? request()->userAgent(),
                     'fbc' => $context['fbc'] ?? MetaIdentity::fbc(),
                     'fbp' => $context['fbp'] ?? MetaIdentity::fbp(),
@@ -624,6 +646,10 @@ class MetaTrackingService
             'fbp' => isset($userData['fbp']),
             'fbc' => isset($userData['fbc']),
             'ip' => isset($userData['client_ip_address']),
+            // 6 or 4, never the address. Meta compares this field with the
+            // address the Pixel arrived from; how often it is IPv6 is the
+            // measure of the browser lookup in MetaIdentity::clientIp().
+            'ip_v' => isset($userData['client_ip_address']) ? (str_contains($userData['client_ip_address'], ':') ? 6 : 4) : null,
             'ua' => isset($userData['client_user_agent']),
             'match_keys' => $matchKeys,
             'action_source' => $actionSource,
@@ -634,7 +660,7 @@ class MetaTrackingService
             // that could not exist.
             'dedup_expected' => $actionSource === 'website'
                 && $this->pixelEnabled()
-                && in_array($event, ['ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase'], true),
+                && in_array($event, ['PageView', 'ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase'], true),
         ];
 
         if ($trace) {

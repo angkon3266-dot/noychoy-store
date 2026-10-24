@@ -21,6 +21,18 @@
             'external_id' => \App\Support\MetaIdentity::externalIds() ?: null,
         ]);
     }
+
+    // The id SendMetaPageView sends this page's server PageView under. Marking
+    // the request is what tells it the browser fired one too.
+    $pageViewId = null;
+    if ($pixelOn && ($events['PageView'] ?? true)) {
+        $pageViewId = request()->attributes->get(\App\Http\Middleware\SendMetaPageView::ATTRIBUTE);
+        if ($pageViewId) {
+            request()->attributes->set(\App\Http\Middleware\SendMetaPageView::PRINTED, true);
+        }
+    }
+
+    $ip6Lookup = $pixelOn ? config('meta.ip6_lookup_url') : null;
 @endphp
 @if($pixelOn)
     <script>
@@ -41,7 +53,7 @@
         window.META_EVENTS = {!! \Illuminate\Support\Js::from($events) !!};
         fbq('init', {!! \Illuminate\Support\Js::from($pixelId) !!}{!! $am ? ', '.\Illuminate\Support\Js::from($am) : '' !!});
         @if($events['PageView'] ?? true)
-        fbq('track', 'PageView');
+        fbq('track', 'PageView', {}{!! $pageViewId ? ', '.\Illuminate\Support\Js::from(['eventID' => $pageViewId]) : '' !!});
         @endif
         // Respects the per-event toggles (Meta → Tracking); disabled events no-op.
         window.track = function (event, params, opts) {
@@ -58,6 +70,44 @@
             } catch (e) {}
         };
     </script>
+    @if($ip6Lookup)
+    <script>
+        // The phone's own IPv6 address, for the server's copy of each event.
+        // The Pixel reaches facebook.com over IPv6 wherever the phone has it,
+        // while the same phone often reaches this site over the carrier's
+        // shared IPv4. Meta flagged the two addresses not matching
+        // (2026-10-11), and its advice is to look the IPv6 up in the browser
+        // (MetaIdentity::clientIp() explains the rest). Once an hour: the
+        // cookie holds the address, or "-" when there is none, and the
+        // address also goes to the server once, for a landing page's events
+        // that are waiting for it. No cookies, no referrer to the lookup host.
+        (function () {
+            try {
+                if (/(?:^|;\s*){{ \App\Support\MetaIdentity::IP6_COOKIE }}=/.test(document.cookie) || !window.fetch) return;
+                var keep = function (v) {
+                    document.cookie = '{{ \App\Support\MetaIdentity::IP6_COOKIE }}=' + v + '; Max-Age={{ \App\Support\MetaIdentity::IP6_MINUTES * 60 }}; Path=/; SameSite=Lax'
+                        + (location.protocol === 'https:' ? '; Secure' : '');
+                };
+                var ctl = window.AbortController ? new AbortController() : null;
+                if (ctl) setTimeout(function () { ctl.abort(); }, 4000);
+                fetch({!! \Illuminate\Support\Js::from($ip6Lookup) !!}, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+                    .then(function (r) { return r.ok ? r.text() : ''; })
+                    .then(function (ip) {
+                        ip = (ip || '').trim().toLowerCase();
+                        if (ip.length > 45 || !/^[0-9a-f:]+$/.test(ip) || ip.indexOf(':') < 0) { keep('-'); return; }
+                        keep(ip);
+                        var token = document.querySelector('meta[name="csrf-token"]');
+                        fetch({!! \Illuminate\Support\Js::from(route('meta.ip6', [], false)) !!}, {
+                            method: 'POST', credentials: 'same-origin', keepalive: true,
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token ? token.content : '' },
+                            body: JSON.stringify({ ip: ip }),
+                        }).catch(function () {});
+                    })
+                    .catch(function () { keep('-'); });
+            } catch (e) {}
+        })();
+    </script>
+    @endif
     <noscript><img height="1" width="1" style="display:none"
         src="https://www.facebook.com/tr?id={{ $pixelId }}&ev=PageView&noscript=1"/></noscript>
     @stack('meta-events')

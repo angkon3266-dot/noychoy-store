@@ -50,16 +50,19 @@ class MetaCapiPayloadTest extends TestCase
         return $sent->data()['data'][0]['user_data'] ?? [];
     }
 
-    protected function lastEvent(): array
+    /** The last event sent, or the last one of that name: a page also sends its PageView. */
+    protected function lastEvent(?string $name = null): array
     {
         $sent = null;
-        Http::recorded(function ($request) use (&$sent) {
-            $sent = $request;
+        Http::recorded(function ($request) use (&$sent, $name) {
+            if ($name === null || ($request->data()['data'][0]['event_name'] ?? null) === $name) {
+                $sent = $request;
+            }
 
             return true;
         });
 
-        return $sent->data()['data'][0] ?? [];
+        return $sent?->data()['data'][0] ?? [];
     }
 
     protected function product(): Product
@@ -233,7 +236,7 @@ class MetaCapiPayloadTest extends TestCase
         $product = $this->product();
         $this->get('/product/'.$product->slug)->assertOk();
 
-        $event = $this->lastEvent();
+        $event = $this->lastEvent('ViewContent');
 
         $this->assertSame('website', $event['action_source']);
         $this->assertStringContainsString('/product/'.$product->slug, $event['event_source_url']);

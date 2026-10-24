@@ -26,9 +26,9 @@ use Illuminate\Support\Facades\Cache;
 class MetaReceivedEvents
 {
     /**
-     * In funnel order. This site sends PageView and Search from the browser
-     * alone, yet Meta counts ~5% of PageViews as server copies (1 of ~50 on
-     * 2026-09-28 was the Test panel's) — forwarded on Meta's side, not by us.
+     * In funnel order. Search goes from the browser alone, yet Meta counts a
+     * few server copies of it, forwarded on Meta's side, not by us. PageView
+     * has had a server copy of its own since 2026-10-25 (SendMetaPageView).
      */
     public const EVENTS = ['PageView', 'ViewContent', 'Search', 'AddToCart', 'InitiateCheckout', 'Purchase'];
 

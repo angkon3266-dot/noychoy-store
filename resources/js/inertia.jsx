@@ -7,18 +7,31 @@ import { createRoot } from 'react-dom/client';
 // Meta Pixel PageView for SPA navigations. The pixel snippet in <head> fires
 // the initial PageView on script init, so the very first `navigate` event
 // (the initial page) must not fire a second one.
+//
+// Each page carries the id its server PageView went out under (metaPageView,
+// from SendMetaPageView), and the Pixel uses it so Meta merges the two. A
+// partial reload (a filter, a refreshed total) keeps the page's id and is not
+// a new page, so it fires nothing; a page with no id (the server copy off)
+// keeps the old behaviour.
 let firstNavigate = true;
+let lastPageView = null;
 router.on('navigate', (event) => {
+    const props = event.detail?.page?.props || {};
+
     // Keep the CSRF <meta> fresh — fetch() helpers read it on every call.
-    const token = event.detail?.page?.props?.csrf;
+    const token = props.csrf;
     const meta = document.querySelector('meta[name="csrf-token"]');
     if (token && meta && meta.content !== token) meta.content = token;
 
+    const pageViewId = props.metaPageView || null;
     if (firstNavigate) {
         firstNavigate = false;
+        lastPageView = pageViewId;
         return;
     }
-    if (window.track) window.track('PageView');
+    if (pageViewId && pageViewId === lastPageView) return;
+    lastPageView = pageViewId;
+    if (window.track) window.track('PageView', {}, pageViewId ? { eventID: pageViewId } : undefined);
 });
 
 createInertiaApp({

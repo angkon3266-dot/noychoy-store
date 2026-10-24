@@ -27,6 +27,10 @@ class HandleInertiaRequests extends Middleware
             // Re-read on every visit: login/logout regenerate it, and the <meta>
             // tag in the root view is only rendered on the first full load.
             'csrf' => fn () => csrf_token(),
+            // This page's PageView event id (SendMetaPageView). inertia.jsx
+            // fires the Pixel's PageView with it on every React navigation, so
+            // Meta can merge it with the server copy.
+            'metaPageView' => fn () => $request->attributes->get(SendMetaPageView::ATTRIBUTE),
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

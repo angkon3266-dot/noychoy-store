@@ -59,12 +59,14 @@ class MetaCapiDeferredTest extends TestCase
         ]);
     }
 
-    /** How many CAPI POSTs have gone out so far. */
-    protected function sentCount(): int
+    /** How many CAPI POSTs have gone out so far, of one event if named. */
+    protected function sentCount(?string $event = null): int
     {
         $n = 0;
-        Http::recorded(function () use (&$n) {
-            $n++;
+        Http::recorded(function ($request) use (&$n, $event) {
+            if ($event === null || ($request->data()['data'][0]['event_name'] ?? null) === $event) {
+                $n++;
+            }
 
             return true;
         });
@@ -86,7 +88,8 @@ class MetaCapiDeferredTest extends TestCase
         $this->get('/product/'.$product->slug)->assertOk();
 
         $this->assertSame(0, $beforeOurs, 'ViewContent was POSTed before the HTML was written');
-        $this->assertSame(1, $this->sentCount(), 'ViewContent was deferred but never sent');
+        $this->assertSame(1, $this->sentCount('ViewContent'), 'ViewContent was deferred but never sent');
+        $this->assertSame(1, $this->sentCount('PageView'), 'PageView was deferred but never sent');
     }
 
     public function test_initiate_checkout_is_sent_after_the_response(): void
@@ -102,7 +105,7 @@ class MetaCapiDeferredTest extends TestCase
         $this->get('/checkout')->assertOk();
 
         $this->assertSame(0, $beforeOurs, 'InitiateCheckout was POSTed before the checkout rendered');
-        $this->assertSame(1, $this->sentCount(), 'InitiateCheckout was deferred but never sent');
+        $this->assertSame(1, $this->sentCount('InitiateCheckout'), 'InitiateCheckout was deferred but never sent');
     }
 
     public function test_add_to_cart_is_sent_after_the_mini_cart_json(): void

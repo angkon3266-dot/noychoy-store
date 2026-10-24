@@ -149,6 +149,7 @@ return [
                 'https://ad.doubleclick.net',
                 'https://www.googleadservices.com',
                 'https://www.google.com.bd',       // conversions ping the visitor's country domain
+                'https://ipv6.icanhazip.com',      // the browser's own IPv6 for CAPI (config/meta.php ip6_lookup_url)
             ],
 
             'frame-src' => [

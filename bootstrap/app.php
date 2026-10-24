@@ -7,6 +7,7 @@ use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\MetaSecurityGate;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SendMetaPageView;
 use App\Http\Middleware\TrackVisit;
 use App\Support\MetaIdentity;
 use Illuminate\Foundation\Application;
@@ -49,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: [
             MetaIdentity::FBP_COOKIE,
             MetaIdentity::FBC_COOKIE,
+            MetaIdentity::IP6_COOKIE,
         ]);
 
         // First-party storefront traffic tracking (dashboard visitors + funnel),
@@ -57,6 +59,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             TrackVisit::class,
             CaptureMetaClickId::class,
+            // The page's PageView id for the Pixel, and its server copy once
+            // the response is out. Ahead of the Inertia share, which hands
+            // the id to React.
+            SendMetaPageView::class,
             // ?ref=CODE → the inviter's cookie (encrypted, httpOnly), before
             // the Inertia share so the register page can name the inviter.
             \App\Http\Middleware\CaptureReferral::class,

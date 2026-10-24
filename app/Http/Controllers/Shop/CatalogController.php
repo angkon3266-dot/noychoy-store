@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Meta\SendDeferredBrowserEvent;
 use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -344,11 +345,14 @@ class CatalogController extends Controller
         // so the payload cannot depend on how much of the request is still
         // standing by the time the callback runs. The event id itself stays
         // synchronous — the page below needs it for Pixel dedup.
+        //
+        // On the first page of a visit it waits a few seconds in the queue
+        // instead, for the IPv6 address the browser is about to report
+        // (SendDeferredBrowserEvent explains why).
         $vcEventId = MetaTrackingService::newEventId('ViewContent');
         $vcUser = $this->trackingUser($request);
         $vcContext = MetaTrackingService::captureClientContext();
-        $tracking = $this->tracking;
-        app()->terminating(fn () => $tracking->viewContent($product, $vcEventId, $vcUser, $vcContext));
+        SendDeferredBrowserEvent::sendOrDefer('ViewContent', $vcEventId, $vcUser, $vcContext, $product);
 
         // The live offer this piece lists under (App\Support\OfferPricing). The
         // page takes it off every price it prints and strikes the regular one

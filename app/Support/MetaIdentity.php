@@ -164,6 +164,90 @@ class MetaIdentity
         return array_values(array_unique($ids));
     }
 
+    // ── Client IP address ────────────────────────────────────────────────────
+
+    /**
+     * Where the browser keeps the IPv6 address it looked up for itself
+     * (partials/meta-pixel), or "-" once it has found it has none. Written by
+     * JavaScript, so it is left out of cookie encryption.
+     */
+    public const IP6_COOKIE = '_nc_ip6';
+
+    /** How long a looked-up address is trusted before the browser asks again. */
+    public const IP6_MINUTES = 60;
+
+    /**
+     * The address to report as client_ip_address.
+     *
+     * Meta's 2026-10-11 diagnostic: "client IP addresses that do not match
+     * those sent from your Meta Pixel", on 55% of ViewContents. The Pixel talks
+     * to facebook.com straight from the phone, and Bangladeshi phones that have
+     * IPv6 tend to use it there, while the same phone often reaches this site
+     * over the carrier's shared IPv4. Meta's own advice (the Parameter Builder)
+     * is to look the IPv6 address up in the browser and prefer it, so the
+     * browser does that and leaves it in IP6_COOKIE.
+     *
+     * The request's own address wins when it is already IPv6: it is the
+     * freshest reading, from this very moment. The cookie only stands in for
+     * a request that arrived over IPv4.
+     */
+    public static function clientIp(?Request $request = null): ?string
+    {
+        $request ??= request();
+        $ip = $request->ip();
+
+        if ($ip !== null && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return $ip;
+        }
+
+        return self::browserIpv6($request) ?? $ip;
+    }
+
+    /** The public IPv6 address the browser reported for itself, if any. */
+    public static function browserIpv6(?Request $request = null): ?string
+    {
+        return self::publicIpv6(($request ?? request())->cookie(self::IP6_COOKIE));
+    }
+
+    /**
+     * Whether this browser has already run the lookup, whatever it found. A
+     * browser that has not is one whose address may still be on its way
+     * ({@see ip6CacheKey()}).
+     */
+    public static function ipv6LookupDone(?Request $request = null): bool
+    {
+        return filled(($request ?? request())->cookie(self::IP6_COOKIE));
+    }
+
+    /**
+     * A routable IPv6 address, or null. Anything the browser hands over is
+     * checked: a private, loopback or documentation address is no use to Meta,
+     * and a value that is not an address at all must never reach the payload.
+     */
+    public static function publicIpv6(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '' || strlen($value) > 45) {
+            return null;
+        }
+
+        $value = strtolower(trim($value));
+        $ok = filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+
+        return $ok === false ? null : $value;
+    }
+
+    /**
+     * Where the address reported by the browser waits for a deferred event
+     * (App\Jobs\Meta\SendDeferredBrowserEvent): keyed by the visitor, not the
+     * session, so a login in between does not lose it. Null with no visitor.
+     */
+    public static function ip6CacheKey(?Request $request = null): ?string
+    {
+        $token = ($request ?? request())->cookie('visitor_token');
+
+        return $token ? 'meta.ip6.'.self::pseudonym('visitor:'.$token) : null;
+    }
+
     /** A per-install, non-reversible, stable id. */
     public static function pseudonym(string $subject): string
     {

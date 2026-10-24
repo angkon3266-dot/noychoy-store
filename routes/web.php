@@ -16,6 +16,7 @@ use App\Http\Controllers\Shop\LandingController;
 use App\Http\Controllers\Shop\LeadController;
 use App\Http\Controllers\Shop\LoveController;
 use App\Http\Controllers\Shop\ManifestController;
+use App\Http\Controllers\Shop\MetaIpController;
 use App\Http\Controllers\Shop\PageController;
 use App\Http\Controllers\Shop\ProductFeedController;
 use App\Http\Controllers\Shop\PushController;
@@ -111,6 +112,13 @@ Route::middleware('throttle:20,1')->group(function () {
     Route::post('/push/watch-stock', [PushController::class, 'watchStock'])->name('push.watch-stock');
 });
 Route::get('/search/suggest', [CatalogController::class, 'suggest'])->name('search.suggest');
+
+// The browser's own IPv6 address, reported once an hour by the Pixel snippet
+// so server events can carry the address the Pixel's copy arrives from.
+// Read-only session: it fires as the page loads, alongside any cart change.
+Route::post('/meta/ip6', [MetaIpController::class, 'store'])
+    ->middleware([ReadOnlySession::class, 'throttle:20,1'])
+    ->name('meta.ip6');
 
 // Meta (Facebook/Instagram) product catalog feed for Commerce Manager
 Route::get('/feed/meta.csv', [ProductFeedController::class, 'meta'])->name('feed.meta');

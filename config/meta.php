@@ -31,6 +31,16 @@ return [
 
     'graph_url' => env('META_GRAPH_URL', 'https://graph.facebook.com'),
 
+    // Where the shopper's browser asks for its own IPv6 address (once an hour,
+    // partials/meta-pixel), so server events carry the address the Pixel's
+    // copy arrives from. The host must answer over IPv6 only, and must allow a
+    // cross-site read. icanhazip.com is Cloudflare's own service, and Cloudflare
+    // already carries every request to this site, so nobody new learns a
+    // visitor's address. A different host must also be added to connect-src
+    // in config/security.php, or the browser blocks it. Empty switches the
+    // lookup off.
+    'ip6_lookup_url' => env('META_IP6_LOOKUP_URL', 'https://ipv6.icanhazip.com'),
+
     // OAuth ("Connect with Facebook") — the vendor's Meta App credentials.
     // Leave blank to offer Development Mode (manual token) only.
     //

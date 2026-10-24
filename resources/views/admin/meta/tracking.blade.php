@@ -101,7 +101,7 @@
                         </tbody>
                     </table>
                 </div>
-                <p class="text-xs text-ink-700/50 mt-2">Meta publishes each hour about an hour late. Most events arrive from both sides and Meta merges each pair on its event ID, so the columns count copies received, not separate shoppers. This site’s server never sends PageView or Search; the few server copies Meta shows for those reach it through Meta’s own forwarding, not from here.</p>
+                <p class="text-xs text-ink-700/50 mt-2">Meta publishes each hour about an hour late. Most events arrive from both sides and Meta merges each pair on its event ID, so the columns count copies received, not separate shoppers. The server sends its own copy of PageView too (since 25 Oct 2026), under the Pixel’s event ID. It never sends Search, so the few server copies Meta shows for Search reach it through Meta’s own forwarding, not from here.</p>
             </div>
         </template>
     </div>
