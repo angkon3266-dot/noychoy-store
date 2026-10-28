@@ -294,6 +294,7 @@ Route::middleware('admin')->group(function () {
     Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
     Route::post('purchase-orders/{purchaseOrder}/status', [PurchaseOrderController::class, 'updateStatus'])->name('purchase-orders.status');
     Route::get('purchase-orders/{purchaseOrder}/export', [PurchaseOrderController::class, 'export'])->name('purchase-orders.export');
+    Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase-orders.pdf');
     Route::post('purchase-orders-fetch-image', [PurchaseOrderController::class, 'fetchImage'])->name('purchase-orders.fetch-image');
     Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-orders.destroy');
 

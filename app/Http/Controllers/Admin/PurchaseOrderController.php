@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
+use App\Services\PurchaseOrderPdf;
 use Illuminate\Http\Request;
 
 class PurchaseOrderController extends Controller
@@ -244,6 +245,12 @@ class PurchaseOrderController extends Controller
         }
 
         return response()->json(['ok' => false]);
+    }
+
+    /** The purchase order as a PDF to send the supplier. */
+    public function pdf(PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf)
+    {
+        return $pdf->download($purchaseOrder);
     }
 
     /** Export a purchase order's items to an Excel-friendly CSV. */

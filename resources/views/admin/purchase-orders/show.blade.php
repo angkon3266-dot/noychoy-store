@@ -15,7 +15,8 @@
             @endforeach
         </select>
     </form>
-    <a href="{{ route('admin.purchase-orders.export', $order) }}" class="btn-outline text-sm py-1.5 ml-auto">⬇ Export Excel</a>
+    <a href="{{ route('admin.purchase-orders.pdf', $order) }}" class="btn-outline text-sm py-1.5 ml-auto">⬇ Export PDF</a>
+    <a href="{{ route('admin.purchase-orders.export', $order) }}" class="btn-outline text-sm py-1.5">⬇ Export Excel</a>
     <a href="{{ route('admin.purchase-orders.edit', $order) }}" class="btn-outline text-sm py-1.5">Edit</a>
     <form action="{{ route('admin.purchase-orders.destroy', $order) }}" method="POST" onsubmit="return confirm('Delete this purchase order?')">
         @csrf @method('DELETE')
