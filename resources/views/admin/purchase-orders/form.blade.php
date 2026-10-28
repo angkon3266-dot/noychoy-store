@@ -7,7 +7,7 @@
 
 <form method="POST" action="{{ $order->exists ? route('admin.purchase-orders.update', $order) : route('admin.purchase-orders.store') }}"
       x-data="poForm({{ Illuminate\Support\Js::from($initialItems) }}, {{ $order->exists ? 'true' : 'false' }})" x-ref="form"
-      @input="queueSave()" @change="queueSave()" @submit="onSubmit($event)">
+      @input="queueSave()" @change="queueSave()" @submit="onSubmit($event)" class="pb-24">
     @csrf
     <template x-if="exists"><input type="hidden" name="_method" value="PUT"></template>
 
@@ -53,12 +53,12 @@
             <div class="card p-4 sm:p-5">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="font-semibold">Items</h2>
-                    <button type="button" @click="addItem()" class="btn-outline text-sm py-1.5">+ Add product</button>
+                    <button type="button" @click="addItemAndFocus()" class="btn-outline text-sm py-1.5">+ Add product</button>
                 </div>
 
                 <div class="space-y-4">
                     <template x-for="(item, i) in items" :key="i">
-                        <div class="rounded-lg border border-ink-100 p-3 overflow-x-auto">
+                        <div class="rounded-lg border border-ink-100 p-3 overflow-x-auto" data-po-item>
                             <div class="min-w-[560px]">
                                 {{-- Top row: thumb + name + sku + delete --}}
                                 <div class="flex items-start gap-2">
@@ -181,6 +181,9 @@
             </div>
         </div>
     </div>
+    {{-- Floating add button: reachable from anywhere down a long order. --}}
+    <button type="button" @click="addItemAndFocus()"
+            class="btn-primary fixed bottom-6 left-1/2 -translate-x-1/2 z-30 rounded-full shadow-lg px-5 py-3 text-base font-semibold">+ Add product</button>
 </form>
 
 <script>
@@ -265,6 +268,15 @@
             courier: {{ old('courier_cost', $order->courier_cost ?: 0) }},
             processing: {{ old('processing_pct', $order->processing_pct ?: 0) }},
             addItem() { this.items.push({ product_name: '', sku: '', unit_cost: 0, target_price: null, received_qty: 0, product_link: '', image_url: '', attribute_names: [], variants: [{ attrs: {}, qty: 1 }] }); },
+            addItemAndFocus() {
+                this.addItem();
+                this.$nextTick(() => {
+                    const card = [...document.querySelectorAll('[data-po-item]')].pop();
+                    if (!card) return;
+                    card.scrollIntoView({ block: 'center' });
+                    card.querySelector('[placeholder="Product name *"]')?.focus({ preventScroll: true });
+                });
+            },
             removeItem(i) { this.items.splice(i, 1); if (!this.items.length) this.addItem(); },
             addAttr(item, name) { if (!item.attribute_names.includes(name)) { item.attribute_names.push(name); item.variants.forEach(v => { if (!(name in v.attrs)) v.attrs[name] = ''; }); } },
             addCustomAttr(item) { const n = (prompt('Attribute name (e.g. Length)') || '').trim(); if (n) this.addAttr(item, n); },
