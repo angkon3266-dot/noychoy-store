@@ -51,6 +51,10 @@ class PurchaseOrderController extends Controller
         $this->syncItems($po, $request);
         $po->recalculateTotal();
 
+        if ($request->expectsJson()) {
+            return $this->autosaved($po);
+        }
+
         return redirect()->route('admin.purchase-orders.show', $po)->with('success', 'Purchase order created.');
     }
 
@@ -116,7 +120,31 @@ class PurchaseOrderController extends Controller
         $this->syncItems($purchaseOrder, $request);
         $purchaseOrder->recalculateTotal();
 
+        if ($request->expectsJson()) {
+            return $this->autosaved($purchaseOrder);
+        }
+
         return redirect()->route('admin.purchase-orders.show', $purchaseOrder)->with('success', 'Purchase order updated.');
+    }
+
+    /**
+     * Reply to the edit form's background autosave. A new PO is created on its
+     * first autosave, so the form needs the URLs to keep saving to that record
+     * and the generated PO number / order date to keep them from being blanked.
+     */
+    protected function autosaved(PurchaseOrder $po)
+    {
+        return response()->json([
+            'ok' => true,
+            'id' => $po->id,
+            'po_number' => $po->po_number,
+            'ordered_at' => $po->ordered_at?->format('Y-m-d'),
+            'total_cost' => (float) $po->total_cost,
+            'update_url' => route('admin.purchase-orders.update', $po),
+            'edit_url' => route('admin.purchase-orders.edit', $po),
+            'show_url' => route('admin.purchase-orders.show', $po),
+            'saved_at' => now()->format('H:i'),
+        ]);
     }
 
     public function updateStatus(Request $request, PurchaseOrder $purchaseOrder)
@@ -149,8 +177,8 @@ class PurchaseOrderController extends Controller
             'po_number' => ['nullable', 'string', 'max:40'],
             'currency' => ['nullable', 'string', 'max:8'],
             'exchange_rate' => ['nullable', 'numeric', 'min:0'],
-            'courier_name' => ['nullable', 'string', 'max:120'],
-            'courier_tracking' => ['nullable', 'string', 'max:120'],
+            'courier_name' => ['nullable', 'string', 'max:2000'],
+            'courier_tracking' => ['nullable', 'string', 'max:10000'],
             'courier_cost' => ['nullable', 'numeric', 'min:0'],
             'processing_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'expected_at' => ['nullable', 'date'],

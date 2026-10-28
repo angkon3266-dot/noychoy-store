@@ -6,15 +6,19 @@
 @if($errors->any())<div class="mb-4 rounded-md bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 text-sm">{{ $errors->first() }}</div>@endif
 
 <form method="POST" action="{{ $order->exists ? route('admin.purchase-orders.update', $order) : route('admin.purchase-orders.store') }}"
-      x-data="poForm({{ Illuminate\Support\Js::from($initialItems) }})">
+      x-data="poForm({{ Illuminate\Support\Js::from($initialItems) }}, {{ $order->exists ? 'true' : 'false' }})" x-ref="form"
+      @input="queueSave()" @change="queueSave()" @submit="onSubmit($event)">
     @csrf
-    @if($order->exists) @method('PUT') @endif
+    <template x-if="exists"><input type="hidden" name="_method" value="PUT"></template>
 
     <div class="grid lg:grid-cols-3 gap-6">
         {{-- Main: supplier + items --}}
         <div class="lg:col-span-2 space-y-6">
             <div class="card p-5">
-                <h2 class="font-semibold mb-3">Order details</h2>
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    <h2 class="font-semibold">Order details</h2>
+                    <span class="text-xs" :class="saveTone" x-text="saveLabel" role="status" aria-live="polite"></span>
+                </div>
                 <div class="grid sm:grid-cols-2 gap-3">
                     <div>
                         <label class="label">Supplier *</label>
@@ -36,10 +40,10 @@
                     </div>
                     <div>
                         <label class="label">PO number</label>
-                        <input name="po_number" value="{{ old('po_number', $order->po_number) }}" class="input" placeholder="Auto-generated if blank">
+                        <input name="po_number" x-ref="poNumber" value="{{ old('po_number', $order->po_number) }}" class="input" placeholder="Auto-generated if blank">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <div><label class="label">Ordered</label><input type="date" name="ordered_at" value="{{ old('ordered_at', $order->ordered_at?->format('Y-m-d')) }}" class="input"></div>
+                        <div><label class="label">Ordered</label><input type="date" name="ordered_at" x-ref="orderedAt" value="{{ old('ordered_at', $order->ordered_at?->format('Y-m-d')) }}" class="input"></div>
                         <div><label class="label">Expected</label><input type="date" name="expected_at" value="{{ old('expected_at', $order->expected_at?->format('Y-m-d')) }}" class="input"></div>
                     </div>
                 </div>
@@ -156,7 +160,7 @@
                     <div><label class="label">Rate → BDT</label><input name="exchange_rate" x-model.number="rate" type="number" step="0.0001" min="0" class="input" placeholder="e.g. 122"></div>
                 </div>
                 <div class="mt-2"><label class="label">Courier / shipping name</label><input name="courier_name" value="{{ old('courier_name', $order->courier_name) }}" class="input" placeholder="Pathao, FedEx…"></div>
-                <div class="mt-2"><label class="label">Courier tracking</label><input name="courier_tracking" value="{{ old('courier_tracking', $order->courier_tracking) }}" class="input"></div>
+                <div class="mt-2"><label class="label">Tracking &amp; shipping details</label><textarea name="courier_tracking" rows="4" class="input" placeholder="Tracking numbers, shipping address, forwarder notes…">{{ old('courier_tracking', $order->courier_tracking) }}</textarea></div>
                 <div class="grid grid-cols-2 gap-2 mt-2">
                     <div><label class="label">Courier cost</label><input name="courier_cost" x-model.number="courier" type="number" step="0.01" min="0" class="input"></div>
                     <div><label class="label">Processing %</label><input name="processing_pct" x-model.number="processing" type="number" step="0.01" min="0" class="input"></div>
@@ -172,17 +176,89 @@
 
                 <div class="mt-3"><label class="label">Notes</label><textarea name="notes" rows="3" class="input" placeholder="MOQ, payment terms, packaging…">{{ old('notes', $order->notes) }}</textarea></div>
 
-                <button class="btn-primary w-full mt-4">{{ $order->exists ? 'Save purchase order' : 'Create purchase order' }}</button>
-                @if($order->exists)<a href="{{ route('admin.purchase-orders.show', $order) }}" class="block text-center text-sm text-ink-700/60 hover:underline mt-2">Cancel</a>@endif
+                <button class="btn-primary w-full mt-4" x-text="exists ? 'Save & close' : 'Create purchase order'">{{ $order->exists ? 'Save & close' : 'Create purchase order' }}</button>
+                <p class="text-center text-xs mt-2" :class="saveTone" x-text="saveLabel"></p>
             </div>
         </div>
     </div>
 </form>
 
 <script>
-    function poForm(initial) {
+    function poForm(initial, exists) {
         return {
             items: initial,
+            // Autosave: every edit is posted in the background (debounced) to the
+            // same store/update routes as JSON. A new PO is created on its first
+            // autosave, after which the form keeps saving to that record.
+            exists,
+            state: exists ? 'saved' : 'new', // new | idle | pending | saving | saved | error
+            savedAt: '',
+            saveError: '',
+            timer: null,
+            saving: false,
+            dirty: false,
+            submitAfterSave: false,
+            init() {
+                this.$watch('items', () => this.queueSave());
+                window.addEventListener('beforeunload', () => { if (this.dirty && !this.saving) this.save(true); });
+            },
+            get saveLabel() {
+                return {
+                    new: 'Autosaves as you edit',
+                    idle: 'Choose a supplier to start autosaving',
+                    pending: 'Unsaved changes…',
+                    saving: 'Saving…',
+                    saved: this.savedAt ? 'All changes saved · ' + this.savedAt : 'All changes saved',
+                    error: 'Not saved — ' + this.saveError,
+                }[this.state];
+            },
+            get saveTone() { return this.state === 'error' ? 'text-red-600' : (this.state === 'saved' ? 'text-green-700' : 'text-ink-700/50'); },
+            queueSave() {
+                this.dirty = true;
+                if (!this.$refs.form.supplier_id.value) { this.state = 'idle'; return; }
+                this.state = 'pending';
+                clearTimeout(this.timer);
+                this.timer = setTimeout(() => this.save(), 1200);
+            },
+            async save(keepalive = false) {
+                clearTimeout(this.timer);
+                if (!this.$refs.form.supplier_id.value) return;
+                if (this.saving) return; // the in-flight save re-runs when it finishes
+                this.saving = true; this.dirty = false; this.state = 'saving';
+                try {
+                    const res = await fetch(this.$refs.form.action, {
+                        method: 'POST', keepalive,
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        body: new FormData(this.$refs.form),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && data.ok) {
+                        if (!this.exists) {
+                            this.exists = true;
+                            this.$refs.form.action = data.update_url;
+                            if (!this.$refs.poNumber.value) this.$refs.poNumber.value = data.po_number;
+                            if (!this.$refs.orderedAt.value) this.$refs.orderedAt.value = data.ordered_at || '';
+                            history.replaceState(null, '', data.edit_url);
+                        }
+                        this.savedAt = data.saved_at; this.state = 'saved';
+                    } else {
+                        this.dirty = true; this.state = 'error';
+                        this.saveError = res.status === 419 ? 'session expired, reload the page'
+                            : (data.errors ? Object.values(data.errors)[0][0] : (data.message || 'server error ' + res.status));
+                    }
+                } catch (e) {
+                    this.dirty = true; this.state = 'error'; this.saveError = 'connection lost, retrying';
+                    this.timer = setTimeout(() => this.save(), 8000);
+                }
+                this.saving = false;
+                if (this.submitAfterSave) { this.submitAfterSave = false; this.$nextTick(() => this.$refs.form.submit()); return; }
+                if (this.dirty && this.state !== 'error') this.save();
+            },
+            onSubmit(e) {
+                clearTimeout(this.timer);
+                // A create still in flight would be duplicated by the normal POST — wait for it.
+                if (this.saving) { e.preventDefault(); this.submitAfterSave = true; }
+            },
             attrPresets: ['Logo', 'Color', 'Size', 'Finish', 'Material', 'Style'],
             currency: '{{ old('currency', $order->currency ?: 'USD') }}',
             rate: {{ old('exchange_rate', $order->exchange_rate ?: 0) }},

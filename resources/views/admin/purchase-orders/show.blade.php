@@ -84,7 +84,10 @@
                 @if($order->totalInBdt())<div class="flex justify-between text-xs text-ink-700/50"><dt>≈ in BDT</dt><dd>{{ money($order->totalInBdt()) }}</dd></div>@endif
             </dl>
             @if($order->courier_name || $order->courier_tracking)
-                <p class="text-xs text-ink-700/60 mt-3 border-t border-ink-100 pt-2">Courier: {{ $order->courier_name }} @if($order->courier_tracking)· {{ $order->courier_tracking }}@endif</p>
+                <div class="text-xs text-ink-700/60 mt-3 border-t border-ink-100 pt-2 break-words">
+                    @if($order->courier_name)<p>Courier: {{ $order->courier_name }}</p>@endif
+                    @if($order->courier_tracking)<p class="whitespace-pre-line mt-1">{{ $order->courier_tracking }}</p>@endif
+                </div>
             @endif
             <div class="text-xs text-ink-700/50 mt-2">
                 Ordered: {{ $order->ordered_at?->format('d M Y') ?? '—' }} · Expected: {{ $order->expected_at?->format('d M Y') ?? '—' }}
