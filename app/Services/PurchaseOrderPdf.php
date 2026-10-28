@@ -6,6 +6,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Setting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,6 +23,14 @@ use Illuminate\Support\Str;
  */
 class PurchaseOrderPdf
 {
+    /** Chinese, Japanese, Korean and full-width forms — none of which DejaVu has. */
+    public const CJK = '/[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]/u';
+
+    public static function hasCjk(?string $text): bool
+    {
+        return $text !== null && preg_match(self::CJK, $text) === 1;
+    }
+
     public function download(PurchaseOrder $po)
     {
         return $this->make($po)->download($po->po_number.'.pdf');
@@ -31,11 +40,24 @@ class PurchaseOrderPdf
     {
         $po->loadMissing('supplier', 'items');
 
+        // dompdf caches the metrics of the CJK font it installs from @font-face
+        // here; storage/ is not in git, so a fresh deploy has no such folder.
+        File::ensureDirectoryExists(config('dompdf.options.font_cache', storage_path('fonts')));
+
+        // The CJK font is ~10 MB a weight and dompdf holds its metrics in memory
+        // (~120 MB peak), so it is only declared when the order needs it, and the
+        // render gets headroom over PHP's usual 128M.
+        $cjk = $this->needsCjk($po);
+        if ($cjk && $this->bytes(ini_get('memory_limit')) < 512 * 1048576) {
+            @ini_set('memory_limit', '512M');
+        }
+
         $images = $this->embedImages($po->items->pluck('image_url', 'id')->filter()->all(), 160);
 
         return Pdf::loadView('admin.purchase-orders.pdf', [
             'order' => $po,
             'images' => $images,
+            'cjk' => $cjk,
             'store' => [
                 'name' => store_name(),
                 'address' => Setting::get('store_address', config('store.address')),
@@ -44,6 +66,36 @@ class PurchaseOrderPdf
                 'logo' => $this->logo(),
             ],
         ])->setPaper('a4')->setOption('isFontSubsettingEnabled', true);
+    }
+
+    protected function needsCjk(PurchaseOrder $po): bool
+    {
+        $texts = [
+            $po->ship_to, $po->courier_name, $po->courier_tracking, $po->notes,
+            $po->supplier?->name, $po->supplier?->contact, $po->supplier?->country, $po->supplier?->wechat,
+            store_name(), Setting::get('store_address', config('store.address')),
+        ];
+        foreach ($po->items as $it) {
+            $texts[] = $it->product_name;
+            $texts[] = $it->sku;
+            $texts[] = json_encode($it->variants ?: [], JSON_UNESCAPED_UNICODE);
+        }
+
+        return collect($texts)->contains(fn ($t) => self::hasCjk($t));
+    }
+
+    /** "128M" → bytes; -1 (no limit) counts as plenty. */
+    protected function bytes(string|false $limit): int
+    {
+        $limit = trim((string) $limit);
+        if ($limit === '' || $limit === '-1') {
+            return PHP_INT_MAX;
+        }
+        $n = (int) $limit;
+
+        return match (strtoupper(substr($limit, -1))) {
+            'G' => $n * 1073741824, 'M' => $n * 1048576, 'K' => $n * 1024, default => $n,
+        };
     }
 
     /** @param  array<int|string, string>  $urls  key => image URL */

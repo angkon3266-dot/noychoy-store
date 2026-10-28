@@ -19,7 +19,7 @@ class PurchaseOrder extends Model
 
     protected $fillable = [
         'po_number', 'supplier_id', 'status', 'ordered_at', 'expected_at', 'arrived_at',
-        'notes', 'courier_name', 'courier_tracking', 'courier_cost', 'processing_pct',
+        'notes', 'ship_to', 'courier_name', 'courier_tracking', 'courier_cost', 'processing_pct',
         'total_cost', 'currency', 'exchange_rate',
     ];
 

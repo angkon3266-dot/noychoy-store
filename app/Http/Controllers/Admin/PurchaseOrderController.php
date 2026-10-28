@@ -34,7 +34,11 @@ class PurchaseOrderController extends Controller
 
     public function create(Request $request)
     {
-        $order = new PurchaseOrder(['currency' => 'USD', 'status' => 'pending', 'supplier_id' => $request->query('supplier')]);
+        $order = new PurchaseOrder([
+            'currency' => 'USD', 'status' => 'pending', 'supplier_id' => $request->query('supplier'),
+            // Usually the same forwarder every time — start from the last one used.
+            'ship_to' => PurchaseOrder::whereNotNull('ship_to')->latest('id')->value('ship_to'),
+        ]);
 
         return view('admin.purchase-orders.form', [
             'order' => $order,
@@ -185,6 +189,7 @@ class PurchaseOrderController extends Controller
             'expected_at' => ['nullable', 'date'],
             'ordered_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'ship_to' => ['nullable', 'string', 'max:5000'],
         ]);
     }
 

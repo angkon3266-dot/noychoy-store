@@ -6,6 +6,16 @@
     $pct = (float) $order->processing_pct;
     $processing = ($subtotal + $courier) * $pct / 100;
     $s = $order->supplier;
+    // dompdf has no per-glyph font fallback and DejaVu has no CJK, so any typed-in
+    // text containing Chinese/Japanese/Korean is set whole in Noto Sans SC.
+    $cjk ??= false;
+    $t = function ($value) use ($cjk) {
+        $html = e((string) $value);
+
+        return $cjk && \App\Services\PurchaseOrderPdf::hasCjk((string) $value)
+            ? '<span class="cjk">'.$html.'</span>' : $html;
+    };
+    $font = fn ($file) => str_replace('\\', '/', resource_path('fonts/'.$file));
 @endphp
 <!doctype html>
 <html>
@@ -13,8 +23,13 @@
 <meta charset="utf-8">
 <title>{{ $order->po_number }}</title>
 <style>
+    @if($cjk)
+    @font-face { font-family: 'Noto Sans SC'; font-weight: normal; src: url('{{ $font('NotoSansSC-Regular.ttf') }}') format('truetype'); }
+    @font-face { font-family: 'Noto Sans SC'; font-weight: bold; src: url('{{ $font('NotoSansSC-Bold.ttf') }}') format('truetype'); }
+    @endif
     @page { margin: 34px 38px 54px; }
     * { font-family: 'DejaVu Sans', sans-serif; }
+    .cjk, .cjk * { font-family: 'Noto Sans SC'; }
     body { font-size: 9.5px; color: #161618; line-height: 1.45; }
     table { border-collapse: collapse; width: 100%; }
     td, th { vertical-align: top; }
@@ -74,11 +89,11 @@
             @if($store['logo'])
                 <img src="{{ $store['logo'] }}" style="max-height: 46px; max-width: 190px;" alt="">
             @else
-                <div class="brand">{{ $store['name'] }}</div>
+                <div class="brand">{!! $t($store['name']) !!}</div>
             @endif
             <div class="muted" style="margin-top: 5px;">
-                @if($store['logo'])<strong style="color:#161618">{{ $store['name'] }}</strong><br>@endif
-                @if($store['address'])<span class="pre">{{ $store['address'] }}</span><br>@endif
+                @if($store['logo'])<strong style="color:#161618">{!! $t($store['name']) !!}</strong><br>@endif
+                @if($store['address'])<span class="pre">{!! $t($store['address']) !!}</span><br>@endif
                 @if($store['phone']){{ $store['phone'] }}@endif
                 @if($store['phone'] && $store['email']) · @endif
                 @if($store['email']){{ $store['email'] }}@endif
@@ -104,20 +119,20 @@
     <tr>
         <td class="party">
             <h3>Supplier</h3>
-            <div class="name">{{ $s?->name ?? '—' }}</div>
-            @if($s?->contact)<div>Attn: {{ $s->contact }}</div>@endif
-            @if($s?->country)<div class="muted">{{ $s->country }}</div>@endif
+            <div class="name">{!! $s ? $t($s->name) : '—' !!}</div>
+            @if($s?->contact)<div>Attn: {!! $t($s->contact) !!}</div>@endif
+            @if($s?->country)<div class="muted">{!! $t($s->country) !!}</div>@endif
             @if($s?->phone)<div>Tel: {{ $s->phone }}</div>@endif
             @if($s?->email)<div>{{ $s->email }}</div>@endif
-            @if($s?->wechat)<div>WeChat: {{ $s->wechat }}</div>@endif
+            @if($s?->wechat)<div>WeChat: {!! $t($s->wechat) !!}</div>@endif
         </td>
         <td style="width: 2%"></td>
         <td class="party">
             <h3>Ship to</h3>
-            <div class="name">{{ $store['name'] }}</div>
-            @if($store['address'])<div class="pre">{{ $store['address'] }}</div>@endif
-            @if($order->courier_name)<div style="margin-top: 4px;"><span class="muted">Shipping via:</span> {{ $order->courier_name }}</div>@endif
-            @if($order->courier_tracking)<div class="pre" style="margin-top: 2px;">{{ $order->courier_tracking }}</div>@endif
+            @if($order->ship_to)<div class="pre">{!! $t($order->ship_to) !!}</div>@endif
+            @if($order->courier_name)<div style="margin-top: 4px;"><span class="muted">Shipping via:</span> {!! $t($order->courier_name) !!}</div>@endif
+            @if($order->courier_tracking)<div class="pre" style="margin-top: 4px;">{!! $t($order->courier_tracking) !!}</div>@endif
+            @if(! $order->ship_to && ! $order->courier_name && ! $order->courier_tracking)<div class="muted">—</div>@endif
         </td>
     </tr>
 </table>
@@ -142,13 +157,13 @@
                     @if(! empty($images[$it->id]))<img src="{{ $images[$it->id] }}" class="thumb" alt="">@else<div class="thumb-empty"></div>@endif
                 </td>
                 <td>
-                    <div class="pname">{{ $it->product_name }}</div>
-                    @if($it->sku)<div class="muted">SKU: {{ $it->sku }}</div>@endif
+                    <div class="pname">{!! $t($it->product_name) !!}</div>
+                    @if($it->sku)<div class="muted">SKU: {!! $t($it->sku) !!}</div>@endif
                     @if($it->variants)
                         <table class="variants" style="width: auto; margin-top: 3px;">
                             @foreach($it->variants as $v)
                                 <tr>
-                                    <td>{{ collect($v['attrs'] ?? [])->filter(fn ($val) => filled($val))->map(fn ($val, $k) => "$k: $val")->implode(' · ') ?: 'Default' }}</td>
+                                    <td>{!! $t(collect($v['attrs'] ?? [])->filter(fn ($val) => filled($val))->map(fn ($val, $k) => "$k: $val")->implode(' · ') ?: 'Default') !!}</td>
                                     <td class="right nowrap"><strong>× {{ (int) ($v['qty'] ?? 0) }}</strong></td>
                                 </tr>
                             @endforeach
@@ -177,14 +192,14 @@
 @if($order->notes)
     <div class="block">
         <h3>Notes &amp; terms</h3>
-        <div class="pre">{{ $order->notes }}</div>
+        <div class="pre">{!! $t($order->notes) !!}</div>
     </div>
 @endif
 
 <table class="sign">
     <tr>
-        <td><div class="line">Authorised by — {{ $store['name'] }}</div></td>
-        <td><div class="line">Accepted by — {{ $s?->name ?? 'Supplier' }}</div></td>
+        <td><div class="line">Authorised by — {!! $t($store['name']) !!}</div></td>
+        <td><div class="line">Accepted by — {!! $s ? $t($s->name) : 'Supplier' !!}</div></td>
     </tr>
 </table>
 

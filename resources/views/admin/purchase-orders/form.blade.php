@@ -160,6 +160,7 @@
                     <div><label class="label">Currency</label><input name="currency" x-model="currency" class="input" placeholder="USD"></div>
                     <div><label class="label">Rate → BDT</label><input name="exchange_rate" x-model.number="rate" type="number" step="0.0001" min="0" class="input" placeholder="e.g. 122"></div>
                 </div>
+                <div class="mt-2"><label class="label">Ship to <span class="font-normal text-ink-700/50">(printed on the PDF)</span></label><textarea name="ship_to" rows="3" class="input" placeholder="Forwarder / warehouse name, address, contact…">{{ old('ship_to', $order->ship_to) }}</textarea></div>
                 <div class="mt-2"><label class="label">Courier / shipping name</label><input name="courier_name" value="{{ old('courier_name', $order->courier_name) }}" class="input" placeholder="Pathao, FedEx…"></div>
                 <div class="mt-2"><label class="label">Tracking &amp; shipping details</label><textarea name="courier_tracking" rows="4" class="input" placeholder="Tracking numbers, shipping address, forwarder notes…">{{ old('courier_tracking', $order->courier_tracking) }}</textarea></div>
                 <div class="grid grid-cols-2 gap-2 mt-2">
