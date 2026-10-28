@@ -465,6 +465,8 @@ class AppearanceController extends Controller
         Cache::put(HomeController::PREVIEW_KEY.$token, [
             'user' => auth('web')->id(),
             'home' => $this->buildHomeContent($request, $optimizer, $data, true),
+            // The design picked in the form, so switching designs previews too.
+            'template' => is_string($t = $request->input('homepage_template')) && config('theme.homepage_templates.'.$t) ? $t : null,
         ], now()->addMinutes(30));
 
         return response()->json(['url' => route('home', ['home_preview' => $token])]);

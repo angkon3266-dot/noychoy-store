@@ -19,11 +19,18 @@ namespace App\Support;
  */
 class HomePage
 {
-    /** The template key whose design the React homepage implements. */
+    /** The original React homepage design (the store's default). */
     public const REACT_TEMPLATE = 'couture';
+
+    /**
+     * Every design the React homepage renders. They share one data payload and
+     * one builder (Admin → Appearance → Homepage) and differ only in how
+     * Home.jsx lays the sections out ("editorial" since 2026-10-28).
+     */
+    public const REACT_TEMPLATES = ['couture', 'editorial'];
 
     public static function isReact(?string $templateKey = null): bool
     {
-        return ($templateKey ?: theme('homepage_template')) === self::REACT_TEMPLATE;
+        return in_array($templateKey ?: theme('homepage_template'), self::REACT_TEMPLATES, true);
     }
 }

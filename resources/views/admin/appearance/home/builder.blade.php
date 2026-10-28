@@ -22,6 +22,52 @@
         <a href="{{ route('home') }}" target="_blank" class="btn-outline text-sm shrink-0">View homepage ↗</a>
     </div>
 
+    {{-- Which design lays the page out. Couture and Editorial are built from
+         the sections below and show in the live preview; the classic designs
+         are older pages that read only part of the builder. --}}
+    @php
+        $reactDesigns = \App\Support\HomePage::REACT_TEMPLATES;
+        $designBlurbs = [
+            'couture' => 'Split hero with a story-style slideshow, rounded tiles and soft panels.',
+            'editorial' => 'A magazine cover hero, giant outlined type, a category index, an editor’s spread and one pull-quote at a time.',
+        ];
+    @endphp
+    <x-admin.home-panel title="Design" hint="How the homepage is laid out — the sections below fill it" :home="$home" fixed :open="true" focus="hero">
+        <div x-data="{ sel: @js($theme['homepage_template']) }" class="space-y-4">
+            <div class="grid sm:grid-cols-2 gap-3">
+                @foreach($reactDesigns as $key)
+                    @php $tpl = $homeTemplates[$key] ?? null; @endphp
+                    @continue(! $tpl)
+                    <label class="cursor-pointer rounded-xl border p-4 transition"
+                           :class="sel === '{{ $key }}' ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-400' : 'border-ink-100 hover:border-gold-300'">
+                        <input type="radio" name="homepage_template" value="{{ $key }}" class="sr-only" x-model="sel" @checked($theme['homepage_template'] == $key)>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-semibold text-sm">{{ $tpl['name'] }}</span>
+                            <span x-show="sel === '{{ $key }}'" class="rounded-full bg-gold-600 text-white text-[10px] px-2 py-0.5">Selected</span>
+                        </div>
+                        <p class="text-xs text-ink-700/60 mt-1.5">{{ $designBlurbs[$key] ?? '' }}</p>
+                    </label>
+                @endforeach
+            </div>
+            <details>
+                <summary class="cursor-pointer text-xs font-medium text-ink-700/70">Classic designs (older pages — the builder shapes them only in part, and the live preview cannot show them)</summary>
+                <div class="mt-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    @foreach($homeTemplates as $key => $tpl)
+                        @continue(in_array($key, $reactDesigns, true))
+                        <label class="cursor-pointer rounded-lg border p-3 transition"
+                               :class="sel === '{{ $key }}' ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-400' : 'border-ink-100 hover:border-gold-300'">
+                            <input type="radio" name="homepage_template" value="{{ $key }}" class="sr-only" x-model="sel" @checked($theme['homepage_template'] == $key)>
+                            <div class="font-medium text-sm">{{ $tpl['name'] }}</div>
+                            <div class="text-[11px] text-ink-700/50 mt-0.5">Inspired by {{ $tpl['inspiration'] }}</div>
+                            <a href="{{ route('home') }}?preview_home={{ $key }}" target="_blank" class="text-[11px] text-gold-700 hover:underline mt-1 inline-block">Preview ↗</a>
+                        </label>
+                    @endforeach
+                </div>
+            </details>
+            <p class="text-xs text-ink-700/50">Pick a design and the preview on the right switches straight away; it goes live when you press <strong>Save</strong>.</p>
+        </div>
+    </x-admin.home-panel>
+
     {{-- Not sections: the page's own settings. --}}
     <x-admin.home-panel title="Search engines" hint="The homepage's title and description in Google" :home="$home" fixed>
         <div class="max-w-xl space-y-3">
@@ -77,23 +123,8 @@
 
     {{-- Settings only the older Blade homepage templates read. --}}
     <details class="card p-5">
-        <summary class="cursor-pointer text-sm font-semibold text-ink-700">Older homepage templates <span class="font-normal text-ink-700/50">— only needed if you switch away from the current design</span></summary>
+        <summary class="cursor-pointer text-sm font-semibold text-ink-700">Settings for the classic designs <span class="font-normal text-ink-700/50">— only read by the older designs</span></summary>
         <div class="mt-4 space-y-5">
-            <div>
-                <h3 class="text-sm font-semibold text-ink-700 mb-1">Homepage design</h3>
-                <p class="text-xs text-ink-700/60 mb-3">The current design is <strong>Couture</strong>. The builder above only shapes Couture.</p>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" x-data="{ sel: '{{ $theme['homepage_template'] }}' }">
-                    @foreach($homeTemplates as $key => $tpl)
-                        <label class="cursor-pointer rounded-lg border p-4 transition"
-                               :class="sel === '{{ $key }}' ? 'border-gold-500 bg-gold-50 ring-1 ring-gold-400' : 'border-ink-100 hover:border-gold-300'">
-                            <input type="radio" name="homepage_template" value="{{ $key }}" class="sr-only" x-model="sel" @checked($theme['homepage_template'] == $key)>
-                            <div class="font-medium text-sm">{{ $tpl['name'] }}</div>
-                            <div class="text-xs text-ink-700/50 mt-1">Inspired by {{ $tpl['inspiration'] }}</div>
-                            <a href="{{ route('home') }}?preview_home={{ $key }}" target="_blank" class="text-xs text-gold-700 hover:underline mt-2 inline-block">Preview ↗</a>
-                        </label>
-                    @endforeach
-                </div>
-            </div>
             <div>
                 <div class="flex flex-wrap gap-4 text-sm mb-3">
                     <input type="hidden" name="home_show_highlights_present" value="1">

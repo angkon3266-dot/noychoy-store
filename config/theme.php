@@ -204,6 +204,8 @@ return [
     'homepage_templates' => [
         'storefront' => ['name' => 'Storefront — Slider + carousels', 'inspiration' => 'Manfare / modern retail', 'view' => 'shop.templates.home.storefront'],
         'couture' => ['name' => 'Couture — Modern Luxury', 'inspiration' => 'Mejuri / Tiffany editorial', 'view' => 'shop.templates.home.couture'],
+        // React, like Couture: same builder, same content, a magazine layout.
+        'editorial' => ['name' => 'Editorial — Magazine', 'inspiration' => 'Vogue / SSENSE editorial', 'view' => 'shop.templates.home.couture'],
         'meridian' => ['name' => 'Meridian — Full storefront', 'inspiration' => 'Occasion-led gifting funnel', 'view' => 'shop.templates.home.meridian'],
         'aurelia' => ['name' => 'Aurelia — Classic Elegance', 'inspiration' => 'Tiffany & Co.', 'view' => 'shop.templates.home.aurelia'],
         'lumiere' => ['name' => 'Lumière — Editorial', 'inspiration' => 'Mejuri', 'view' => 'shop.templates.home.lumiere'],

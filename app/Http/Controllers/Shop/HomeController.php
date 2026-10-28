@@ -29,6 +29,7 @@ class HomeController extends Controller
             if (is_array($draft) && ($draft['user'] ?? null) === auth('web')->id()) {
                 app()->instance('home_content.preview', $draft['home']);
                 $preview = true;
+                $previewTemplate = $draft['template'] ?? null;
             }
         }
 
@@ -113,8 +114,12 @@ class HomeController extends Controller
             return $b;
         })->values();
 
-        // Logged-in admins can preview any template via ?preview_home=KEY without saving it.
+        // Logged-in admins can preview any template via ?preview_home=KEY without saving it,
+        // and the builder's live preview shows the design picked in the form.
         $key = theme('homepage_template');
+        if ($preview && config('theme.homepage_templates.'.($previewTemplate ?? ''))) {
+            $key = $previewTemplate;
+        }
         if ($request->filled('preview_home') && auth('web')->check()
             && config('theme.homepage_templates.'.$request->query('preview_home'))) {
             $key = $request->query('preview_home');
@@ -141,6 +146,8 @@ class HomeController extends Controller
             $page = \Inertia\Inertia::render('Home', $data + [
                 'seoTitle' => home_content('seo_title'),
                 'preview' => $preview,
+                // Which React design lays the page out (couture | editorial).
+                'template' => $key,
             ])->withViewData([
                 // A preview is the owner looking at a draft: no Pixel, no
                 // Google tag, no push prompt, no chat — nothing reaches Meta.

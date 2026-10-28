@@ -29,7 +29,10 @@
     @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @php $cartSavedSeed = ($cartCount ?? 0) > 0 ? (float) app(\App\Services\CartService::class)->totalSaved() : 0.0; @endphp
-    <script>window.__cartCount = {{ $cartCount ?? 0 }}; window.__cartSaved = {{ json_encode($cartSavedSeed) }}; window.__cartSavedText = {{ json_encode($cartSavedSeed > 0 ? money($cartSavedSeed) : '') }};</script>
+    {{-- @js, not {{ json_encode() }}: Blade escaped the quotes to &quot;, the
+         script died with a syntax error and the older homepage designs went
+         with it (owner, 2026-10-28: "the other template is not working"). --}}
+    <script>window.__cartCount = @js((int) ($cartCount ?? 0)); window.__cartSaved = @js($cartSavedSeed); window.__cartSavedText = @js($cartSavedSeed > 0 ? money($cartSavedSeed) : '');</script>
     {{-- Alpine.js is bundled via Vite in resources/js/app.js (no CDN). --}}
 
     {{-- Brand fonts: either of the two built-in families (self-hosted by the

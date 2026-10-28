@@ -4,6 +4,8 @@ import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
 import Carousel from '../Shared/Carousel';
 import { HomeBlock } from '../Shared/HomeBlocks';
+import { Arrow, Heading, ViewAll, shell } from '../Shared/HomeKit';
+import { EdCategories, EdFeatured, EdGiftFinder, EdHero, EdOccasions, EdPromise, EdRail, EdRanked, EdReviews, EdRibbon } from '../Shared/HomeEditorial';
 import SmartLink from '../Shared/SmartLink';
 import useCountdown from '../Shared/useCountdown';
 import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
@@ -20,25 +22,27 @@ import { t } from '../Shared/i18n';
 const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
 
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, reviewsSection } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, reviewsSection, template } = props;
+    // Editorial (2026-10-28) restyles these sections; the rest are shared.
+    const ed = template === 'editorial';
 
     // Per-visitor rows (picked / recent) hide themselves until there is a
     // real signal; every other section hides when switched off or empty.
     const sections = {
-        ribbon: () => <Ribbon strip={featureStrip} trust={heroTrust} />,
-        categories: () => <Categories section={categoriesSection} />,
+        ribbon: () => (ed ? <EdRibbon strip={featureStrip} /> : <Ribbon strip={featureStrip} trust={heroTrust} />),
+        categories: () => (ed ? <EdCategories section={categoriesSection} /> : <Categories section={categoriesSection} />),
         picked: () => <CardSection section={pickedForYou} rail />,
-        occasions: () => <Occasions section={occasions} />,
+        occasions: () => (ed ? <EdOccasions section={occasions} /> : <Occasions section={occasions} />),
         deals: () => <Deals deals={deals} />,
         membership: () => (membershipBand?.show === false ? null : <MembershipBand />),
-        best: () => <CardSection section={bestSellers} />,
+        best: () => (ed ? <EdRanked section={bestSellers} /> : <CardSection section={bestSellers} />),
         recent: () => <CardSection section={recentlyViewed} rail />,
-        gift_finder: () => <GiftFinder finder={giftFinder} />,
-        featured: () => <Featured featured={featured} />,
+        gift_finder: () => (ed ? <EdGiftFinder finder={giftFinder} /> : <GiftFinder finder={giftFinder} />),
+        featured: () => (ed ? <EdFeatured featured={featured} /> : <Featured featured={featured} />),
         gifting_steps: () => <GiftingSteps giftFinder={giftFinder} />,
-        reviews: () => (reviewsSection?.show === false ? null : <ReviewsBand reviews={reviews} section={reviewsSection} />),
-        promise: () => <Promise promise={promise} />,
-        new: () => <CardSection section={newArrivals} rail />,
+        reviews: () => (reviewsSection?.show === false ? null : (ed ? <EdReviews reviews={reviews} section={reviewsSection} /> : <ReviewsBand reviews={reviews} section={reviewsSection} />)),
+        promise: () => (ed ? <EdPromise promise={promise} /> : <Promise promise={promise} />),
+        new: () => (ed ? <EdRail section={newArrivals} /> : <CardSection section={newArrivals} rail />),
     };
     const blockById = Object.fromEntries(blocks.map((b) => [String(b.id), b]));
     const keys = order?.length ? order : [...DEFAULT_ORDER, ...blocks.map((b) => `block:${b.id}`)];
@@ -48,7 +52,9 @@ export default function Home(props) {
             {/* data-home-section lets the admin's live preview scroll to the
                 section being edited. */}
             <div data-home-section="hero">
-                <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} giftFinder={giftFinder} />
+                {ed
+                    ? <EdHero hero={hero} trust={heroTrust} giftFinder={giftFinder} />
+                    : <Hero hero={hero} hasReviews={reviews?.length > 0} trust={heroTrust} giftFinder={giftFinder} />}
             </div>
             {keys.map((key) => {
                 if (key.startsWith('block:')) {
@@ -63,42 +69,6 @@ export default function Home(props) {
 }
 
 Home.layout = (page) => <Layout>{page}</Layout>;
-
-const Arrow = ({ className = 'w-4 h-4' }) => (
-    <svg aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 12h16m0 0l-6-6m6 6l-6 6" /></svg>
-);
-
-/* ── Shared section heading ─────────────────────────────────────────────── */
-function Heading({ eyebrow, title, subtitle = null, action = null, center = false, dark = false }) {
-    return (
-        <div className={`mb-10 lg:mb-14 ${center ? 'text-center max-w-2xl mx-auto' : 'flex flex-wrap items-end justify-between gap-x-10 gap-y-4'}`}>
-            <div className={center ? '' : 'max-w-2xl'}>
-                {eyebrow && (
-                    <p className={`eyebrow flex items-center gap-3 ${center ? 'justify-center' : ''} ${dark ? '!text-white/60' : ''}`}>
-                        <span className={`h-px w-8 ${dark ? 'bg-white/40' : 'bg-ink-900/25'}`} aria-hidden="true" />
-                        {eyebrow}
-                    </p>
-                )}
-                <h2 className={`display mt-4 text-[2.1rem] sm:text-5xl lg:text-[3.5rem] ${dark ? '!text-white' : ''}`}>{title}</h2>
-                {subtitle && <p className={`mt-4 text-[15px] leading-relaxed ${dark ? 'text-white/65' : 'text-ink-700/75'}`}>{subtitle}</p>}
-            </div>
-            {action && <div className="shrink-0">{action}</div>}
-        </div>
-    );
-}
-
-function ViewAll({ href, children, dark = false }) {
-    return (
-        <SmartLink href={href} className={`lux-arrow group/va inline-flex items-center gap-3 text-[12px] font-medium tracking-[0.12em] uppercase ${dark ? 'text-white' : 'text-ink-900'}`}>
-            <span className="lux-link lux-link-on">{children}</span>
-            <span className={`grid place-items-center w-9 h-9 rounded-full border transition-colors duration-300 ${dark ? 'border-white/30 group-hover/va:bg-white group-hover/va:text-ink-900' : 'border-ink-900/15 group-hover/va:bg-ink-900 group-hover/va:text-white group-hover/va:border-ink-900'}`}>
-                <Arrow className="w-3.5 h-3.5" />
-            </span>
-        </SmartLink>
-    );
-}
-
-const shell = 'mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10';
 
 /* ── Hero: editorial split, story-style slideshow ───────────────────────── */
 function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
