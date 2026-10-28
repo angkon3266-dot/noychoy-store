@@ -68,6 +68,7 @@
                                     </span>
                                     <input :name="`items[${i}][product_name]`" x-model="item.product_name" class="input flex-1" placeholder="Product name *" list="po-products">
                                     <input :name="`items[${i}][sku]`" x-model="item.sku" class="input w-24" placeholder="SKU">
+                                    <button type="button" @click="duplicateItem(i)" class="shrink-0 text-ink-700/70 hover:bg-ink-100 rounded p-2" title="Duplicate product">⧉</button>
                                     <button type="button" @click="removeItem(i)" class="shrink-0 text-red-600 hover:bg-red-50 rounded p-2" title="Remove product">🗑</button>
                                 </div>
 
@@ -270,11 +271,24 @@
             addItem() { this.items.push({ product_name: '', sku: '', unit_cost: 0, target_price: null, received_qty: 0, product_link: '', image_url: '', attribute_names: [], variants: [{ attrs: {}, qty: 1 }] }); },
             addItemAndFocus() {
                 this.addItem();
+                this.focusItem(this.items.length - 1);
+            },
+            // Copy a product (links, image, prices, attributes, variant rows) into
+            // a new row right below it; nothing of it has been received yet.
+            duplicateItem(i) {
+                const copy = JSON.parse(JSON.stringify(this.items[i]));
+                copy.received_qty = 0;
+                this.items.splice(i + 1, 0, copy);
+                this.focusItem(i + 1, true);
+            },
+            focusItem(index, select = false) {
                 this.$nextTick(() => {
-                    const card = [...document.querySelectorAll('[data-po-item]')].pop();
+                    const card = document.querySelectorAll('[data-po-item]')[index];
                     if (!card) return;
                     card.scrollIntoView({ block: 'center' });
-                    card.querySelector('[placeholder="Product name *"]')?.focus({ preventScroll: true });
+                    const name = card.querySelector('[placeholder="Product name *"]');
+                    name?.focus({ preventScroll: true });
+                    if (select) name?.select();
                 });
             },
             removeItem(i) { this.items.splice(i, 1); if (!this.items.length) this.addItem(); },
