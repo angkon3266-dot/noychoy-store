@@ -18,7 +18,7 @@ export default function Footer({ minimal = false }) {
     if (minimal) {
         return (
             <footer className="mt-16 border-t border-ink-900/[0.07]">
-                <div className="mx-auto max-w-[1440px] px-4 py-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-ink-700/60">
+                <div className="mx-auto max-w-[1440px] px-4 py-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-ink-700/70">
                     <span className="inline-flex items-center gap-1.5"><Icon name="shieldCheck" className="w-4 h-4" strokeWidth={1.5} /> Secure checkout · Cash on delivery</span>
                     <span>{footer.copyright}</span>
                 </div>

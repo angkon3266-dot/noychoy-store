@@ -54,7 +54,7 @@ const pt = (r, deg) => {
 
 const restingAngle = (spin) => (spin?.result ? 360 - (spin.result.index + 0.5) * (360 / spin.segments.length) : 0);
 
-export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointer = true }) {
+export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointer = true, labels = true }) {
     const n = segments.length;
     const seg = 360 / n;
     const R = 100;
@@ -94,13 +94,18 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
                     return (
                         <g key={i}>
                             <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={s.color} stroke="#E9C46A" strokeWidth="0.8" />
-                            <g transform={`rotate(${mid})`}>
-                                <text x="0" y="-60" transform="rotate(-90 0 -60)" textAnchor="middle" dominantBaseline="central"
-                                      fill={inkFor(s.color)} fontSize={fs} fontWeight="700" letterSpacing="0.3"
-                                      style={{ fontFamily: 'inherit' }}>
-                                    {label}
-                                </text>
-                            </g>
+                            {/* No labels on the thumbnail wheels: unreadable at
+                                that size, and a screen reader would hear every
+                                slice as the button's text. */}
+                            {labels && (
+                                <g transform={`rotate(${mid})`}>
+                                    <text x="0" y="-60" transform="rotate(-90 0 -60)" textAnchor="middle" dominantBaseline="central"
+                                          fill={inkFor(s.color)} fontSize={fs} fontWeight="700" letterSpacing="0.3"
+                                          style={{ fontFamily: 'inherit' }}>
+                                        {label}
+                                    </text>
+                                </g>
+                            )}
                         </g>
                     );
                 })}
@@ -158,9 +163,10 @@ const ss = {
  * while she browses.
  */
 export function SpinHost() {
-    const { url, component } = usePage();
+    const { url, component, props } = usePage();
     const spin = useSpin();
     const { refresh, drawer } = useCart();
+    const inBag = (props.cart?.count || 0) > 0;
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [rotation, setRotation] = useState(0);
@@ -197,6 +203,13 @@ export function SpinHost() {
     // The popup: once per visit, after the Nth page or N seconds of browsing,
     // whichever comes first. Never over the checkout form — the wheel has its
     // own card there — and never on top of the open bag.
+    //
+    // Never on the first page of a visit either, whatever the delay says. An
+    // ad lands on a product page, and on a phone the 31 Oct 2026 audit had
+    // the wheel covering that page within twenty seconds, before she had
+    // read it. From the second page on, the owner's timing applies; a
+    // shopper who puts something in the bag on the first page has shown she
+    // is staying, so she may see it there.
     useEffect(() => {
         clearTimeout(popTimer.current);
         if (!spin?.popup || spin.result || spin.blocked || landed) return;
@@ -206,6 +219,7 @@ export function SpinHost() {
         ss.set('spin_pages', pages);
         const start = Number(ss.get('spin_started') || 0) || Date.now();
         ss.set('spin_started', start);
+        if (pages < 2 && !inBag) return;
 
         const pop = () => {
             if (drawerOpen.current) {
@@ -218,7 +232,7 @@ export function SpinHost() {
         };
         const wait = pages >= spin.popup.pages ? 1500 : Math.max(1500, start + spin.popup.delay * 1000 - Date.now());
         popTimer.current = setTimeout(pop, wait);
-    }, [url, !!spin?.popup, !!spin?.result, !!spin?.blocked]);
+    }, [url, !!spin?.popup, !!spin?.result, !!spin?.blocked, inBag]);
 
     useEffect(() => {
         if (!open) return;
@@ -405,9 +419,9 @@ export function SpinFab() {
             onClick={openSpinWheel}
             className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-ink-900 shadow-lg ring-2 ring-gold-400 hover:scale-105 transition"
             title={spin.title}
-            aria-label={`${spin.title} — spin the wheel`}
+            aria-label={`WIN — ${spin.title}: spin the wheel`}
         >
-            <span className="block slow-spin"><Wheel segments={spin.segments} size={44} pointer={false} /></span>
+            <span className="block slow-spin"><Wheel segments={spin.segments} size={44} pointer={false} labels={false} /></span>
             <span aria-hidden="true" className="absolute -top-1 -right-1 rounded-full bg-danger-600 px-1.5 text-[10px] font-bold leading-5 text-white">WIN</span>
         </button>
     );
@@ -419,7 +433,7 @@ export function SpinMenuButton({ className = '', onClick }) {
     if (!spin || spin.result) return null;
     return (
         <button type="button" onClick={() => { onClick?.(); openSpinWheel(); }} className={className}>
-            <span className="inline-block w-5 h-5 shrink-0 slow-spin"><Wheel segments={spin.segments} size={20} pointer={false} /></span>
+            <span className="inline-block w-5 h-5 shrink-0 slow-spin"><Wheel segments={spin.segments} size={20} pointer={false} labels={false} /></span>
             <span>{spin.title}</span>
         </button>
     );

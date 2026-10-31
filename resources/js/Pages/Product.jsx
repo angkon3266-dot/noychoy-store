@@ -311,7 +311,7 @@ function Breadcrumb({ product }) {
     const home = props.chrome?.urls?.home || '/';
 
     return (
-        <nav aria-label="Breadcrumb" className="text-[12px] tracking-[0.04em] text-ink-700/60 mb-5 lg:mb-8 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <nav aria-label="Breadcrumb" className="text-[12px] tracking-[0.04em] text-ink-700/70 mb-5 lg:mb-8 flex flex-wrap items-center gap-x-2 gap-y-1">
             <a href={home} className="hover:text-ink-900 transition-colors">Home</a><span aria-hidden="true" className="text-ink-900/25">/</span>
             {product.category && (
                 <>
@@ -1140,7 +1140,7 @@ function Details({ specs }) {
             <dl>
                 {specs.map((spec, i) => (
                     <div key={i} className="grid grid-cols-[8rem_1fr] sm:grid-cols-[10rem_1fr] gap-4 py-3.5 border-b border-ink-900/[0.08] text-sm">
-                        <dt className="text-ink-700/60">{spec.label}</dt>
+                        <dt className="text-ink-700/70">{spec.label}</dt>
                         <dd className="text-ink-900">{spec.value}</dd>
                     </div>
                 ))}

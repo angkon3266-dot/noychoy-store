@@ -60,12 +60,12 @@ export default function Profile({ profile, genders, languages = {}, reminderDays
                             <option value="">Automatic</option>
                             {Object.entries(languages).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                         </select></label>
-                        <p className="text-xs text-ink-700/60 mt-1">Greetings, reminders and the assistant use this.</p>
+                        <p className="text-xs text-ink-700/70 mt-1">Greetings, reminders and the assistant use this.</p>
                     </div>
 
                     <div className="border-t border-ink-100 pt-4">
-                        <h3 className="text-sm font-semibold">Special dates <span className="font-normal text-ink-700/60">(optional)</span></h3>
-                        <p className="text-xs text-ink-700/60 mb-3">We'll send a little reminder {reminderDays} days before with gift ideas, and a wish on the day.</p>
+                        <h3 className="text-sm font-semibold">Special dates <span className="font-normal text-ink-700/70">(optional)</span></h3>
+                        <p className="text-xs text-ink-700/70 mb-3">We'll send a little reminder {reminderDays} days before with gift ideas, and a wish on the day.</p>
                         <div className="grid sm:grid-cols-2 gap-4">
                             <DateField label="Birthday" day={info.data.birthday_day} month={info.data.birthday_month}
                                 onDay={(v) => info.setData('birthday_day', v)} onMonth={(v) => info.setData('birthday_month', v)} />

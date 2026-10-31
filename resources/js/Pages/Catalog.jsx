@@ -143,7 +143,7 @@ export default function Catalog({ title, description = null, products, filters, 
                             <details key={group.label} open className="group/f border-b border-ink-900/[0.08] py-4">
                                 <summary className="flex items-center justify-between cursor-pointer list-none text-[12px] font-medium uppercase tracking-[0.16em] text-ink-900">
                                     {group.label}
-                                    <Icon name="chevronDown" className="w-3.5 h-3.5 text-ink-700/60 transition-transform duration-300 group-open/f:rotate-180" strokeWidth={2} />
+                                    <Icon name="chevronDown" className="w-3.5 h-3.5 text-ink-700/70 transition-transform duration-300 group-open/f:rotate-180" strokeWidth={2} />
                                 </summary>
                                 <div className="mt-3 space-y-0.5 max-h-64 overflow-y-auto pr-1">
                                     {group.options.map((opt) => (

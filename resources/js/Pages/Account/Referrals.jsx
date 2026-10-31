@@ -50,7 +50,7 @@ export default function Referrals({ invite }) {
                         <Icon name="globe" className="w-4 h-4" /> Share…
                     </button>
                 </div>
-                <p className="mt-3 text-xs text-ink-700/60">Your code: <span className="font-mono">{invite.code}</span>. Any product link with <span className="font-mono">?ref={invite.code}</span> counts too.</p>
+                <p className="mt-3 text-xs text-ink-700/70">Your code: <span className="font-mono">{invite.code}</span>. Any product link with <span className="font-mono">?ref={invite.code}</span> counts too.</p>
             </div>
 
             <div className="grid sm:grid-cols-3 gap-3 mb-6">

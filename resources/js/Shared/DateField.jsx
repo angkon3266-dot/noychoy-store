@@ -16,7 +16,7 @@ export default function DateField({ label, hint, day, month, onDay, onMonth, com
                     {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                 </select>
             </div>
-            {hint && <p className="text-xs text-ink-700/60 mt-1">{hint}</p>}
+            {hint && <p className="text-xs text-ink-700/70 mt-1">{hint}</p>}
         </div>
     );
 }

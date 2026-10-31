@@ -40,6 +40,10 @@ document.addEventListener('submit', (e) => {
 }, true);
 
 document.addEventListener('alpine:init', () => {
+    // Whether the phone launcher for the floating contact stack is open
+    // (layouts/shop.blade.php); the back-to-top arrow steps aside while it is.
+    window.Alpine.store('floats', { open: false });
+
     // ── Global cart store: optimistic add, toast, slide-over drawer ──────────
     window.Alpine.store('cart', {
         count: Number(window.__cartCount || 0),

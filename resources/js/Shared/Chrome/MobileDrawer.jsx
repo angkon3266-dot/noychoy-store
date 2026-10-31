@@ -161,7 +161,7 @@ export default function MobileDrawer() {
                         <p className="px-3 pt-2 pb-1 eyebrow">Your account</p>
                         {acctLinks.map(([href, label, icon]) => (
                             <a key={label} href={href} onClick={close} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white text-[14px] text-ink-900">
-                                <Icon name={icon} className="w-5 h-5 text-ink-700/60" strokeWidth={1.5} />
+                                <Icon name={icon} className="w-5 h-5 text-ink-700/70" strokeWidth={1.5} />
                                 {label}
                             </a>
                         ))}
@@ -170,7 +170,7 @@ export default function MobileDrawer() {
 
                 {/* Footer with social icons */}
                 <div className="shrink-0 border-t border-ink-900/[0.07] px-5 py-3 flex items-center justify-between" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-                    <span className="text-xs text-ink-700/60">{storeName}</span>
+                    <span className="text-xs text-ink-700/70">{storeName}</span>
                     <div className="flex items-center gap-2">
                         {(footer.socials || []).map(({ platform, label, url }) => {
                             const Glyph = SOCIAL_ICONS[platform];

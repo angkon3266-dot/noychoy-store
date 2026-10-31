@@ -393,13 +393,13 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                         >
                             <span className="font-display text-lg font-semibold">
                                 Order summary
-                                <span className="ml-2 font-sans text-xs font-normal text-ink-700/60">
+                                <span className="ml-2 font-sans text-xs font-normal text-ink-700/70">
                                     {itemCount} {itemCount === 1 ? 'item' : 'items'}
                                 </span>
                             </span>
                             <span className="flex shrink-0 items-center gap-2">
                                 <span className="font-semibold">{wasPrice}{money(total)}</span>
-                                <Icon name="chevronDown" className={`w-4 h-4 text-ink-700/60 transition-transform ${summaryOpen ? 'rotate-180' : ''}`} />
+                                <Icon name="chevronDown" className={`w-4 h-4 text-ink-700/70 transition-transform ${summaryOpen ? 'rotate-180' : ''}`} />
                             </span>
                         </button>
                     </h2>

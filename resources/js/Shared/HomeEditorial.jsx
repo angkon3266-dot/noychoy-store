@@ -198,7 +198,7 @@ export function EdCategories({ section }) {
                                 )}
                             </div>
                             <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-ink-900/15 pt-3">
-                                <span className="text-[11px] tracking-[0.24em] text-ink-700/60 tabular-nums">No. {pad(k + 1)}</span>
+                                <span className="text-[11px] tracking-[0.24em] text-ink-700/70 tabular-nums">No. {pad(k + 1)}</span>
                                 <span className="lux-arrow flex items-center gap-2 font-display text-2xl lg:text-3xl tracking-[-0.02em] text-ink-900">{cat.name} <Arrow className="w-4 h-4" /></span>
                             </div>
                         </SmartLink>
@@ -350,7 +350,7 @@ export function EdGiftFinder({ finder }) {
                         {finder.promises.map(({ icon, title, text }) => (
                             <li key={title} className="flex gap-3">
                                 <IconOrGlyph value={icon} fallback="gift" className="w-5 h-5 text-gold-600 shrink-0 mt-0.5" />
-                                <span><span className="block text-sm font-medium text-ink-900">{title}</span><span className="block text-[12px] text-ink-700/60 mt-0.5">{text}</span></span>
+                                <span><span className="block text-sm font-medium text-ink-900">{title}</span><span className="block text-[12px] text-ink-700/70 mt-0.5">{text}</span></span>
                             </li>
                         ))}
                     </ul>
@@ -383,12 +383,12 @@ export function EdReviews({ reviews, section = {} }) {
                 <div className="mt-8 flex flex-col items-center gap-2">
                     <span className="flex text-gold-500">{[1, 2, 3, 4, 5].map((s) => <Star key={s} className="w-4 h-4" off={s > r.rating} />)}</span>
                     <span className="text-sm font-medium text-ink-900">{r.author}</span>
-                    {r.product && <SmartLink href={r.product.url} className="text-[12px] text-ink-700/60 lux-link">{r.product.name}</SmartLink>}
+                    {r.product && <SmartLink href={r.product.url} className="text-[12px] text-ink-700/70 lux-link">{r.product.name}</SmartLink>}
                 </div>
                 {n > 1 && (
                     <div className="mt-10 flex items-center justify-center gap-4">
                         <button type="button" onClick={() => setI((i - 1 + n) % n)} aria-label="Previous review" className="grid place-items-center w-10 h-10 rounded-full border border-ink-900/15 hover:bg-ink-900 hover:text-white transition-colors"><Arrow className="w-4 h-4 rotate-180" /></button>
-                        <span className="text-[12px] tabular-nums tracking-[0.2em] text-ink-700/60">{pad(i + 1)} / {pad(n)}</span>
+                        <span className="text-[12px] tabular-nums tracking-[0.2em] text-ink-700/70">{pad(i + 1)} / {pad(n)}</span>
                         <button type="button" onClick={() => setI((i + 1) % n)} aria-label="Next review" className="grid place-items-center w-10 h-10 rounded-full border border-ink-900/15 hover:bg-ink-900 hover:text-white transition-colors"><Arrow className="w-4 h-4" /></button>
                     </div>
                 )}

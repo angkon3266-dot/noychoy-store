@@ -175,7 +175,7 @@
             <div>
                 <label class="label">…or when she opens this many pages</label>
                 <input name="popup_pages" type="number" min="1" max="20" value="{{ old('popup_pages', $spinWheel['popup_pages']) }}" class="input">
-                <p class="text-[11px] text-ink-700/50 mt-1">Whichever comes first. It opens once per visit; closed, it stays closed until the next visit.</p>
+                <p class="text-[11px] text-ink-700/50 mt-1">Whichever comes first, but never on the first page of a visit: an ad lands on a product page, and she reads it before anything pops up (unless she has already put something in her bag). It opens once per visit; closed, it stays closed until the next visit.</p>
             </div>
         </div>
         <div class="overflow-x-auto">

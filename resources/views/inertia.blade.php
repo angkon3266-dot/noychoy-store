@@ -86,7 +86,7 @@
             --color-gold-900: color-mix(in srgb, var(--brand) 52%, black);
             --color-ink-900: var(--ink);
             --color-ink-800: color-mix(in srgb, var(--ink) 90%, white);
-            --color-ink-700: color-mix(in srgb, var(--ink) 78%, white);
+            --color-ink-700: color-mix(in srgb, var(--ink) 87%, white); /* 87%, not 78%: matches app.css's #36363b, so /70 text passes AA */
             --color-accent: var(--accent);
 
             --font-sans: '{{ $fBody }}', ui-sans-serif, system-ui, sans-serif;

@@ -73,7 +73,7 @@ export default function MiniCart() {
                                 </span>
                                 <span className="flex-1 min-w-0">
                                     <span className="block text-[14px] leading-snug text-ink-900 line-clamp-2">{item.name}</span>
-                                    <span className="block text-xs text-ink-700/60 mt-1">Qty {item.qty}</span>
+                                    <span className="block text-xs text-ink-700/70 mt-1">Qty {item.qty}</span>
                                     <span className="block text-[14px] font-semibold text-ink-900 mt-1">{item.price_text}</span>
                                     {item.promo && (
                                         <span className="block text-[11px] text-success-700">

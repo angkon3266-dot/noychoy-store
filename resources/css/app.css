@@ -274,7 +274,8 @@ html {
     letter-spacing: 0.28em;
     text-transform: uppercase;
     font-weight: 500;
-    color: color-mix(in srgb, var(--color-ink-900) 55%, transparent);
+    /* 62%, not 55%: on white that is 5.2:1 (AA needs 4.5); 55% measured 4.0. */
+    color: color-mix(in srgb, var(--color-ink-900) 62%, transparent);
 }
 .display {
     font-family: var(--font-serif);
