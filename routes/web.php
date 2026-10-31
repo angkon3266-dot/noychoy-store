@@ -22,6 +22,7 @@ use App\Http\Controllers\Shop\ProductFeedController;
 use App\Http\Controllers\Shop\PushController;
 use App\Http\Controllers\Shop\ReviewController;
 use App\Http\Controllers\Shop\SitemapController;
+use App\Http\Controllers\Shop\SpinWheelController;
 use App\Http\Controllers\SteadfastWebhookController;
 use App\Http\Middleware\ReadOnlySession;
 use App\Http\Middleware\TrackVisit;
@@ -185,6 +186,10 @@ Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.s
     ->middleware('throttle:10,1')->block(15, 20);
 Route::post('/checkout/lead', [LeadController::class, 'capture'])->name('checkout.lead')
     ->middleware('throttle:15,1')->block(15, 20);
+// The spin wheel holds the session like the two above: a double tap must
+// not spin twice and mint two prizes.
+Route::post('/checkout/spin', SpinWheelController::class)->name('checkout.spin')
+    ->middleware('throttle:10,10')->block(15, 20);
 
 // Rebuilds a saved cart from the abandoned-cart reminder SMS. Signed, because
 // a cart's contents are the shopper's business and the id is guessable.

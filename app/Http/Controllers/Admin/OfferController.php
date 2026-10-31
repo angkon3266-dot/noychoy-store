@@ -44,6 +44,20 @@ class OfferController extends Controller
                 'photo_bonus' => (int) \App\Models\Setting::get('loyalty_review_photo_bonus', config('loyalty.review_photo_bonus', 100)),
                 'referral' => (int) \App\Models\Setting::get('loyalty_referral_points', config('loyalty.referral_points', 300)),
             ],
+            'spinWheel' => [
+                'enabled' => (bool) \App\Models\Setting::get('spin_wheel_enabled', false),
+                'live' => app(\App\Support\SpinWheel::class)->enabled(),
+                'title' => app(\App\Support\SpinWheel::class)->title(),
+                'subtitle' => app(\App\Support\SpinWheel::class)->subtitle(),
+                'valid_hours' => app(\App\Support\SpinWheel::class)->validHours(),
+                'min_cart' => app(\App\Support\SpinWheel::class)->minCart(),
+                'once_per_phone' => \App\Support\SpinWheel::oncePerPhone(),
+                'segments' => app(\App\Support\SpinWheel::class)->segments(),
+                'max_segments' => \App\Support\SpinWheel::MAX_SEGMENTS,
+                // Prizes won, and how many of them reached an order.
+                'won' => \App\Models\Coupon::where('source', \App\Support\SpinWheel::SOURCE)->count(),
+                'used' => \App\Models\Coupon::where('source', \App\Support\SpinWheel::SOURCE)->where('used_count', '>', 0)->count(),
+            ],
             'occasions' => [
                 'enabled' => \App\Support\Occasions::enabled(),
                 'sms' => \App\Support\Occasions::smsEnabled(),
@@ -138,6 +152,45 @@ class OfferController extends Controller
         \App\Models\Setting::put('gift_ladder_gifts_collection_id', $giftsId);
 
         return back()->with('success', $enabled ? 'Reward ladder saved and live.' : 'Reward ladder saved (off).')->with('offers_card', 'ladder');
+    }
+
+    /** Save the checkout spin wheel: its slices, and the rules around a spin. */
+    public function saveSpinWheel(Request $request)
+    {
+        $data = $request->validate([
+            'title' => ['nullable', 'string', 'max:60'],
+            'subtitle' => ['nullable', 'string', 'max:160'],
+            'valid_hours' => ['required', 'integer', 'min:1', 'max:720'],
+            'min_cart' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'segments' => ['nullable', 'array', 'max:'.\App\Support\SpinWheel::MAX_SEGMENTS],
+            'segments.*.label' => ['nullable', 'string', 'max:24'],
+            'segments.*.type' => ['required', 'in:'.implode(',', \App\Support\SpinWheel::TYPES)],
+            'segments.*.value' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'segments.*.weight' => ['required', 'integer', 'min:0', 'max:1000'],
+            'segments.*.color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+        ], [
+            'segments.*.weight.required' => 'Every slice needs a chance (0 means it never comes up).',
+        ]);
+
+        $enabled = $request->boolean('enabled');
+        $segments = \App\Support\SpinWheel::normalise($data['segments'] ?? []);
+
+        if ($enabled && count($segments) < \App\Support\SpinWheel::MIN_SEGMENTS) {
+            return back()->withInput()->with('error', 'The wheel needs at least two slices (a % or ৳ slice needs its value) before it can go live.')->with('offers_card', 'spin-wheel');
+        }
+        if ($enabled && ! collect($segments)->contains(fn ($s) => $s['type'] !== 'none' && $s['weight'] > 0)) {
+            return back()->withInput()->with('error', 'At least one prize slice needs a chance above 0.')->with('offers_card', 'spin-wheel');
+        }
+
+        \App\Models\Setting::put('spin_wheel_enabled', $enabled);
+        \App\Models\Setting::put('spin_wheel_segments', $segments);
+        \App\Models\Setting::put('spin_wheel_title', $data['title'] ?? null);
+        \App\Models\Setting::put('spin_wheel_subtitle', $data['subtitle'] ?? null);
+        \App\Models\Setting::put('spin_wheel_valid_hours', (int) $data['valid_hours']);
+        \App\Models\Setting::put('spin_wheel_min_cart', (float) ($data['min_cart'] ?? 0));
+        \App\Models\Setting::put('spin_wheel_once_per_phone', $request->boolean('once_per_phone'));
+
+        return back()->with('success', $enabled ? 'Spin wheel saved and live on checkout.' : 'Spin wheel saved (off).')->with('offers_card', 'spin-wheel');
     }
 
     /** Save the "register for an extra discount" offer (shown to guests, applied to members). */

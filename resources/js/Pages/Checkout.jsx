@@ -6,6 +6,7 @@ import Icon from '../Shared/Icons';
 import MemberPill from '../Shared/MemberPill';
 import { useCart } from '../Shared/CartContext';
 import OfferCountdown from '../Shared/OfferCountdown';
+import SpinWheel from '../Shared/SpinWheel';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
 // what "the same number" is — and so "017 1234 5678" is not silently dropped.
@@ -19,7 +20,7 @@ const bdPhone = (v) => {
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
 // loyalty point redemption, and the InitiateCheckout pixel event.
-export default function Checkout({ items, summary, prefill, loyalty, registerPct, ic, urls, coupon, freeShipping, gift }) {
+export default function Checkout({ items, summary, prefill, loyalty, registerPct, ic, urls, coupon, freeShipping, gift, spin }) {
     const { props } = usePage();
     const chromeUrls = props.chrome?.urls || {};
     const errors = props.errors || {};
@@ -67,17 +68,22 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     // because the checkout redirects an empty basket there.
     const { remove: removeFromCart } = useCart();
     const [removing, setRemoving] = useState(null);
+    const RELOAD_ONLY = ['items', 'summary', 'coupon', 'freeShipping', 'gift', 'loyalty', 'cart', 'ladder', 'flash', 'errors', 'spin'];
     const removeItem = async (key) => {
         if (!key || removing) return;
         setRemoving(key);
         await removeFromCart(key);
         router.reload({
-            only: ['items', 'summary', 'coupon', 'freeShipping', 'gift', 'loyalty', 'cart', 'ladder', 'flash', 'errors'],
+            only: RELOAD_ONLY,
             preserveScroll: true,
             onSuccess: () => setLive(null),
             onFinish: () => setRemoving(null),
         });
     };
+    // The wheel has stopped and its prize is already on the cart: re-read the
+    // totals, as removing a piece does, so the saving lands with the wheel.
+    const afterSpin = () => router.reload({ only: RELOAD_ONLY, preserveScroll: true, onSuccess: () => setLive(null) });
+
     // A coupon applied or rejected answers back into this card, so never leave
     // the verdict behind a fold the customer just closed by navigating.
     const flash = props.flash || {};
@@ -239,6 +245,10 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                 place order. Everything that is not needed to get there — the
                 zone, the gift card, the note, the summary itself — lives below
                 the button for whoever wants it. */}
+            {/* Above the form (owner, 2026-10-31): the wheel is the first thing
+                she sees, so the prize is on the total before she starts typing. */}
+            {spin && <div className="mb-6"><SpinWheel spin={spin} url={urls.spin} onDone={afterSpin} /></div>}
+
             <form onSubmit={submit} className="space-y-6">
                 <div className="card p-6 space-y-4">
                     <h2 className="font-display text-2xl tracking-[-0.01em] text-ink-900">Delivery details</h2>

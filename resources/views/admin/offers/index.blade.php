@@ -111,6 +111,111 @@
     </div>
 </x-admin.settings-card>
 
+{{-- Spin & win — a wheel on the checkout page; the slice it lands on comes off that order --}}
+<x-admin.settings-card id="spin-wheel" title="Spin & win wheel (checkout)" :open="$openCard === 'spin-wheel'">
+    <x-slot:status>
+        {!! $spinWheel['live'] ? sprintf($onBadge, 'Live') : $offBadge !!}
+        <span class="text-xs text-ink-700/50">{{ count($spinWheel['segments']) }} {{ Str::plural('slice', count($spinWheel['segments'])) }} · {{ $spinWheel['won'] }} won, {{ $spinWheel['used'] }} used on an order</span>
+    </x-slot:status>
+    <div x-data="{
+            segs: @js(old('segments', $spinWheel['segments'])),
+            total() { return this.segs.reduce((n, s) => n + (Math.max(0, +s.weight) || 0), 0) },
+            chance(s) { const t = this.total(); return t ? Math.round((Math.max(0, +s.weight) || 0) / t * 1000) / 10 : 0 },
+         }">
+    <p class="text-xs text-ink-700/60 mb-3">
+        A casino-style wheel at the top of the checkout page. The customer gets <strong>one spin</strong>; whatever slice it
+        lands on is applied to her order straight away as a single-use coupon (it shows in her order summary, and in
+        <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a> as “Spin wheel · …”).
+        <strong>Chance</strong> is a weight, not a percent — the % column shows what each slice actually comes up as.
+        The draw happens on the server, so nobody can pick their slice. A prize stacks with your offers like any coupon;
+        a code the customer typed herself stays, and the wheel is hidden for that order.
+    </p>
+    <form action="{{ route('admin.offers.spin-wheel') }}" method="POST">
+        @csrf
+        <input type="hidden" name="_card" value="spin-wheel">
+        @if($err = $cardError('spin-wheel'))<div class="rounded bg-red-50 text-red-700 text-sm px-3 py-2 mb-3">{{ $err }}</div>@endif
+        <div class="flex flex-wrap items-end gap-3 mb-3">
+            <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
+                <input type="checkbox" name="enabled" value="1" @checked(old('_card') === 'spin-wheel' ? old('enabled') : $spinWheel['enabled'])>
+                Wheel is live
+            </label>
+            <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
+                <input type="checkbox" name="once_per_phone" value="1" @checked(old('_card') === 'spin-wheel' ? old('once_per_phone') : $spinWheel['once_per_phone'])>
+                One prize per phone number
+            </label>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="label">Heading</label>
+                <input name="title" maxlength="60" value="{{ old('title', $spinWheel['title']) }}" class="input">
+            </div>
+            <div>
+                <label class="label">Line under it</label>
+                <input name="subtitle" maxlength="160" value="{{ old('subtitle', $spinWheel['subtitle']) }}" class="input">
+            </div>
+            <div>
+                <label class="label">Prize valid for (hours)</label>
+                <input name="valid_hours" type="number" min="1" max="720" value="{{ old('valid_hours', $spinWheel['valid_hours']) }}" class="input" required>
+            </div>
+            <div>
+                <label class="label">Show the wheel from (৳, after offers)</label>
+                <input name="min_cart" type="number" min="0" step="1" value="{{ old('min_cart', (int) $spinWheel['min_cart']) }}" class="input" placeholder="0 = every order">
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-ink-700/60">
+                        <th class="py-1 pr-2 font-medium">Colour</th>
+                        <th class="py-1 pr-2 font-medium">Text on the slice</th>
+                        <th class="py-1 pr-2 font-medium">Prize</th>
+                        <th class="py-1 pr-2 font-medium">Value</th>
+                        <th class="py-1 pr-2 font-medium">Chance</th>
+                        <th class="py-1 pr-2 font-medium">%</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(s, i) in segs" :key="i">
+                        <tr>
+                            <td class="py-1 pr-2"><input type="color" :name="`segments[${i}][color]`" x-model="s.color" class="h-9 w-11 cursor-pointer rounded border border-ink-100 bg-white p-0.5" aria-label="Slice colour"></td>
+                            <td class="py-1 pr-2"><input type="text" maxlength="24" :name="`segments[${i}][label]`" x-model="s.label" class="input py-1.5 w-36" placeholder="e.g. 10% OFF"></td>
+                            <td class="py-1 pr-2">
+                                <select :name="`segments[${i}][type]`" x-model="s.type" class="input py-1.5 w-36">
+                                    <option value="percent">% off</option>
+                                    <option value="flat">৳ off</option>
+                                    <option value="free_delivery">Free delivery</option>
+                                    <option value="none">No prize</option>
+                                </select>
+                            </td>
+                            <td class="py-1 pr-2">
+                                <input type="number" step="0.01" min="0" :name="`segments[${i}][value]`" x-model="s.value" class="input py-1.5 w-24"
+                                       x-show="s.type === 'flat' || s.type === 'percent'" :placeholder="s.type === 'percent' ? '%' : '৳'">
+                                <span x-show="s.type !== 'flat' && s.type !== 'percent'" class="text-xs text-ink-700/50">—</span>
+                            </td>
+                            <td class="py-1 pr-2"><input type="number" min="0" max="1000" :name="`segments[${i}][weight]`" x-model.number="s.weight" class="input py-1.5 w-20" required></td>
+                            <td class="py-1 pr-2 text-xs text-ink-700/70 tabular-nums" x-text="chance(s) + '%'"></td>
+                            <td class="py-1"><button type="button" @click="segs.splice(i, 1)" class="text-red-500 px-1 text-lg leading-none" aria-label="Remove slice">&times;</button></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+            <button type="button" x-show="segs.length < {{ (int) $spinWheel['max_segments'] }}"
+                    @click="segs.push({ label: '', type: 'percent', value: '', weight: 10, color: @js(\App\Support\SpinWheel::PALETTE)[segs.length % {{ count(\App\Support\SpinWheel::PALETTE) }}] })"
+                    class="btn-outline text-xs py-1">+ Add slice</button>
+            <button class="btn-primary">Save wheel</button>
+        </div>
+        <p class="text-xs text-ink-700/50 mt-2">
+            Between 2 and {{ (int) $spinWheel['max_segments'] }} slices. “No prize” slices (Try again, Better luck next time) count toward the
+            wheel but give nothing. With “one prize per phone number” on, a number that has already ordered with a wheel prize
+            cannot use another — checked when the order is placed.
+        </p>
+    </form>
+    </div>
+</x-admin.settings-card>
+
 {{-- Registration offer (shown to guests, applied automatically to logged-in members) --}}
 <x-admin.settings-card id="register-offer" title="Register-for-discount offer" :open="$openCard === 'register'">
     <x-slot:status>

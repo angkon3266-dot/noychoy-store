@@ -19,6 +19,7 @@ use App\Services\SteadfastService;
 use App\Support\DeliveryEstimate;
 use App\Support\DuplicateOrders;
 use App\Support\Referral;
+use App\Support\SpinWheel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -31,6 +32,10 @@ class CheckoutController extends Controller
         if ($this->cart->isEmpty()) {
             return redirect()->route('cart')->with('error', 'Your cart is empty.');
         }
+
+        // First, before any total is read: a prize won in an earlier session
+        // is put back on the cart here, and the summary must include it.
+        $spin = app(SpinWheel::class)->forCheckout($this->cart);
 
         // A partial reload is this page refreshing its own totals — after a
         // piece is removed from the order summary (owner, 2026-09-17). She is
@@ -156,6 +161,7 @@ class CheckoutController extends Controller
                 'value' => $icValue,
                 'numItems' => $icCount,
             ],
+            'spin' => $spin,
             'coupon' => ($c = $this->cart->coupon()) ? ['code' => $c->code] : null,
             // Free delivery already won: the zone picker is noise at that
             // point, so the page drops it (the zone still travels with the
@@ -173,6 +179,7 @@ class CheckoutController extends Controller
                 'store' => route('checkout.store'),
                 'lead' => route('checkout.lead'),
                 'couponRemove' => route('cart.coupon.remove'),
+                'spin' => route('checkout.spin'),
             ],
         ])->withViewData(['pageTitle' => 'Checkout']);
     }

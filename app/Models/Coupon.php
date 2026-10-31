@@ -15,7 +15,7 @@ class Coupon extends Model
     ];
 
     protected $fillable = [
-        'code', 'label', 'type', 'value', 'applies_to', 'category_ids', 'product_ids',
+        'code', 'label', 'source', 'type', 'value', 'applies_to', 'category_ids', 'product_ids',
         'exclude_sale_items', 'min_order', 'min_qty', 'max_qty', 'usage_limit',
         'per_customer_limit', 'reserved_for_phone', 'used_count', 'free_shipping',
         'is_exclusive', 'starts_at', 'expires_at', 'is_active',
@@ -237,7 +237,19 @@ class Coupon extends Model
     /** Whether a per-customer usage cap has been reached for the given phone. */
     public function customerLimitReached(?string $phone): bool
     {
-        if ($this->per_customer_limit === null || blank($phone)) {
+        if (blank($phone)) {
+            return false;
+        }
+
+        // A spin-wheel prize is a fresh code every spin, so its own usage says
+        // nothing about whether this number has already had one. "One prize
+        // per number" counts across every code the wheel minted.
+        if ($this->source === \App\Support\SpinWheel::SOURCE && \App\Support\SpinWheel::oncePerPhone()
+            && \App\Support\SpinWheel::phoneHasUsedAPrize($phone)) {
+            return true;
+        }
+
+        if ($this->per_customer_limit === null) {
             return false;
         }
         $used = Order::where('coupon_code', $this->code)

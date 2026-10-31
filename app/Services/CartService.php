@@ -718,6 +718,12 @@ class CartService
         return $this->cascade()['base_before_coupon'];
     }
 
+    /** The code she put on the cart (typed, or won on the spin wheel), if any. */
+    public function storedCouponCode(): ?string
+    {
+        return session($this->couponKey) ?: null;
+    }
+
     /** The coupon code sitting in the session, whatever its validity. */
     protected function storedCoupon(): ?Coupon
     {
