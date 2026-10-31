@@ -193,7 +193,7 @@ export function EdCategories({ section }) {
                         <SmartLink key={cat.url} href={cat.url} className={`group block ${k % 2 ? 'lg:mt-20' : ''}`}>
                             <div className={`relative overflow-hidden bg-mist-100 ${ratios[k % ratios.length]}`}>
                                 {cat.image && (
-                                    <img src={cat.image} {...(cat.srcset ? { srcSet: cat.srcset, sizes: '(min-width: 1024px) 25vw, 50vw' } : {})} alt="" loading="lazy" decoding="async"
+                                    <img src={cat.image} {...(cat.srcset ? { srcSet: cat.srcset, sizes: '(min-width: 1024px) 25vw, 50vw' } : {})} alt={cat.name || ''} loading="lazy" decoding="async"
                                         className="absolute inset-0 w-full h-full object-cover grayscale-[15%] transition duration-[1200ms] ease-[var(--ease-lux)] group-hover:scale-[1.05] group-hover:grayscale-0" />
                                 )}
                             </div>
@@ -220,7 +220,7 @@ export function EdOccasions({ section }) {
                     {section.items.map((o, k) => (
                         <SmartLink key={k} href={o.link} className="group snap-start shrink-0 w-[74%] sm:w-[42%] lg:w-[28%]">
                             <div className="relative aspect-[3/4] overflow-hidden bg-white/5">
-                                {o.image && <img src={o.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover opacity-90 transition duration-[1200ms] group-hover:scale-105 group-hover:opacity-100" />}
+                                {o.image && <img src={o.image} alt={o.title || o.name || ''} loading="lazy" className="absolute inset-0 w-full h-full object-cover opacity-90 transition duration-[1200ms] group-hover:scale-105 group-hover:opacity-100" />}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                                 <span className="absolute top-4 left-5 font-display italic text-5xl text-white/90">{ROMAN[k] || k + 1}</span>
                                 <div className="absolute inset-x-0 bottom-0 p-5">
@@ -279,7 +279,7 @@ export function EdFeatured({ featured }) {
                 {lead ? (
                     <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                         <SmartLink href={href} className="group lg:col-span-7 block relative overflow-hidden aspect-[4/5] lg:aspect-[5/6] bg-mist-100">
-                            {image && <img src={image} alt="" loading="lazy" {...(srcset ? { srcSet: srcset, sizes: '(min-width: 1024px) 55vw, 100vw' } : {})}
+                            {image && <img src={image} alt={piece ? piece.name : (lead?.title || '')} loading="lazy" {...(srcset ? { srcSet: srcset, sizes: '(min-width: 1024px) 55vw, 100vw' } : {})}
                                 className="absolute inset-0 w-full h-full object-cover transition duration-[1400ms] ease-[var(--ease-lux)] group-hover:scale-[1.04]" />}
                             {lead.eyebrow && <span className="absolute top-5 left-5 rounded-full bg-white/90 px-3 py-1 text-[10px] tracking-[0.24em] uppercase text-ink-900">{lead.eyebrow}</span>}
                         </SmartLink>

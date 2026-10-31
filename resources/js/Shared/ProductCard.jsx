@@ -88,7 +88,7 @@ export default function ProductCard({ product: p }) {
                             <>
                                 <img
                                     src={p.thumb}
-                                    alt=""
+                                    alt={p.name}
                                     loading="lazy"
                                     decoding="async"
                                     width="450"
@@ -104,6 +104,9 @@ export default function ProductCard({ product: p }) {
                                         alt=""
                                         loading="lazy"
                                         decoding="async"
+                                        width="450"
+                                        height="563"
+                                        {...(p.hover_srcset ? { srcSet: p.hover_srcset, sizes: '(min-width: 1024px) 24vw, (min-width: 768px) 30vw, 50vw' } : {})}
                                         className="absolute inset-0 hidden md:block h-full w-full object-cover opacity-0 scale-[1.04] transition duration-[900ms] ease-[var(--ease-lux)] group-hover:opacity-100 group-hover:scale-100"
                                     />
                                 )}

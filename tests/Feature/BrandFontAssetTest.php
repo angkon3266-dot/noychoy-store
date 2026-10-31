@@ -56,7 +56,7 @@ class BrandFontAssetTest extends TestCase
         );
     }
 
-    public function test_the_storefront_links_the_stylesheet_it_can_actually_serve(): void
+    public function test_the_storefront_serves_the_font_faces_from_the_file_it_can_actually_read(): void
     {
         $url = brand_font_css_url();
 
@@ -64,6 +64,13 @@ class BrandFontAssetTest extends TestCase
             $this->markTestSkipped('No fonts manifest in this checkout.');
         }
 
-        $this->get('/')->assertOk()->assertSee($url, false);
+        // Since 2026-10-31 the rules are printed inline (brand_font_css) rather
+        // than linked, so the page must carry the file's own contents — and
+        // those contents must come from the file the URL resolves to.
+        $css = brand_font_css();
+        $this->assertNotNull($css, 'brand_font_css() found no file behind '.$url);
+        $this->assertStringContainsString('@font-face', $css);
+
+        $this->get('/')->assertOk()->assertSee('<style>'.$css.'</style>', false);
     }
 }

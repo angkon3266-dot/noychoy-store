@@ -140,8 +140,10 @@ class HomeController extends Controller
             );
 
             // First hero slide is the LCP element on almost every home visit.
+            // For a video slide that is its poster (HomePageData::heroSlides),
+            // which a phone shows on its own and a desktop shows first.
             $lcp = collect($data['hero']['slides'] ?? [])->first();
-            $lcpImage = ($lcp && ($lcp['type'] ?? null) === 'image') ? $lcp['image'] : null;
+            $lcpImage = $lcp['image'] ?? null;
 
             $page = \Inertia\Inertia::render('Home', $data + [
                 'seoTitle' => home_content('seo_title'),

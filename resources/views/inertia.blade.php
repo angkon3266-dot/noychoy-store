@@ -39,7 +39,10 @@
          Display were being built, committed and deployed on every release, and
          no page ever emitted a @font-face for them. Self-hosted, so no
          third-party request and no Google Fonts privacy question. --}}
-    @if($fontCss = brand_font_css_url())
+    @if($fontCss = brand_font_css())
+        {{-- Inline, not a <link>: a stylesheet request blocks first paint (helpers: brand_font_css). --}}
+        <style>{!! $fontCss !!}</style>
+    @elseif($fontCss = brand_font_css_url())
         <link rel="stylesheet" href="{{ $fontCss }}">
     @endif
     @viteReactRefresh

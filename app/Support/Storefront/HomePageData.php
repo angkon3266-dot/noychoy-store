@@ -287,7 +287,10 @@ class HomePageData
             ->take(8)
             ->map(function ($s) {
                 $video = filled($s['video'] ?? null) ? video_meta($s['video']) : null;
-                $image = $video ? null : theme_asset($s['image'] ?? null);
+                // A video slide's image is its poster: the first frame on
+                // screen, and the whole slide on a phone that is not going
+                // to be sent a 4 MB clip. It used to be dropped.
+                $image = theme_asset($s['image'] ?? null) ?: ($video['thumb'] ?? null);
                 if (! $video && ! $image) {
                     return null;
                 }
@@ -301,8 +304,9 @@ class HomePageData
                 return [
                     'type' => $video ? 'video' : 'image',
                     'video' => $video ? self::heroVideo($video) : null,
-                    'image' => $image ?: ($video['thumb'] ?? null),
+                    'image' => $image,
                     'image900' => $image ? image_variant($image, 900) : null,
+                    'image450' => $image ? image_variant($image, 450) : null,
                     'link' => filled($s['link'] ?? null) ? $s['link'] : null,
                     'alt' => $s['alt'] ?? '',
                     'seconds' => max(2.0, min(120.0, $seconds)),

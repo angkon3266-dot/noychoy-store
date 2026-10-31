@@ -52,6 +52,33 @@ if (! function_exists('image_srcset')) {
     }
 }
 
+if (! function_exists('brand_font_css')) {
+    /**
+     * The @font-face rules themselves, to print into a <style> in <head>.
+     *
+     * A stylesheet link blocks first paint until it has come back; Lighthouse
+     * put that at 170-180 ms on a phone (31 Oct 2026) for 8 KB of CSS that
+     * every page needs. Inlined, there is nothing to wait for, and the
+     * preloaded woff2 files are already on their way.
+     */
+    function brand_font_css(): ?string
+    {
+        static $css = false;
+
+        if ($css !== false) {
+            return $css;
+        }
+
+        if (! ($url = brand_font_css_url())) {
+            return $css = null;
+        }
+
+        $file = public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/'));
+
+        return $css = is_file($file) ? trim((string) file_get_contents($file)) : null;
+    }
+}
+
 if (! function_exists('brand_font_css_url')) {
     /**
      * URL of the built self-hosted brand font stylesheet, or null.
@@ -756,7 +783,23 @@ if (! function_exists('video_meta')) {
             ? $url
             : Storage::disk('public')->url($url);
 
-        return ['type' => 'file', 'embed' => null, 'thumb' => null, 'src' => $src];
+        // A still beside the file, same name with .webp or .jpg, is its
+        // poster: the frame shown before a byte of video has arrived, and
+        // what a phone shows instead of the whole clip (Home.jsx). Nothing
+        // generates it here — an uploaded frame or an exported still is
+        // dropped next to the video.
+        $thumb = null;
+        if (! Str::startsWith($url, ['http://', 'https://', '/'])) {
+            $base = preg_replace('/\.[a-z0-9]+$/i', '', $url);
+            foreach (['.webp', '.jpg', '.jpeg', '.png'] as $ext) {
+                if (Storage::disk('public')->exists($base.$ext)) {
+                    $thumb = Storage::disk('public')->url($base.$ext);
+                    break;
+                }
+            }
+        }
+
+        return ['type' => 'file', 'embed' => null, 'thumb' => $thumb, 'src' => $src];
     }
 }
 

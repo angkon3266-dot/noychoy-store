@@ -86,6 +86,24 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
         return () => cancelAnimationFrame(raf);
     }, []);
 
+    // When an uploaded hero clip may be fetched, on a slide that has a poster
+    // to show meanwhile. Desktop: at once (there is room on the line and the
+    // poster paints first anyway). Phone: after the page has loaded and a
+    // moment of quiet, and only on a connection that is not asking to save
+    // data or crawling on 2G/3G — otherwise the poster is the slide.
+    const [clipReady, setClipReady] = useState(false);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (window.matchMedia('(min-width: 768px)').matches) { setClipReady(true); return; }
+        const c = navigator.connection;
+        if (c && (c.saveData || /(^|[^4-9])(slow-2g|2g|3g)$/.test(c.effectiveType || ''))) return;
+        if (window.matchMedia('(prefers-reduced-data: reduce)').matches) return;
+        let timer;
+        const arm = () => { timer = setTimeout(() => setClipReady(true), 2500); };
+        if (document.readyState === 'complete') arm(); else window.addEventListener('load', arm, { once: true });
+        return () => { clearTimeout(timer); window.removeEventListener('load', arm); };
+    }, []);
+
     // Only the current slide (and the one queued behind it) is put in the
     // DOM. They are all absolutely positioned inside the viewport, so
     // loading="lazy" does nothing — eight hero images would all be fetched at
@@ -221,7 +239,29 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                             const cls = `absolute inset-0 block transition-opacity duration-[1200ms] ease-[var(--ease-lux)] ${active ? 'opacity-100' : 'opacity-0 pointer-events-none'}`;
                             if (!mounted.has(k)) return <div key={k} className={cls} aria-hidden="true" />;
                             const inner = s.type === 'video' && s.video?.type === 'file' ? (
-                                <video src={s.video.src} autoPlay muted={!(soundOn && active)} loop playsInline className="w-full h-full object-cover" />
+                                // The poster is the frame on screen until the
+                                // clip arrives — and, on a phone, the slide
+                                // itself until the page has loaded and the
+                                // connection looks able to take a 4 MB file
+                                // (clipReady). The 31 Oct 2026 audit had the
+                                // bare <video> as the mobile LCP at 5.7 s.
+                                // With no poster the clip loads as before:
+                                // an empty frame for seconds would be worse.
+                                <>
+                                    {s.image && (
+                                        <img
+                                            src={s.image}
+                                            alt={s.alt}
+                                            decoding="async"
+                                            {...(k > 0 ? { loading: 'lazy' } : { fetchPriority: 'high' })}
+                                            {...(s.image900 ? { srcSet: `${s.image450 ? `${s.image450} 450w, ` : ''}${s.image900} 900w, ${s.image} 1600w`, sizes: '(min-width: 1024px) 58vw, 100vw' } : {})}
+                                            className="absolute inset-0 w-full h-full object-cover object-[50%_30%]"
+                                        />
+                                    )}
+                                    {(!s.image || clipReady) && (
+                                        <video src={s.video.src} poster={s.image || undefined} autoPlay muted={!(soundOn && active)} loop playsInline preload={s.image ? 'metadata' : 'auto'} className="relative w-full h-full object-cover" />
+                                    )}
+                                </>
                             ) : s.type === 'video' ? (
                                 // Sized to cover the frame like the photos do: a 16:9
                                 // player in a portrait frame would otherwise sit in
@@ -370,7 +410,7 @@ function Categories({ section }) {
                             <img
                                 src={cat.image}
                                 {...(cat.srcset ? { srcSet: cat.srcset, sizes: '(min-width: 1024px) 22vw, 64vw' } : {})}
-                                alt="" loading="lazy" decoding="async"
+                                alt={cat.name || ''} loading="lazy" decoding="async"
                                 className="absolute inset-0 w-full h-full object-cover transition duration-[1200ms] ease-[var(--ease-lux)] group-hover:scale-[1.06]"
                             />
                         )}
@@ -441,7 +481,7 @@ function Occasions({ section }) {
                                     <img
                                         key={k}
                                         src={o.image}
-                                        alt=""
+                                        alt={o.title || o.name || ''}
                                         loading="lazy"
                                         decoding="async"
                                         className={`absolute inset-0 w-full h-full object-cover transition duration-[900ms] ease-[var(--ease-lux)] ${hover === k ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.06]'}`}
@@ -467,7 +507,7 @@ function Occasions({ section }) {
                                 {o.image ? (
                                     <>
                                         <img
-                                            src={o.image} alt="" loading="lazy" width="450" height="562"
+                                            src={o.image} alt={o.title || o.name || ''} loading="lazy" width="450" height="562"
                                             {...(o.image450 ? { srcSet: `${o.image450} 450w, ${o.image} 1200w`, sizes: '62vw' } : {})}
                                             className="absolute inset-0 w-full h-full object-cover"
                                         />
@@ -528,7 +568,7 @@ function DealsInner({ deals }) {
                         <SmartLink key={k} href={card.href}
                             className="group snap-start shrink-0 w-[78%] sm:w-[44%] lg:w-[31.5%] rounded-[22px] overflow-hidden bg-white border border-ink-900/[0.07] flex flex-col transition duration-500 hover:shadow-[0_30px_60px_-35px_rgb(0_0_0/0.4)]">
                             <div className="relative aspect-[16/11] bg-mist-100 overflow-hidden shrink-0">
-                                {card.image && <img src={card.image} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-[1200ms] ease-[var(--ease-lux)] group-hover:scale-105" />}
+                                {card.image && <img src={card.image} alt={card.title || card.name || ''} loading="lazy" className="w-full h-full object-cover transition-transform duration-[1200ms] ease-[var(--ease-lux)] group-hover:scale-105" />}
                                 {card.discount && <span className="absolute top-3 left-3 rounded-full bg-gold-500 text-ink-900 text-[11px] font-semibold px-3 py-1">{card.discount}</span>}
                             </div>
                             <div className="flex-1 p-6 flex flex-col justify-between gap-5">
@@ -710,7 +750,7 @@ function Featured({ featured }) {
         <SmartLink href={piece ? piece.url : lead.url} className="group lg:col-span-5 relative block overflow-hidden rounded-[28px] bg-mist-100 aspect-[4/5] lg:aspect-auto lg:min-h-full">
             {(piece ? piece.thumb : lead.image) && (
                 <img
-                    src={piece ? piece.thumb : lead.image} alt="" loading="lazy" decoding="async"
+                    src={piece ? piece.thumb : lead.image} alt={piece ? piece.name : (lead.title || '')} loading="lazy" decoding="async"
                     {...((piece ? piece.srcset : lead.srcset) ? { srcSet: piece ? piece.srcset : lead.srcset, sizes: '(min-width: 1024px) 40vw, 100vw' } : {})}
                     className="absolute inset-0 w-full h-full object-cover transition duration-[1400ms] ease-[var(--ease-lux)] group-hover:scale-105"
                 />

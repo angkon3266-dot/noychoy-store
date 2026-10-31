@@ -155,7 +155,10 @@ class LinkPreviewMetaTest extends TestCase
         // them — the storefront rendered in whatever system font the phone had.
         $html = $this->get('/')->assertOk()->getContent();
 
-        $this->assertStringContainsString('fonts-', $html, 'the brand font stylesheet is not linked');
+        // Inlined since 2026-10-31 (brand_font_css), so the page carries the
+        // rules themselves rather than a link to them.
+        $this->assertStringContainsString('@font-face', $html, 'the brand font faces are not in the page');
+        $this->assertStringContainsString('Instrument Sans', $html);
     }
 
     public function test_the_fonts_are_not_all_force_preloaded(): void

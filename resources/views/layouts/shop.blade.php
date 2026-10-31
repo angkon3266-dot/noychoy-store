@@ -24,7 +24,10 @@
     <link rel="apple-touch-icon" href="{{ $fav ?: asset('favicon.ico') }}">
     {{-- Same brand fonts as the React root — the landing pages an ad points
          at should not render in a different typeface from the storefront. --}}
-    @if($fontCss = brand_font_css_url())
+    @if($fontCss = brand_font_css())
+        {{-- Inline, not a <link>: a stylesheet request blocks first paint (helpers: brand_font_css). --}}
+        <style>{!! $fontCss !!}</style>
+    @elseif($fontCss = brand_font_css_url())
         <link rel="stylesheet" href="{{ $fontCss }}">
     @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])

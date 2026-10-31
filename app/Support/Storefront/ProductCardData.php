@@ -36,8 +36,12 @@ class ProductCardData
             'srcset' => image_srcset($p->thumbnail),
             // The second photo, cross-faded in on hover. Only read when the
             // images are already loaded (every storefront listing eager-loads
-            // them), so a card never costs an extra query for it.
+            // them), so a card never costs an extra query for it. At the
+            // card's own size: it used to ask for a 900 px variant no product
+            // photo has and fall back to the full file, 150-200 KB a card
+            // (17 cards, 1.5 MB, on the desktop homepage, 31 Oct 2026).
             'hover' => self::hoverImage($p),
+            'hover_srcset' => image_srcset(self::hoverSource($p)),
             // Raw, for the AddToCart pixel value and the ladder hint's arrow.
             'price' => $quote['price'],
             'price_text' => money($quote['price']),
@@ -63,15 +67,22 @@ class ProductCardData
 
     protected static function hoverImage(Product $p): ?string
     {
+        $url = self::hoverSource($p);
+
+        return $url ? (image_variant($url, 450) ?: $url) : null;
+    }
+
+    /** The second photo's original URL, or null when there is no second photo. */
+    protected static function hoverSource(Product $p): ?string
+    {
         if (! $p->relationLoaded('images') || $p->images->count() < 2) {
             return null;
         }
 
         $primary = $p->images->firstWhere('is_primary', true) ?? $p->images->first();
         $second = $p->images->sortBy('position')->first(fn ($im) => $im->id !== $primary->id);
-        $url = $second?->url;
 
-        return $url ? (image_variant($url, 900) ?: $url) : null;
+        return $second?->url ?: null;
     }
 
     /** @param  iterable<Product>  $products */
