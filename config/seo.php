@@ -34,10 +34,13 @@ return [
     'geo_placename' => env('SEO_GEO_PLACENAME', 'Dhaka, Bangladesh'),
 
     // Appended to product / category titles that have no admin-written
-    // meta title. Bangladeshi shoppers overwhelmingly search "<thing> price
-    // in bangladesh" / "<thing> price in bd", so the qualifier belongs in the
-    // title rather than being left to Google to infer.
-    'title_qualifier' => env('SEO_TITLE_QUALIFIER', 'Price in Bangladesh'),
+    // meta title, as "<name> — <qualifier> | <store>". Empty by default: it
+    // used to be "Price in Bangladesh" (shoppers do search "<thing> price in
+    // bangladesh"), but the owner read "Earrings — Price in Bangladesh" at
+    // the top of every page as a price-comparison site, not a brand
+    // (2026-10-31). The price and "Bangladesh" still sit in every meta
+    // description. Set SEO_TITLE_QUALIFIER in .env to bring a phrase back.
+    'title_qualifier' => env('SEO_TITLE_QUALIFIER', ''),
 
     // ── Who the shop is (Organization / OnlineStore schema) ─────────────────
     'organization' => [

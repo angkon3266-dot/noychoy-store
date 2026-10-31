@@ -407,8 +407,9 @@ class CatalogController extends Controller
         ] + \App\Support\Storefront\ProductPageData::make(
             $product, $related, $crossSells, $pp, $lovesCount, $loved, $vcEventId, $recentlyViewed,
         ))->withViewData([
-            // Falls back to "<name> — Price in Bangladesh" when the admin has
-            // not written a meta title, which is most products.
+            // Falls back to "<name>" (plus config('seo.title_qualifier'), if
+            // one is set) when the admin has not written a meta title, which
+            // is most products.
             'pageTitle' => \App\Support\Seo\Meta::productTitle($product),
             'product' => $product,
             // "You may also like", server-rendered into the pre-hydration shell

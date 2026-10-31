@@ -106,7 +106,8 @@ class SeoTest extends TestCase
 
         $this->get('/product/'.$product->slug)
             ->assertOk()
-            ->assertSee('<title>'.$product->name.' — Price in Bangladesh | '.store_name().'</title>', false);
+            ->assertSee('<title>'.$product->name.' | '.store_name().'</title>', false)
+            ->assertDontSee('Price in Bangladesh');
     }
 
     public function test_an_admin_written_meta_title_is_left_alone(): void
