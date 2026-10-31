@@ -10,6 +10,7 @@ import Footer from './Footer';
 import FloatingStack from './FloatingStack';
 import BottomNav from './BottomNav';
 import PushPrompt from './PushPrompt';
+import { SpinHost } from '../SpinWheel';
 import { initReveal } from '../reveal';
 
 // Persistent layout: assigned via `Page.layout = (page) => <Layout>{page}</Layout>`
@@ -101,6 +102,7 @@ function Chrome({ children, minimalFooter }) {
             <Footer minimal={minimalFooter} />
             <FloatingStack />
             <BottomNav />
+            <SpinHost />
 
             {/* Toast */}
             <div

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Coupon;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Services\CartService;
 use Illuminate\Support\Carbon;
@@ -32,7 +33,7 @@ class SpinWheel
 {
     public const SOURCE = 'spin_wheel';
 
-    public const TYPES = ['percent', 'flat', 'free_delivery', 'none'];
+    public const TYPES = ['percent', 'flat', 'free_delivery', 'free_gift', 'none'];
 
     public const MIN_SEGMENTS = 2;
 
@@ -102,6 +103,19 @@ class SpinWheel
         return max(0, (float) Setting::get('spin_wheel_min_cart', 0));
     }
 
+    /** The browsing popup: on or off, and when it opens. */
+    public function popup(): ?array
+    {
+        if (! (bool) Setting::get('spin_wheel_popup', true)) {
+            return null;
+        }
+
+        return [
+            'delay' => max(3, min(600, (int) Setting::get('spin_wheel_popup_delay', 20))),
+            'pages' => max(1, min(20, (int) Setting::get('spin_wheel_popup_pages', 2))),
+        ];
+    }
+
     public static function oncePerPhone(): bool
     {
         return (bool) Setting::get('spin_wheel_once_per_phone', true);
@@ -146,6 +160,12 @@ class SpinWheel
                 $value = null;
             }
 
+            // A gift slice names the piece it gives; without one it gives nothing.
+            $productId = $type === 'free_gift' ? (int) ($row['product_id'] ?? 0) : 0;
+            if ($type === 'free_gift' && $productId < 1) {
+                continue;
+            }
+
             $label = trim((string) ($row['label'] ?? ''));
             if ($label === '') {
                 $label = static::defaultLabel($type, $value);
@@ -162,6 +182,7 @@ class SpinWheel
                 'value' => $value,
                 'weight' => max(0, min(1000, (int) ($row['weight'] ?? 1))),
                 'color' => strtoupper($color),
+                'product_id' => $productId ?: null,
             ];
 
             if (count($out) >= self::MAX_SEGMENTS) {
@@ -180,6 +201,7 @@ class SpinWheel
             'percent' => $n.'% OFF',
             'flat' => '৳'.$n.' OFF',
             'free_delivery' => 'Free delivery',
+            'free_gift' => 'Free gift',
             default => 'Try again',
         };
     }
@@ -187,8 +209,9 @@ class SpinWheel
     // ── The spin ────────────────────────────────────────────────────────────
 
     /**
-     * What the checkout page shows: the wheel, the result of a spin already
-     * taken, or nothing at all.
+     * What the storefront shows - on every page (the popup, the menu, the
+     * floating button, the homepage band, the cart) and on the checkout: the
+     * wheel, the result of a spin already taken, or nothing at all.
      */
     public function forCheckout(CartService $cart): ?array
     {
@@ -212,6 +235,8 @@ class SpinWheel
                 ->values()->all(),
             'result' => $last ? $this->present($last, $cart) : null,
             'blocked' => $last ? null : $this->blockedReason($cart),
+            'popup' => $this->popup(),
+            'url' => route('checkout.spin'),
         ];
     }
 
@@ -222,7 +247,9 @@ class SpinWheel
      */
     public function spin(CartService $cart): array
     {
-        if (! $this->enabled() || $cart->isEmpty()) {
+        // An empty cart may spin: the popup asks while she is still browsing,
+        // and the prize waits in her session for the checkout.
+        if (! $this->enabled()) {
             return ['ok' => false, 'message' => 'The wheel is not available right now.'];
         }
 
@@ -242,6 +269,12 @@ class SpinWheel
 
         if ($coupon) {
             $cart->applyCoupon($coupon);
+        }
+
+        // The gift goes into her bag the moment she wins it, at 0 taka once
+        // she has anything else in there with it.
+        if ($segment['type'] === 'free_gift' && ($gift = $this->giftProduct($segment))) {
+            $cart->add($gift, null, 1);
         }
 
         $spin = [
@@ -270,12 +303,6 @@ class SpinWheel
             return 'Your coupon '.$code.' is already on this order.';
         }
 
-        // Shown on the card rather than hiding it: "add ৳300 more" is a
-        // reason to add a piece.
-        if (($short = $this->minCart() - $cart->couponBase()) > 0) {
-            return 'Add '.money(ceil($short)).' more to unlock your free spin.';
-        }
-
         if (static::oncePerPhone() && static::phoneHasUsedAPrize($cart->checkoutPhone())) {
             return 'This number has already used its wheel prize.';
         }
@@ -294,6 +321,23 @@ class SpinWheel
     /** Weighted draw — the weights never leave the server. */
     protected function pick(array $segments): int
     {
+        // A gift that has sold out (or been unpublished) since the owner set
+        // the wheel cannot be won: its slice still shows, it just never stops
+        // there.
+        foreach ($segments as $i => $s) {
+            if ($s['type'] === 'free_gift' && ! $this->giftProduct($s)) {
+                $segments[$i]['weight'] = 0;
+            }
+        }
+
+        // Nothing left with any weight: land on a no-prize slice if there is
+        // one, rather than on a prize nobody chose to give.
+        if (array_sum(array_column($segments, 'weight')) < 1) {
+            $none = collect($segments)->search(fn ($s) => $s['type'] === 'none');
+
+            return $none === false ? array_key_last($segments) : (int) $none;
+        }
+
         $total = array_sum(array_column($segments, 'weight'));
         $roll = random_int(1, max(1, $total));
 
@@ -307,6 +351,18 @@ class SpinWheel
         return array_key_last($segments);
     }
 
+    /** The piece a gift slice gives, while it can still be sold. */
+    public function giftProduct(array $segment): ?Product
+    {
+        if (($segment['type'] ?? null) !== 'free_gift' || empty($segment['product_id'])) {
+            return null;
+        }
+
+        $product = Product::find($segment['product_id']);
+
+        return $product && ! $product->has_variants && $product->isAvailable() ? $product : null;
+    }
+
     protected function mint(array $segment): Coupon
     {
         do {
@@ -317,6 +373,31 @@ class SpinWheel
         } while (Coupon::where('code', $code)->exists());
 
         $min = $this->minCart();
+
+        // A gift is a coupon worth one of that piece, good on that piece only:
+        // it zeroes one unit and nothing else, and it goes away with the piece
+        // if she takes it out. Coupon::isValidFor() makes it wait for
+        // something else in the bag - a gift comes with an order.
+        if ($segment['type'] === 'free_gift') {
+            $gift = $this->giftProduct($segment);
+
+            return Coupon::create([
+                'code' => $code,
+                'label' => 'Spin wheel · Free gift — '.$gift->name,
+                'source' => self::SOURCE,
+                'type' => 'fixed',
+                'value' => (float) $gift->price,
+                'free_shipping' => false,
+                'applies_to' => 'products',
+                'product_ids' => [$gift->id],
+                'min_order' => $min > 0 ? $min : null,
+                'usage_limit' => 1,
+                'per_customer_limit' => 1,
+                'is_exclusive' => false,
+                'expires_at' => Carbon::now()->addHours($this->validHours()),
+                'is_active' => true,
+            ]);
+        }
 
         return Coupon::create([
             'code' => $code,
@@ -398,8 +479,18 @@ class SpinWheel
         $coupon = $this->prizeCoupon($spin);
         $applied = $coupon !== null && $cart->coupon()?->is($coupon);
 
+        $gift = $coupon && $coupon->applies_to === 'products'
+            ? Product::find(($coupon->product_ids ?? [])[0] ?? 0) : null;
+        $live = $coupon && $this->stillSpendable($coupon);
+
         $note = null;
-        if ($coupon && ! $applied) {
+        if ($live && ! $applied && $cart->isEmpty()) {
+            $note = 'Saved for you — it comes off automatically at checkout.';
+        } elseif ($live && $gift && ! $applied && ! $cart->items()->contains(fn ($i) => (int) $i['product_id'] === $gift->id)) {
+            $note = 'Your free '.$gift->name.' is no longer in your bag.';
+        } elseif ($live && $gift && ! $applied && (int) $cart->items()->sum('qty') < 2) {
+            $note = 'Add any piece you love — the gift comes free with it.';
+        } elseif ($coupon && ! $applied) {
             $note = match (true) {
                 $coupon->used_count >= (int) ($coupon->usage_limit ?? 1) => 'Already used on an earlier order.',
                 ! $this->stillSpendable($coupon) => 'This prize has expired.',
@@ -416,6 +507,7 @@ class SpinWheel
             'code' => $coupon?->code,
             'applied' => $applied,
             'note' => $note,
+            'gift' => $gift ? ['name' => $gift->name, 'url' => route('product.show', $gift), 'image' => $gift->thumbnail] : null,
         ];
     }
 }

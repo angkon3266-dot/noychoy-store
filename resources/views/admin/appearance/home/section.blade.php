@@ -83,6 +83,12 @@
             <p class="text-sm text-ink-700/70">Shows what joining is worth — the member discount, points and tiers. Those numbers come from the membership settings, so they always match the cart and checkout. It hides itself when membership has no discount or points.</p>
             @break
 
+        @case('spin_wheel')
+            <p class="text-sm text-ink-700/70">A band with the wheel and a “Spin now” button. Its heading, slices and prizes are set in
+                <a href="{{ route('admin.offers.index') }}#spin-wheel" class="text-gold-700 underline">Offers → Spin &amp; win wheel</a>,
+                and it hides itself while the wheel is off. After a visitor spins, it shows what she won.</p>
+            @break
+
         @case('best')
             @include('admin.appearance.home._texts', ['fields' => [
                 'best_selling_eyebrow' => 'Small label', 'best_selling_title' => 'Heading',

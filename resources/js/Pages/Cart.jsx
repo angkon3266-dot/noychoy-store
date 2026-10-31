@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SpinCard } from '../Shared/SpinWheel';
 import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
@@ -70,6 +71,9 @@ export default function Cart({ items, summary, coupon, giftBar, freeBar, offersP
             <h1 className="display text-4xl sm:text-5xl mb-6">Your cart</h1>
 
             <GiftLadderBar gift={giftBar} />
+
+            {/* The spin wheel, before the totals it can change. */}
+            <div className="mb-6 empty:hidden"><SpinCard /></div>
 
             {freeBar && (
                 <div className="card p-4 mb-6">

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { SpinMenuButton } from '../SpinWheel';
 import { usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import Icon, { SOCIAL_ICONS } from '../Icons';
@@ -151,6 +152,7 @@ export default function MobileDrawer() {
                     {(menu.items || []).map((item, i) => (
                         <MobileItem key={i} item={item} onNavigate={close} />
                     ))}
+                    <SpinMenuButton onClick={close} className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3.5 text-left font-display text-[1.25rem] text-white" />
                     {menu.cta && (
                         <SmartLink href={menu.cta.url} onClick={close} className="btn-primary w-full mt-5">{menu.cta.label}</SmartLink>
                     )}

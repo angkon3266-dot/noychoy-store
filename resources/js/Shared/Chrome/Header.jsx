@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SpinMenuButton } from '../SpinWheel';
 import { router, usePage } from '@inertiajs/react';
 import SmartLink from '../SmartLink';
 import Icon from '../Icons';
@@ -137,6 +138,7 @@ export default function Header() {
                         </nav>
 
                         <div className="flex items-center gap-0.5 ml-auto lg:ml-0">
+                            <SpinMenuButton className="hidden lg:inline-flex items-center gap-2 mr-2 rounded-full bg-ink-900 px-4 h-9 text-[12px] font-medium tracking-[0.06em] uppercase text-white hover:bg-ink-800 transition-colors" />
                             {menu.cta && (
                                 <a href={menu.cta.url} className="hidden lg:inline-flex items-center gap-2 mr-2 rounded-full border border-ink-900/15 px-4 h-9 text-[12px] font-medium tracking-[0.06em] uppercase text-ink-900 hover:bg-ink-900 hover:text-white hover:border-ink-900 transition-colors duration-300">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gold-500" aria-hidden="true" />

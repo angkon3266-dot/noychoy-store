@@ -6,7 +6,7 @@ import Icon from '../Shared/Icons';
 import MemberPill from '../Shared/MemberPill';
 import { useCart } from '../Shared/CartContext';
 import OfferCountdown from '../Shared/OfferCountdown';
-import SpinWheel from '../Shared/SpinWheel';
+import { SpinCard, DONE_EVENT } from '../Shared/SpinWheel';
 
 // Mirrors app/helpers.php bd_phone() so the client and the server agree on
 // what "the same number" is — and so "017 1234 5678" is not silently dropped.
@@ -80,9 +80,13 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
             onFinish: () => setRemoving(null),
         });
     };
-    // The wheel has stopped and its prize is already on the cart: re-read the
-    // totals, as removing a piece does, so the saving lands with the wheel.
-    const afterSpin = () => router.reload({ only: RELOAD_ONLY, preserveScroll: true, onSuccess: () => setLive(null) });
+    // The wheel has stopped and its prize is on the cart; the spin dialog has
+    // re-read this page's totals, so drop the lead-capture copy of them.
+    useEffect(() => {
+        const done = () => setLive(null);
+        window.addEventListener(DONE_EVENT, done);
+        return () => window.removeEventListener(DONE_EVENT, done);
+    }, []);
 
     // A coupon applied or rejected answers back into this card, so never leave
     // the verdict behind a fold the customer just closed by navigating.
@@ -247,7 +251,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                 the button for whoever wants it. */}
             {/* Above the form (owner, 2026-10-31): the wheel is the first thing
                 she sees, so the prize is on the total before she starts typing. */}
-            {spin && <div className="mb-6"><SpinWheel spin={spin} url={urls.spin} onDone={afterSpin} /></div>}
+            {spin && <div className="mb-6"><SpinCard spin={spin} /></div>}
 
             <form onSubmit={submit} className="space-y-6">
                 <div className="card p-6 space-y-4">

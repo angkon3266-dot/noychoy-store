@@ -10,6 +10,7 @@ import SmartLink from '../Shared/SmartLink';
 import useCountdown from '../Shared/useCountdown';
 import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
 import { t } from '../Shared/i18n';
+import { SpinBand } from '../Shared/SpinWheel';
 
 // The homepage — editorial, conversion-first and gift-led (redesigned
 // 2026-10-24).
@@ -19,10 +20,10 @@ import { t } from '../Shared/i18n';
 // App\Support\HomeLayout): built-in sections by key, the owner's custom
 // sections as "block:<id>". Every section has an on/off switch and its words,
 // links and products are editable there; copy falls back to sensible defaults.
-const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
+const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'spin_wheel', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
 
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, reviewsSection, template } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, spinBand, reviewsSection, template } = props;
     // Editorial (2026-10-28) restyles these sections; the rest are shared.
     const ed = template === 'editorial';
 
@@ -34,6 +35,7 @@ export default function Home(props) {
         picked: () => <CardSection section={pickedForYou} rail />,
         occasions: () => (ed ? <EdOccasions section={occasions} /> : <Occasions section={occasions} />),
         deals: () => <Deals deals={deals} />,
+        spin_wheel: () => (spinBand?.show === false ? null : <SpinBand />),
         membership: () => (membershipBand?.show === false ? null : <MembershipBand />),
         best: () => (ed ? <EdRanked section={bestSellers} /> : <CardSection section={bestSellers} />),
         recent: () => <CardSection section={recentlyViewed} rail />,

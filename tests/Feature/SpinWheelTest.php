@@ -198,14 +198,125 @@ class SpinWheelTest extends TestCase
         $this->assertSame(1, Coupon::count());
     }
 
-    public function test_below_the_minimum_the_card_asks_for_more(): void
+    public function test_a_prize_waits_for_the_minimum_order(): void
     {
         $this->wheel(null, ['min_cart' => 1500]);
         $this->inCart(1000);
 
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => ['won' => true, 'applied' => false]]);
+
         $this->get('/checkout')->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('spin.blocked', 'Add ৳500 more to unlock your free spin.'));
-        $this->postJson('/checkout/spin')->assertJson(['ok' => false]);
+            ->where('coupon', null)
+            ->where('spin.result.note', 'Spend ৳1,500 to use it.'));
+    }
+
+    // ── While browsing ──────────────────────────────────────────────────────
+
+    public function test_every_storefront_page_carries_the_wheel(): void
+    {
+        $this->wheel(null, ['popup_delay' => 30, 'popup_pages' => 3]);
+        $this->product();
+
+        $this->get('/shop')->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('chrome.spin.segments', 2)
+            ->where('chrome.spin.popup', ['delay' => 30, 'pages' => 3])
+            ->where('chrome.spin.url', route('checkout.spin')));
+    }
+
+    public function test_the_popup_can_be_switched_off(): void
+    {
+        $this->wheel(null, ['popup' => false]);
+        $this->product();
+
+        $this->get('/shop')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('chrome.spin.popup', null)
+            ->has('chrome.spin.segments'));
+    }
+
+    public function test_a_shopper_can_spin_before_adding_anything(): void
+    {
+        $this->wheel();
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => [
+            'won' => true, 'applied' => false, 'note' => 'Saved for you — it comes off automatically at checkout.',
+        ]]);
+
+        // The prize was waiting in her session; it applies once there is a bag.
+        $this->inCart(2000);
+        $this->get('/checkout')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('coupon.code', Coupon::firstOrFail()->code)
+            ->where('spin.result.applied', true));
+    }
+
+    // ── Free gift ───────────────────────────────────────────────────────────
+
+    protected function giftWheel(Product $gift): void
+    {
+        $this->wheel([
+            ['label' => 'Free gift', 'type' => 'free_gift', 'product_id' => $gift->id, 'weight' => 1],
+            ['label' => 'Try again', 'type' => 'none', 'weight' => 0],
+        ]);
+    }
+
+    public function test_a_gift_goes_into_the_bag_and_comes_off_with_an_order(): void
+    {
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 300]);
+        $this->giftWheel($gift);
+        $this->inCart(2000);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => [
+            'won' => true, 'applied' => true, 'gift' => ['name' => 'Pouch'],
+        ]]);
+
+        $this->app->forgetInstance(CartService::class);
+        $cart = app(CartService::class);
+        $this->assertTrue($cart->items()->contains(fn ($i) => $i['product_id'] === $gift->id && $i['qty'] === 1));
+        $this->assertSame(300.0, $cart->couponDiscount());
+
+        // The order carries the gift line, and the gift's stock comes off.
+        $this->post('/checkout', $this->checkoutData())->assertRedirect();
+        $this->assertSame(1, Order::firstOrFail()->items()->where('product_id', $gift->id)->count());
+        $this->assertSame(49, $gift->fresh()->stock_quantity);
+    }
+
+    public function test_a_gift_on_its_own_is_not_free(): void
+    {
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 300]);
+        $this->giftWheel($gift);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true]);
+
+        $this->get('/checkout')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('coupon', null)
+            ->where('spin.result.note', 'Add any piece you love — the gift comes free with it.'));
+    }
+
+    public function test_the_gift_can_be_the_piece_she_is_buying(): void
+    {
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 300]);
+        $this->giftWheel($gift);
+        $this->post('/cart/add/pouch', ['qty' => 1]);
+
+        // One paid, one won: the second pouch is the free one.
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => ['applied' => true]]);
+
+        $this->app->forgetInstance(CartService::class);
+        $cart = app(CartService::class);
+        $this->assertSame(2, (int) $cart->items()->sum('qty'));
+        $this->assertSame(300.0, $cart->couponDiscount());
+    }
+
+    public function test_a_sold_out_gift_is_never_won(): void
+    {
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 300, 'stock_quantity' => 0]);
+        $this->wheel([
+            ['label' => 'Free gift', 'type' => 'free_gift', 'product_id' => $gift->id, 'weight' => 1000],
+            ['label' => 'Try again', 'type' => 'none', 'weight' => 1],
+        ]);
+        $this->inCart(2000);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'index' => 1, 'result' => ['won' => false]]);
+        $this->assertSame(0, Coupon::count());
     }
 
     public function test_the_odds_follow_the_weights(): void
@@ -259,6 +370,32 @@ class SpinWheelTest extends TestCase
         $this->assertCount(2, $wheel->segments());
         $this->assertSame('15% OFF', $wheel->segments()[0]['label']);
         $this->assertSame('#ABCDEF', $wheel->segments()[1]['color']);
+    }
+
+    public function test_a_gift_slice_needs_its_piece(): void
+    {
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 300]);
+
+        $this->actingAs($this->admin())->post(route('admin.offers.spin-wheel'), [
+            'enabled' => 1, 'valid_hours' => 24, 'popup' => 1, 'popup_delay' => 15, 'popup_pages' => 2,
+            'segments' => [
+                ['label' => 'Gift', 'type' => 'free_gift', 'weight' => 1],
+                ['label' => 'No', 'type' => 'none', 'weight' => 1],
+            ],
+        ])->assertSessionHasErrors('segments.0.product_id');
+
+        $this->actingAs($this->admin())->post(route('admin.offers.spin-wheel'), [
+            'enabled' => 1, 'valid_hours' => 24, 'popup' => 1, 'popup_delay' => 15, 'popup_pages' => 2,
+            'segments' => [
+                ['label' => '', 'type' => 'free_gift', 'product_id' => $gift->id, 'weight' => 1],
+                ['label' => 'No', 'type' => 'none', 'weight' => 1],
+            ],
+        ])->assertSessionHas('success');
+
+        $wheel = app(SpinWheel::class);
+        $this->assertSame($gift->id, $wheel->segments()[0]['product_id']);
+        $this->assertSame('Free gift', $wheel->segments()[0]['label']);
+        $this->assertSame(['delay' => 15, 'pages' => 2], $wheel->popup());
     }
 
     public function test_a_wheel_with_no_prize_cannot_go_live(): void

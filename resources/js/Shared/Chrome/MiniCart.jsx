@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SpinMenuButton } from '../SpinWheel';
 import { usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
 import { useCart } from '../CartContext';
@@ -129,6 +130,7 @@ export default function MiniCart() {
                                 {' — '}<span className="underline font-medium">{t(props.chrome.lang, 'minicart.join')}</span>
                             </a>
                         )}
+                        <SpinMenuButton onClick={() => setDrawer(false)} className="flex w-full items-center gap-2 rounded-md bg-ink-900 px-3 py-2 text-xs font-medium text-white hover:bg-ink-800" />
                         <div className="grid grid-cols-2 gap-2 pt-1">
                             <Link href={urls.cart || '/cart'} onClick={() => setDrawer(false)} className="btn-outline w-full">View bag</Link>
                             <SmartLink href={urls.checkout || '/checkout'} onClick={() => setDrawer(false)} className="btn-primary w-full">Checkout</SmartLink>

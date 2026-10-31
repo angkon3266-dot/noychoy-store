@@ -177,6 +177,8 @@ class HomePageData
             ],
             'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
             'membershipBand' => ['show' => (bool) home_content('show_membership')],
+            // The wheel's own state rides in chrome.spin; this is only the switch.
+            'spinBand' => ['show' => (bool) (home_content('show_spin_wheel') ?? true)],
             'reviewsSection' => [
                 'show' => (bool) home_content('show_reviews_band'),
                 'eyebrow' => home_content('reviews_eyebrow'),

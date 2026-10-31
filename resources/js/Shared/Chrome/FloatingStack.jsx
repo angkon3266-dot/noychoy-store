@@ -3,6 +3,7 @@ import { usePage } from '@inertiajs/react';
 import Icon, { Messenger, Phone, WhatsApp } from '../Icons';
 import ShareButton from '../ShareButton';
 import SmartLink from '../SmartLink';
+import { SpinFab, useSpin } from '../SpinWheel';
 
 // Floating stacks: share + back-to-top (left), member offers / call /
 // messenger / WhatsApp (right).
@@ -31,7 +32,9 @@ export default function FloatingStack() {
     }, []);
 
     const ai = chrome.ai;
-    const anyRight = ai || offers || floats.call || floats.messenger || floats.whatsapp;
+    const spin = useSpin();
+    const spinFab = spin && !spin.result && !spin.blocked;
+    const anyRight = spinFab || ai || offers || floats.call || floats.messenger || floats.whatsapp;
 
     // The money page gets no floating chrome over its form — except the
     // assistant, which is exactly where a "delivery charge koto?" happens.
@@ -72,6 +75,7 @@ export default function FloatingStack() {
             {/* Right: offers, call, messenger, WhatsApp */}
             {anyRight && (
                 <div className={`fixed right-5 z-50 flex flex-col items-center gap-3 ${rightPos}`}>
+                    <SpinFab />
                     {ai && (
                         /* The panel is the ai-chat partial (outside #app, so it
                            survives Inertia navigations); this only opens it. */

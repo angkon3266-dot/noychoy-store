@@ -111,8 +111,8 @@
     </div>
 </x-admin.settings-card>
 
-{{-- Spin & win — a wheel on the checkout page; the slice it lands on comes off that order --}}
-<x-admin.settings-card id="spin-wheel" title="Spin & win wheel (checkout)" :open="$openCard === 'spin-wheel'">
+{{-- Spin & win — a wheel shoppers spin while browsing or at checkout; the slice it lands on comes off their order --}}
+<x-admin.settings-card id="spin-wheel" title="Spin & win wheel" :open="$openCard === 'spin-wheel'">
     <x-slot:status>
         {!! $spinWheel['live'] ? sprintf($onBadge, 'Live') : $offBadge !!}
         <span class="text-xs text-ink-700/50">{{ count($spinWheel['segments']) }} {{ Str::plural('slice', count($spinWheel['segments'])) }} · {{ $spinWheel['won'] }} won, {{ $spinWheel['used'] }} used on an order</span>
@@ -123,9 +123,12 @@
             chance(s) { const t = this.total(); return t ? Math.round((Math.max(0, +s.weight) || 0) / t * 1000) / 10 : 0 },
          }">
     <p class="text-xs text-ink-700/60 mb-3">
-        A casino-style wheel at the top of the checkout page. The customer gets <strong>one spin</strong>; whatever slice it
-        lands on is applied to her order straight away as a single-use coupon (it shows in her order summary, and in
+        A casino-style wheel. It pops up while a visitor browses (once per visit), and is also in the menu, a floating
+        button, a homepage band (move or hide it in Appearance → Homepage), the cart and the top of the checkout.
+        The customer gets <strong>one spin</strong>; whatever slice it lands on is applied to her order automatically as a
+        single-use coupon (it shows in her order summary, and in
         <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a> as “Spin wheel · …”).
+        A <strong>free gift</strong> slice puts the piece you pick into her bag at ৳0 — with any other piece, never on its own.
         <strong>Chance</strong> is a weight, not a percent — the % column shows what each slice actually comes up as.
         The draw happens on the server, so nobody can pick their slice. A prize stacks with your offers like any coupon;
         a code the customer typed herself stays, and the wheel is hidden for that order.
@@ -143,6 +146,10 @@
                 <input type="checkbox" name="once_per_phone" value="1" @checked(old('_card') === 'spin-wheel' ? old('once_per_phone') : $spinWheel['once_per_phone'])>
                 One prize per phone number
             </label>
+            <label class="flex items-center gap-2 rounded-lg border border-ink-100 px-3 py-2.5 text-sm">
+                <input type="checkbox" name="popup" value="1" @checked(old('_card') === 'spin-wheel' ? old('popup') : $spinWheel['popup'])>
+                Pop up while browsing
+            </label>
         </div>
         <div class="grid sm:grid-cols-2 gap-3 mb-3">
             <div>
@@ -158,8 +165,17 @@
                 <input name="valid_hours" type="number" min="1" max="720" value="{{ old('valid_hours', $spinWheel['valid_hours']) }}" class="input" required>
             </div>
             <div>
-                <label class="label">Show the wheel from (৳, after offers)</label>
-                <input name="min_cart" type="number" min="0" step="1" value="{{ old('min_cart', (int) $spinWheel['min_cart']) }}" class="input" placeholder="0 = every order">
+                <label class="label">Prize needs an order of at least (৳, after offers)</label>
+                <input name="min_cart" type="number" min="0" step="1" value="{{ old('min_cart', (int) $spinWheel['min_cart']) }}" class="input" placeholder="0 = any order">
+            </div>
+            <div>
+                <label class="label">Pop up after this many seconds browsing</label>
+                <input name="popup_delay" type="number" min="3" max="600" value="{{ old('popup_delay', $spinWheel['popup_delay']) }}" class="input">
+            </div>
+            <div>
+                <label class="label">…or when she opens this many pages</label>
+                <input name="popup_pages" type="number" min="1" max="20" value="{{ old('popup_pages', $spinWheel['popup_pages']) }}" class="input">
+                <p class="text-[11px] text-ink-700/50 mt-1">Whichever comes first. It opens once per visit; closed, it stays closed until the next visit.</p>
             </div>
         </div>
         <div class="overflow-x-auto">
@@ -185,13 +201,22 @@
                                     <option value="percent">% off</option>
                                     <option value="flat">৳ off</option>
                                     <option value="free_delivery">Free delivery</option>
+                                    <option value="free_gift">Free gift</option>
                                     <option value="none">No prize</option>
                                 </select>
                             </td>
                             <td class="py-1 pr-2">
                                 <input type="number" step="0.01" min="0" :name="`segments[${i}][value]`" x-model="s.value" class="input py-1.5 w-24"
                                        x-show="s.type === 'flat' || s.type === 'percent'" :placeholder="s.type === 'percent' ? '%' : '৳'">
-                                <span x-show="s.type !== 'flat' && s.type !== 'percent'" class="text-xs text-ink-700/50">—</span>
+                                <template x-if="s.type === 'free_gift'">
+                                    <select :name="`segments[${i}][product_id]`" x-model.number="s.product_id" class="input py-1.5 w-56" required aria-label="Gift piece">
+                                        <option value="">Pick the gift…</option>
+                                        @foreach($spinWheel['gift_products'] as $gp)
+                                            <option value="{{ $gp['id'] }}">{{ $gp['name'] }}</option>
+                                        @endforeach
+                                    </select>
+                                </template>
+                                <span x-show="s.type !== 'flat' && s.type !== 'percent' && s.type !== 'free_gift'" class="text-xs text-ink-700/50">—</span>
                             </td>
                             <td class="py-1 pr-2"><input type="number" min="0" max="1000" :name="`segments[${i}][weight]`" x-model.number="s.weight" class="input py-1.5 w-20" required></td>
                             <td class="py-1 pr-2 text-xs text-ink-700/70 tabular-nums" x-text="chance(s) + '%'"></td>
@@ -209,7 +234,8 @@
         </div>
         <p class="text-xs text-ink-700/50 mt-2">
             Between 2 and {{ (int) $spinWheel['max_segments'] }} slices. “No prize” slices (Try again, Better luck next time) count toward the
-            wheel but give nothing. With “one prize per phone number” on, a number that has already ordered with a wheel prize
+            wheel but give nothing. A gift must be a piece with no size/colour options; if it sells out, its slice still
+            shows but the wheel never stops on it, and its stock comes off like any sale. With “one prize per phone number” on, a number that has already ordered with a wheel prize
             cannot use another — checked when the order is placed.
         </p>
     </form>

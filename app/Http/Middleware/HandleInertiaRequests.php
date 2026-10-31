@@ -146,6 +146,10 @@ class HandleInertiaRequests extends Middleware
             // The chat assistant's launcher lives in the floating stack; the
             // panel itself is a Blade partial on every root view.
             'ai' => app(\App\Services\Ai\AssistantService::class)->enabled() ? ['label' => 'Ask us anything'] : null,
+            // The spin wheel (Admin -> Offers): the browsing popup, the menu
+            // entry, the floating button, the homepage band and the cart card
+            // all read this one state.
+            'spin' => app(\App\Support\SpinWheel::class)->forCheckout(app(\App\Services\CartService::class)),
             'floats' => [
                 'share' => (bool) theme('show_share_button', true),
                 // No call button on the storefront (owner, 2026-10-24: contact is

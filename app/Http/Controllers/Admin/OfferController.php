@@ -52,6 +52,13 @@ class OfferController extends Controller
                 'valid_hours' => app(\App\Support\SpinWheel::class)->validHours(),
                 'min_cart' => app(\App\Support\SpinWheel::class)->minCart(),
                 'once_per_phone' => \App\Support\SpinWheel::oncePerPhone(),
+                'popup' => (bool) \App\Models\Setting::get('spin_wheel_popup', true),
+                'popup_delay' => (int) \App\Models\Setting::get('spin_wheel_popup_delay', 20),
+                'popup_pages' => (int) \App\Models\Setting::get('spin_wheel_popup_pages', 2),
+                // Gift slices give a piece with no options to choose.
+                'gift_products' => \App\Models\Product::where('status', 'published')->where('has_variants', false)
+                    ->orderBy('name')->get(['id', 'name', 'price'])
+                    ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name.' ('.money((float) $p->price).')'])->values(),
                 'segments' => app(\App\Support\SpinWheel::class)->segments(),
                 'max_segments' => \App\Support\SpinWheel::MAX_SEGMENTS,
                 // Prizes won, and how many of them reached an order.
@@ -168,8 +175,12 @@ class OfferController extends Controller
             'segments.*.value' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'segments.*.weight' => ['required', 'integer', 'min:0', 'max:1000'],
             'segments.*.color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'segments.*.product_id' => ['nullable', 'required_if:segments.*.type,free_gift', 'integer', 'exists:products,id'],
+            'popup_delay' => ['nullable', 'integer', 'min:3', 'max:600'],
+            'popup_pages' => ['nullable', 'integer', 'min:1', 'max:20'],
         ], [
             'segments.*.weight.required' => 'Every slice needs a chance (0 means it never comes up).',
+            'segments.*.product_id.required_if' => 'Pick the piece a free-gift slice gives.',
         ]);
 
         $enabled = $request->boolean('enabled');
@@ -189,6 +200,9 @@ class OfferController extends Controller
         \App\Models\Setting::put('spin_wheel_valid_hours', (int) $data['valid_hours']);
         \App\Models\Setting::put('spin_wheel_min_cart', (float) ($data['min_cart'] ?? 0));
         \App\Models\Setting::put('spin_wheel_once_per_phone', $request->boolean('once_per_phone'));
+        \App\Models\Setting::put('spin_wheel_popup', $request->boolean('popup'));
+        \App\Models\Setting::put('spin_wheel_popup_delay', (int) ($data['popup_delay'] ?? 20));
+        \App\Models\Setting::put('spin_wheel_popup_pages', (int) ($data['popup_pages'] ?? 2));
 
         return back()->with('success', $enabled ? 'Spin wheel saved and live on checkout.' : 'Spin wheel saved (off).')->with('offers_card', 'spin-wheel');
     }

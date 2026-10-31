@@ -72,6 +72,16 @@ class Coupon extends Model
             if ($eligible->isEmpty()) {
                 return false; // nothing in cart matches this coupon's scope
             }
+            // A spin-wheel gift (a wheel coupon good on one piece only) waits
+            // for something else in the bag: the wheel gives a gift with an
+            // order, and a gift-only order would be the gift for the price of
+            // delivery.
+            // Two of the gift piece itself counts: one paid, one free.
+            if ($this->source === \App\Support\SpinWheel::SOURCE && $this->applies_to === 'products'
+                && (int) $cart->discountableItems()->sum('qty') < 2) {
+                return false;
+            }
+
             $qty = (int) $eligible->sum('qty');
             if ($this->min_qty !== null && $qty < $this->min_qty) {
                 return false;
