@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Meta\MetaTrackingService;
 use App\Support\MetaIdentity;
 use Closure;
 use Illuminate\Http\Request;
@@ -46,6 +47,48 @@ class CaptureMetaClickId
             ));
         }
 
+        $this->mintBrowserId($request);
+
         return $next($request);
+    }
+
+    /**
+     * Give a first-time shopper's browser its _fbp now, rather than waiting
+     * for the Pixel to load a second after the page (or never, behind an ad
+     * blocker). The Pixel adopts the cookie as its own, so both copies of
+     * every event carry the same id from the first page on. This is what
+     * Meta's Parameter Builder does on the server.
+     *
+     * Only for a shopper's page request: a crawler keeps no cookies, so each
+     * of its hits would be a new id for Meta to count as a new person.
+     */
+    private function mintBrowserId(Request $request): void
+    {
+        if (MetaIdentity::fbp($request) !== null
+            || ! $request->isMethod('GET')
+            || $request->is('admin', 'admin/*')
+            || MetaTrackingService::isMachineAgent($request->userAgent())) {
+            return;
+        }
+
+        $tracking = app(MetaTrackingService::class);
+        if (! $tracking->enabled() && ! $tracking->pixelEnabled()) {
+            return;
+        }
+
+        $fbp = MetaIdentity::buildFbp();
+        $request->attributes->set(MetaIdentity::FBP_ATTRIBUTE, $fbp);
+
+        Cookie::queue(Cookie::make(
+            name: MetaIdentity::FBP_COOKIE,
+            value: $fbp,
+            minutes: MetaIdentity::FBP_DAYS * 24 * 60,
+            path: '/',
+            domain: MetaIdentity::cookieDomain($request),   // where the Pixel keeps it
+            secure: $request->isSecure(),
+            httpOnly: false,   // the Pixel reads it
+            raw: false,
+            sameSite: 'lax',
+        ));
     }
 }

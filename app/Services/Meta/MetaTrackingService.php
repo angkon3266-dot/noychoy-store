@@ -271,7 +271,54 @@ class MetaTrackingService
                 && ! MetaIdentity::ipv6LookupDone()
                 && ! str_contains((string) $ip, ':'),
             'ip6_key' => MetaIdentity::ip6CacheKey(),
+            'buyer' => app(self::class)->returningBuyerData(),
         ];
+    }
+
+    /**
+     * What this browser's earlier order says about who is shopping, hashed,
+     * for a guest who is not signed in.
+     *
+     * Owner's call (2026-10-31): send it, as a signed-in customer's details
+     * already are. Events Manager showed phone and name on 5% of ViewContents,
+     * the signed-in share, while most buyers check out as guests. The link is
+     * the checkout lead: the phone typed into checkout on this browser
+     * (visitor_token), once it became an order (`recovered`). The rest comes
+     * from that order. Hashed here, so a queued job never holds the raw values.
+     * Server events only: the Pixel's Advanced Matching would print them into
+     * the page, where anyone else using the same phone could read them.
+     *
+     * @return array<string,array<int,string>>
+     */
+    public function returningBuyerData(?Request $request = null): array
+    {
+        $token = ($request ?? request())->cookie('visitor_token');
+        if (! is_string($token) || $token === '') {
+            return [];
+        }
+
+        return Cache::remember('meta.buyer.'.MetaIdentity::pseudonym('visitor:'.$token), 1800, function () use ($token) {
+            $lead = \App\Models\AbandonedCart::where('visitor_token', $token)
+                ->where('recovered', true)
+                ->latest('id')
+                ->first();
+            if (! $lead) {
+                return [];
+            }
+
+            $order = $lead->recoveredOrder
+                ?? Order::where('customer_phone', $lead->phone)->latest('id')->first();
+            [$first, $last] = $this->splitName($order->customer_name ?? $lead->name);
+
+            return $this->hashUser([
+                'ph' => $order->customer_phone ?? $lead->phone,
+                'em' => $order->customer_email ?? $lead->email,
+                'fn' => $first,
+                'ln' => $last,
+                'ct' => $order->city ?? null,
+                'st' => $order->district ?? null,
+            ]);
+        });
     }
 
     /**
@@ -494,6 +541,16 @@ class MetaTrackingService
                 // request; synchronous ones fall back to the live request.
                 // fbp/fbc/IP/UA are sent as-is — Meta rejects hashed values for
                 // all four.
+                // Fields the caller did not have: a returning guest buyer's
+                // details, and the store's country (Meta → Tracking). Never
+                // over a field the caller filled — a signed-in customer's own
+                // record and an order's details win.
+                $known = is_array($context) && array_key_exists('buyer', $context)
+                    ? (array) $context['buyer']
+                    : $this->returningBuyerData();
+                $known += $this->hashUser(['country' => $this->country()]);
+                $userData = array_filter($userData) + $known;
+
                 $userData = array_merge(array_filter($userData), array_filter([
                     'client_ip_address' => $context['ip'] ?? MetaIdentity::clientIp(),
                     'client_user_agent' => $context['ua'] ?? request()->userAgent(),

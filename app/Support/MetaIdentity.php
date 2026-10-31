@@ -38,21 +38,66 @@ class MetaIdentity
     /** Where CaptureMetaClickId leaves the resolved value for this request. */
     public const FBC_ATTRIBUTE = 'meta.fbc';
 
+    /** Where CaptureMetaClickId leaves a browser id it has just minted. */
+    public const FBP_ATTRIBUTE = 'meta.fbp';
+
+    /** Meta's own _fbp lifetime. */
+    public const FBP_DAYS = 90;
+
     // ── First-party identifiers ──────────────────────────────────────────────
 
     /**
-     * The Meta browser id.
+     * The Meta browser id: the _fbp cookie, or the one CaptureMetaClickId
+     * minted for this request when the browser had none.
      *
-     * Read-only by design. The Pixel owns this cookie, and minting our own
-     * would put a second, competing identifier on the same browser — the server
-     * would report one fbp while the browser's events carried another. When the
-     * Pixel is blocked there simply is no fbp, and that is the honest answer.
+     * This used to be read-only, for fear of a second, competing id. But the
+     * Pixel adopts an _fbp it finds rather than writing its own, and Meta's
+     * Parameter Builder mints it server-side for exactly this reason. Leaving
+     * it to the Pixel meant a landing page never had one: the Pixel loads
+     * after the page, and not at all behind an ad blocker. Events Manager
+     * showed fbp on only 57% of ViewContents (2026-10-31).
      */
     public static function fbp(?Request $request = null): ?string
     {
-        $value = ($request ?? request())->cookie(self::FBP_COOKIE);
+        $request ??= request();
+
+        if ($minted = $request->attributes->get(self::FBP_ATTRIBUTE)) {
+            return $minted;
+        }
+
+        $value = $request->cookie(self::FBP_COOKIE);
 
         return self::looksLikeMetaId($value) ? $value : null;
+    }
+
+    /**
+     * A new browser id in the Pixel's own shape: fb.1.{ms}.{random}, the same
+     * subdomain index as buildFbc() and a random part in the Pixel's range.
+     */
+    public static function buildFbp(?int $milliseconds = null): string
+    {
+        return implode('.', [
+            'fb',
+            self::SUBDOMAIN_INDEX,
+            $milliseconds ?? (int) round(microtime(true) * 1000),
+            random_int(1000000000, 2147483647),
+        ]);
+    }
+
+    /**
+     * The domain the Pixel scopes _fbp to: the site's own domain with a
+     * leading dot, so www. and the bare domain share one cookie. Null for a
+     * bare IP or "localhost", where the browser would refuse a domain cookie.
+     */
+    public static function cookieDomain(Request $request): ?string
+    {
+        $host = strtolower($request->getHost());
+
+        if (filter_var($host, FILTER_VALIDATE_IP) || ! str_contains($host, '.')) {
+            return null;
+        }
+
+        return '.'.preg_replace('/^www\./', '', $host);
     }
 
     /**
