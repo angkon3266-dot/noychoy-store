@@ -122,6 +122,67 @@ class ExpensesTest extends TestCase
         $this->assertSame(0, Expense::count());
     }
 
+    // ── VAT ──────────────────────────────────────────────────────────────────
+
+    public function test_vat_is_added_on_top_of_the_amount(): void
+    {
+        $this->log(['amount' => 2500, 'vat_rate' => 15])
+            ->assertSessionHas('success', money(2875).' with VAT for Facebook / Instagram ads logged.');
+
+        $expense = Expense::sole();
+        $this->assertEquals(2500, (float) $expense->amount);
+        $this->assertEquals(15, (float) $expense->vat_rate);
+        $this->assertEquals(375, (float) $expense->vat_amount);
+        $this->assertEquals(2875, $expense->total);
+    }
+
+    public function test_no_rate_is_no_vat(): void
+    {
+        $this->log(['amount' => 900, 'vat_rate' => '']);
+        $this->log(['amount' => 100, 'vat_rate' => 0]);
+
+        $this->assertSame(0, Expense::whereNotNull('vat_rate')->count());
+        $this->assertEquals(0, (float) Expense::sum('vat_amount'));
+        $this->log(['vat_rate' => 101])->assertSessionHasErrors('vat_rate');
+    }
+
+    public function test_changing_the_amount_or_rate_works_the_vat_out_again(): void
+    {
+        $this->log(['amount' => 1000, 'vat_rate' => 15]);
+        $expense = Expense::sole();
+
+        $this->actingAs($this->user())->put(route('admin.expenses.update', $expense), [
+            'spent_on' => now()->toDateString(), 'category' => 'Website & software', 'amount' => 2000, 'vat_rate' => 7.5,
+        ])->assertRedirect();
+        $this->assertEquals(150, (float) $expense->refresh()->vat_amount);
+
+        $this->actingAs($this->user())->put(route('admin.expenses.update', $expense), [
+            'spent_on' => now()->toDateString(), 'category' => 'Website & software', 'amount' => 2000,
+        ])->assertRedirect();
+        $this->assertEquals(0, (float) $expense->refresh()->vat_amount);
+        $this->assertNull($expense->vat_rate);
+    }
+
+    public function test_totals_and_the_csv_count_the_vat(): void
+    {
+        $this->order(10000, 4000);
+        Expense::create(['spent_on' => now()->toDateString(), 'category' => 'Facebook / Instagram ads', 'amount' => 2000, 'vat_rate' => 15, 'vat_amount' => 300]);
+        Expense::create(['spent_on' => now()->toDateString(), 'category' => 'Stock purchase', 'amount' => 1000, 'vat_rate' => 5, 'vat_amount' => 50]);
+
+        $r = ExpenseReport::for(DateRange::preset('month'));
+        $this->assertEquals(2300, $r['expenses']);
+        $this->assertEquals(1050, $r['stock_bought']);
+        $this->assertEquals(3350, $r['spent']);
+        $this->assertEquals(3700, $r['net']); // 10,000 − 4,000 − 2,300
+
+        $this->actingAs($this->user())->get(route('admin.expenses.index', ['category' => 'Facebook / Instagram ads']))
+            ->assertSee(money(2300))
+            ->assertSee(money(2000).' + 15% VAT');
+
+        $csv = $this->actingAs($this->user())->get(route('admin.expenses.export', ['period' => 'all']))->streamedContent();
+        $this->assertStringContainsString('"Facebook / Instagram ads",2000.00,15,300.00,2300.00', $csv);
+    }
+
     // ── Receipts ─────────────────────────────────────────────────────────────
 
     public function test_a_receipt_is_kept_privately_and_shown_only_through_the_admin(): void

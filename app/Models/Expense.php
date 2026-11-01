@@ -39,14 +39,39 @@ class Expense extends Model
 
     public const PAID_VIA = ['Cash', 'bKash', 'Nagad', 'Rocket', 'Bank', 'Card'];
 
+    /** What the VAT box starts at: Bangladesh's standard rate, the one on Meta's ad bills. */
+    public const DEFAULT_VAT_RATE = 15;
+
+    /** The sum that totals add up: the amount plus the VAT on top of it. */
+    public const TOTAL_SQL = 'amount + vat_amount';
+
     protected $fillable = [
-        'spent_on', 'category', 'amount', 'description', 'paid_to', 'paid_via', 'receipt_path', 'user_id',
+        'spent_on', 'category', 'amount', 'vat_rate', 'vat_amount', 'description', 'paid_to', 'paid_via', 'receipt_path', 'user_id',
     ];
 
     protected $casts = [
         'spent_on' => 'date',
         'amount' => 'decimal:2',
+        'vat_rate' => 'decimal:2',
+        'vat_amount' => 'decimal:2',
     ];
+
+    /** What was actually paid: the amount plus any VAT added on top. */
+    public function getTotalAttribute(): float
+    {
+        return round((float) $this->amount + (float) $this->vat_amount, 2);
+    }
+
+    public function hasVat(): bool
+    {
+        return (float) $this->vat_amount > 0;
+    }
+
+    /** The VAT on an amount at a rate, to the poisha. */
+    public static function vatOn(float $amount, ?float $rate): float
+    {
+        return $rate ? round($amount * $rate / 100, 2) : 0.0;
+    }
 
     public function user(): BelongsTo
     {

@@ -15,7 +15,8 @@ use App\Models\OrderItem;
  *                    returned orders left out (the dashboard's Sales figure)
  *   − Product cost   cost price + transport of the pieces in those orders
  *   = Gross profit
- *   − Expenses       logged in Admin → Expenses, except stock purchases
+ *   − Expenses       logged in Admin → Expenses, VAT included, except
+ *                    stock purchases
  *   = Net profit
  *
  * Built from order totals rather than from the "Revenue & profit" card, which
@@ -51,7 +52,7 @@ final class ExpenseReport
             ->value('cost');
 
         $byCategory = Expense::query()->within($range)
-            ->selectRaw('category, SUM(amount) as amount, COUNT(*) as n')
+            ->selectRaw('category, SUM('.Expense::TOTAL_SQL.') as amount, COUNT(*) as n')
             ->groupBy('category')
             ->orderByDesc('amount')
             ->get();

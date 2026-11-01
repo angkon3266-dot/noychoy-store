@@ -73,7 +73,8 @@
     <div class="lg:col-span-1">
         <div class="card p-4 sm:p-5 lg:sticky lg:top-4">
             <h2 class="font-semibold mb-3">Log an expense</h2>
-            <form action="{{ route('admin.expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-2.5">
+            <form action="{{ route('admin.expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-2.5"
+                  x-data="{ amount: @js((float) old('amount')), vat: @js(filled(old('vat_rate'))), rate: @js((float) old('vat_rate', $defaultVat)) }">
                 @csrf
                 <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -82,8 +83,23 @@
                     </div>
                     <div>
                         <label class="label" for="ex-amount">Amount (৳) *</label>
-                        <input id="ex-amount" type="number" name="amount" value="{{ old('amount') }}" min="0.01" step="0.01" inputmode="decimal" class="input" placeholder="0" required>
+                        <input id="ex-amount" type="number" name="amount" value="{{ old('amount') }}" x-model.number="amount" min="0.01" step="0.01" inputmode="decimal" class="input" placeholder="0" required>
                     </div>
+                </div>
+                {{-- VAT goes on top of the amount: ৳2,500 + 15% is ৳2,875 spent. --}}
+                <div class="rounded-md border border-ink-100 px-3 py-2">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" x-model="vat"> <span class="whitespace-nowrap">Add VAT</span>
+                        <span x-show="vat" x-cloak class="ml-auto flex items-center gap-1">
+                            <input type="number" name="vat_rate" x-model.number="rate" :disabled="!vat" min="0" max="100" step="0.01" inputmode="decimal"
+                                   class="input w-16 py-1 text-right" aria-label="VAT %">
+                            <span class="text-ink-700/60">%</span>
+                        </span>
+                    </label>
+                    <p x-show="vat && amount > 0" x-cloak class="mt-1 text-xs text-ink-700/70 tabular-nums">
+                        VAT ৳<span x-text="(Math.round(amount * rate) / 100).toLocaleString('en-IN')"></span>
+                        · Total <strong class="text-ink-900">৳<span x-text="(Math.round(amount * (100 + rate)) / 100).toLocaleString('en-IN')"></span></strong>
+                    </p>
                 </div>
                 <div>
                     <label class="label" for="ex-category">Category *</label>
@@ -200,10 +216,11 @@
                             </div>
                         </div>
                         <div class="shrink-0 text-right">
-                            <div class="font-semibold tabular-nums">{{ money($e->amount) }}</div>
+                            <div class="font-semibold tabular-nums">{{ money($e->total) }}</div>
+                            @if($e->hasVat())<div class="text-[11px] text-ink-700/50 tabular-nums whitespace-nowrap">{{ money($e->amount) }} + {{ (float) $e->vat_rate }}% VAT</div>@endif
                             <div class="mt-1 flex justify-end gap-3 text-xs">
                                 <button type="button" @click="edit = !edit" class="text-gold-700 hover:underline" x-text="edit ? 'Close' : 'Edit'">Edit</button>
-                                <form action="{{ route('admin.expenses.destroy', $e) }}" method="POST" onsubmit="return confirm('Delete this expense of {{ money($e->amount) }}?')">
+                                <form action="{{ route('admin.expenses.destroy', $e) }}" method="POST" onsubmit="return confirm('Delete this expense of {{ money($e->total) }}?')">
                                     @csrf @method('DELETE')
                                     <button class="text-red-600 hover:underline">Delete</button>
                                 </form>
@@ -215,7 +232,10 @@
                           class="mt-3 grid grid-cols-2 gap-2 border-t border-ink-100 pt-3">
                         @csrf @method('PUT')
                         <input type="date" name="spent_on" value="{{ $e->spent_on->toDateString() }}" class="input" required aria-label="Date">
-                        <input type="number" name="amount" value="{{ (float) $e->amount }}" min="0.01" step="0.01" inputmode="decimal" class="input" required aria-label="Amount">
+                        <div class="flex gap-2">
+                            <input type="number" name="amount" value="{{ (float) $e->amount }}" min="0.01" step="0.01" inputmode="decimal" class="input min-w-0 flex-1" required aria-label="Amount before VAT" title="Amount before VAT">
+                            <input type="number" name="vat_rate" value="{{ $e->vat_rate !== null ? (float) $e->vat_rate : '' }}" min="0" max="100" step="0.01" inputmode="decimal" class="input w-20 shrink-0" placeholder="VAT %" aria-label="VAT % on top (empty for none)" title="VAT % on top — leave empty for none">
+                        </div>
                         <input name="category" value="{{ $e->category }}" list="expense-categories" class="input col-span-2" required maxlength="60" aria-label="Category">
                         <input name="description" value="{{ $e->description }}" class="input col-span-2" maxlength="255" placeholder="What for" aria-label="What for">
                         <input name="paid_to" value="{{ $e->paid_to }}" class="input" maxlength="120" placeholder="Paid to" aria-label="Paid to">

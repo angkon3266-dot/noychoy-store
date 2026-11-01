@@ -9,6 +9,7 @@ use App\Support\ExpenseReport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -34,11 +35,12 @@ class ExpenseController extends Controller
                 ->with('user:id,name')
                 ->orderByDesc('spent_on')->orderByDesc('id')
                 ->paginate(50)->withQueryString(),
-            'listTotal' => (float) $this->filtered($request, $range)->sum('amount'),
+            'listTotal' => (float) $this->filtered($request, $range)->sum(DB::raw(Expense::TOTAL_SQL)),
             'filtering' => $request->filled('category') || $request->filled('q'),
             'report' => ExpenseReport::for($range),
             'categories' => $this->categories(),
             'paidVia' => Expense::PAID_VIA,
+            'defaultVat' => Expense::DEFAULT_VAT_RATE,
             'today' => now(config('store.timezone', 'Asia/Dhaka'))->toDateString(),
         ]);
     }
@@ -51,7 +53,7 @@ class ExpenseController extends Controller
 
         $expense = Expense::create($data);
 
-        return back()->with('success', money($expense->amount).' for '.$expense->category.' logged.');
+        return back()->with('success', money($expense->total).($expense->hasVat() ? ' with VAT' : '').' for '.$expense->category.' logged.');
     }
 
     public function update(Request $request, Expense $expense)
@@ -100,7 +102,7 @@ class ExpenseController extends Controller
         return response()->streamDownload(function () use ($query, $cell) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM, so Excel reads Bangla correctly
-            fputcsv($out, ['date', 'category', 'amount', 'description', 'paid_to', 'paid_via', 'counts_against_profit', 'logged_by', 'logged_at']);
+            fputcsv($out, ['date', 'category', 'amount', 'vat_rate', 'vat', 'total', 'description', 'paid_to', 'paid_via', 'counts_against_profit', 'logged_by', 'logged_at']);
 
             $query->chunk(500, function ($rows) use ($out, $cell) {
                 foreach ($rows as $e) {
@@ -108,6 +110,9 @@ class ExpenseController extends Controller
                         $e->spent_on->toDateString(),
                         $cell($e->category),
                         number_format((float) $e->amount, 2, '.', ''),
+                        $e->vat_rate !== null ? (float) $e->vat_rate : '',
+                        number_format((float) $e->vat_amount, 2, '.', ''),
+                        number_format($e->total, 2, '.', ''),
                         $cell($e->description),
                         $cell($e->paid_to),
                         $e->paid_via,
@@ -147,6 +152,7 @@ class ExpenseController extends Controller
             'spent_on' => ['required', 'date'],
             'category' => ['required', 'string', 'max:60'],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999'],
+            'vat_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'description' => ['nullable', 'string', 'max:255'],
             'paid_to' => ['nullable', 'string', 'max:120'],
             'paid_via' => ['nullable', 'string', 'max:40'],
@@ -158,6 +164,11 @@ class ExpenseController extends Controller
         ]);
 
         $data['category'] = Expense::normaliseCategory($data['category']);
+
+        // VAT is added on top of the amount, never taken out of it. An empty
+        // or zero rate is no VAT.
+        $data['vat_rate'] = (float) ($data['vat_rate'] ?? 0) > 0 ? (float) $data['vat_rate'] : null;
+        $data['vat_amount'] = Expense::vatOn((float) $data['amount'], $data['vat_rate']);
 
         return Arr::except($data, ['receipt', 'remove_receipt']);
     }
