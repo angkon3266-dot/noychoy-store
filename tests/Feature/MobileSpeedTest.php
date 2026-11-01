@@ -90,13 +90,35 @@ class MobileSpeedTest extends TestCase
         $this->assertMatchesRegularExpression('/<link rel="preload" as="image" href="[^"]*hero-videos\/clip\.webp"/', $res->getContent());
     }
 
+    public function test_the_preload_offers_the_same_poster_widths_as_the_slide(): void
+    {
+        // Its own file name: image_variant() memoises per process, and the
+        // tests above already looked up clip.webp with no variants on disk.
+        Storage::fake('public');
+        Storage::disk('public')->put('hero-videos/sized.mp4', 'not really a video');
+        $this->image('hero-videos/sized.webp', 1600);
+        foreach ([450, 900] as $w) {
+            app(ImageOptimizer::class)->variant('hero-videos/sized.webp', $w);
+        }
+        Setting::put('theme', ['homepage_template' => 'couture']); // the React homepage
+        Setting::put('home_content', array_merge((array) Setting::get('home_content', []), [
+            'hero_slides' => [['video' => 'hero-videos/sized.mp4', 'link' => '']],
+        ]));
+
+        $html = $this->get('/')->assertOk()->getContent();
+
+        // Home.jsx: `${image450} 450w, ${image900} 900w, ${image} 1600w`, sizes 58vw / 100vw.
+        $this->assertMatchesRegularExpression('/imagesrcset="[^"]*sized@450\.webp 450w, [^"]*sized@900\.webp 900w, [^"]*sized\.webp 1600w"/', $html);
+        $this->assertStringContainsString('imagesizes="(min-width: 1024px) 58vw, 100vw"', $html);
+    }
+
     public function test_a_hero_clip_with_no_still_has_no_poster(): void
     {
         Storage::fake('public');
-        Storage::disk('public')->put('hero-videos/clip.mp4', 'not really a video');
+        Storage::disk('public')->put('hero-videos/sized.mp4', 'not really a video');
         Setting::put('theme', ['homepage_template' => 'couture']); // the React homepage
         Setting::put('home_content', array_merge((array) Setting::get('home_content', []), [
-            'hero_slides' => [['video' => 'hero-videos/clip.mp4', 'link' => '']],
+            'hero_slides' => [['video' => 'hero-videos/sized.mp4', 'link' => '']],
         ]));
 
         $res = $this->get('/')->assertOk();
@@ -108,12 +130,12 @@ class MobileSpeedTest extends TestCase
     public function test_a_still_the_owner_attached_to_a_video_slide_wins(): void
     {
         Storage::fake('public');
-        Storage::disk('public')->put('hero-videos/clip.mp4', 'x');
-        $this->image('hero-videos/clip.webp', 1080);
+        Storage::disk('public')->put('hero-videos/sized.mp4', 'x');
+        $this->image('hero-videos/sized.webp', 1080);
         $this->image('hero/chosen.webp', 1080);
         Setting::put('theme', ['homepage_template' => 'couture']); // the React homepage
         Setting::put('home_content', array_merge((array) Setting::get('home_content', []), [
-            'hero_slides' => [['video' => 'hero-videos/clip.mp4', 'image' => 'hero/chosen.webp', 'link' => '']],
+            'hero_slides' => [['video' => 'hero-videos/sized.mp4', 'image' => 'hero/chosen.webp', 'link' => '']],
         ]));
 
         $this->get('/')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page

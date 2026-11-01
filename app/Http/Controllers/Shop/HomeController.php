@@ -144,6 +144,15 @@ class HomeController extends Controller
             // which a phone shows on its own and a desktop shows first.
             $lcp = collect($data['hero']['slides'] ?? [])->first();
             $lcpImage = $lcp['image'] ?? null;
+            // The same srcset and sizes as the <img> Home.jsx renders for the
+            // slide, or the browser preloads one width and paints another.
+            $lcpSrcset = ($lcpImage && ($lcp['image900'] ?? null))
+                ? collect([
+                    (($lcp['video']['type'] ?? null) === 'file' && ($lcp['image450'] ?? null)) ? $lcp['image450'].' 450w' : null,
+                    $lcp['image900'].' 900w',
+                    $lcpImage.' 1600w',
+                ])->filter()->implode(', ')
+                : null;
 
             $page = \Inertia\Inertia::render('Home', $data + [
                 'seoTitle' => home_content('seo_title'),
@@ -169,9 +178,8 @@ class HomeController extends Controller
                 ])->all(),
                 'seoListName' => 'Featured jewelry',
                 'preloadImage' => $lcpImage,
-                'preloadSrcset' => ($lcpImage && ($lcp['image900'] ?? null))
-                    ? $lcp['image900'].' 900w, '.$lcpImage.' 1600w' : null,
-                'preloadSizes' => '(min-width: 1024px) 50vw, 100vw',
+                'preloadSrcset' => $lcpSrcset,
+                'preloadSizes' => '(min-width: 1024px) 58vw, 100vw',
             ]);
 
             if (! $preview) {
