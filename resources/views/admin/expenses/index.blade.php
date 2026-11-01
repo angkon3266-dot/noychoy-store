@@ -31,7 +31,7 @@
                 {{ $range->isCustom() ? $range->label : 'Custom…' }}
             </button>
         </div>
-        <a href="{{ route('admin.expenses.export', request()->query()) }}" class="btn-outline shrink-0 py-1.5 px-3 text-xs"
+        <a href="{{ route('admin.expenses.export', request()->except('copy')) }}" class="btn-outline shrink-0 py-1.5 px-3 text-xs"
            title="Download the expenses in this window as a CSV — opens in Excel">Export CSV</a>
     </div>
     <form x-show="custom" x-cloak method="GET" action="{{ route('admin.expenses.index') }}" class="mt-2 flex flex-wrap items-center gap-2">
@@ -70,11 +70,27 @@
 
 <div class="grid lg:grid-cols-3 gap-4 sm:gap-6">
     {{-- Log one. First on a phone: it is what the page is opened for. --}}
-    <div class="lg:col-span-1">
-        <div class="card p-4 sm:p-5 lg:sticky lg:top-4">
-            <h2 class="font-semibold mb-3">Log an expense</h2>
+    @php
+        // What the form starts with: what was just typed if it came back with
+        // an error, else the expense being duplicated (dated today), else empty.
+        $field = fn (string $key) => session()->hasOldInput() ? old($key) : $copy?->{$key};
+        $startAmount = $field('amount');
+        $startVat = $field('vat_rate');
+    @endphp
+    <div class="lg:col-span-1" id="log">
+        <div class="card p-4 sm:p-5 lg:sticky lg:top-4 {{ $copy ? 'ring-2 ring-gold-200' : '' }}">
+            @if($copy)
+                <h2 class="font-semibold">Duplicate an expense</h2>
+                <p class="mb-3 text-xs text-ink-700/60">
+                    Copied from {{ $copy->category }}, {{ $copy->spent_on->format('j M Y') }} — change what differs and log it.
+                    @if($copy->receipt_path) The receipt is not copied. @endif
+                    <a href="{{ route('admin.expenses.index', \Illuminate\Support\Arr::except(request()->query(), 'copy')) }}" class="text-gold-700 hover:underline">Cancel</a>
+                </p>
+            @else
+                <h2 class="font-semibold mb-3">Log an expense</h2>
+            @endif
             <form action="{{ route('admin.expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-2.5"
-                  x-data="{ amount: @js((float) old('amount')), vat: @js(filled(old('vat_rate'))), rate: @js((float) old('vat_rate', $defaultVat)) }">
+                  x-data="{ amount: @js(filled($startAmount) ? (float) $startAmount : ''), vat: @js(filled($startVat) && (float) $startVat > 0), rate: @js(filled($startVat) && (float) $startVat > 0 ? (float) $startVat : $defaultVat) }">
                 @csrf
                 <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -83,7 +99,7 @@
                     </div>
                     <div>
                         <label class="label" for="ex-amount">Amount (৳) *</label>
-                        <input id="ex-amount" type="number" name="amount" value="{{ old('amount') }}" x-model.number="amount" min="0.01" step="0.01" inputmode="decimal" class="input" placeholder="0" required>
+                        <input id="ex-amount" type="number" name="amount" value="{{ $startAmount }}" x-model.number="amount" min="0.01" step="0.01" inputmode="decimal" class="input" placeholder="0" required>
                     </div>
                 </div>
                 {{-- VAT goes on top of the amount: ৳2,500 + 15% is ৳2,875 spent. --}}
@@ -103,22 +119,22 @@
                 </div>
                 <div>
                     <label class="label" for="ex-category">Category *</label>
-                    <input id="ex-category" name="category" value="{{ old('category') }}" list="expense-categories" class="input" placeholder="Pick one or type your own" required maxlength="60">
+                    <input id="ex-category" name="category" value="{{ $field('category') }}" list="expense-categories" class="input" placeholder="Pick one or type your own" required maxlength="60">
                 </div>
                 <div>
                     <label class="label" for="ex-description">What for</label>
-                    <input id="ex-description" name="description" value="{{ old('description') }}" class="input" maxlength="255" placeholder="e.g. Boost for the Eid post">
+                    <input id="ex-description" name="description" value="{{ $field('description') }}" class="input" maxlength="255" placeholder="e.g. Boost for the Eid post">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="label" for="ex-paid-to">Paid to</label>
-                        <input id="ex-paid-to" name="paid_to" value="{{ old('paid_to') }}" class="input" maxlength="120" placeholder="Meta, Steadfast…">
+                        <input id="ex-paid-to" name="paid_to" value="{{ $field('paid_to') }}" class="input" maxlength="120" placeholder="Meta, Steadfast…">
                     </div>
                     <div>
                         <label class="label" for="ex-paid-via">Paid by</label>
                         <select id="ex-paid-via" name="paid_via" class="input">
                             <option value="">—</option>
-                            @foreach($paidVia as $via)<option value="{{ $via }}" @selected(old('paid_via') === $via)>{{ $via }}</option>@endforeach
+                            @foreach(collect($paidVia)->push($field('paid_via'))->filter()->unique() as $via)<option value="{{ $via }}" @selected($field('paid_via') === $via)>{{ $via }}</option>@endforeach
                         </select>
                     </div>
                 </div>
@@ -126,7 +142,7 @@
                     <label class="label" for="ex-receipt">Receipt <span class="font-normal text-ink-700/40">(photo or PDF, optional)</span></label>
                     <input id="ex-receipt" type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" class="input text-sm">
                 </div>
-                <button class="btn-primary w-full">Log expense</button>
+                <button class="btn-primary w-full">{{ $copy ? 'Log the copy' : 'Log expense' }}</button>
                 <p class="text-[11px] text-ink-700/50 leading-snug">
                     <strong>Stock purchase</strong> is kept as money spent but not taken off profit again: each product's cost price already
                     comes off when it sells. Log courier bills under <strong>Courier &amp; delivery</strong> — the delivery charges customers pay are counted in Sales.
@@ -219,6 +235,8 @@
                             <div class="font-semibold tabular-nums">{{ money($e->total) }}</div>
                             @if($e->hasVat())<div class="text-[11px] text-ink-700/50 tabular-nums whitespace-nowrap">{{ money($e->amount) }} + {{ (float) $e->vat_rate }}% VAT</div>@endif
                             <div class="mt-1 flex justify-end gap-3 text-xs">
+                                <a href="{{ route('admin.expenses.index', ['copy' => $e->id] + request()->except('page')) }}#log" class="text-gold-700 hover:underline"
+                                   title="Start a new expense with these details, dated today">Duplicate</a>
                                 <button type="button" @click="edit = !edit" class="text-gold-700 hover:underline" x-text="edit ? 'Close' : 'Edit'">Edit</button>
                                 <form action="{{ route('admin.expenses.destroy', $e) }}" method="POST" onsubmit="return confirm('Delete this expense of {{ money($e->total) }}?')">
                                     @csrf @method('DELETE')

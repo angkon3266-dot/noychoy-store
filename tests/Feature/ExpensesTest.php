@@ -122,6 +122,33 @@ class ExpensesTest extends TestCase
         $this->assertSame(0, Expense::count());
     }
 
+    public function test_duplicate_starts_the_log_form_from_an_entry_dated_today(): void
+    {
+        $this->log(['spent_on' => '2026-09-03', 'amount' => 2500, 'vat_rate' => 15, 'paid_via' => 'Nagad']);
+        $expense = Expense::sole();
+
+        $this->actingAs($this->user())->get(route('admin.expenses.index', ['copy' => $expense->id]))
+            ->assertOk()
+            ->assertSee('Duplicate an expense')
+            ->assertSee('value="'.now(config('store.timezone', 'Asia/Dhaka'))->toDateString().'"', false)
+            ->assertSee('value="Boost for the Eid post"', false)
+            ->assertSee('<option value="Nagad" selected>', false)
+            ->assertSee('Log the copy');
+
+        // Logged with a change; the form is empty again afterwards.
+        $this->actingAs($this->user())->from(route('admin.expenses.index', ['copy' => $expense->id, 'period' => 'all']))
+            ->post(route('admin.expenses.store'), [
+                'spent_on' => '2026-10-03', 'category' => $expense->category, 'amount' => 3000, 'vat_rate' => 15,
+                'description' => $expense->description, 'paid_to' => 'Meta', 'paid_via' => 'Nagad',
+            ])->assertRedirect(route('admin.expenses.index', ['period' => 'all']));
+
+        $copy = Expense::latest('id')->first();
+        $this->assertNotSame($expense->id, $copy->id);
+        $this->assertEquals(450, (float) $copy->vat_amount);
+        $this->assertSame('2026-10-03', $copy->spent_on->toDateString());
+        $this->assertEquals(2500, (float) $expense->refresh()->amount);
+    }
+
     // ── VAT ──────────────────────────────────────────────────────────────────
 
     public function test_vat_is_added_on_top_of_the_amount(): void

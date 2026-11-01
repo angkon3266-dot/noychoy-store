@@ -41,6 +41,8 @@ class ExpenseController extends Controller
             'categories' => $this->categories(),
             'paidVia' => Expense::PAID_VIA,
             'defaultVat' => Expense::DEFAULT_VAT_RATE,
+            // "Duplicate" on an entry: the log form starts from its details.
+            'copy' => $request->filled('copy') ? Expense::find((int) $request->input('copy')) : null,
             'today' => now(config('store.timezone', 'Asia/Dhaka'))->toDateString(),
         ]);
     }
@@ -53,7 +55,11 @@ class ExpenseController extends Controller
 
         $expense = Expense::create($data);
 
-        return back()->with('success', money($expense->total).($expense->hasVat() ? ' with VAT' : '').' for '.$expense->category.' logged.');
+        // Back to the page it was logged from, minus "copy": a duplicate is
+        // logged once, and the form starts empty again.
+        parse_str((string) parse_url(url()->previous(), PHP_URL_QUERY), $query);
+
+        return redirect()->route('admin.expenses.index', Arr::except($query, 'copy'))->with('success', money($expense->total).($expense->hasVat() ? ' with VAT' : '').' for '.$expense->category.' logged.');
     }
 
     public function update(Request $request, Expense $expense)
