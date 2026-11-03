@@ -16,6 +16,7 @@ use App\Services\LoyaltyService;
 use App\Services\MemberPricingService;
 use App\Services\Meta\MetaTrackingService;
 use App\Services\SteadfastService;
+use App\Services\WalletService;
 use App\Support\DeliveryEstimate;
 use App\Support\DuplicateOrders;
 use App\Support\Referral;
@@ -162,6 +163,10 @@ class CheckoutController extends Controller
                 'numItems' => $icCount,
             ],
             'spin' => $spin,
+            // Credit on the number already in the form (a member's own, or one
+            // typed earlier). A number typed now brings its own card back from
+            // the lead capture, which fires when the phone field is left.
+            'wallet' => app(WalletService::class)->checkoutCard(old('phone', $customer->phone ?? $this->cart->checkoutPhone())),
             'coupon' => ($c = $this->cart->coupon()) ? ['code' => $c->code] : null,
             // Free delivery already won: the zone picker is noise at that
             // point, so the page drops it (the zone still travels with the
@@ -214,6 +219,7 @@ class CheckoutController extends Controller
             'birthday_month' => ['nullable', 'integer', 'between:1,12'],
             'anniversary_day' => ['nullable', 'integer', 'between:1,31'],
             'anniversary_month' => ['nullable', 'integer', 'between:1,12'],
+            'use_wallet' => ['nullable', 'boolean'],
         ], [
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);
@@ -228,6 +234,7 @@ class CheckoutController extends Controller
 
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
         $data['is_gift'] = $request->boolean('is_gift');
+        $data['use_wallet'] = $request->boolean('use_wallet');
 
         // The same pieces on the same number a few minutes ago: someone unsure
         // the first order went through, not someone who wants two parcels.
@@ -280,7 +287,10 @@ class CheckoutController extends Controller
                     'subtotalText' => money($i->subtotal),
                 ])->values(),
                 'subtotalText' => money($order->subtotal),
-                'discountText' => $order->discount > 0 ? money($order->discount) : null,
+                // Wallet credit is inside `discount`; it is shown on its own
+                // line, since it was her money rather than a saving.
+                'discountText' => ($d = (float) $order->discount - (float) $order->wallet_amount) >= 0.01 ? money($d) : null,
+                'walletText' => (float) $order->wallet_amount > 0 ? money($order->wallet_amount) : null,
                 // What the reward ladder unlocked on this order, in one line.
                 'ladderText' => ($order->ladder_tier ?? 0) > 0
                     ? 'Reward ladder · rung '.$order->ladder_tier.': '.collect($order->ladder_rewards ?? [])->pluck('label')->implode(' · ')

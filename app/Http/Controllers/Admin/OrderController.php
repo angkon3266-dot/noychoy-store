@@ -1764,6 +1764,7 @@ class OrderController extends Controller
             $from = $order->status;
             $locked = $order->isStatusLocked();
             $pointsWereRefunded = (float) $order->points_discount > 0 && (int) $order->points_redeemed === 0;
+            $walletWasRefunded = (float) $order->wallet_amount > 0 && $order->wallet_refunded_at !== null;
 
             $shipment = $steadfast->createForOrder($order, rebook: true);
 
@@ -1793,6 +1794,11 @@ class OrderController extends Controller
                 if ($reopens && $pointsWereRefunded) {
                     $statusLine .= ' The points the customer spent on it were refunded when it was '.$from
                         .', and booking again does not take them back.';
+                }
+                if ($reopens && $walletWasRefunded) {
+                    $statusLine .= ' The '.money($order->wallet_amount).' wallet credit spent on it went back to '
+                        .$order->customer_phone.' when it was '.$from.', and booking again does not take it back — '
+                        .'take it off in Customers → Wallets if it should be.';
                 }
             } else {
                 $order->history()->create(['status' => $from, 'note' => $note, 'created_by' => $by]);

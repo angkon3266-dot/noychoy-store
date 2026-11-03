@@ -235,7 +235,10 @@
                     </tbody>
                     <tfoot class="border-t border-ink-100 text-sm">
                         <tr><td colspan="2" class="px-5 py-1.5 text-right text-ink-700/70">Subtotal</td><td class="px-5 py-1.5 text-right">{{ money($order->subtotal) }}</td></tr>
-                        @if($order->discount > 0)<tr><td colspan="2" class="px-5 py-1.5 text-right text-green-700">Discount {{ $order->coupon_code ? '('.$order->coupon_code.')' : '' }}</td><td class="px-5 py-1.5 text-right text-green-700">−{{ money($order->discount) }}</td></tr>@endif
+                        @php $walletUsed = (float) $order->wallet_amount; $otherDiscount = (float) $order->discount - $walletUsed; @endphp
+                        @if($walletUsed > 0 ? $otherDiscount >= 0.01 : $order->discount > 0)<tr><td colspan="2" class="px-5 py-1.5 text-right text-green-700">Discount {{ $order->coupon_code ? '('.$order->coupon_code.')' : '' }}</td><td class="px-5 py-1.5 text-right text-green-700">−{{ money($walletUsed > 0 ? $otherDiscount : $order->discount) }}</td></tr>@endif
+                        {{-- Store credit from the number's wallet; inside `discount`. --}}
+                        @if($walletUsed > 0)<tr><td colspan="2" class="px-5 py-1.5 text-right text-green-700">Wallet credit{{ $order->wallet_refunded_at ? ' (returned to wallet '.store_time($order->wallet_refunded_at)->format('d M').')' : '' }}</td><td class="px-5 py-1.5 text-right text-green-700">−{{ money($walletUsed) }}</td></tr>@endif
                         @if(($order->ladder_tier ?? 0) > 0)
                             <tr><td colspan="3" class="px-5 py-1 text-right text-xs text-ink-700/60">Reward ladder · rung {{ $order->ladder_tier }}: {{ collect($order->ladder_rewards ?? [])->pluck('label')->implode(' · ') }}</td></tr>
                         @endif

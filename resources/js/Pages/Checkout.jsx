@@ -20,7 +20,7 @@ const bdPhone = (v) => {
 // COD checkout — the money page. Faithful port of shop/checkout.blade.php:
 // live shipping-zone totals, abandoned-cart lead capture on phone blur,
 // loyalty point redemption, and the InitiateCheckout pixel event.
-export default function Checkout({ items, summary, prefill, loyalty, registerPct, ic, urls, coupon, freeShipping, gift, spin }) {
+export default function Checkout({ items, summary, prefill, loyalty, registerPct, ic, urls, coupon, freeShipping, gift, spin, wallet }) {
     const { props } = usePage();
     const chromeUrls = props.chrome?.urls || {};
     const errors = props.errors || {};
@@ -52,6 +52,11 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     // until then, so the page starts from the props it was rendered with.
     const [live, setLive] = useState(null);
     const [couponBusy, setCouponBusy] = useState(false);
+    // Wallet credit on a number (WalletService) — from the page for a number
+    // already in the form, then from the lead capture whenever the phone field
+    // is left with a different one. Null when that number holds nothing.
+    const [walletCard, setWalletCard] = useState(wallet || null);
+    useEffect(() => { setWalletCard(wallet || null); }, [wallet]);
     // The order summary starts open (owner, 2026-09-19): the pieces, the
     // savings and the delivery charge are what she is agreeing to pay for, so
     // they are shown rather than tucked behind a tap. It was folded on
@@ -68,7 +73,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     // because the checkout redirects an empty basket there.
     const { remove: removeFromCart } = useCart();
     const [removing, setRemoving] = useState(null);
-    const RELOAD_ONLY = ['items', 'summary', 'coupon', 'freeShipping', 'gift', 'loyalty', 'cart', 'ladder', 'flash', 'errors', 'spin'];
+    const RELOAD_ONLY = ['items', 'summary', 'coupon', 'freeShipping', 'gift', 'loyalty', 'cart', 'ladder', 'flash', 'errors', 'spin', 'wallet'];
     const removeItem = async (key) => {
         if (!key || removing) return;
         setRemoving(key);
@@ -111,6 +116,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
         notes: '',
         is_gift: false,
         card_message: '',
+        use_wallet: true,
     });
 
     // InitiateCheckout — same event id as the server's CAPI call (dedup).
@@ -143,6 +149,13 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
     const freeShip = live ? live.freeShipping : freeShipping;
     const ship = freeShip ? 0 : (inside ? view.shipInside : view.shipOutside);
     const total = view.sub + ship;
+    // Wallet credit pays for the pieces only, never delivery (owner,
+    // 2026-11-03), and only for the number it belongs to — a number changed
+    // after the card appeared has not been looked up yet, so it gets nothing.
+    const walletFits = !!walletCard && bdPhone(form.data.phone) === walletCard.phone;
+    const walletUse = walletFits && form.data.use_wallet
+        ? Math.round(Math.min(walletCard.balance, Math.max(0, view.sub)) * 100) / 100 : 0;
+    const payable = Math.max(0, total - walletUse);
     // What she is saving, and the price it came off (owner, 2026-09-19: the
     // original struck through beside the total, and the saving said). The
     // same sum as the header's "saved" badge (CartService::totalSaved): money
@@ -196,6 +209,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
             .then((res) => {
                 leadSent.current = key;
                 if (res?.summary) setLive(res.summary);
+                if (res && 'wallet' in res) setWalletCard(res.wallet || null);
             })
             .catch(() => {})
             .finally(() => { leadBusy.current = false; });
@@ -216,6 +230,9 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
 
     const submit = (e) => {
         e.preventDefault();
+        // Only credit she was shown: a number changed since its card appeared
+        // places the order without it rather than at a total nobody saw.
+        form.transform((data) => ({ ...data, use_wallet: walletUse > 0 }));
         form.post(urls.store, {
             // Hold scroll only when we stay on this page; a placed order
             // redirects to the confirmation, which must open at the top.
@@ -283,6 +300,14 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                             {err('phone') && <p id="co-phone-error" className="text-xs text-danger-600 mt-1">{err('phone')}</p>}
                         </div>
                     </div>
+                    {walletFits && (
+                        <WalletCard
+                            card={walletCard}
+                            use={walletUse}
+                            on={form.data.use_wallet}
+                            onChange={(on) => form.setData('use_wallet', on)}
+                        />
+                    )}
                     <div data-field="address">
                         <label className="label" htmlFor="co-address">Full address *</label>
                         <textarea {...a11y('address')} value={form.data.address} onChange={(e) => form.setData('address', e.target.value)} onBlur={captureLead} rows={2} className="input" required autoComplete="street-address" />
@@ -315,7 +340,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                         anything to know what they are agreeing to pay. */}
                     <div className="pt-1">
                         <button type="submit" className="btn-primary w-full" disabled={form.processing}>
-                            {form.processing ? 'Placing order…' : <>Place order · {wasPrice}{money(total)}</>}
+                            {form.processing ? 'Placing order…' : <>Place order · {wasPrice}{money(payable)}</>}
                         </button>
                         {saving && (
                             <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-success-700" aria-live="polite">
@@ -398,7 +423,7 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                 </span>
                             </span>
                             <span className="flex shrink-0 items-center gap-2">
-                                <span className="font-semibold">{wasPrice}{money(total)}</span>
+                                <span className="font-semibold">{wasPrice}{money(payable)}</span>
                                 <Icon name="chevronDown" className={`w-4 h-4 text-ink-700/70 transition-transform ${summaryOpen ? 'rotate-180' : ''}`} />
                             </span>
                         </button>
@@ -456,13 +481,16 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                                 )) : (view.discountText && (
                                     <div className="flex justify-between text-success-700"><dt>Discount</dt><dd>−{view.discountText}</dd></div>
                                 ))}
+                                {walletUse > 0 && (
+                                    <div className="flex justify-between text-success-700"><dt>Wallet credit</dt><dd>−{money(walletUse)}</dd></div>
+                                )}
                                 <div className="flex justify-between">
                                     <dt className="text-ink-700/70">Shipping</dt>
                                     <dd>{deliverySaved > 0
                                         ? <><s className="mr-1 text-ink-700/50"><span className="sr-only">was </span>{money(deliverySaved)}</s><span className="text-success-700">Free</span></>
                                         : money(ship)}</dd>
                                 </div>
-                                <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{wasPrice}{money(total)}</dd></div>
+                                <div className="flex justify-between font-semibold text-base border-t border-ink-100 pt-3"><dt>Total</dt><dd>{wasPrice}{money(payable)}</dd></div>
                             </dl>
 
                             {/* The whole saving, delivery included — the same figure
@@ -518,6 +546,33 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
                 )}
             </form>
         </div>
+    );
+}
+
+// Credit the shop put on this number. On by default — it is her money — and
+// one tick box to keep it for later.
+function WalletCard({ card, use, on, onChange }) {
+    const left = Math.max(0, card.balance - use);
+    return (
+        <label className={`flex items-start gap-3 cursor-pointer rounded-xl border p-4 transition-colors ${on ? 'border-success-200 bg-success-50' : 'border-ink-100'}`}>
+            <input
+                type="checkbox"
+                checked={on}
+                onChange={(e) => onChange(e.target.checked)}
+                className="mt-1 h-4 w-4 accent-success-600"
+            />
+            <span className="text-sm">
+                <span className="flex items-center gap-1.5 font-semibold text-ink-900">
+                    <Icon name="cash" className="w-4 h-4 shrink-0" />
+                    Use your {card.balanceText} wallet credit
+                </span>
+                <span className="block text-xs text-ink-700/70 mt-0.5">
+                    {on && use > 0
+                        ? <>{money(use)} off the products on this order{left >= 1 ? <> · {money(left)} stays in your wallet</> : null}. Delivery is paid on delivery.</>
+                        : <>Pays for products, not delivery.</>}
+                </span>
+            </span>
+        </label>
     );
 }
 

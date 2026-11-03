@@ -96,6 +96,8 @@ class TransitionOrderStatus
         // having paid with points for goods that never shipped.
         if (in_array($status, Order::NOT_SALES, true)) {
             app(LoyaltyService::class)->refundRedemptionForOrder($order->fresh('customer'));
+            // Wallet credit spent on it goes back to the number, the same way.
+            app(\App\Services\WalletService::class)->refundForOrder($order);
         }
 
         $this->push($order->fresh(), $status);

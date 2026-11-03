@@ -37,6 +37,11 @@
             </form>
         @endif
 
+        {{-- Wallet credit on this number (owner, 2026-11-03). --}}
+        @php $walletRow = \App\Models\Wallet::where('phone', bd_phone($customer->phone))->first(); @endphp
+        <a href="{{ $walletRow ? route('admin.customers.wallets.show', $walletRow) : route('admin.customers.wallets', ['phone' => $customer->phone]) }}"
+           class="btn-outline py-2 text-sm">💳 Wallet {{ money((float) ($walletRow->balance ?? 0)) }}</a>
+
         <a href="{{ route('admin.orders.create', ['customer' => $customer->id]) }}" class="btn-primary py-2 text-sm">+ New order</a>
     </div>
 </div>

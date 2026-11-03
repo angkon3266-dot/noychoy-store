@@ -15,6 +15,7 @@ use App\Models\Visit;
 use App\Services\CartService;
 use App\Services\LoyaltyService;
 use App\Services\Meta\MetaTrackingService;
+use App\Services\WalletService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ class PlaceOrder
     ) {}
 
     /**
-     * @param  array{name:string,phone:string,email?:string,address:string,area?:string,district?:string,is_inside_dhaka?:bool,notes?:string,is_gift?:bool,card_message?:string}  $data
+     * @param  array{name:string,phone:string,email?:string,address:string,area?:string,district?:string,is_inside_dhaka?:bool,notes?:string,is_gift?:bool,card_message?:string,use_wallet?:bool}  $data
      */
     public function handle(array $data): Order
     {
@@ -169,6 +170,19 @@ class PlaceOrder
                 }
             }
 
+            // Wallet credit on the number she typed (WalletService): products
+            // only, after every other discount — never the delivery charge —
+            // and counted inside $discount, because it is store credit. Only
+            // when the checkout asked for it; the chat assistant's quote above
+            // is built without it. The wallet row stays locked until commit,
+            // so two orders on one number cannot both spend the same taka.
+            $wallet = null;
+            $walletUse = 0.0;
+            if (! empty($data['use_wallet'])) {
+                [$wallet, $walletUse] = app(WalletService::class)->reserve($data['phone'], max(0, $subtotal - $discount));
+                $discount = round($discount + $walletUse, 2);
+            }
+
             // Personalized offer applied to this order (marked redeemed below).
             //
             // Only when it actually paid out: customerOffer() resolves the best
@@ -235,6 +249,7 @@ class PlaceOrder
                 'ladder_rewards' => $ladderRewards ?: null,
                 'points_redeemed' => $pointsRedeemed,
                 'points_discount' => $pointsDiscount,
+                'wallet_amount' => $walletUse,
                 'total' => max(0, $subtotal - $discount + $shipping),
                 'payment_method' => 'cod',
                 'payment_status' => 'unpaid',
@@ -294,6 +309,10 @@ class PlaceOrder
                     $customer, -$pointsRedeemed, 'redeem',
                     'Redeemed on order '.$order->order_number, $order,
                 );
+            }
+
+            if ($wallet && $walletUse > 0) {
+                app(WalletService::class)->spend($wallet, $walletUse, $order);
             }
 
             // Update customer rollups.

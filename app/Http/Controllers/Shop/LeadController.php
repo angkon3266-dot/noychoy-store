@@ -97,6 +97,9 @@ class LeadController extends Controller
             // the discount the moment she finishes typing rather than springing
             // it on her at the end.
             'summary' => $this->summary(),
+            // Credit on this number, offered on the checkout the moment the
+            // number is known (WalletService). Null when it holds nothing.
+            'wallet' => app(\App\Services\WalletService::class)->checkoutCard($data['phone']),
         ]);
     }
 

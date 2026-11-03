@@ -49,6 +49,7 @@ class Order extends Model
         'subtotal', 'shipping_cost', 'discount', 'adjustments', 'member_discount', 'total',
         'ladder_tier', 'ladder_rewards',
         'points_redeemed', 'points_discount', 'points_earned',
+        'wallet_amount', 'wallet_refunded_at',
         'payment_method', 'payment_status', 'status', 'coupon_code',
         'notes', 'admin_notes', 'card_message', 'is_gift', 'source', 'stock_restored',
         'source_channel', 'source_campaign', 'source_content', 'source_referrer', 'first_touch_channel', 'landing_path',
@@ -70,6 +71,8 @@ class Order extends Model
         'ladder_tier' => 'integer',
         'ladder_rewards' => 'array',
         'points_earned' => 'integer',
+        'wallet_amount' => 'decimal:2',
+        'wallet_refunded_at' => 'datetime',
         'review_request_sent_at' => 'datetime',
     ];
 

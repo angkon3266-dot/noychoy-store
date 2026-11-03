@@ -192,6 +192,13 @@ Route::middleware('admin')->group(function () {
     Route::post('customers/blocked/quick', [\App\Http\Controllers\Admin\BlockedPhoneController::class, 'quickStore'])->name('customers.blocked.quick');
     Route::delete('customers/blocked/{blockedPhone}', [\App\Http\Controllers\Admin\BlockedPhoneController::class, 'destroy'])->name('customers.blocked.destroy');
 
+    // ── Wallet credit per number (owner, 2026-11-03) ───────────────────────
+    // Declared above `customers/{customer}` so "wallets" is never read as an id.
+    Route::get('customers/wallets', [\App\Http\Controllers\Admin\WalletController::class, 'index'])->name('customers.wallets');
+    Route::post('customers/wallets', [\App\Http\Controllers\Admin\WalletController::class, 'store'])->name('customers.wallets.store');
+    Route::post('customers/wallets/template', [\App\Http\Controllers\Admin\WalletController::class, 'template'])->name('customers.wallets.template');
+    Route::get('customers/wallets/{wallet}', [\App\Http\Controllers\Admin\WalletController::class, 'show'])->name('customers.wallets.show');
+
     // ── Customer courier tiers (owner, 2026-09-17) ─────────────────────────
     // BDCourier lookups from the customer list and the customer page. Every
     // lookup spends a plan credit, so each is a POST behind a click and all are
