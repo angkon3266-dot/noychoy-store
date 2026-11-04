@@ -19,6 +19,14 @@ class WalletTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // BlockedPhone memoises per process; a number another test blocked
+        // must not refuse these orders.
+        \App\Models\BlockedPhone::forgetMemo();
+    }
+
     protected function admin(): User
     {
         return User::firstOrCreate(['email' => 'a@b.test'], ['name' => 'Admin', 'password' => bcrypt('secret'), 'role' => 'admin']);
@@ -200,5 +208,58 @@ class WalletTest extends TestCase
 
         $this->actingAs($this->admin())->post(route('admin.customers.wallets.template'), ['template' => '']);
         $this->assertSame(WalletService::WHATSAPP_DEFAULT, app(WalletService::class)->whatsappTemplate());
+    }
+
+    protected function manualOrder(array $override = [])
+    {
+        // The order-placed effects (SMS, invoice, Meta) would reach real services.
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $product = $this->product(1000);
+
+        return $this->actingAs($this->admin())
+            ->from(route('admin.orders.create'))
+            ->post(route('admin.orders.store-manual'), array_merge([
+                'name' => 'Buyer', 'phone' => '01712345678',
+                'address' => 'Road 4, Banani', 'is_inside_dhaka' => '1',
+                'shipping_cost' => 70, 'discount' => 100, 'status' => 'confirmed',
+                'use_wallet' => '1',
+                'lines' => [['product_id' => $product->id, 'qty' => 1, 'price' => null]],
+            ], $override));
+    }
+
+    public function test_an_order_typed_in_the_admin_spends_the_credit_on_products(): void
+    {
+        app(WalletService::class)->adjust('01712345678', 2000);
+
+        $this->manualOrder()->assertSessionHasNoErrors();
+
+        $order = Order::sole();
+        // ৳1,000 less her ৳100 discount = ৳900 of products; delivery stays cash.
+        $this->assertEquals(900, (float) $order->wallet_amount);
+        $this->assertEquals(1000, (float) $order->discount);
+        $this->assertEquals(70, (float) $order->total);
+        $this->assertEquals(1100, app(WalletService::class)->balanceFor('01712345678'));
+        $this->assertStringContainsString('paid from the wallet', $order->history()->value('note'));
+    }
+
+    public function test_an_admin_order_leaves_the_credit_when_unticked_or_typed_in_cancelled(): void
+    {
+        app(WalletService::class)->adjust('01712345678', 500);
+
+        $this->manualOrder(['use_wallet' => null])->assertSessionHasNoErrors();
+        $this->manualOrder(['status' => 'cancelled'])->assertSessionHasNoErrors();
+
+        $this->assertEquals(0, (float) Order::sum('wallet_amount'));
+        $this->assertEquals(500, app(WalletService::class)->balanceFor('01712345678'));
+    }
+
+    public function test_the_order_form_lookup_reports_the_balance(): void
+    {
+        app(WalletService::class)->adjust('01712345678', 450);
+
+        $this->actingAs($this->admin())
+            ->getJson(route('admin.orders.coupon-lookup', ['phone' => '+8801712345678']))
+            ->assertOk()->assertJsonPath('wallet', 450);
     }
 }

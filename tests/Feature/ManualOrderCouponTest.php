@@ -110,7 +110,7 @@ class ManualOrderCouponTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson(route('admin.orders.coupon-lookup', ['phone' => '01812345678']))
             ->assertOk()
-            ->assertExactJson(['coupons' => []]);
+            ->assertExactJson(['coupons' => [], 'wallet' => 0]);
     }
 
     public function test_the_lookup_also_finds_a_coupon_reserved_for_the_number(): void
@@ -149,7 +149,7 @@ class ManualOrderCouponTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson(route('admin.orders.coupon-lookup'))
             ->assertOk()
-            ->assertExactJson(['coupons' => []]);
+            ->assertExactJson(['coupons' => [], 'wallet' => 0]);
     }
 
     // ── Saving an order with one ─────────────────────────────────────────────

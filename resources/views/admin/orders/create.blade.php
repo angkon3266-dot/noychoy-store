@@ -309,6 +309,21 @@
             </span>
         </div>
 
+        {{-- Wallet credit on this number (owner, 2026-11-03), found by the same
+             lookup as the coupons. Products only, never delivery; disabled —
+             so not sent — until the lookup has seen a balance, so an order is
+             never saved with credit nobody was shown. --}}
+        <div x-show="wallet > 0" x-cloak class="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm space-y-1">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="use_wallet" value="1" x-model="useWallet" :disabled="wallet <= 0" class="accent-green-600">
+                <span>Use wallet credit · <span class="font-medium" x-text="money(wallet)"></span> on this number</span>
+            </label>
+            <div x-show="walletUse() > 0" class="flex justify-between text-green-700">
+                <span>Wallet credit</span><span x-text="'−' + money(walletUse())"></span>
+            </div>
+            <p class="text-[11px] text-ink-700/60">Pays for products, not delivery. Goes back to the wallet if the order is cancelled or returned.</p>
+        </div>
+
         <div class="border-t border-ink-100 pt-3">
             <div class="flex justify-between font-semibold">
                 <span>Total (COD)</span><span x-text="money(total())"></span>
@@ -369,6 +384,9 @@
             // Coupons waiting for the number in the Phone box (owner, 2026-09-17).
             coupon: restored ? (restored.coupon || '') : '',
             couponOptions: [],
+            // Wallet credit on the number in the Phone box, from the same lookup.
+            wallet: 0,
+            useWallet: restored ? !!restored.useWallet : true,
             // The code this form filled in or was picked from its suggestions —
             // cleared again if the number changes to one it is not for.
             couponAuto: '',
@@ -471,8 +489,13 @@
                     return sum + unit * (Number(l.qty) || 0);
                 }, 0);
             },
+            walletUse() {
+                if (!this.useWallet || this.wallet <= 0) return 0;
+                const products = this.subtotal() - (Number(this.discount) || 0) - this.couponDiscount();
+                return Math.max(0, Math.min(this.wallet, products));
+            },
             total() {
-                return Math.max(0, this.subtotal() - (Number(this.discount) || 0) - this.couponDiscount() + this.deliveryCharge());
+                return Math.max(0, this.subtotal() - (Number(this.discount) || 0) - this.couponDiscount() - this.walletUse() + this.deliveryCharge());
             },
             money(n) { return '৳' + Number(n || 0).toLocaleString('en-BD', { maximumFractionDigits: 0 }); },
 
@@ -495,6 +518,7 @@
                 this.holdAutofill = false;
 
                 if (!/^01\d{9}$/.test(phone)) {
+                    this.wallet = 0;
                     this.offerCoupons([], seq, hold);
                     return;
                 }
@@ -505,6 +529,7 @@
                 })
                     .then((res) => (res.ok ? res.json() : null))
                     .then((body) => {
+                        if (body && seq === this.lookupSeq) this.wallet = Number(body.wallet) || 0;
                         if (body && Array.isArray(body.coupons)) this.offerCoupons(body.coupons, seq, hold);
                     })
                     // Advisory only: a lookup that fails leaves the form as it was.

@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Meta\MetaTrackingService;
+use App\Services\WalletService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -34,7 +35,7 @@ use Illuminate\Validation\ValidationException;
 class CreateManualOrder
 {
     /**
-     * @param  array{name:string,phone:string,email?:?string,address:string,area?:?string,district?:?string,is_inside_dhaka?:bool,notes?:?string,shipping_cost?:float,discount?:float,status?:string,coupon_code?:?string}  $data
+     * @param  array{name:string,phone:string,email?:?string,address:string,area?:?string,district?:?string,is_inside_dhaka?:bool,notes?:?string,shipping_cost?:float,discount?:float,status?:string,coupon_code?:?string,use_wallet?:bool}  $data
      * @param  array<int,array{product_id:int,variant_id:?int,qty:int,price?:?float}>  $lines
      */
     public function handle(array $data, array $lines): Order
@@ -112,7 +113,20 @@ class CreateManualOrder
                 $shipping = 0.0;
             }
 
-            $total = max(0, round($subtotal - $discount - $couponDiscount + $shipping, 2));
+            // Wallet credit on this number (owner, 2026-11-03: "add it" to
+            // orders typed here too). Same rules as the checkout: products
+            // only, after every other discount, never delivery, and counted
+            // in the discount column. The wallet row stays locked until
+            // commit. An order typed in already cancelled spends nothing.
+            $wallet = null;
+            $walletUse = 0.0;
+            if (! empty($data['use_wallet']) && ! in_array($data['status'] ?? 'confirmed', Order::NOT_SALES, true)) {
+                [$wallet, $walletUse] = app(WalletService::class)->reserve(
+                    $data['phone'], max(0, round($subtotal - $discount - $couponDiscount, 2)),
+                );
+            }
+
+            $total = max(0, round($subtotal - $discount - $couponDiscount - $walletUse + $shipping, 2));
 
             // Match the order to an existing customer by phone, or make one, so
             // a DM buyer builds the same history as a storefront buyer.
@@ -144,7 +158,8 @@ class CreateManualOrder
                 // One discount column, as a storefront order has: the coupon's
                 // share is in it, and coupon_code says where that share came
                 // from — which is also what the per-number limit counts.
-                'discount' => round($discount + $couponDiscount, 2),
+                'discount' => round($discount + $couponDiscount + $walletUse, 2),
+                'wallet_amount' => $walletUse,
                 'coupon_code' => $coupon?->code,
                 'total' => $total,
                 'payment_method' => 'cod',
@@ -178,9 +193,14 @@ class CreateManualOrder
                 $coupon->increment('used_count');
             }
 
+            if ($wallet && $walletUse > 0) {
+                app(WalletService::class)->spend($wallet, $walletUse, $order);
+            }
+
             $order->history()->create([
                 'status' => $order->status,
-                'note' => 'Order taken by hand in the admin'.($coupon ? $this->couponNote($coupon, $couponDiscount) : ''),
+                'note' => 'Order taken by hand in the admin'.($coupon ? $this->couponNote($coupon, $couponDiscount) : '')
+                    .($walletUse > 0 ? ', '.money($walletUse).' paid from the wallet' : ''),
                 'created_by' => auth()->user()?->name ?? 'Admin',
             ]);
 

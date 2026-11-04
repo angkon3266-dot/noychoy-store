@@ -878,6 +878,7 @@ class OrderController extends Controller
             // An unticked box is simply absent from the old input.
             'inside' => (bool) $request->old('is_inside_dhaka'),
             'coupon' => is_string($coupon) ? $coupon : '',
+            'useWallet' => (bool) $request->old('use_wallet'),
             'picked' => $picked ? $this->customerCards(collect([$picked]))->first() : null,
         ];
     }
@@ -1082,9 +1083,11 @@ class OrderController extends Controller
             // under the same row lock checkout takes — a refusal comes back as
             // an error on this field, with the reason in plain words.
             'coupon_code' => ['nullable', 'string', 'max:50'],
+            'use_wallet' => ['nullable', 'boolean'],
         ]);
 
         $data['is_inside_dhaka'] = $request->boolean('is_inside_dhaka');
+        $data['use_wallet'] = $request->boolean('use_wallet');
 
         try {
             $order = $creator->handle($data, $data['lines']);
@@ -1152,6 +1155,8 @@ class OrderController extends Controller
                     'min_order' => $coupon->min_order !== null ? (float) $coupon->min_order : null,
                 ])
                 ->values(),
+            // Wallet credit on the number, offered on the form (WalletService).
+            'wallet' => app(\App\Services\WalletService::class)->balanceFor(is_string($phone) ? $phone : null),
         ]);
     }
 
