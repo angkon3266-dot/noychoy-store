@@ -207,7 +207,70 @@ class SpinWheelTest extends TestCase
 
         $this->get('/checkout')->assertInertia(fn (AssertableInertia $page) => $page
             ->where('coupon', null)
-            ->where('spin.result.note', 'Spend ৳1,500 to use it.'));
+            ->where('spin.result.note', 'Add ৳500 more — it comes off on orders of ৳1,500+.'));
+    }
+
+    // ── A prize's own minimum order (owner, 2026-11-05) ─────────────────────
+
+    /** ৳100 off that needs a ৳1,000 order, and nothing else can come up. */
+    protected function bigPrizeWheel(): void
+    {
+        $this->wheel([
+            ['label' => 'Try again', 'type' => 'none', 'weight' => 0, 'min_order' => 999],
+            ['label' => '৳100 OFF', 'type' => 'flat', 'value' => 100, 'weight' => 1, 'min_order' => 1000],
+        ]);
+    }
+
+    public function test_the_wheel_prints_what_each_prize_needs(): void
+    {
+        $this->bigPrizeWheel();
+        $this->inCart(450);
+
+        $this->get('/checkout')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('spin.segments.1.min', '৳1,000+')
+            // A "no prize" slice needs nothing, whatever was typed into it.
+            ->where('spin.segments.0.min', null));
+    }
+
+    public function test_a_small_bag_wins_the_big_prize_but_does_not_get_it_yet(): void
+    {
+        $this->bigPrizeWheel();
+        $this->inCart(450);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => [
+            'won' => true, 'applied' => false, 'min' => '৳1,000',
+            'note' => 'Add ৳550 more — it comes off on orders of ৳1,000+.',
+        ]]);
+        $this->assertEquals(1000, Coupon::firstOrFail()->min_order);
+
+        $this->app->forgetInstance(CartService::class);
+        $this->assertSame(0.0, app(CartService::class)->couponDiscount());
+
+        // Another ৳600 piece takes the bag past ৳1,000, and the ৳100 comes off.
+        $this->post('/cart/add/'.$this->product(['name' => 'Studs', 'slug' => 'studs', 'price' => 600])->slug, ['qty' => 1]);
+        $this->app->forgetInstance(CartService::class);
+        $this->assertSame(100.0, app(CartService::class)->couponDiscount());
+    }
+
+    public function test_an_empty_bag_is_told_what_the_prize_needs(): void
+    {
+        $this->bigPrizeWheel();
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => [
+            'note' => 'Saved for you — it comes off on orders of ৳1,000 or more.',
+        ]]);
+    }
+
+    public function test_the_wheel_wide_minimum_is_a_floor_under_each_prize(): void
+    {
+        $this->wheel([
+            ['label' => '5% OFF', 'type' => 'percent', 'value' => 5, 'weight' => 1, 'min_order' => 300],
+            ['label' => 'Try again', 'type' => 'none', 'weight' => 0],
+        ], ['min_cart' => 800]);
+        $this->inCart(450);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true]);
+        $this->assertEquals(800, Coupon::firstOrFail()->min_order);
     }
 
     // ── While browsing ──────────────────────────────────────────────────────
@@ -356,7 +419,7 @@ class SpinWheelTest extends TestCase
         $this->actingAs($this->admin())->post(route('admin.offers.spin-wheel'), [
             'enabled' => 1, 'once_per_phone' => 1, 'title' => 'Ghurao, jeto!', 'valid_hours' => 48, 'min_cart' => 0,
             'segments' => [
-                ['label' => '', 'type' => 'percent', 'value' => 15, 'weight' => 5, 'color' => '#112233'],
+                ['label' => '', 'type' => 'percent', 'value' => 15, 'weight' => 5, 'color' => '#112233', 'min_order' => 1200],
                 ['label' => 'Oops', 'type' => 'none', 'value' => '', 'weight' => 5, 'color' => '#abcdef'],
                 ['label' => 'Broken', 'type' => 'flat', 'value' => '', 'weight' => 5],
             ],
@@ -369,6 +432,8 @@ class SpinWheelTest extends TestCase
         // A ৳ slice with no amount is dropped; a blank label is written for her.
         $this->assertCount(2, $wheel->segments());
         $this->assertSame('15% OFF', $wheel->segments()[0]['label']);
+        $this->assertSame(1200.0, $wheel->segments()[0]['min_order']);
+        $this->assertNull($wheel->segments()[1]['min_order']);
         $this->assertSame('#ABCDEF', $wheel->segments()[1]['color']);
     }
 

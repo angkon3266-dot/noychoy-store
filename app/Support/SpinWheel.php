@@ -54,10 +54,10 @@ class SpinWheel
         return [
             ['label' => '5% OFF', 'type' => 'percent', 'value' => 5, 'weight' => 30],
             ['label' => 'Try again', 'type' => 'none', 'value' => null, 'weight' => 20],
-            ['label' => '৳50 OFF', 'type' => 'flat', 'value' => 50, 'weight' => 20],
+            ['label' => '৳50 OFF', 'type' => 'flat', 'value' => 50, 'weight' => 20, 'min_order' => 500],
             ['label' => 'Free delivery', 'type' => 'free_delivery', 'value' => null, 'weight' => 15],
             ['label' => '10% OFF', 'type' => 'percent', 'value' => 10, 'weight' => 10],
-            ['label' => '৳100 OFF', 'type' => 'flat', 'value' => 100, 'weight' => 5],
+            ['label' => '৳100 OFF', 'type' => 'flat', 'value' => 100, 'weight' => 5, 'min_order' => 1000],
         ];
     }
 
@@ -137,7 +137,7 @@ class SpinWheel
      * Sanitise slices from settings or the admin form, so what is stored is
      * exactly what the wheel will spin.
      *
-     * @return array<int, array{label:string, type:string, value:?float, weight:int, color:string}>
+     * @return array<int, array{label:string, type:string, value:?float, weight:int, color:string, product_id:?int, min_order:?float}>
      */
     public static function normalise(mixed $rows): array
     {
@@ -166,6 +166,16 @@ class SpinWheel
                 continue;
             }
 
+            // The order value this prize needs (owner, 2026-11-05: "a ৳450
+            // product can't have ৳100 off, but a ৳1,000+ order can"). Any
+            // slice can still come up; a prize with a minimum only comes off
+            // once the bag reaches it.
+            $minOrder = isset($row['min_order']) && is_numeric($row['min_order']) && (float) $row['min_order'] > 0
+                ? round((float) $row['min_order'], 2) : null;
+            if ($type === 'none') {
+                $minOrder = null;
+            }
+
             $label = trim((string) ($row['label'] ?? ''));
             if ($label === '') {
                 $label = static::defaultLabel($type, $value);
@@ -183,6 +193,7 @@ class SpinWheel
                 'weight' => max(0, min(1000, (int) ($row['weight'] ?? 1))),
                 'color' => strtoupper($color),
                 'product_id' => $productId ?: null,
+                'min_order' => $minOrder,
             ];
 
             if (count($out) >= self::MAX_SEGMENTS) {
@@ -231,7 +242,12 @@ class SpinWheel
             'title' => $this->title(),
             'subtitle' => $this->subtitle(),
             'segments' => collect($this->segments())
-                ->map(fn ($s) => ['label' => $s['label'], 'color' => $s['color'], 'prize' => $s['type'] !== 'none'])
+                ->map(fn ($s) => [
+                    'label' => $s['label'], 'color' => $s['color'], 'prize' => $s['type'] !== 'none',
+                    // Printed on the slice under the prize, so nobody spins for
+                    // ৳100 off thinking it fits a ৳450 bag.
+                    'min' => ($m = $this->minFor($s)) > 0 ? money($m).'+' : null,
+                ])
                 ->values()->all(),
             'result' => $last ? $this->present($last, $cart) : null,
             'blocked' => $last ? null : $this->blockedReason($cart),
@@ -372,7 +388,7 @@ class SpinWheel
             }
         } while (Coupon::where('code', $code)->exists());
 
-        $min = $this->minCart();
+        $min = $this->minFor($segment);
 
         // A gift is a coupon worth one of that piece, good on that piece only:
         // it zeroes one unit and nothing else, and it goes away with the piece
@@ -414,6 +430,16 @@ class SpinWheel
             'expires_at' => Carbon::now()->addHours($this->validHours()),
             'is_active' => true,
         ]);
+    }
+
+    /** What a slice's prize needs: its own minimum, never below the wheel-wide one. */
+    protected function minFor(array $segment): float
+    {
+        if (($segment['type'] ?? null) === 'none') {
+            return 0.0;
+        }
+
+        return max($this->minCart(), (float) ($segment['min_order'] ?? 0));
     }
 
     /**
@@ -483,8 +509,15 @@ class SpinWheel
             ? Product::find(($coupon->product_ids ?? [])[0] ?? 0) : null;
         $live = $coupon && $this->stillSpendable($coupon);
 
+        $min = (float) ($coupon?->min_order ?? 0);
+        $short = $min - $cart->couponBase();
+
         $note = null;
-        if ($live && ! $applied && $cart->isEmpty()) {
+        if ($live && ! $applied && $min > 0 && $cart->isEmpty()) {
+            $note = 'Saved for you — it comes off on orders of '.money($min).' or more.';
+        } elseif ($live && ! $applied && $min > 0 && $short > 0) {
+            $note = 'Add '.money(ceil($short)).' more — it comes off on orders of '.money($min).'+.';
+        } elseif ($live && ! $applied && $cart->isEmpty()) {
             $note = 'Saved for you — it comes off automatically at checkout.';
         } elseif ($live && $gift && ! $applied && ! $cart->items()->contains(fn ($i) => (int) $i['product_id'] === $gift->id)) {
             $note = 'Your free '.$gift->name.' is no longer in your bag.';
@@ -507,6 +540,7 @@ class SpinWheel
             'code' => $coupon?->code,
             'applied' => $applied,
             'note' => $note,
+            'min' => $min > 0 ? money($min) : null,
             'gift' => $gift ? ['name' => $gift->name, 'url' => route('product.show', $gift), 'image' => $gift->thumbnail] : null,
         ];
     }

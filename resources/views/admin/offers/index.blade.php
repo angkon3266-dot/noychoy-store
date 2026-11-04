@@ -129,6 +129,8 @@
         single-use coupon (it shows in her order summary, and in
         <a href="{{ route('admin.coupons.index') }}" class="text-gold-700 underline">Coupons</a> as “Spin wheel · …”).
         A <strong>free gift</strong> slice puts the piece you pick into her bag at ৳0 — with any other piece, never on its own.
+        <strong>Min order</strong> on a slice (e.g. ৳100 OFF from ৳1,000) is printed on the wheel; any slice can still come up,
+        but that prize only comes off once her bag reaches the amount — a ৳450 bag never gets ৳100 off.
         <strong>Chance</strong> is a weight, not a percent — the % column shows what each slice actually comes up as.
         The draw happens on the server, so nobody can pick their slice. A prize stacks with your offers like any coupon;
         a code the customer typed herself stays, and the wheel is hidden for that order.
@@ -165,7 +167,7 @@
                 <input name="valid_hours" type="number" min="1" max="720" value="{{ old('valid_hours', $spinWheel['valid_hours']) }}" class="input" required>
             </div>
             <div>
-                <label class="label">Prize needs an order of at least (৳, after offers)</label>
+                <label class="label">Every prize needs an order of at least (৳, after offers)</label>
                 <input name="min_cart" type="number" min="0" step="1" value="{{ old('min_cart', (int) $spinWheel['min_cart']) }}" class="input" placeholder="0 = any order">
             </div>
             <div>
@@ -186,6 +188,7 @@
                         <th class="py-1 pr-2 font-medium">Text on the slice</th>
                         <th class="py-1 pr-2 font-medium">Prize</th>
                         <th class="py-1 pr-2 font-medium">Value</th>
+                        <th class="py-1 pr-2 font-medium">Min order ৳</th>
                         <th class="py-1 pr-2 font-medium">Chance</th>
                         <th class="py-1 pr-2 font-medium">%</th>
                         <th></th>
@@ -218,6 +221,11 @@
                                 </template>
                                 <span x-show="s.type !== 'flat' && s.type !== 'percent' && s.type !== 'free_gift'" class="text-xs text-ink-700/50">—</span>
                             </td>
+                            <td class="py-1 pr-2">
+                                <input type="number" min="0" step="1" :name="`segments[${i}][min_order]`" x-model="s.min_order" class="input py-1.5 w-24"
+                                       x-show="s.type !== 'none'" placeholder="any" aria-label="Minimum order for this prize">
+                                <span x-show="s.type === 'none'" class="text-xs text-ink-700/50">—</span>
+                            </td>
                             <td class="py-1 pr-2"><input type="number" min="0" max="1000" :name="`segments[${i}][weight]`" x-model.number="s.weight" class="input py-1.5 w-20" required></td>
                             <td class="py-1 pr-2 text-xs text-ink-700/70 tabular-nums" x-text="chance(s) + '%'"></td>
                             <td class="py-1"><button type="button" @click="segs.splice(i, 1)" class="text-red-500 px-1 text-lg leading-none" aria-label="Remove slice">&times;</button></td>
@@ -228,7 +236,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3">
             <button type="button" x-show="segs.length < {{ (int) $spinWheel['max_segments'] }}"
-                    @click="segs.push({ label: '', type: 'percent', value: '', weight: 10, color: @js(\App\Support\SpinWheel::PALETTE)[segs.length % {{ count(\App\Support\SpinWheel::PALETTE) }}] })"
+                    @click="segs.push({ label: '', type: 'percent', value: '', min_order: '', weight: 10, color: @js(\App\Support\SpinWheel::PALETTE)[segs.length % {{ count(\App\Support\SpinWheel::PALETTE) }}] })"
                     class="btn-outline text-xs py-1">+ Add slice</button>
             <button class="btn-primary">Save wheel</button>
         </div>

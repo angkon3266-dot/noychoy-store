@@ -175,6 +175,7 @@ class OfferController extends Controller
             'segments.*.value' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'segments.*.weight' => ['required', 'integer', 'min:0', 'max:1000'],
             'segments.*.color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'segments.*.min_order' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
             'segments.*.product_id' => ['nullable', 'required_if:segments.*.type,free_gift', 'integer', 'exists:products,id'],
             'popup_delay' => ['nullable', 'integer', 'min:3', 'max:600'],
             'popup_pages' => ['nullable', 'integer', 'min:1', 'max:20'],

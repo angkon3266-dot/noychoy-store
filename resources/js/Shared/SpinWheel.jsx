@@ -99,11 +99,21 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
                                 slice as the button's text. */}
                             {labels && (
                                 <g transform={`rotate(${mid})`}>
-                                    <text x="0" y="-60" transform="rotate(-90 0 -60)" textAnchor="middle" dominantBaseline="central"
+                                    {/* The prize, and under it (beside it, as
+                                        the text runs outward) the order value
+                                        it needs. */}
+                                    <text x={s.min ? -3.5 : 0} y="-60" transform={`rotate(-90 ${s.min ? -3.5 : 0} -60)`} textAnchor="middle" dominantBaseline="central"
                                           fill={inkFor(s.color)} fontSize={fs} fontWeight="700" letterSpacing="0.3"
                                           style={{ fontFamily: 'inherit' }}>
                                         {label}
                                     </text>
+                                    {s.min && (
+                                        <text x="6" y="-60" transform="rotate(-90 6 -60)" textAnchor="middle" dominantBaseline="central"
+                                              fill={inkFor(s.color)} fillOpacity="0.85" fontSize="6" fontWeight="600"
+                                              style={{ fontFamily: 'inherit' }}>
+                                            {s.min}
+                                        </text>
+                                    )}
                                 </g>
                             )}
                         </g>
