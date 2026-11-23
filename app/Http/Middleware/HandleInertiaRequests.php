@@ -177,6 +177,8 @@ class HandleInertiaRequests extends Middleware
                 // (owner, 2026-10-24); the phone number stays an admin setting.
                 'email' => \App\Models\Setting::get('store_email', config('store.email')),
                 'whatsapp' => theme('whatsapp_number'),
+                // Only once the owner says the catalogue is connected.
+                'whatsappCatalog' => \App\Support\WhatsAppCatalog::url(),
                 'messenger' => theme('messenger_url') ?: null,
                 'copyright' => theme('footer_copyright') ?: '© '.date('Y').' '.store_name().'. All rights reserved.',
             ],

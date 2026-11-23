@@ -525,6 +525,30 @@
         <div class="grid sm:grid-cols-2 gap-4">
             <div><label class="label">WhatsApp number (with country code)</label><input name="whatsapp_number" value="{{ $theme['whatsapp_number'] }}" class="input" placeholder="8801XXXXXXXXX"></div>
         </div>
+
+        {{-- WhatsApp catalogue (Nov 2026) — App\Support\WhatsAppCatalog --}}
+        <div class="mt-5 rounded-lg border border-ink-100 bg-ink-50/40 p-4">
+            <label class="inline-flex items-start gap-2 text-sm font-medium">
+                <input type="hidden" name="whatsapp_catalog" value="0">
+                <input type="checkbox" name="whatsapp_catalog" value="1" class="mt-0.5" @checked($theme['whatsapp_catalog'] ?? false)>
+                <span>My WhatsApp catalogue is connected — show “Browse our catalogue on WhatsApp” on the site</span>
+            </label>
+            <p class="text-xs text-ink-700/60 mt-2">
+                Your products already go to Meta every hour (catalogue “Noychoy.com”, fed from
+                <a href="{{ route('feed.meta') }}" target="_blank" rel="noopener" class="underline">/feed/meta.csv</a>).
+                Connect that same catalogue to WhatsApp once, then tick this box:
+            </p>
+            <ol class="text-xs text-ink-700/70 mt-2 list-decimal pl-5 space-y-1">
+                <li><strong>Business Suite route:</strong> Meta Business Suite → Settings → All tools → <em>WhatsApp Manager</em> → choose your WhatsApp account → <em>Catalogue</em> → pick “Noychoy.com” → <em>Connect catalogue</em>.</li>
+                <li><strong>Or in the WhatsApp Business app</strong> on your phone: Business tools → Catalogue. The app needs your Facebook Page linked to both the catalogue and the WhatsApp account.</li>
+                <li>Open the catalogue in the app and make sure it shows your pieces, then tick the box above and save.</li>
+            </ol>
+            @if(filled($theme['whatsapp_number']))
+                <p class="text-xs mt-2">Test the link first:
+                    <a href="https://wa.me/c/{{ preg_replace('/\D/', '', $theme['whatsapp_number']) }}" target="_blank" rel="noopener" class="underline font-medium">wa.me/c/{{ preg_replace('/\D/', '', $theme['whatsapp_number']) }}</a>
+                    — if WhatsApp says “Invalid catalog link”, the catalogue is not connected yet and the box should stay unticked.</p>
+            @endif
+        </div>
         <p class="text-xs text-ink-700/50 mt-2">
             The Meta Pixel and the server-side Conversions API are configured under
             <a href="{{ route('admin.meta.tracking') }}" class="underline font-medium">Meta Integration → Tracking</a>.

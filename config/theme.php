@@ -88,6 +88,9 @@ return [
 
         // Conversion toggles
         'whatsapp_number' => null,            // e.g. 8801XXXXXXXXX
+        // The Meta catalogue is connected to this WhatsApp number, so the
+        // storefront may offer wa.me/c/<number> (App\Support\WhatsAppCatalog).
+        'whatsapp_catalog' => false,
         'messenger_url' => null,              // e.g. https://m.me/yourpage
         'show_call_button' => true,           // floating "Call now" (uses store phone)
         'show_whatsapp_button' => true,

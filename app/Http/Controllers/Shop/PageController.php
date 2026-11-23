@@ -98,6 +98,7 @@ class PageController extends Controller
                 'email' => \App\Models\Setting::get('store_email', config('store.email')),
                 'address' => \App\Models\Setting::get('store_address', config('store.address')),
                 'whatsapp' => theme('whatsapp_number'),
+                'whatsappCatalog' => \App\Support\WhatsAppCatalog::url(),
                 'messenger' => theme('messenger_url') ?: null,
             ],
             'submitUrl' => route('page.contact.submit'),

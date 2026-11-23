@@ -120,6 +120,14 @@ export default function Footer({ minimal = false }) {
                                         </a>
                                     </li>
                                 )}
+                                {footer.whatsappCatalog && (
+                                    <li>
+                                        <a href={footer.whatsappCatalog} target="_blank" rel="noopener" className={`${link} inline-flex items-center gap-2.5`}>
+                                            <WhatsApp className="w-4 h-4 text-[#25D366]" />
+                                            Browse our catalogue on WhatsApp
+                                        </a>
+                                    </li>
+                                )}
                                 {footer.messenger && (
                                     <li>
                                         <a href={footer.messenger} target="_blank" rel="noopener" className={`${link} inline-flex items-center gap-2.5`}>
