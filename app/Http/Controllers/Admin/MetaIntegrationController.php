@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Services\Meta\Credentials\MetaCredentialResolver;
 use App\Services\Meta\Credentials\MetaCredentials;
 use App\Services\Meta\MetaCatalogService;
+use App\Services\Meta\MetaGraphClient;
 use App\Services\Meta\MetaQueueRunner;
 use App\Services\Meta\MetaSettings;
 use App\Services\Meta\MetaStats;
@@ -97,6 +98,15 @@ class MetaIntegrationController extends Controller
         // Only overwrite the token when a new one is actually supplied.
         if (filled($data['access_token'] ?? null)) {
             $this->settings->setToken($data['access_token']);
+
+            // The stored expiry belongs to whatever token was there before —
+            // typically a 60-day Facebook login. Keeping it made a pasted,
+            // never-expiring System User token still read "Expiring soon" and
+            // then "Expired". Ask Meta for THIS token's expiry instead.
+            $this->settings->update([
+                'token_expires_at' => $this->tokenExpiry($data['access_token']),
+                'connected_since' => now()->toIso8601String(),
+            ]);
         }
 
         // Optional dedicated CAPI token — only overwrite when supplied.
@@ -105,6 +115,39 @@ class MetaIntegrationController extends Controller
         }
 
         return back()->with('success', 'Meta settings saved.');
+    }
+
+    /**
+     * When a freshly pasted token expires, per Meta's debug_token: an ISO date,
+     * or null for "never" (System User tokens report expires_at = 0).
+     *
+     * Inspected with the app token first, then by the token itself — a System
+     * User token issued under a different Meta App can't be read with ours.
+     * If Meta can't be asked at all, null: a pasted token is almost always a
+     * permanent System User token, and the old login's date is certainly wrong.
+     */
+    private function tokenExpiry(string $token): ?string
+    {
+        $client = app(MetaGraphClient::class);
+
+        foreach ([fn () => $client->debugToken($token),
+            fn () => $client->request('GET', 'debug_token', ['input_token' => $token], $token)['data'] ?? []] as $inspect) {
+            try {
+                $data = $inspect();
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if (! array_key_exists('expires_at', $data)) {
+                continue;
+            }
+
+            $expiresAt = (int) $data['expires_at'];
+
+            return $expiresAt > 0 ? Carbon::createFromTimestamp($expiresAt)->toIso8601String() : null;
+        }
+
+        return null;
     }
 
     /** Run the full connection test and flash the structured result. */
