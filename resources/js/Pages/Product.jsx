@@ -7,6 +7,7 @@ import RichText from '../Shared/RichText';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import LadderRow from '../Shared/LadderRow';
 import OfferCountdown from '../Shared/OfferCountdown';
+import SizeFinder from '../Shared/SizeFinder';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
 import { ordinal, rewardLabel, rewardPhrase, t } from '../Shared/i18n';
@@ -545,11 +546,13 @@ function Gallery({ product, img, setImg, variantId }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────────── */
-function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, reviews, loved, lovesCount, ui, chrome, ladderQuote, onOpenReviews }) {
+function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, sizeGuide, reviews, loved, lovesCount, ui, chrome, ladderQuote, onOpenReviews }) {
     const { add, gift } = useCart();
     const preorder = product.preorder;
     const lang = chrome?.lang || 'en';
     const ladderText = ladderPriceLine(ladderQuote, purchase, product, lang);
+    const [sizing, setSizing] = useState(false);
+    const closeSizing = useCallback(() => setSizing(false), []);
 
     const addToCart = async () => {
         if (!purchase.canBuy) return;
@@ -605,6 +608,7 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             <div className="flex items-center gap-4 flex-wrap">
                 <LoveButton url={product.love_url} loved={loved} count={lovesCount} />
                 <ShareButton url={product.url} title={product.name} label="Share" />
+                <HintLink product={product} storeName={chrome?.storeName} lang={lang} />
             </div>
 
             <div className="mt-6 pt-6 border-t border-ink-900/[0.08] flex items-baseline gap-3 flex-wrap">
@@ -721,11 +725,12 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             {/* Variant picker */}
             {purchase.hasVariants && (
                 <div className="mt-6 space-y-4">
-                    <AttributePickers purchase={purchase} />
+                    <AttributePickers purchase={purchase} sizeAttr={sizeGuide?.attribute} onFindSize={() => setSizing(true)} />
                     {!purchase.matched && <p className="text-xs text-ink-700/70">Select options to see price &amp; availability.</p>}
                     {purchase.matched && !purchase.variantInStock && <p className="text-xs text-danger-600 font-medium">This combination is sold out.</p>}
                 </div>
             )}
+            {sizing && sizeGuide && <SizeFinder guide={sizeGuide} purchase={purchase} onClose={closeSizing} />}
 
             {/* "Why buy from us" — product, else category, else store-wide list */}
             {pdpPoints?.items?.length > 0 && (
@@ -857,14 +862,22 @@ function ladderPriceLine(quote, purchase, product, lang) {
     return perks.length ? `${line} + ${perks.join(' + ')}` : line;
 }
 
-function AttributePickers({ purchase }) {
+function AttributePickers({ purchase, sizeAttr = null, onFindSize }) {
     return (
         <>
             {(purchase.attributesList || []).map((attr) => (
                 <div key={attr.name}>
-                    <span className="label">
-                        {attr.name}: <span className="text-ink-700/70 font-normal">{purchase.selected[attr.name] || 'Choose'}</span>
-                    </span>
+                    <div className="flex items-baseline justify-between gap-3">
+                        <span className="label">
+                            {attr.name}: <span className="text-ink-700/70 font-normal">{purchase.selected[attr.name] || 'Choose'}</span>
+                        </span>
+                        {attr.name === sizeAttr && (
+                            <button type="button" onClick={onFindSize} className="shrink-0 inline-flex items-center gap-1.5 text-[13px] text-ink-800 hover:text-ink-900 lux-link">
+                                <RulerGlyph className="w-4 h-4" />
+                                Find my size
+                            </button>
+                        )}
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {attr.values.map((val) => {
                             const inStock = purchase.valueInStock(attr.name, val);
@@ -890,6 +903,39 @@ function AttributePickers({ purchase }) {
 
 // A real count, shown once it is worth showing: "Loved by 2 people" under a
 // heading reads as a warning, so the label stays "Love" until then.
+const RulerGlyph = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2.25" y="8.25" width="19.5" height="7.5" rx="1.5" />
+        <path d="M6 8.25v3M9.75 8.25v2M13.5 8.25v3M17.25 8.25v2" />
+    </svg>
+);
+
+/**
+ * "Drop a hint" (Nov 2026): jewellery is mostly bought as a gift, and the
+ * person who wants it is rarely the one who pays. One tap opens WhatsApp —
+ * how this store's customers talk — with the piece and its link written out,
+ * and they choose who gets it. No number of ours is involved and nothing is
+ * sent until they press send, so the link needs no setting to be safe.
+ */
+function HintLink({ product, storeName, lang }) {
+    const store = storeName || 'NoyChoy';
+    const text = lang === 'bn'
+        ? `একটা ছোট্ট ইঙ্গিত দিলাম 💛 ${store}-এর এই গয়নাটা আমার খুব পছন্দ: ${product.name}\n${product.url}`
+        : `Dropping a little hint 💛 I'd love this from ${store}: ${product.name}\n${product.url}`;
+
+    return (
+        <a
+            href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1.5 text-sm text-ink-700/70 hover:text-gold-700"
+        >
+            <Icon name="gift" className="w-5 h-5" strokeWidth={1.5} />
+            <span>{lang === 'bn' ? 'ইঙ্গিত দিন' : 'Drop a hint'}</span>
+        </a>
+    );
+}
+
 const LOVES_SHOWN_FROM = 10;
 
 function LoveButton({ url, loved: initialLoved, count: initialCount }) {
