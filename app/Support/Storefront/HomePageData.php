@@ -177,6 +177,10 @@ class HomePageData
             ],
             'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
             'membershipBand' => ['show' => (bool) home_content('show_membership')],
+            // Shop the look (Nov 2026): the first three active looks.
+            'looksSection' => (home_content('show_looks') ?? true)
+                ? \App\Http\Controllers\Shop\StyleController::lookPayload(\App\Models\Look::active()->take(3)->get())
+                : [],
             // The wheel's own state rides in chrome.spin; this is only the switch.
             'spinBand' => ['show' => (bool) (home_content('show_spin_wheel') ?? true)],
             'reviewsSection' => [

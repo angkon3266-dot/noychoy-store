@@ -39,7 +39,7 @@ class User extends Authenticatable
             //
             // `reminders` — calls to ring back (owner, 2026-09-17) — is on both
             // lists: staff take the phone orders, so they make those calls.
-            'manager' => ['dashboard', 'alerts', 'products', 'categories', 'collections', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'reminders', 'customers', 'suppliers', 'purchase-orders', 'media', 'menu', 'profile'],
+            'manager' => ['dashboard', 'alerts', 'products', 'categories', 'collections', 'looks', 'coupons', 'offers', 'reviews', 'abandoned', 'orders', 'reminders', 'customers', 'suppliers', 'purchase-orders', 'media', 'menu', 'profile'],
             'staff' => ['dashboard', 'alerts', 'orders', 'reminders', 'profile'],
             default => ['*'], // admin
         };

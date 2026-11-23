@@ -23,6 +23,7 @@ use App\Http\Controllers\Shop\PushController;
 use App\Http\Controllers\Shop\ReviewController;
 use App\Http\Controllers\Shop\SitemapController;
 use App\Http\Controllers\Shop\SpinWheelController;
+use App\Http\Controllers\Shop\StyleController;
 use App\Http\Controllers\SteadfastWebhookController;
 use App\Http\Middleware\ReadOnlySession;
 use App\Http\Middleware\TrackVisit;
@@ -275,6 +276,17 @@ Route::middleware('auth:customer')->group(function () {
 });
 
 Route::get('/discover', [DiscoverController::class, 'index'])->name('discover');
+
+// Style tools (Nov 2026): wishlist for everyone (guests love pieces too) and
+// a share link for it, the gift quiz, the stacker, the try-on, Shop the look.
+Route::get('/wishlist', [StyleController::class, 'wishlist'])->name('wishlist');
+Route::post('/wishlist/share', [StyleController::class, 'shareWishlist'])->name('wishlist.share')->middleware('throttle:10,1');
+Route::get('/wishlist/{code}', [StyleController::class, 'sharedWishlist'])->where('code', '[a-z0-9]{6,16}')->name('wishlist.shared');
+Route::get('/gift-finder', [StyleController::class, 'giftQuiz'])->name('gift-quiz');
+Route::get('/gift-finder/results', [StyleController::class, 'giftQuizResults'])->name('gift-quiz.results')->middleware('throttle:40,1');
+Route::get('/stack', [StyleController::class, 'stacker'])->name('stacker');
+Route::get('/try-on', [StyleController::class, 'tryOn'])->name('try-on');
+Route::get('/looks', [StyleController::class, 'looks'])->name('looks');
 
 // Footer content pages (about / privacy / terms / refund) + contact.
 Route::get('/about', [PageController::class, 'legal'])->defaults('page', 'about')->name('page.about');

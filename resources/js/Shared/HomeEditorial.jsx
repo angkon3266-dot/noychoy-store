@@ -345,6 +345,7 @@ export function EdGiftFinder({ finder }) {
                     <span>.</span>
                 </div>
                 {finder.text && <p className="mt-8 max-w-xl text-ink-700/70 leading-relaxed">{finder.text}</p>}
+                <SmartLink href="/gift-finder" className="mt-5 inline-block text-sm text-ink-900 lux-link">Not sure? Take the 30-second gift quiz →</SmartLink>
                 {(finder.promises || []).length > 0 && (
                     <ul className="mt-10 grid sm:grid-cols-3 gap-6 border-t border-ink-900/10 pt-8">
                         {finder.promises.map(({ icon, title, text }) => (

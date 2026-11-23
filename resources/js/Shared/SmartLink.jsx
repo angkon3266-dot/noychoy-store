@@ -13,6 +13,8 @@ const INERTIA_PREFIXES = [
     // Auth pages are Inertia; a signed-in customer hitting them is redirected
     // to "/" by the guest middleware, which is Inertia too.
     '/login', '/register', '/password/',
+    // Style tools (Nov 2026).
+    '/wishlist', '/wishlist/', '/gift-finder', '/stack', '/try-on', '/looks',
 ];
 
 const HARD_NAV = ['/account/n/'];

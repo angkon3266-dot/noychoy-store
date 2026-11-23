@@ -115,6 +115,48 @@ export function CartProvider({ children }) {
         }
     }, [apply, showToast]);
 
+    /**
+     * Add a whole set in one request — the stacker, a look, a wishlist (Nov
+     * 2026). `items` is [{ id, variantId?, price, name, contentId }]; a piece
+     * that comes in sizes needs its variantId or the server skips it. One
+     * AddToCart for the set, as "Frequently bought together" sends, so a
+     * single decision is not counted once per piece.
+     */
+    const addSet = useCallback(async (items) => {
+        if (busyRef.current || !items?.length) return false;
+        busyRef.current = true;
+        try {
+            const eventId = newEventId('AddToCart');
+            if (window.track) {
+                window.track('AddToCart', {
+                    content_ids: items.map((i) => i.contentId || `prod-${i.id}`),
+                    content_type: 'product',
+                    value: items.reduce((s, i) => s + (Number(i.price) || 0), 0),
+                    currency: 'BDT',
+                    num_items: items.length,
+                }, { eventID: eventId });
+            }
+
+            const body = new FormData();
+            items.forEach((i) => {
+                body.append('product_ids[]', i.id);
+                if (i.variantId) body.append(`variants[${i.id}]`, i.variantId);
+            });
+            body.append('event_id', eventId);
+            const data = await fetchJson(usePageSafeUrl(props, 'cartAddMany') || '/cart/add-many', { method: 'POST', body });
+            apply(data);
+            showToast(`${data.added || 'Pieces'} added to cart ✓`);
+            cartTrigger.current = document.activeElement;
+            setDrawer(true);
+            return true;
+        } catch (e) {
+            showToast('Could not add these — please choose a size where asked.');
+            return false;
+        } finally {
+            setTimeout(() => { busyRef.current = false; }, 800);
+        }
+    }, [apply, showToast, props]);
+
     const remove = useCallback(async (key) => {
         try {
             apply(await fetchJson('/cart/remove', {
@@ -136,7 +178,7 @@ export function CartProvider({ children }) {
     return (
         <CartContext.Provider value={{
             count, savedText, items, subtotalText, discountLines, hints, gift, couponNotice, freeShipping, deliverySavedText, pairs,
-            drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, remove, refresh,
+            drawer, setDrawer, openDrawer, cartTrigger, toast, showToast, add, addSet, remove, refresh,
         }}>
             {children}
         </CartContext.Provider>

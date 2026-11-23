@@ -134,6 +134,13 @@ class ProductPageData
             // "Find my size" beside the size options of a ring or bangle
             // (Nov 2026). Null on everything else.
             'sizeGuide' => SizeGuide::for($product),
+            // Which style tool this piece opens in (Nov 2026): earrings →
+            // the try-on, rings / bangles / bracelets → the stacker.
+            'styleTool' => match (StylePieces::kind($product)) {
+                'earring' => ['label' => 'Try it on', 'hint' => 'see them on a face', 'url' => route('try-on', ['product' => $product->id])],
+                'ring', 'bangle', 'bracelet' => ['label' => 'Stack it', 'hint' => 'style it with other pieces', 'url' => route('stacker', ['add' => $product->id])],
+                default => null,
+            },
             // The folded "Care instructions" section under Details, the same
             // on every product (Appearance); null hides it.
             'care' => filled(theme('pdp_care_text')) ? theme('pdp_care_text') : null,

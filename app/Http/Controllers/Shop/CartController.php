@@ -401,6 +401,11 @@ class CartController extends Controller
         $data = $request->validate([
             'product_ids' => ['required', 'array', 'min:1'],
             'product_ids.*' => ['integer'],
+            // product id => variant id, for the pieces that come in sizes
+            // (the stacker, Shop the look, a shared wishlist — Nov 2026).
+            // A variant product without one is still skipped, as before.
+            'variants' => ['nullable', 'array'],
+            'variants.*' => ['nullable', 'integer'],
             'redirect' => ['nullable', 'in:checkout'],
             // Optional event id the browser Pixel fired its AddToCart with.
             'event_id' => ['nullable', 'string', 'max:100'],
@@ -418,19 +423,25 @@ class CartController extends Controller
         $firstProductId = null;
         $addedLines = [];
         foreach ($products as $product) {
+            $variant = null;
             if ($product->has_variants) {
-                continue; // variant products need explicit option selection
+                $variantId = $data['variants'][$product->id] ?? null;
+                $variant = $variantId ? ProductVariant::where('product_id', $product->id)
+                    ->where('id', $variantId)->where('is_active', true)->first() : null;
+                if (! $variant) {
+                    continue; // variant products need explicit option selection
+                }
             }
             if (! $once) {
-                $this->cart->add($product, null, 1);
-            } elseif ($this->cart->ensure($product, null, 1) === 0) {
+                $this->cart->add($product, $variant, 1);
+            } elseif ($this->cart->ensure($product, $variant, 1) === 0) {
                 $already++;   // in the cart already — nothing added, nothing to report
 
                 continue;
             }
-            $bundleValue += (float) $product->price;
+            $bundleValue += (float) ($variant->price ?? $product->price);
             $firstProductId ??= $product->id;
-            $addedLines[] = ['product' => $product, 'variant' => null, 'quantity' => 1];
+            $addedLines[] = ['product' => $product, 'variant' => $variant, 'quantity' => 1];
             $added++;
         }
 
@@ -461,6 +472,15 @@ class CartController extends Controller
         // items — including a repeat press, whose pieces were all already in.
         if (($added || $already) && $toCheckout) {
             return redirect()->route('checkout');
+        }
+
+        // The mini-cart's JSON contract, for callers that add a whole set
+        // with fetch and open the drawer (useCart().add).
+        if ($request->expectsJson()) {
+            return response()->json($this->miniPayload([
+                'added' => $added === 1 ? '1 piece' : "$added pieces",
+                'added_count' => $added,
+            ]), $added ? 200 : 422);
         }
 
         return back()->with($added ? 'success' : 'error',
