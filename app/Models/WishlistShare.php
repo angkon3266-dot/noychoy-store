@@ -12,9 +12,15 @@ class WishlistShare extends Model
 
     public static function newCode(): string
     {
+        // No look-alike characters: people read these out on the phone. Drawn
+        // with random_int (a CSPRNG) — str_shuffle runs on mt_rand, whose
+        // output can be predicted, and a guessed code shows someone's list.
+        $alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
         do {
-            // No look-alike characters: people read these out on the phone.
-            $code = substr(str_shuffle(str_repeat('abcdefghjkmnpqrstuvwxyz23456789', 3)), 0, 10);
+            $code = '';
+            for ($i = 0; $i < 10; $i++) {
+                $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
         } while (static::where('code', $code)->exists());
 
         return $code;

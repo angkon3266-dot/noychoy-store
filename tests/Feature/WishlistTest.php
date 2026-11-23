@@ -99,6 +99,14 @@ class WishlistTest extends TestCase
             ->component('Wishlist')->where('shared.owner', 'Nusrat')->has('cards', 1));
     }
 
+    public function test_share_codes_are_ten_unambiguous_characters_and_unique(): void
+    {
+        $codes = collect(range(1, 200))->map(fn () => WishlistShare::newCode());
+
+        $codes->each(fn ($c) => $this->assertMatchesRegularExpression('/^[a-hjkmnp-z2-9]{10}$/', $c));
+        $this->assertCount(200, $codes->unique());
+    }
+
     public function test_an_empty_wishlist_cannot_be_shared(): void
     {
         $this->withCredentials()->withCookie('visitor_token', 'nobody')->postJson(route('wishlist.share'))->assertStatus(422);

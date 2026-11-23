@@ -86,13 +86,35 @@ function recommend(kind, mm, options) {
     const nearest = Math.round(us * 2) / 2;
     const want = Math.abs(us - nearest) <= 0.15 ? nearest : Math.ceil(us * 2) / 2;
     const offered = options.filter((o) => o.num !== null).map((o) => ({ ...o, us: parseFloat(o.num) }));
-    const fit = offered
-        .filter((o) => o.us >= want - 0.01)
-        .sort((a, b) => a.us - b.us)[0]
-        || offered.sort((a, b) => b.us - a.us)[0]
-        || null;
+    // Only a size at least as big as the finger. Offering the largest one
+    // when every size is too small put a "Choose" button on a ring that would
+    // not go over the knuckle — a returned parcel, both ways paid by the store.
+    const fit = offered.filter((o) => o.us >= want - 0.01).sort((a, b) => a.us - b.us)[0] || null;
+    const largest = offered.reduce((m, o) => (m === null || o.us > m.us ? o : m), null);
 
-    return { label: ringLabel(want), exact: want, fit, off: fit && Math.abs(fit.us - want) > 0.01 };
+    return {
+        label: ringLabel(want),
+        exact: want,
+        fit,
+        off: fit && Math.abs(fit.us - want) > 0.01,
+        // More than a whole size up: it will spin on the finger.
+        loose: fit && fit.us - want > 1.01,
+        tooSmall: !fit && largest ? largest.value : null,
+    };
+}
+
+/**
+ * Whether a typed length is a believable finger or hand measurement in mm.
+ * A length typed in centimetres (5.4 for 54 mm) used to come out as
+ * "US -12"; a slip of a digit as US 40.
+ */
+export function measureProblem(kind, value) {
+    const v = parseFloat(value);
+    if (!(v > 0)) return null;
+    const [min, max] = kind === 'bangle' ? [130, 280] : [38, 80];
+    if (v * 10 >= min && v * 10 <= max) return `That looks like centimetres — type it in millimetres (${Math.round(v * 10)}).`;
+    if (v < min || v > max) return `That seems ${v < min ? 'small' : 'large'} for ${kind === 'bangle' ? 'a hand' : 'a finger'} — measure again, in millimetres (${min}–${max}).`;
+    return null;
 }
 
 export default function SizeFinder({ guide, purchase, onClose }) {
@@ -129,7 +151,7 @@ export default function SizeFinder({ guide, purchase, onClose }) {
 
     // The measurement the answer is read from: whichever tab was last used.
     const mm = source === 'measure'
-        ? (parseFloat(measured) > 0 ? parseFloat(measured) / Math.PI : null)
+        ? (parseFloat(measured) > 0 && !measureProblem(kind, measured) ? parseFloat(measured) / Math.PI : null)
         : source === 'chart'
             ? chartPick
             : (source === 'screen' && !calibrating ? diameter : null);
@@ -363,6 +385,9 @@ function Measure({ kind, value, setValue }) {
                     <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-ink-700/60">mm</span>
                 </span>
             </label>
+            {measureProblem(kind, value) && (
+                <p className="mt-2 text-sm font-medium text-danger-600" aria-live="polite">{measureProblem(kind, value)}</p>
+            )}
             <p className="mt-3 text-xs leading-relaxed text-ink-700/60">
                 {bangle
                     ? 'Measure the hand, not the wrist — a bangle has to pass over the knuckles.'
@@ -440,10 +465,17 @@ function Answer({ rec, attrName, onPick }) {
             </p>
             {fit && rec.off && (
                 <p className="mt-1 text-xs text-ink-700/70">
-                    The closest this piece comes in is <strong className="font-semibold text-ink-900">{fit.value}</strong>.
+                    The closest this piece comes in is <strong className="font-semibold text-ink-900">{fit.value}</strong>
+                    {rec.loose ? ' — it will be loose on you.' : '.'}
                 </p>
             )}
-            {!fit && <p className="mt-1 text-xs text-ink-700/70">This piece does not come in that size.</p>}
+            {!fit && (
+                <p className="mt-1 text-xs text-ink-700/70">
+                    {rec.tooSmall
+                        ? <>This piece only goes up to <strong className="font-semibold text-ink-900">{rec.tooSmall}</strong>, which would be too tight.</>
+                        : 'This piece does not come in that size.'}
+                </p>
+            )}
             {fit && (fit.inStock ? (
                 <button type="button" onClick={onPick} className="btn-primary w-full mt-3 !min-h-12">
                     Choose {attrName ? `${attrName.toLowerCase()} ` : ''}{fit.value}

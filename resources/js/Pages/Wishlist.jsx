@@ -160,7 +160,7 @@ export default function Wishlist({ shared, cards, pieces, shareUrl, customerName
                         <div className="sticky bottom-20 lg:bottom-6 z-30 mt-10 flex justify-center">
                             <div className="rounded-full border border-ink-900/10 bg-white/90 backdrop-blur px-3 py-2 shadow-xl flex items-center gap-3">
                                 <span className="pl-3 text-sm text-ink-800">
-                                    {missingSize > 0 ? `Choose ${missingSize === 1 ? 'a size' : `${missingSize} sizes`} to add every piece` : `${items.length} pieces`}
+                                    {missingSize > 0 ? `Choose ${missingSize === 1 ? 'a size' : `${missingSize} sizes`} to add every piece` : `${items.length} piece${items.length === 1 ? '' : 's'}`}
                                 </span>
                                 <button type="button" onClick={() => addSet(items)} disabled={items.length === 0} className="btn-primary !min-h-11 !px-5 text-sm disabled:opacity-50">
                                     Add {missingSize > 0 ? 'the rest' : 'all'} to bag

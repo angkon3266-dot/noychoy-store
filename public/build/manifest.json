@@ -238,7 +238,7 @@
     ]
   },
   "resources/js/Pages/Account/Loved.jsx": {
-    "file": "assets/Loved-C4G61KBC.js",
+    "file": "assets/Loved-Bc0qqJTx.js",
     "name": "Loved",
     "src": "resources/js/Pages/Account/Loved.jsx",
     "isDynamicEntry": true,
@@ -465,7 +465,7 @@
     ]
   },
   "resources/js/Pages/Product.jsx": {
-    "file": "assets/Product-D_ey_PLZ.js",
+    "file": "assets/Product-BUj_A7Kb.js",
     "name": "Product",
     "src": "resources/js/Pages/Product.jsx",
     "isDynamicEntry": true,
@@ -509,7 +509,7 @@
     ]
   },
   "resources/js/Pages/Wishlist.jsx": {
-    "file": "assets/Wishlist-BhYVgduL.js",
+    "file": "assets/Wishlist-BvRgTFZg.js",
     "name": "Wishlist",
     "src": "resources/js/Pages/Wishlist.jsx",
     "isDynamicEntry": true,
@@ -527,7 +527,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-OQx1DGo2.js",
+    "file": "assets/inertia-DuFbaGpD.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,

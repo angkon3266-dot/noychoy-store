@@ -12,7 +12,13 @@ export default function Loved({ products }) {
 
     return (
         <AccountShell wide>
-            <h1 className="display text-3xl sm:text-4xl mb-6">Loved items</h1>
+            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+                <h1 className="display text-3xl sm:text-4xl">Loved items</h1>
+                {/* The shareable wishlist (Nov 2026) is the same list, with a link to send. */}
+                {products.data.length > 0 && urls.wishlist && (
+                    <SmartLink href={urls.wishlist} className="text-sm text-ink-900 lux-link">Share this list →</SmartLink>
+                )}
+            </div>
 
             {products.data.length === 0 ? (
                 <div className="card p-8 text-center text-sm text-ink-700/70">
