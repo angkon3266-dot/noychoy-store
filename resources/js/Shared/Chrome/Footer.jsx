@@ -80,11 +80,6 @@ export default function Footer({ minimal = false }) {
                                     <li key={cat.url}><SmartLink href={cat.url} className={link}>{cat.name}</SmartLink></li>
                                 ))}
                                 {urls.shop && <li><SmartLink href={urls.shop} className={link}>Shop all</SmartLink></li>}
-                                {/* Style tools (Nov 2026) */}
-                                {urls.giftQuiz && <li><SmartLink href={urls.giftQuiz} className={link}>Gift quiz</SmartLink></li>}
-                                {urls.looks && <li><SmartLink href={urls.looks} className={link}>Shop the look</SmartLink></li>}
-                                {urls.stacker && <li><SmartLink href={urls.stacker} className={link}>Bangle &amp; ring stacker</SmartLink></li>}
-                                {urls.tryOn && <li><SmartLink href={urls.tryOn} className={link}>Earring try-on</SmartLink></li>}
                                 {urls.wishlist && <li><SmartLink href={urls.wishlist} className={link}>Wishlist</SmartLink></li>}
                             </ul>
                         </div>

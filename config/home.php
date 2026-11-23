@@ -123,8 +123,6 @@ return [
         // shop's existing price filter. Amounts only; the labels are formatted
         // with the store's own currency so this travels to other installs.
         'show_gift_finder' => true,
-        // Shop the look (Nov 2026): hides itself until a look is set up.
-        'show_looks' => true,
         'gift_finder_title' => 'Shopping for someone?',
         'gift_budgets' => [
             ['min' => null, 'max' => 1000],
@@ -250,7 +248,6 @@ return [
         'best' => ['label' => 'Best sellers', 'toggle' => 'show_best_selling', 'hint' => 'A grid of products.'],
         'recent' => ['label' => 'Recently viewed', 'toggle' => 'show_recently_viewed', 'hint' => 'Each visitor sees what they looked at. Hides itself until there are two.'],
         'gift_finder' => ['label' => 'Gift finder', 'toggle' => 'show_gift_finder', 'hint' => 'Occasion chips and budget buttons on a dark panel.'],
-        'looks' => ['label' => 'Shop the look', 'toggle' => 'show_looks', 'hint' => 'Your styled photos with the pieces pinned on them. Hides itself until a look is set up.'],
         'featured' => ['label' => 'Featured', 'toggle' => 'show_featured', 'hint' => 'One large tile beside a grid of products.'],
         'gifting_steps' => ['label' => 'How gifting works', 'toggle' => 'show_gifting_steps', 'hint' => 'Numbered steps.'],
         'reviews' => ['label' => 'Customer reviews', 'toggle' => 'show_reviews_band', 'hint' => 'Review cards with the average score.'],

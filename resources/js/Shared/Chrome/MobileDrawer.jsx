@@ -157,23 +157,7 @@ export default function MobileDrawer() {
                         <SmartLink href={menu.cta.url} onClick={close} className="btn-primary w-full mt-5">{menu.cta.label}</SmartLink>
                     )}
 
-                    {/* Style tools (Nov 2026) */}
-                    <div className="mt-6 rounded-[22px] border border-ink-900/[0.07] p-2">
-                        <p className="px-3 pt-2 pb-1 eyebrow">Find your piece</p>
-                        {[
-                            [urls.giftQuiz, 'Gift quiz', 'gift'],
-                            [urls.looks, 'Shop the look', 'heart'],
-                            [urls.stacker, 'Stack bangles & rings', 'sparkle'],
-                            [urls.tryOn, 'Try on earrings', 'diamond'],
-                        ].filter(([href]) => href).map(([href, label, icon]) => (
-                            <a key={label} href={href} onClick={close} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-mist-50 text-[14px] text-ink-900">
-                                <Icon name={icon} className="w-5 h-5 text-gold-600" strokeWidth={1.5} />
-                                {label}
-                            </a>
-                        ))}
-                    </div>
-
-                    <div className="mt-3 rounded-[22px] bg-mist-50 p-2">
+                    <div className="mt-6 rounded-[22px] bg-mist-50 p-2">
                         <p className="px-3 pt-2 pb-1 eyebrow">Your account</p>
                         {acctLinks.map(([href, label, icon]) => (
                             <a key={label} href={href} onClick={close} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white text-[14px] text-ink-900">

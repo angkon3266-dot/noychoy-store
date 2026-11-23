@@ -126,17 +126,6 @@ Route::middleware('admin')->group(function () {
     Route::post('categories/{category}/move', [CategoryController::class, 'move'])->name('categories.move');
     Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
 
-    // Shop the look + cut-outs for the try-on and stacker (Nov 2026).
-    Route::get('looks', [\App\Http\Controllers\Admin\LookController::class, 'index'])->name('looks.index');
-    Route::get('looks/create', [\App\Http\Controllers\Admin\LookController::class, 'create'])->name('looks.create');
-    Route::post('looks', [\App\Http\Controllers\Admin\LookController::class, 'store'])->name('looks.store');
-    Route::get('looks/cutouts', [\App\Http\Controllers\Admin\LookController::class, 'cutouts'])->name('looks.cutouts');
-    Route::post('looks/cutouts/{product}', [\App\Http\Controllers\Admin\LookController::class, 'saveCutout'])->name('looks.cutouts.save');
-    Route::delete('looks/cutouts/{product}', [\App\Http\Controllers\Admin\LookController::class, 'removeCutout'])->name('looks.cutouts.remove');
-    Route::get('looks/{look}/edit', [\App\Http\Controllers\Admin\LookController::class, 'edit'])->name('looks.edit');
-    Route::put('looks/{look}', [\App\Http\Controllers\Admin\LookController::class, 'update'])->name('looks.update');
-    Route::delete('looks/{look}', [\App\Http\Controllers\Admin\LookController::class, 'destroy'])->name('looks.destroy');
-
     // Collections — Shopify-style curated groups. Names must all start with
     // 'collections.' so the sidebar active-state and the section gate work.
     Route::get('collections', [CollectionController::class, 'index'])->name('collections.index');

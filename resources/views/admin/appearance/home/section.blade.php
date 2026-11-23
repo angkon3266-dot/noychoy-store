@@ -83,12 +83,6 @@
             <p class="text-sm text-ink-700/70">Shows what joining is worth — the member discount, points and tiers. Those numbers come from the membership settings, so they always match the cart and checkout. It hides itself when membership has no discount or points.</p>
             @break
 
-        @case('looks')
-            <p class="text-sm text-ink-700/70">Up to three of your looks, each a photo with numbered pins on the pieces in it. Make and order them in
-                <a href="{{ route('admin.looks.index') }}" class="text-gold-700 underline">Shop the look</a>;
-                the section hides itself until one has a photo and a pin.</p>
-            @break
-
         @case('spin_wheel')
             <p class="text-sm text-ink-700/70">A band with the wheel and a “Spin now” button. Its heading, slices and prizes are set in
                 <a href="{{ route('admin.offers.index') }}#spin-wheel" class="text-gold-700 underline">Offers → Spin &amp; win wheel</a>,

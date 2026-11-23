@@ -116,7 +116,7 @@ export function CartProvider({ children }) {
     }, [apply, showToast]);
 
     /**
-     * Add a whole set in one request — the stacker, a look, a wishlist (Nov
+     * Add a whole set in one request — the shared wishlist's "Add all" (Nov
      * 2026). `items` is [{ id, variantId?, price, name, contentId }]; a piece
      * that comes in sizes needs its variantId or the server skips it. One
      * AddToCart for the set, as "Frequently bought together" sends, so a

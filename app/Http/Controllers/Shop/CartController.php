@@ -402,7 +402,7 @@ class CartController extends Controller
             'product_ids' => ['required', 'array', 'min:1'],
             'product_ids.*' => ['integer'],
             // product id => variant id, for the pieces that come in sizes
-            // (the stacker, Shop the look, a shared wishlist — Nov 2026).
+            // (the shareable wishlist's "Add all to bag" — Nov 2026).
             // A variant product without one is still skipped, as before.
             'variants' => ['nullable', 'array'],
             'variants.*' => ['nullable', 'integer'],

@@ -11,7 +11,6 @@ import useCountdown from '../Shared/useCountdown';
 import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
 import { t } from '../Shared/i18n';
 import { SpinBand } from '../Shared/SpinWheel';
-import LookViewer from '../Shared/LookViewer';
 
 // The homepage — editorial, conversion-first and gift-led (redesigned
 // 2026-10-24).
@@ -21,10 +20,10 @@ import LookViewer from '../Shared/LookViewer';
 // App\Support\HomeLayout): built-in sections by key, the owner's custom
 // sections as "block:<id>". Every section has an on/off switch and its words,
 // links and products are editable there; copy falls back to sensible defaults.
-const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'spin_wheel', 'membership', 'best', 'recent', 'gift_finder', 'looks', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
+const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'spin_wheel', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
 
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, spinBand, reviewsSection, template, looksSection = [] } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, spinBand, reviewsSection, template } = props;
     // Editorial (2026-10-28) restyles these sections; the rest are shared.
     const ed = template === 'editorial';
 
@@ -41,7 +40,6 @@ export default function Home(props) {
         best: () => (ed ? <EdRanked section={bestSellers} /> : <CardSection section={bestSellers} />),
         recent: () => <CardSection section={recentlyViewed} rail />,
         gift_finder: () => (ed ? <EdGiftFinder finder={giftFinder} /> : <GiftFinder finder={giftFinder} />),
-        looks: () => <LooksBand looks={looksSection} />,
         featured: () => (ed ? <EdFeatured featured={featured} /> : <Featured featured={featured} />),
         gifting_steps: () => <GiftingSteps giftFinder={giftFinder} />,
         reviews: () => (reviewsSection?.show === false ? null : (ed ? <EdReviews reviews={reviews} section={reviewsSection} /> : <ReviewsBand reviews={reviews} section={reviewsSection} />)),
@@ -729,30 +727,9 @@ function GiftFinder({ finder }) {
                                         </SmartLink>
                                     ))}
                                 </div>
-                                <SmartLink href="/gift-finder" className="mt-6 inline-flex items-center gap-2 text-sm text-white/80 hover:text-white lux-link">
-                                    Not sure? Take the 30-second gift quiz <Arrow className="w-3.5 h-3.5" />
-                                </SmartLink>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </section>
-    );
-}
-
-/* ── Shop the look (Nov 2026): up to three styled photos with pins ───────── */
-function LooksBand({ looks }) {
-    const { props } = usePage();
-    if (!looks?.length) return null;
-    const url = props.chrome?.urls?.looks || '/looks';
-
-    return (
-        <section className="py-16 lg:py-24">
-            <div className={shell}>
-                <Heading eyebrow="Styled by us" title="Shop the look" subtitle="Tap a number to see the piece — or take the whole look." action={<ViewAll href={url}>All looks</ViewAll>} />
-                <div className={`grid gap-8 sm:gap-6 ${looks.length === 1 ? 'max-w-xl' : looks.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-                    {looks.map((look) => <LookViewer key={look.id} look={look} compact />)}
                 </div>
             </div>
         </section>

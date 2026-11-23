@@ -8,7 +8,6 @@ import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import LadderRow from '../Shared/LadderRow';
 import OfferCountdown from '../Shared/OfferCountdown';
 import SizeFinder from '../Shared/SizeFinder';
-import SmartLink from '../Shared/SmartLink';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
 import { ordinal, rewardLabel, rewardPhrase, t } from '../Shared/i18n';
@@ -547,7 +546,7 @@ function Gallery({ product, img, setImg, variantId }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────────── */
-function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, sizeGuide, styleTool, reviews, loved, lovesCount, ui, chrome, ladderQuote, onOpenReviews }) {
+function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints, sizeGuide, reviews, loved, lovesCount, ui, chrome, ladderQuote, onOpenReviews }) {
     const { add, gift } = useCart();
     const preorder = product.preorder;
     const lang = chrome?.lang || 'en';
@@ -794,15 +793,6 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                     <WhatsApp />
                     Order or ask on WhatsApp
                 </a>
-            )}
-
-            {/* One quiet line into the style tools (Nov 2026). */}
-            {styleTool && (
-                <SmartLink href={styleTool.url} className="mt-4 flex items-center justify-center gap-2 text-[13px] text-ink-800 hover:text-ink-900">
-                    <Icon name="sparkle" className="w-4 h-4 text-gold-600" />
-                    <span className="lux-link font-medium">{styleTool.label}</span>
-                    <span className="text-ink-700/60">— {styleTool.hint}</span>
-                </SmartLink>
             )}
         </div>
     );
