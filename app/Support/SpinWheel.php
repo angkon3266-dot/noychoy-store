@@ -539,6 +539,9 @@ class SpinWheel
             'won' => $coupon !== null,
             'code' => $coupon?->code,
             'applied' => $applied,
+            // Still spendable (not used, not expired): the storefront keeps a
+            // small reminder of it above the chat buttons while this is true.
+            'live' => $live,
             'note' => $note,
             'min' => $min > 0 ? money($min) : null,
             'gift' => $gift ? ['name' => $gift->name, 'url' => route('product.show', $gift), 'image' => $gift->thumbnail] : null,

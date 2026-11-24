@@ -1,0 +1,103 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\Setting;
+use App\Models\User;
+use App\Support\SpinWheel;
+use App\Support\Storefront\SizeChart;
+use App\Support\Storefront\SizeGuide;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
+
+/**
+ * The owner's own ring and bangle size charts (Nov 2026), which "Find my
+ * size" answers from — on the owner's chart a 60 mm finger is a US 7.
+ */
+class SizeChartTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function admin(): User
+    {
+        return User::firstOrCreate(
+            ['email' => 'owner@sizes.test'],
+            ['name' => 'Owner', 'password' => bcrypt('secret'), 'role' => 'admin'],
+        );
+    }
+
+    public function test_the_standard_charts_apply_until_the_owner_saves_one(): void
+    {
+        $ring = SizeChart::rows('ring');
+        $seven = collect($ring)->firstWhere('size', '7');
+        $this->assertEqualsWithDelta(54.4, $seven['around'], 0.1);
+        $this->assertFalse(SizeChart::isCustom('ring'));
+        $this->assertSame('2.2', SizeChart::rows('bangle')[0]['size']);
+    }
+
+    public function test_the_owner_saves_a_chart_and_the_product_page_sends_it(): void
+    {
+        $this->actingAs($this->admin())->get(route('admin.products.size-chart'))->assertOk()->assertSee('Find my size');
+
+        $this->actingAs($this->admin())->post(route('admin.products.size-chart.update'), [
+            'ring' => [
+                ['size' => '8', 'around' => '62.5'],
+                ['size' => '7', 'around' => '60'],
+                ['size' => '7', 'around' => '61'],   // the same size twice: kept once
+                ['size' => '9', 'around' => '5.4'],  // centimetres: out of range, dropped
+                ['size' => '', 'around' => ''],      // a blank row
+            ],
+            'bangle' => [],
+        ])->assertRedirect(route('admin.products.size-chart'))->assertSessionHas('success');
+
+        Setting::flushMemo();
+        $this->assertSame([['size' => '7', 'around' => 60.0], ['size' => '8', 'around' => 62.5]], SizeChart::rows('ring'));
+        $this->assertTrue(SizeChart::isCustom('ring'));
+        // An empty bangle chart means the standard one, not no sizes.
+        $this->assertFalse(SizeChart::isCustom('bangle'));
+        $this->assertCount(7, SizeChart::rows('bangle'));
+
+        $product = Product::create([
+            'name' => 'Halo Ring', 'slug' => 'halo-ring', 'status' => 'published', 'price' => 1000,
+            'manage_stock' => false, 'in_stock' => true,
+            'category_id' => Category::create(['name' => 'Rings'])->id,
+            'has_variants' => true,
+            'options' => [['name' => 'Size', 'values' => ['7', '8']]],
+        ]);
+
+        $this->get(route('product.show', $product))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('sizeGuide.kind', 'ring')
+            ->where('sizeGuide.chart.0.size', '7')
+            ->where('sizeGuide.chart.0.around', 60));
+    }
+
+    public function test_a_bangle_size_on_the_owners_chart_counts_as_a_size(): void
+    {
+        $category = Category::create(['name' => 'Bangles']);
+        $product = Product::create([
+            'name' => 'Churi', 'slug' => 'churi', 'status' => 'published', 'price' => 900,
+            'manage_stock' => false, 'in_stock' => true, 'category_id' => $category->id,
+            'has_variants' => true,
+            'options' => [['name' => 'Size', 'values' => ['2.5', '2.7']]],
+        ]);
+
+        // Not standard bangle sizes, so no finder…
+        $this->assertNull(SizeGuide::for($product));
+
+        // …until they are on the owner's chart.
+        Setting::put(SizeChart::KEY, ['bangle' => [['size' => '2.5', 'around' => 178], ['size' => '2.7', 'around' => 190]]]);
+        $this->assertSame('Size', SizeGuide::for($product)['attribute']);
+    }
+
+    public function test_staff_without_product_access_cannot_edit_it(): void
+    {
+        $staff = User::create(['name' => 'Packer', 'email' => 'packer@sizes.test', 'password' => bcrypt('x'), 'role' => 'staff']);
+        if ($staff->canAccess('products')) {
+            $this->markTestSkipped('Staff can manage products on this install.');
+        }
+        $this->actingAs($staff)->get(route('admin.products.size-chart'))->assertForbidden();
+    }
+}

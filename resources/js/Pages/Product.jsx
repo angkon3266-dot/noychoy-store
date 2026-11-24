@@ -587,7 +587,17 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
 
     return (
         <div>
-            {product.category && <p className="eyebrow mb-4">{product.category.name}</p>}
+            {/* Love and share as two quiet icons on the eyebrow line (Nov 2026).
+                They were a row of three words under the stars — Love, Share,
+                Drop a hint — between the reviews and the price, and the owner
+                found it busy. "Drop a hint" now lives in the share menu. */}
+            <div className="mb-4 flex items-center justify-between gap-3">
+                {product.category ? <p className="eyebrow">{product.category.name}</p> : <span />}
+                <div className="-mr-2 -my-2 flex shrink-0 items-center">
+                    <LoveButton url={product.love_url} loved={loved} count={lovesCount} />
+                    <ShareButton url={product.url} title={product.name} label="Share" variant="round" placement="down-left" hint={hintFor(product, chrome?.storeName, lang)} />
+                </div>
+            </div>
             <h1 className="display text-[2.1rem] sm:text-[2.6rem] lg:text-5xl">{product.name}</h1>
 
             {/* Five grey stars under a heading say "nobody bought this"; with no
@@ -604,12 +614,6 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
             ) : (
                 <a href="#reviews" onClick={() => onOpenReviews?.(true)} className="mt-3 inline-block text-sm text-ink-700/70 hover:text-ink-900 lux-link">Be the first to review</a>
             )}
-
-            <div className="flex items-center gap-4 flex-wrap">
-                <LoveButton url={product.love_url} loved={loved} count={lovesCount} />
-                <ShareButton url={product.url} title={product.name} label="Share" />
-                <HintLink product={product} storeName={chrome?.storeName} lang={lang} />
-            </div>
 
             <div className="mt-6 pt-6 border-t border-ink-900/[0.08] flex items-baseline gap-3 flex-wrap">
                 <span className="text-[1.9rem] leading-none font-semibold tracking-[-0.02em] text-ink-900">{purchase.priceText()}</span>
@@ -912,28 +916,24 @@ const RulerGlyph = ({ className }) => (
 
 /**
  * "Drop a hint" (Nov 2026): jewellery is mostly bought as a gift, and the
- * person who wants it is rarely the one who pays. One tap opens WhatsApp —
- * how this store's customers talk — with the piece and its link written out,
- * and they choose who gets it. No number of ours is involved and nothing is
- * sent until they press send, so the link needs no setting to be safe.
+ * person who wants it is rarely the one who pays. It opens WhatsApp — how this
+ * store's customers talk — with the piece and its link written out, and they
+ * choose who gets it. No number of ours is involved and nothing is sent until
+ * they press send, so the link needs no setting to be safe. An entry in the
+ * share menu (ShareButton's `hint`), with a line saying what it does.
  */
-function HintLink({ product, storeName, lang }) {
+function hintFor(product, storeName, lang) {
     const store = storeName || 'NoyChoy';
-    const text = lang === 'bn'
+    const bn = lang === 'bn';
+    const text = bn
         ? `একটা ছোট্ট ইঙ্গিত দিলাম 💛 ${store}-এর এই গয়নাটা আমার খুব পছন্দ: ${product.name}\n${product.url}`
         : `Dropping a little hint 💛 I'd love this from ${store}: ${product.name}\n${product.url}`;
 
-    return (
-        <a
-            href={`https://wa.me/?text=${encodeURIComponent(text)}`}
-            target="_blank"
-            rel="noopener"
-            className="inline-flex items-center gap-1.5 text-sm text-ink-700/70 hover:text-gold-700"
-        >
-            <Icon name="gift" className="w-5 h-5" strokeWidth={1.5} />
-            <span>{lang === 'bn' ? 'ইঙ্গিত দিন' : 'Drop a hint'}</span>
-        </a>
-    );
+    return {
+        href: `https://wa.me/?text=${encodeURIComponent(text)}`,
+        label: bn ? 'ইঙ্গিত দিন 💛' : 'Drop a hint 💛',
+        note: bn ? 'উপহার হিসেবে চান? যিনি দেবেন, তাকে WhatsApp-এ জানান' : 'Wish for it as a gift? Tell them on WhatsApp',
+    };
 }
 
 const LOVES_SHOWN_FROM = 10;
@@ -961,10 +961,20 @@ function LoveButton({ url, loved: initialLoved, count: initialCount }) {
         }
     };
 
+    const label = loved ? 'Remove from your wishlist' : 'Save to your wishlist';
+    const many = count >= LOVES_SHOWN_FROM;
+
     return (
-        <button type="button" onClick={toggle} className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-700/80 hover:text-danger-500 transition" aria-pressed={loved} title={loved ? 'Remove from loved' : 'Love this'}>
-            <svg className={`w-5 h-5 transition ${loved ? 'text-danger-500' : ''}`} fill={loved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-            <span>{count >= LOVES_SHOWN_FROM ? `Loved by ${count} people` : (loved ? 'Loved' : 'Love')}</span>
+        <button
+            type="button"
+            onClick={toggle}
+            className="inline-flex h-10 min-w-10 items-center justify-center gap-1 rounded-full px-2 text-ink-700/80 hover:bg-ink-900/[0.05] hover:text-danger-500 transition"
+            aria-pressed={loved}
+            aria-label={many ? `${label} — loved by ${count} people` : label}
+            title={many ? `Loved by ${count} people` : label}
+        >
+            <svg className={`w-[22px] h-[22px] transition ${loved ? 'text-danger-500' : ''}`} fill={loved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.02-4.5-4.5-4.5-1.74 0-3.25.99-4 2.44-.75-1.45-2.26-2.44-4-2.44A4.5 4.5 0 003 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+            {many && <span className="text-xs tabular-nums text-ink-700/70" aria-hidden="true">{count}</span>}
         </button>
     );
 }

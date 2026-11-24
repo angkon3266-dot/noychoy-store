@@ -83,7 +83,7 @@ class SpinWheelTest extends TestCase
         $this->inCart(2000);
 
         $res = $this->postJson('/checkout/spin')->assertOk()
-            ->assertJson(['ok' => true, 'index' => 1, 'result' => ['won' => true, 'applied' => true, 'label' => '10% OFF']]);
+            ->assertJson(['ok' => true, 'index' => 1, 'result' => ['won' => true, 'applied' => true, 'live' => true, 'label' => '10% OFF']]);
 
         $coupon = Coupon::firstOrFail();
         $this->assertSame(SpinWheel::SOURCE, $coupon->source);

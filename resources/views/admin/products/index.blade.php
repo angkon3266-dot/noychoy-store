@@ -57,6 +57,7 @@
         {{-- Carries the filters, so this exports the list actually on screen --}}
         <a href="{{ route('admin.products.export', request()->query()) }}" class="btn-outline"
            title="Download these products as a CSV — opens in Excel">Export CSV</a>
+        <a href="{{ route('admin.products.size-chart') }}" class="btn-outline" title="Your ring and bangle sizes, for &quot;Find my size&quot;">Size chart</a>
         <a href="{{ route('admin.products.import') }}" class="btn-outline">Import CSV</a>
         <a href="{{ route('admin.products.create') }}" class="btn-primary">+ Add product</a>
     </div>

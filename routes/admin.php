@@ -68,6 +68,9 @@ Route::middleware('admin')->group(function () {
     Route::post('products/import', [ProductController::class, 'import'])->name('products.import.store');
     // Above `products/{product}/…` so "export" is never read as a slug.
     Route::get('products/export', [ProductController::class, 'export'])->name('products.export');
+    // The owner's ring and bangle size charts, read by "Find my size".
+    Route::get('products/size-chart', [\App\Http\Controllers\Admin\SizeChartController::class, 'edit'])->name('products.size-chart');
+    Route::post('products/size-chart', [\App\Http\Controllers\Admin\SizeChartController::class, 'update'])->name('products.size-chart.update');
     Route::get('products/{product}/export', [ProductController::class, 'exportOne'])->name('products.export-one');
     Route::post('products', [ProductController::class, 'store'])->name('products.store');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');

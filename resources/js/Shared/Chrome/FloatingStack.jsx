@@ -3,7 +3,7 @@ import { usePage } from '@inertiajs/react';
 import Icon, { Messenger, Phone, WhatsApp } from '../Icons';
 import ShareButton from '../ShareButton';
 import SmartLink from '../SmartLink';
-import { SpinFab, useSpin } from '../SpinWheel';
+import { SpinFab, SpinPrize, useSpin } from '../SpinWheel';
 
 // Floating stacks: share + back-to-top (left), spin / assistant / member
 // offers / call / messenger / WhatsApp (right).
@@ -52,7 +52,9 @@ export default function FloatingStack() {
     const spin = useSpin();
     const spinFab = spin && !spin.result && !spin.blocked;
     const rightCount = [spinFab, ai, offers, floats.call, floats.messenger, floats.whatsapp].filter(Boolean).length;
-    const anyRight = rightCount > 0;
+    // A prize won on the wheel and not yet spent rides on top of the stack.
+    const prize = !!(spin?.result?.won && spin.result.live);
+    const anyRight = rightCount > 0 || prize;
     // One button needs no launcher; two or more fold behind one on phones.
     const folded = rightCount > 1;
 
@@ -96,6 +98,8 @@ export default function FloatingStack() {
             {/* Right: spin, assistant, offers, call, messenger, WhatsApp */}
             {anyRight && (
                 <div ref={stackRef} className={`fixed right-5 z-50 flex flex-col items-center gap-3 ${rightPos}`}>
+                    {/* Out of the way while the stack is open on a phone. */}
+                    {prize && <SpinPrize className={`self-end ${open ? 'hidden md:flex' : 'flex'}`} />}
                     <div
                         id="floating-contact"
                         className={`flex-col items-center gap-3 md:flex ${folded && !open ? 'hidden' : 'flex'} ${folded ? 'pop-in' : ''}`}

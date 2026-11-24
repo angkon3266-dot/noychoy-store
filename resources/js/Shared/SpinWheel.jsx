@@ -437,6 +437,50 @@ export function SpinFab() {
     );
 }
 
+/**
+ * The prize she won, kept in sight (owner, Nov 2026): a small pill on top of
+ * the floating chat buttons for as long as the prize can still be spent, so it
+ * is not forgotten the moment the wheel closes. Still — no motion, no badge —
+ * and the × puts it away for the rest of the visit. A tap opens the wheel,
+ * which says where the prize stands (in the bag, how much more to spend…).
+ */
+export function SpinPrize({ className = '' }) {
+    const spin = useSpin();
+    const r = spin?.result;
+    const key = r?.code ? `nc_prize_hidden:${r.code}` : null;
+    const [hidden, setHidden] = useState(() => (key ? ss.get(key) === '1' : false));
+
+    if (!r?.won || !r.live || hidden) return null;
+
+    return (
+        <div className={`items-center rounded-full bg-ink-900 text-white shadow-lg ring-1 ring-gold-400/50 ${className}`}>
+            <button
+                type="button"
+                onClick={openSpinWheel}
+                className="flex max-w-[14rem] items-center gap-2 rounded-full py-1.5 pl-1.5 pr-1 text-left text-xs"
+                aria-label={`Your spin prize: ${r.label}${r.applied ? ', applied to your bag' : ''}. Show details`}
+            >
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold-400 text-ink-900" aria-hidden="true">
+                    <Icon name="gift" className="w-3.5 h-3.5" strokeWidth={2} />
+                </span>
+                <span className="min-w-0 truncate" aria-hidden="true">
+                    <span className="font-semibold text-gold-300">{r.label}</span>
+                    <span className="text-white/75">{r.applied ? ' · applied ✓' : ' · yours'}</span>
+                </span>
+            </button>
+            <button
+                type="button"
+                onClick={() => { ss.set(key, '1'); setHidden(true); }}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-white/60 hover:text-white"
+                aria-label="Hide the prize reminder"
+                title="Hide"
+            >
+                <Icon name="close" className="w-3 h-3" />
+            </button>
+        </div>
+    );
+}
+
 /** A menu entry: "Spin & win", for the header and the drawer. */
 export function SpinMenuButton({ className = '', onClick }) {
     const spin = useSpin();

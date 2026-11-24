@@ -32,6 +32,14 @@ class SizeGuideTest extends TestCase
         ]);
     }
 
+    /** SizeGuide::for without the chart rows, which have tests of their own. */
+    protected function guide(Product $product): ?array
+    {
+        $guide = SizeGuide::for($product);
+
+        return $guide === null ? null : \Illuminate\Support\Arr::except($guide, 'chart');
+    }
+
     public function test_a_sized_ring_gets_the_ring_finder_on_its_size_option(): void
     {
         $parent = Category::create(['name' => 'Ring']);
@@ -42,7 +50,7 @@ class SizeGuideTest extends TestCase
             'options' => [['name' => 'Colour', 'values' => ['Gold', 'Silver']], ['name' => 'Size', 'values' => ['6', '7', '8']]],
         ]);
 
-        $this->assertSame(['kind' => 'ring', 'attribute' => 'Size'], SizeGuide::for($product));
+        $this->assertSame(['kind' => 'ring', 'attribute' => 'Size'], $this->guide($product));
 
         $this->get(route('product.show', $product))
             ->assertOk()
@@ -61,7 +69,7 @@ class SizeGuideTest extends TestCase
             'options' => [['name' => 'Option', 'values' => ['6', '7']]],
         ]);
 
-        $this->assertNull(SizeGuide::for($product));
+        $this->assertNull($this->guide($product));
     }
 
     public function test_an_unnamed_option_of_ring_numbers_is_picked_on_a_ring(): void
@@ -72,7 +80,7 @@ class SizeGuideTest extends TestCase
             'options' => [['name' => 'Option', 'values' => ['US 6', 'US 6.5', 'US 7']]],
         ]);
 
-        $this->assertSame(['kind' => 'ring', 'attribute' => 'Option'], SizeGuide::for($product));
+        $this->assertSame(['kind' => 'ring', 'attribute' => 'Option'], $this->guide($product));
     }
 
     public function test_a_wordy_value_beside_the_sizes_does_not_switch_it_off(): void
@@ -94,7 +102,7 @@ class SizeGuideTest extends TestCase
             'options' => [['name' => 'Size', 'values' => ['2.4', '2.6', '2.8', '2.10']]],
         ]);
 
-        $this->assertSame(['kind' => 'bangle', 'attribute' => 'Size'], SizeGuide::for($product));
+        $this->assertSame(['kind' => 'bangle', 'attribute' => 'Size'], $this->guide($product));
     }
 
     public function test_nothing_to_pick_means_no_finder(): void

@@ -40,7 +40,7 @@ class SizeGuide
 
     private const RING_MAX = 13.5;
 
-    /** @return array{kind: string, attribute: ?string}|null */
+    /** @return array{kind: string, attribute: string, chart: list<array{size: string, around: float}>}|null */
     public static function for(Product $product): ?array
     {
         $options = collect($product->options ?? [])
@@ -66,7 +66,9 @@ class SizeGuide
 
         // Nothing to pick (a one-size or adjustable piece): no finder, so the
         // page does not grow a link that leads nowhere.
-        return $attribute ? ['kind' => $kind, 'attribute' => $attribute] : null;
+        // The chart goes with it: the owner's own sizes, or the standard ones
+        // (SizeChart), so the finder answers in the sizes this store sells.
+        return $attribute ? ['kind' => $kind, 'attribute' => $attribute, 'chart' => SizeChart::rows($kind)] : null;
     }
 
     private static function kindFromCategories(Product $product): ?string
@@ -113,6 +115,8 @@ class SizeGuide
     private static function allAre(string $kind, array $values): bool
     {
         $numbered = 0;
+        // A size on the owner's own chart counts too, whatever its number.
+        $charted = array_map(fn ($s) => (preg_match('/(\d+(?:\.\d+)?)/', $s, $c) ? $c[1] : $s), SizeChart::sizes($kind));
 
         foreach ($values as $value) {
             if (! preg_match('/(\d+(?:\.\d+)?)/', (string) $value, $m)) {
@@ -121,9 +125,9 @@ class SizeGuide
             $numbered++;
             $n = (float) $m[1];
 
-            $ok = $kind === self::BANGLE
+            $ok = in_array($m[1], $charted, true) || ($kind === self::BANGLE
                 ? preg_match('/^2\.(2|4|6|8|10|12|14)$/', $m[1]) === 1
-                : $n >= self::RING_MIN && $n <= self::RING_MAX;
+                : $n >= self::RING_MIN && $n <= self::RING_MAX);
 
             if (! $ok) {
                 return false;
