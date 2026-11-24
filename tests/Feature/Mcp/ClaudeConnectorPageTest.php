@@ -49,9 +49,42 @@ class ClaudeConnectorPageTest extends TestCase
     public function test_managers_and_staff_cannot_open_it(): void
     {
         foreach (['manager', 'staff'] as $role) {
-            $this->actingAs(User::factory()->create(['role' => $role]))
-                ->get(route('admin.api-tokens'))->assertForbidden();
+            $user = User::factory()->create(['role' => $role]);
+            $this->actingAs($user)->get(route('admin.api-tokens'))->assertForbidden();
+            $this->actingAs($user)->get(route('admin.api-tokens.blueprint'))->assertForbidden();
+            $this->actingAs($user)->get(route('admin.api-tokens.blueprint.download'))->assertForbidden();
         }
+    }
+
+    public function test_the_blueprint_page_explains_the_build_and_lists_every_tool_live(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)->get(route('admin.api-tokens'))->assertSee(route('admin.api-tokens.blueprint'));
+
+        $res = $this->actingAs($admin)->get(route('admin.api-tokens.blueprint'))->assertOk()
+            ->assertSee('Porting it to another Laravel store')
+            ->assertSee('AdminAction.php')
+            ->assertSee('/oauth/register')
+            ->assertSee('A prompt to hand Claude Code');
+
+        $count = count((new \ReflectionClass(\App\Mcp\StoreServer::class))->getDefaultProperties()['tools']);
+        $res->assertSee("The {$count} tools in this store")
+            ->assertSee('update_order_status')
+            ->assertSee('Orders\UpdateOrderStatus');
+    }
+
+    public function test_the_blueprint_downloads_as_markdown_with_the_tool_appendix(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $res = $this->actingAs($admin)->get(route('admin.api-tokens.blueprint.download'))->assertOk();
+
+        $this->assertStringContainsString('attachment; filename="claude-connector-blueprint.md"', $res->headers->get('Content-Disposition'));
+        $body = $res->getContent();
+        $this->assertStringStartsWith('# How the Claude connector is built', $body);
+        $this->assertStringContainsString('| `send_customer_sms` | customers | destructive |', $body);
+        $this->assertStringContainsString('| `store_info` | any | read-only |', $body);
     }
 
     public function test_the_audit_log_is_pruned_after_a_year(): void

@@ -487,6 +487,8 @@ Route::middleware('admin')->group(function () {
     Route::get('api-tokens', [ApiTokenController::class, 'index'])->name('api-tokens');
     Route::post('api-tokens', [ApiTokenController::class, 'store'])->name('api-tokens.store');
     Route::delete('api-tokens/{apiToken}', [ApiTokenController::class, 'destroy'])->name('api-tokens.destroy');
+    Route::get('api-tokens/blueprint', [ApiTokenController::class, 'blueprint'])->name('api-tokens.blueprint');
+    Route::get('api-tokens/blueprint.md', [ApiTokenController::class, 'blueprintDownload'])->name('api-tokens.blueprint.download');
 
     // ── System Configuration Manager (Super Admin only) ────────────────────
     Route::prefix('system-config')->name('system-config.')->group(function () {

@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApiToken;
+use App\Mcp\StoreServer;
+use App\Mcp\Tools\StoreTool;
 use App\Models\McpToolCall;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Admin → Claude connector (route name kept as `api-tokens`, an admin-only
@@ -29,6 +32,62 @@ class ApiTokenController extends Controller
             'callsToday' => McpToolCall::where('created_at', '>=', now()->subDay())->count(),
             'failedToday' => McpToolCall::where('created_at', '>=', now()->subDay())->where('ok', false)->count(),
         ]);
+    }
+
+    /**
+     * "How it's built" — the blueprint for building the same connector into
+     * another store. One Markdown source (docs/CLAUDE-CONNECTOR-BLUEPRINT.md)
+     * for both this page and the download, plus the tool list read live from
+     * StoreServer so it can never fall behind the code.
+     */
+    public function blueprint()
+    {
+        return view('admin.connector-blueprint', [
+            'html' => Str::markdown(self::blueprintMarkdown(), ['html_input' => 'escape', 'allow_unsafe_links' => false]),
+            'tools' => self::toolCatalogue(),
+            'mcpUrl' => url('/mcp'),
+        ]);
+    }
+
+    public function blueprintDownload()
+    {
+        $md = rtrim(self::blueprintMarkdown())."\n\n## Appendix — the tools in this store\n\n"
+            ."| Tool | Section | Kind | What it does |\n|---|---|---|---|\n"
+            .collect(self::toolCatalogue())->map(fn ($t) => '| `'.$t['name'].'` | '.($t['section'] ?? 'any').' | '.$t['kind'].' | '.str_replace('|', '/', $t['description']).' |')->implode("\n")."\n";
+
+        return response($md, 200, [
+            'Content-Type' => 'text/markdown; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="claude-connector-blueprint.md"',
+        ]);
+    }
+
+    private static function blueprintMarkdown(): string
+    {
+        return (string) @file_get_contents(base_path('docs/CLAUDE-CONNECTOR-BLUEPRINT.md'));
+    }
+
+    /** @return array<int,array{name:string,section:?string,kind:string,description:string,class:string}> */
+    private static function toolCatalogue(): array
+    {
+        $classes = (new \ReflectionClass(StoreServer::class))->getDefaultProperties()['tools'];
+
+        return collect($classes)->map(function (string $class) {
+            /** @var StoreTool $tool */
+            $tool = app($class);
+            $annotations = $tool->annotations();
+
+            return [
+                'name' => $tool->name(),
+                'section' => $tool->section(),
+                'kind' => match (true) {
+                    ! empty($annotations['readOnlyHint']) => 'read-only',
+                    ! empty($annotations['destructiveHint']) => 'destructive',
+                    default => 'changes data',
+                },
+                'description' => $tool->description(),
+                'class' => Str::after($class, 'App\\Mcp\\Tools\\'),
+            ];
+        })->all();
     }
 
     public function store(Request $request)

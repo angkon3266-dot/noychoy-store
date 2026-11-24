@@ -29,6 +29,10 @@
             sections that person’s role can open. It asks before deleting anything, changing an order or texting a customer,
             and every action is listed at the bottom of this page.
         </p>
+        <p class="text-sm mb-4">
+            <a href="{{ route('admin.api-tokens.blueprint') }}" class="font-medium underline">How it’s built →</a>
+            <span class="text-ink-700/60">the architecture, files, sign-in flow and every tool, with steps and a ready prompt for building it into another store.</span>
+        </p>
         <label class="label">Connector URL</label>
         <div class="flex gap-2">
             <input readonly value="{{ $mcpUrl }}" class="input font-mono text-sm" onclick="this.select()">
