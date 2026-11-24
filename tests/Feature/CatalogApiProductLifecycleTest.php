@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ApiToken;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,7 +23,7 @@ class CatalogApiProductLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        [, $this->token] = ApiToken::issue('Lifecycle');
+        [, $this->token] = ApiToken::issue('Lifecycle', null, null, User::factory()->create(['role' => 'admin']));
         Category::create(['name' => 'Earrings', 'slug' => 'earrings', 'is_active' => true]);
     }
 
@@ -35,7 +36,7 @@ class CatalogApiProductLifecycleTest extends TestCase
     {
         return $this->postJson('/mcp', [
             'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call',
-            'params' => ['name' => $tool, 'arguments' => $arguments],
+            'params' => ['name' => $tool, 'arguments' => (object) $arguments],
         ], $this->auth());
     }
 
@@ -128,13 +129,15 @@ class CatalogApiProductLifecycleTest extends TestCase
 
         $res = $this->mcp('delete_product', ['product' => 'keep-me'])->assertOk();
 
-        $this->assertStringContainsString('confirm=true', $res->json('error.message'));
+        $this->assertTrue($res->json('result.isError'));
+        $this->assertStringContainsString('confirm=true', $res->json('result.content.0.text'));
         $this->assertDatabaseHas('products', ['slug' => 'keep-me', 'deleted_at' => null]);
     }
 
     public function test_mcp_create_needs_name_and_price(): void
     {
         $res = $this->mcp('create_product', ['name' => 'No price'])->assertOk();
-        $this->assertSame(-32602, $res->json('error.code'));
+        $this->assertTrue($res->json('result.isError'));
+        $this->assertStringContainsString('name and price', $res->json('result.content.0.text'));
     }
 }

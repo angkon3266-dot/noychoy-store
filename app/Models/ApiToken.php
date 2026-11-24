@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
@@ -15,13 +16,29 @@ use Illuminate\Support\Str;
  */
 class ApiToken extends Model
 {
-    protected $fillable = ['name', 'token_hash', 'prefix', 'abilities', 'last_used_at', 'expires_at'];
+    protected $fillable = [
+        'user_id', 'name', 'kind', 'client_id', 'token_hash', 'refresh_hash', 'prefix', 'abilities',
+        'last_used_at', 'expires_at', 'refresh_expires_at',
+    ];
 
     protected $casts = [
         'abilities' => 'array',
         'last_used_at' => 'datetime',
         'expires_at' => 'datetime',
+        'refresh_expires_at' => 'datetime',
     ];
+
+    /** Pasted into Claude Code / Desktop by hand. */
+    public const KIND_MANUAL = 'manual';
+
+    /** Minted by the OAuth flow (claude.ai custom connector). */
+    public const KIND_OAUTH = 'oauth';
+
+    /** The admin user this token acts as. Its role decides what it can reach. */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /** Distinguishes our tokens from anything else pasted into a Bearer header. */
     public const PREFIX = 'mec_';
@@ -32,19 +49,64 @@ class ApiToken extends Model
      *
      * @return array{0: static, 1: string}
      */
-    public static function issue(string $name, ?array $abilities = null, ?\DateTimeInterface $expiresAt = null): array
+    public static function issue(string $name, ?array $abilities = null, ?\DateTimeInterface $expiresAt = null, ?User $user = null, array $extra = []): array
     {
-        $plain = self::PREFIX.Str::random(48);
+        $plain = self::newPlain();
 
         $token = static::create([
+            'user_id' => $user?->id,
             'name' => $name,
             'token_hash' => hash('sha256', $plain),
             'prefix' => substr($plain, 0, 12),
             'abilities' => $abilities,
             'expires_at' => $expiresAt,
+            ...$extra,
         ]);
 
         return [$token, $plain];
+    }
+
+    public static function newPlain(): string
+    {
+        return self::PREFIX.Str::random(48);
+    }
+
+    /**
+     * Swap in a fresh access token (and refresh token) on this same row — an
+     * OAuth refresh. The old pair stops working the moment this returns.
+     *
+     * @return array{0: string, 1: string} [access, refresh]
+     */
+    public function rotate(\DateTimeInterface $expiresAt, \DateTimeInterface $refreshExpiresAt): array
+    {
+        $access = self::newPlain();
+        $refresh = 'mcr_'.Str::random(48);
+
+        $this->forceFill([
+            'token_hash' => hash('sha256', $access),
+            'prefix' => substr($access, 0, 12),
+            'refresh_hash' => hash('sha256', $refresh),
+            'expires_at' => $expiresAt,
+            'refresh_expires_at' => $refreshExpiresAt,
+        ])->save();
+
+        return [$access, $refresh];
+    }
+
+    /** Resolve a presented refresh token, or null when unknown or expired. */
+    public static function findByRefresh(?string $plain): ?static
+    {
+        if (blank($plain)) {
+            return null;
+        }
+
+        $token = static::where('refresh_hash', hash('sha256', $plain))->first();
+
+        if (! $token || ($token->refresh_expires_at && $token->refresh_expires_at->isPast())) {
+            return null;
+        }
+
+        return $token;
     }
 
     /** Resolve a presented token, or null when it is unknown or expired. */

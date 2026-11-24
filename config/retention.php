@@ -30,6 +30,10 @@ return [
 
         // Who changed which setting. Audit trail: kept a year.
         'config_audit_logs' => (int) env('RETAIN_CONFIG_AUDIT_LOGS_DAYS', 365),
+
+        // Every tool call made through the Claude connector (Admin → Claude
+        // connector). An audit trail, so kept a year like the one above.
+        'mcp_tool_calls' => (int) env('RETAIN_MCP_TOOL_CALLS_DAYS', 365),
     ],
 
     /*

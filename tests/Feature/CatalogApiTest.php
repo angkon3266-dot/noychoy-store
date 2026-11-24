@@ -6,6 +6,7 @@ use App\Models\ApiToken;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\User;
 use App\Services\ImageOptimizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -32,7 +33,7 @@ class CatalogApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        [, $this->token] = ApiToken::issue('Test');
+        [, $this->token] = ApiToken::issue('Test', null, null, User::factory()->create(['role' => 'admin']));
     }
 
     protected function auth(array $extra = []): array
@@ -84,7 +85,7 @@ class CatalogApiTest extends TestCase
     public function test_an_expired_token_is_refused(): void
     {
         ApiToken::query()->delete();
-        [, $plain] = ApiToken::issue('Old', null, now()->subDay());
+        [, $plain] = ApiToken::issue('Old', null, now()->subDay(), User::factory()->create(['role' => 'admin']));
 
         $this->getJson('/api/v1/products', ['Authorization' => 'Bearer '.$plain])->assertStatus(401);
     }
@@ -218,70 +219,5 @@ class CatalogApiTest extends TestCase
         $this->assertDatabaseHas('product_images', ['id' => $img->id]);
     }
 
-    // ── MCP ──────────────────────────────────────────────────────────────────
-
-    public function test_mcp_initialize_advertises_tools(): void
-    {
-        $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize'], $this->auth())
-            ->assertOk()
-            ->assertJsonPath('result.protocolVersion', '2025-06-18')
-            ->assertJsonPath('result.capabilities.tools.listChanged', false);
-    }
-
-    public function test_mcp_lists_the_catalogue_tools(): void
-    {
-        $names = collect($this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'], $this->auth())
-            ->assertOk()->json('result.tools'))->pluck('name');
-
-        foreach (['search_products', 'get_product', 'upload_product_image', 'set_primary_image', 'delete_product_image', 'update_product'] as $tool) {
-            $this->assertContains($tool, $names);
-        }
-    }
-
-    public function test_mcp_can_search_products(): void
-    {
-        $this->product('Pearl Drops');
-
-        $text = $this->postJson('/mcp', [
-            'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call',
-            'params' => ['name' => 'search_products', 'arguments' => ['query' => 'pearl']],
-        ], $this->auth())->assertOk()->json('result.content.0.text');
-
-        $this->assertStringContainsString('Pearl Drops', $text);
-    }
-
-    public function test_mcp_can_update_a_product_by_slug(): void
-    {
-        $p = $this->product();
-
-        $this->postJson('/mcp', [
-            'jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/call',
-            'params' => ['name' => 'update_product', 'arguments' => ['product' => $p->slug, 'price' => 2100]],
-        ], $this->auth())->assertOk()->assertJsonPath('result.isError', false);
-
-        $this->assertEquals(2100, $p->fresh()->price);
-    }
-
-    public function test_mcp_reports_a_missing_product_as_a_jsonrpc_error(): void
-    {
-        $res = $this->postJson('/mcp', [
-            'jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/call',
-            'params' => ['name' => 'get_product', 'arguments' => ['product' => 'does-not-exist']],
-        ], $this->auth())->assertOk();
-
-        // An agent needs a usable next step, not a stack trace.
-        $this->assertStringContainsString('search_products', $res->json('error.message'));
-    }
-
-    public function test_mcp_rejects_an_unknown_method(): void
-    {
-        $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 6, 'method' => 'nonsense'], $this->auth())
-            ->assertOk()->assertJsonPath('error.code', -32601);
-    }
-
-    public function test_mcp_notifications_get_no_body(): void
-    {
-        $this->postJson('/mcp', ['jsonrpc' => '2.0', 'method' => 'notifications/initialized'], $this->auth())
-            ->assertNoContent();
-    }
+    // The MCP endpoint has its own suite: tests/Feature/Mcp.
 }

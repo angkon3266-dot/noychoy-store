@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\Api\McpController;
+use App\Mcp\StoreServer;
 use App\Http\Controllers\Api\V1\ProductApiController;
 use App\Http\Controllers\Api\V1\ProductImageApiController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Mcp\Facades\Mcp;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 | an agent in a loop should hit a limit, not the CPU ceiling of shared hosting.
 */
 
-Route::middleware(['api.token', 'throttle:60,1'])->group(function () {
+Route::middleware(['api.token:products', 'throttle:60,1'])->group(function () {
     Route::prefix('api/v1')->group(function () {
         Route::get('categories', [ProductApiController::class, 'categories']);
         Route::get('products', [ProductApiController::class, 'index']);
@@ -33,6 +34,9 @@ Route::middleware(['api.token', 'throttle:60,1'])->group(function () {
         Route::patch('products/{product}/images/{image}', [ProductImageApiController::class, 'update']);
         Route::delete('products/{product}/images/{image}', [ProductImageApiController::class, 'destroy']);
     });
-
-    Route::post('mcp', [McpController::class, 'handle']);
 });
+
+// The Claude connector (App\Mcp\StoreServer). The token decides which admin
+// user Claude acts as; each tool then checks that user's role. 120/min: a
+// single "tidy up these 30 products" request is many quick calls.
+Mcp::web('mcp', StoreServer::class)->middleware(['api.token', 'throttle:120,1']);

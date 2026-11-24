@@ -31,6 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // on purpose: no session, no cookies, no CSRF token to fetch — the
             // callers are scripts and agents, not browsers.
             Route::group([], base_path('routes/api.php'));
+
+            // OAuth for claude.ai's custom connector: discovery + token are
+            // session-free; the consent screen opts into `web` itself.
+            Route::group([], base_path('routes/oauth.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
