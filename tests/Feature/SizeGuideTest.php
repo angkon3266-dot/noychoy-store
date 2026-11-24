@@ -32,12 +32,12 @@ class SizeGuideTest extends TestCase
         ]);
     }
 
-    /** SizeGuide::for without the chart rows, which have tests of their own. */
+    /** SizeGuide::for without the chart rows and pictures, which have tests of their own. */
     protected function guide(Product $product): ?array
     {
         $guide = SizeGuide::for($product);
 
-        return $guide === null ? null : \Illuminate\Support\Arr::except($guide, 'chart');
+        return $guide === null ? null : \Illuminate\Support\Arr::except($guide, ['chart', 'images']);
     }
 
     public function test_a_sized_ring_gets_the_ring_finder_on_its_size_option(): void

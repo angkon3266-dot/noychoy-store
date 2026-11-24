@@ -10,6 +10,8 @@ use App\Support\SpinWheel;
 use App\Support\Storefront\SizeChart;
 use App\Support\Storefront\SizeGuide;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -90,6 +92,47 @@ class SizeChartTest extends TestCase
         // …until they are on the owner's chart.
         Setting::put(SizeChart::KEY, ['bangle' => [['size' => '2.5', 'around' => 178], ['size' => '2.7', 'around' => 190]]]);
         $this->assertSame('Size', SizeGuide::for($product)['attribute']);
+    }
+
+    public function test_the_owner_adds_and_removes_pictures(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin())->post(route('admin.products.size-chart.update'), [
+            'ring_measure_image' => UploadedFile::fake()->image('tape.jpg', 900, 700),
+            'bangle_chart_image' => UploadedFile::fake()->image('chart.png', 800, 1000),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        Setting::flushMemo();
+        $paths = Setting::get(SizeChart::IMAGES_KEY);
+        Storage::disk('public')->assertExists($paths['ring']['measure']);
+        Storage::disk('public')->assertExists($paths['bangle']['chart']);
+        $this->assertNotNull(SizeChart::images('ring')['measure']);
+        $this->assertNull(SizeChart::images('ring')['chart']);
+
+        // A piece's finder gets the pictures of its kind.
+        $product = Product::create([
+            'name' => 'Band', 'slug' => 'band', 'status' => 'published', 'price' => 900,
+            'manage_stock' => false, 'in_stock' => true,
+            'category_id' => Category::create(['name' => 'Rings'])->id,
+            'has_variants' => true, 'options' => [['name' => 'Size', 'values' => ['6', '7']]],
+        ]);
+        $this->assertSame(SizeChart::images('ring'), SizeGuide::for($product)['images']);
+
+        // Saving again without a file keeps it; "remove" deletes the file.
+        $this->actingAs($this->admin())->post(route('admin.products.size-chart.update'), [])->assertRedirect();
+        Setting::flushMemo();
+        Storage::disk('public')->assertExists($paths['ring']['measure']);
+
+        $this->actingAs($this->admin())->post(route('admin.products.size-chart.update'), ['remove_ring_measure_image' => '1'])->assertRedirect();
+        Setting::flushMemo();
+        Storage::disk('public')->assertMissing($paths['ring']['measure']);
+        $this->assertNull(SizeChart::images('ring')['measure']);
+
+        // Not a picture: refused, with words.
+        $this->actingAs($this->admin())->post(route('admin.products.size-chart.update'), [
+            'ring_chart_image' => UploadedFile::fake()->create('chart.pdf', 100, 'application/pdf'),
+        ])->assertSessionHasErrors(['ring_chart_image' => 'A picture must be a JPG, PNG or WebP image.']);
     }
 
     public function test_staff_without_product_access_cannot_edit_it(): void

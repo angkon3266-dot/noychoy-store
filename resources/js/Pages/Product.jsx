@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import Layout from '../Shared/Chrome/Layout';
 import ProductCard from '../Shared/ProductCard';
-import ShareButton from '../Shared/ShareButton';
 import RichText from '../Shared/RichText';
 import Icon, { IconOrGlyph, Star, WhatsApp } from '../Shared/Icons';
 import LadderRow from '../Shared/LadderRow';
@@ -78,9 +77,6 @@ export default function Product(props) {
             <Description text={product.description} />
             <Details specs={product.specs} />
             <Care text={props.care} />
-            <div className="max-w-3xl mt-6 border-t border-ink-900/[0.08] pt-4">
-                <ShareButton url={product.url} title={product.name} label="Share" />
-            </div>
             <CardStrip title="You may also like" products={props.related} cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-5" />
             <CardStrip title="Recently viewed" products={props.recentlyViewed} cols="grid-cols-2 md:grid-cols-4" />
             <StickyBar {...props} purchase={purchase} />
@@ -587,15 +583,15 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
 
     return (
         <div>
-            {/* Love and share as two quiet icons on the eyebrow line (Nov 2026).
-                They were a row of three words under the stars — Love, Share,
-                Drop a hint — between the reviews and the price, and the owner
-                found it busy. "Drop a hint" now lives in the share menu. */}
+            {/* The heart and "Ask for it as a gift" on the eyebrow line (Nov
+                2026). They were a row of three words under the stars — Love,
+                Share, Drop a hint — and the owner found it busy; Share went,
+                and the hint got words that say what it is for. */}
             <div className="mb-4 flex items-center justify-between gap-3">
-                {product.category ? <p className="eyebrow">{product.category.name}</p> : <span />}
-                <div className="-mr-2 -my-2 flex shrink-0 items-center">
+                {product.category ? <p className="eyebrow min-w-0 truncate">{product.category.name}</p> : <span />}
+                <div className="-mr-2 -my-2 flex shrink-0 items-center gap-1">
+                    <GiftAsk product={product} storeName={chrome?.storeName} lang={lang} />
                     <LoveButton url={product.love_url} loved={loved} count={lovesCount} />
-                    <ShareButton url={product.url} title={product.name} label="Share" variant="round" placement="down-left" hint={hintFor(product, chrome?.storeName, lang)} />
                 </div>
             </div>
             <h1 className="display text-[2.1rem] sm:text-[2.6rem] lg:text-5xl">{product.name}</h1>
@@ -915,25 +911,34 @@ const RulerGlyph = ({ className }) => (
 );
 
 /**
- * "Drop a hint" (Nov 2026): jewellery is mostly bought as a gift, and the
- * person who wants it is rarely the one who pays. It opens WhatsApp — how this
- * store's customers talk — with the piece and its link written out, and they
- * choose who gets it. No number of ours is involved and nothing is sent until
- * they press send, so the link needs no setting to be safe. An entry in the
- * share menu (ShareButton's `hint`), with a line saying what it does.
+ * "Ask for it as a gift" (Nov 2026; first called "Drop a hint" / "ইঙ্গিত
+ * দিন", which the owner found unclear). Jewellery is mostly bought as a gift,
+ * and the person who wants it is rarely the one who pays. It opens WhatsApp —
+ * how this store's customers talk — with the piece and its link written out,
+ * and they choose who gets it (a husband, a parent, a friend). No number of
+ * ours is involved and nothing is sent until they press send.
  */
-function hintFor(product, storeName, lang) {
+function GiftAsk({ product, storeName, lang }) {
     const store = storeName || 'NoyChoy';
     const bn = lang === 'bn';
     const text = bn
-        ? `একটা ছোট্ট ইঙ্গিত দিলাম 💛 ${store}-এর এই গয়নাটা আমার খুব পছন্দ: ${product.name}\n${product.url}`
-        : `Dropping a little hint 💛 I'd love this from ${store}: ${product.name}\n${product.url}`;
+        ? `এটা আমার খুব পছন্দ হয়েছে 💛 উপহার হিসেবে পেলে খুশি হব: ${product.name} (${store})
+${product.url}`
+        : `I'd love this as a gift 💛 ${product.name} from ${store}
+${product.url}`;
 
-    return {
-        href: `https://wa.me/?text=${encodeURIComponent(text)}`,
-        label: bn ? 'ইঙ্গিত দিন 💛' : 'Drop a hint 💛',
-        note: bn ? 'উপহার হিসেবে চান? যিনি দেবেন, তাকে WhatsApp-এ জানান' : 'Wish for it as a gift? Tell them on WhatsApp',
-    };
+    return (
+        <a
+            href={`https://wa.me/?text=${encodeURIComponent(text)}`}
+            target="_blank"
+            rel="noopener"
+            title={bn ? 'WhatsApp-এ কাউকে পাঠান, যাতে তিনি এটা আপনাকে উপহার দিতে পারেন' : 'Send it on WhatsApp to someone who might gift it to you'}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink-900/10 px-3 text-xs font-medium text-ink-800 hover:border-ink-900/30 hover:text-ink-900 transition"
+        >
+            <Icon name="gift" className="w-4 h-4" strokeWidth={1.6} />
+            <span>{bn ? 'উপহার হিসেবে চাই' : 'Ask for it as a gift'}</span>
+        </a>
+    );
 }
 
 const LOVES_SHOWN_FROM = 10;

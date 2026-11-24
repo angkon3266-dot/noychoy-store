@@ -80,7 +80,9 @@ export default function FloatingStack() {
             {/* Left: share + back-to-top. Out of the way while the right
                 launcher is open on a phone — one thing at a time. */}
             <div className={`fixed left-5 z-40 flex-col items-center gap-3 ${leftPos} ${open ? 'hidden md:flex' : 'flex'}`}>
-                {floats.share && (
+                {/* Not on product pages (owner, Nov 2026): it sat on the size
+                    buttons, and the page's own share went at the same time. */}
+                {floats.share && !onProduct && (
                     <div className="w-11 h-11 rounded-full bg-white shadow-lg border border-ink-100 flex items-center justify-center hover:border-gold-300 transition">
                         <ShareButton compact label="Share this page" placement="up-right" />
                     </div>

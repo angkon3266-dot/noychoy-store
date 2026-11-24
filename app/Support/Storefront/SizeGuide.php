@@ -68,7 +68,7 @@ class SizeGuide
         // page does not grow a link that leads nowhere.
         // The chart goes with it: the owner's own sizes, or the standard ones
         // (SizeChart), so the finder answers in the sizes this store sells.
-        return $attribute ? ['kind' => $kind, 'attribute' => $attribute, 'chart' => SizeChart::rows($kind)] : null;
+        return $attribute ? ['kind' => $kind, 'attribute' => $attribute, 'chart' => SizeChart::rows($kind), 'images' => SizeChart::images($kind)] : null;
     }
 
     private static function kindFromCategories(Product $product): ?string

@@ -22,7 +22,7 @@
             Add every size you sell: a size missing here is never suggested.</p>
     </div>
 
-    <form method="POST" action="{{ route('admin.products.size-chart.update') }}" data-no-ajax class="space-y-6">
+    <form method="POST" action="{{ route('admin.products.size-chart.update') }}" enctype="multipart/form-data" data-no-ajax class="space-y-6">
         @csrf
         @foreach($kinds as $kind => $k)
             @php $chart = $charts[$kind]; @endphp
@@ -73,6 +73,32 @@
                 <div class="mt-3 flex flex-wrap gap-2">
                     <button type="button" @click="rows.push({ size: '', around: '' })" class="btn-outline text-sm">+ Add a size</button>
                     <button type="button" @click="if (confirm('Replace this chart with the standard sizes? Nothing is saved until you press Save.')) rows = standard.map(r => ({ ...r }))" class="btn-outline text-sm">Use the standard chart</button>
+                </div>
+
+                <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                    @foreach([
+                        'measure' => ['How-to-measure picture', 'Shown in the finder’s Measure tab instead of our photo — e.g. your own photo of a tape round the '.($kind === 'ring' ? 'finger' : 'knuckles').'.'],
+                        'chart' => ['Your size chart picture', 'Shown at the top of the finder’s Size chart tab — e.g. your printed chart.'],
+                    ] as $slot => [$slotTitle, $slotHelp])
+                        @php $current = $chart['images'][$slot] ?? null; @endphp
+                        <div class="rounded-lg border border-ink-100 p-3" x-data="{ preview: @js($current), removed: false }">
+                            <p class="text-sm font-medium">{{ $slotTitle }}</p>
+                            <p class="text-xs text-ink-700/60 mt-0.5 mb-2">{{ $slotHelp }}</p>
+                            <template x-if="preview && !removed">
+                                <img :src="preview" alt="" class="mb-2 max-h-40 rounded-md border border-ink-100 object-contain bg-ink-50">
+                            </template>
+                            <template x-if="!preview || removed">
+                                <p class="mb-2 text-xs text-ink-700/50">{{ $slot === 'measure' ? 'None — the store’s own photo is used.' : 'None — only the table is shown.' }}</p>
+                            </template>
+                            <input type="file" name="{{ $kind }}_{{ $slot }}_image" accept="image/jpeg,image/png,image/webp" class="block w-full text-xs"
+                                   @change="const f = $event.target.files[0]; if (f) { preview = URL.createObjectURL(f); removed = false; }">
+                            @if($current)
+                                <label class="mt-2 flex items-center gap-2 text-xs text-red-700">
+                                    <input type="checkbox" name="remove_{{ $kind }}_{{ $slot }}_image" value="1" x-model="removed"> Remove this picture
+                                </label>
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
 
                 <div class="mt-4 rounded-lg bg-ink-50 px-4 py-3 text-sm flex flex-wrap items-center gap-3">

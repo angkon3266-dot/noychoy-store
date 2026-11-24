@@ -22,6 +22,16 @@ class SizeChart
 {
     public const KEY = 'size_charts';
 
+    /** The owner's pictures: [kind => [slot => storage path]] (Setting). */
+    public const IMAGES_KEY = 'size_chart_images';
+
+    /**
+     * Picture slots per kind: `measure` replaces the store's how-to-measure
+     * photo in the finder's Measure tab; `chart` is the owner's own printed
+     * chart, shown above the table in the Size chart tab.
+     */
+    public const IMAGE_SLOTS = ['measure', 'chart'];
+
     /** What a row's measurement may be, in mm round the finger / hand. */
     public const LIMITS = ['ring' => [30, 90], 'bangle' => [120, 300]];
 
@@ -37,6 +47,20 @@ class SizeChart
     public static function isCustom(string $kind): bool
     {
         return static::clean($kind, (array) (Setting::get(self::KEY)[$kind] ?? [])) !== [];
+    }
+
+    /** Storage paths of the owner's pictures for a kind, by slot (missing = none). */
+    public static function imagePaths(string $kind): array
+    {
+        return array_filter((array) ((Setting::get(self::IMAGES_KEY) ?? [])[$kind] ?? []), 'filled');
+    }
+
+    /** @return array{measure: ?string, chart: ?string} public URLs */
+    public static function images(string $kind): array
+    {
+        $paths = static::imagePaths($kind);
+
+        return collect(self::IMAGE_SLOTS)->mapWithKeys(fn ($slot) => [$slot => theme_asset($paths[$slot] ?? null)])->all();
     }
 
     /** Every size on the chart, as typed ("7", "2.10"). */

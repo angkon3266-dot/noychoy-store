@@ -237,13 +237,14 @@ export default function SizeFinder({ guide, purchase, onClose }) {
                     ))}
 
                     {tab === 'measure' && (
-                        <Measure kind={kind} value={measured} setValue={(v) => { setMeasured(v); setSource('measure'); }} />
+                        <Measure kind={kind} photo={guide.images?.measure} value={measured} setValue={(v) => { setMeasured(v); setSource('measure'); }} />
                     )}
 
                     {tab === 'chart' && (
                         <Chart
                             kind={kind}
                             rows={rows}
+                            picture={guide.images?.chart}
                             options={options}
                             picked={source === 'chart' ? chartPick : null}
                             onPick={(d) => { setChartPick(d); setSource('chart'); }}
@@ -364,20 +365,21 @@ function OnScreen({ kind, rows, pxPerMm, diameter, setDiameter, onRecalibrate })
 }
 
 /* ── Measure: thread or paper strip, in millimetres ────────────────────────── */
-function Measure({ kind, value, setValue }) {
+function Measure({ kind, photo, value, setValue }) {
     const bangle = kind === 'bangle';
 
     return (
         <div>
             <figure className="mb-4 overflow-hidden rounded-2xl bg-mist-50">
+                {/* The owner's own photo (Admin → Products → Size chart) when there is one. */}
                 <img
-                    src={bangle ? '/images/size-guide/measure-bangle.webp' : '/images/size-guide/measure-ring.webp'}
+                    src={photo || (bangle ? '/images/size-guide/measure-bangle.webp' : '/images/size-guide/measure-ring.webp')}
                     width="840"
                     height="633"
                     alt={bangle
                         ? 'A measuring tape wrapped round the widest part of a hand, over the knuckles, with the thumb tucked in'
                         : 'A measuring tape wrapped round the base of the ring finger, read where the end overlaps'}
-                    className="block w-full aspect-[4/3] object-cover"
+                    className={`block w-full ${photo ? 'max-h-[22rem] object-contain' : 'aspect-[4/3] object-cover'}`}
                     decoding="async"
                 />
             </figure>
@@ -428,7 +430,7 @@ function Measure({ kind, value, setValue }) {
 }
 
 /* ── Chart: every size, with the ones this piece comes in marked ───────────── */
-function Chart({ kind, rows: chart, options, picked, onPick }) {
+function Chart({ kind, rows: chart, picture, options, picked, onPick }) {
     // null: not made in that size; true / false: made, and in stock or not.
     const stock = (match) => {
         const hits = options.filter((o) => o.num !== null && match(o.num));
@@ -438,6 +440,11 @@ function Chart({ kind, rows: chart, options, picked, onPick }) {
 
     return (
         <div>
+            {picture && (
+                <a href={picture} target="_blank" rel="noopener" className="mb-4 block overflow-hidden rounded-2xl border border-ink-900/[0.06] bg-mist-50" title="Open the size chart full size">
+                    <img src={picture} alt="Size chart" className="block w-full max-h-[26rem] object-contain" decoding="async" />
+                </a>
+            )}
             <p className="text-sm text-ink-700/80">Know the size already? Tap it.</p>
             <table className="mt-3 w-full text-sm tabular-nums">
                 <thead>
