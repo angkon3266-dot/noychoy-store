@@ -101,7 +101,7 @@ export default function FloatingStack() {
             {anyRight && (
                 <div ref={stackRef} className={`fixed right-5 z-50 flex flex-col items-center gap-3 ${rightPos}`}>
                     {/* Out of the way while the stack is open on a phone. */}
-                    {prize && <SpinPrize className={`self-end ${open ? 'hidden md:flex' : 'flex'}`} />}
+                    {prize && <SpinPrize className={open ? 'hidden md:block' : ''} />}
                     <div
                         id="floating-contact"
                         className={`flex-col items-center gap-3 md:flex ${folded && !open ? 'hidden' : 'flex'} ${folded ? 'pop-in' : ''}`}

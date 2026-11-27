@@ -78,7 +78,7 @@
     ];
 @endphp
 <form action="{{ $product->exists ? route('admin.products.update', $product) : route('admin.products.store') }}"
-      method="POST" enctype="multipart/form-data" x-data="productForm(@js($formConfig))">
+      method="POST" enctype="multipart/form-data" id="product-form" x-data="productForm(@js($formConfig))">
     @csrf
     @if($product->exists) @method('PUT') @endif
 
@@ -114,29 +114,99 @@
                     $existingCats = $product->exists ? $product->categories->pluck('id')->all() : [];
                     $selectedCats = collect(old('category_ids', $existingCats))->map(fn ($i) => (int) $i)->all();
                 @endphp
-                <div x-data="{ q: '' }">
-                    <label class="label">Categories (a product can be in several)</label>
-                    <input x-model="q" placeholder="Filter categories…" class="input py-1.5 mb-2">
-                    <div class="max-h-44 overflow-y-auto rounded-lg border border-ink-100 p-2 grid sm:grid-cols-2 gap-1">
-                        @foreach($categories as $cat)
-                            <label class="flex items-center gap-2 text-sm py-1 px-1 rounded hover:bg-ink-50"
-                                   x-show="q==='' || '{{ Str::lower($cat->name) }}'.includes(q.toLowerCase())">
-                                <input type="checkbox" name="category_ids[]" value="{{ $cat->id }}" @checked(in_array($cat->id, $selectedCats))>
-                                <span>{{ $cat->parent_id ? '— ' : '' }}{{ $cat->name }}</span>
-                            </label>
-                        @endforeach
+                {{-- Grouped by main category (owner, 2026-11-27: the flat list of
+                     "— Earrings" rows did not say which parent each belonged to).
+                     Ticked ones are summed up on top as "Parent › Child" chips. --}}
+                @php
+                    $catTree = $categories->whereNull('parent_id')->sortBy([['position', 'asc'], ['name', 'asc']])->values()
+                        ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'children' => $categories->where('parent_id', $c->id)->sortBy('name')->values()->map(fn ($k) => ['id' => $k->id, 'name' => $k->name])->all()]);
+                    $placed = $catTree->flatMap(fn ($g) => array_merge([$g['id']], array_column($g['children'], 'id')))->all();
+                    $orphans = $categories->whereNotIn('id', $placed)->sortBy('name')->values()->map(fn ($k) => ['id' => $k->id, 'name' => $k->name])->all();
+                    if ($orphans) {
+                        $catTree->push(['id' => null, 'name' => 'Other', 'children' => $orphans]);
+                    }
+                @endphp
+                <div x-data="{
+                        q: '',
+                        tree: @js($catTree->values()),
+                        selected: @js(array_map('strval', $selectedCats)),
+                        has(id) { return this.selected.includes(String(id)); },
+                        toggle(id) { id = String(id); this.selected = this.has(id) ? this.selected.filter(x => x !== id) : [...this.selected, id]; },
+                        match(name) { return this.q === '' || name.toLowerCase().includes(this.q.toLowerCase()); },
+                        groupShown(g) { return this.q === '' || this.match(g.name) || g.children.some(c => this.match(c.name)); },
+                        childShown(g, c) { return this.q === '' || this.match(c.name) || this.match(g.name); },
+                        label(id) {
+                            for (const g of this.tree) {
+                                if (String(g.id) === String(id)) return g.name;
+                                const c = g.children.find(c => String(c.id) === String(id));
+                                if (c) return (g.id ? g.name + ' › ' : '') + c.name;
+                            }
+                            return '#' + id;
+                        },
+                        primary(id) {
+                            if (!id) return;
+                            const g = this.tree.find(g => String(g.id) === String(id));
+                            const ids = [String(id), ...(g ? g.children.map(c => String(c.id)) : [])];
+                            this.selected = [...new Set([...this.selected, ...ids])];
+                        },
+                     }" @primary-category.window="primary($event.detail)">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <label class="label mb-0">Categories</label>
+                        <span class="text-xs text-ink-700/60"><span x-text="selected.length"></span> selected · a piece can sit in several</span>
                     </div>
-                    <p class="text-xs text-ink-700/50 mt-1">Tick every category this piece belongs to — this powers category-based Meta catalog ads later.</p>
+
+                    <template x-for="id in selected" :key="id">
+                        <input type="hidden" name="category_ids[]" :value="id">
+                    </template>
+
+                    {{-- What is ticked, in words --}}
+                    <div class="mt-2 flex flex-wrap gap-1.5 min-h-[2rem]">
+                        <template x-for="id in selected" :key="'chip' + id">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-ink-900 text-white text-xs pl-3 pr-1 py-1">
+                                <span x-text="label(id)"></span>
+                                <button type="button" @click="toggle(id)" class="grid place-items-center w-5 h-5 rounded-full text-white/60 hover:text-white hover:bg-white/10" :aria-label="'Remove ' + label(id)">&times;</button>
+                            </span>
+                        </template>
+                        <span x-show="!selected.length" class="text-xs text-ink-700/50 py-1.5">None yet — tick below.</span>
+                    </div>
+
+                    <div class="relative mt-2">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-700/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
+                        <input x-model="q" placeholder="Find a category…" class="input py-1.5 pl-9" @keydown.enter.prevent>
+                    </div>
+
+                    <div class="mt-2 max-h-80 overflow-y-auto rounded-lg border border-ink-100 bg-ink-50/40 p-2 grid sm:grid-cols-2 gap-2">
+                        <template x-for="g in tree" :key="'g' + (g.id ?? 'other')">
+                            <div x-show="groupShown(g)" class="rounded-lg border bg-white p-2.5 transition-colors" :class="g.id && has(g.id) ? 'border-gold-400 ring-1 ring-gold-300' : 'border-ink-100'">
+                                <template x-if="g.id">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" :checked="has(g.id)" @change="toggle(g.id)" class="rounded">
+                                        <span class="text-sm font-semibold text-ink-900" x-text="g.name"></span>
+                                        <span class="ml-auto text-[11px] text-ink-700/40" x-show="g.children.length" x-text="g.children.length + ' sub'"></span>
+                                    </label>
+                                </template>
+                                <template x-if="!g.id">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-ink-700/50" x-text="g.name"></p>
+                                </template>
+                                <div x-show="g.children.length" class="mt-2 flex flex-wrap gap-1.5" :class="g.id ? 'pl-6' : ''">
+                                    <template x-for="c in g.children" :key="c.id">
+                                        <button type="button" x-show="childShown(g, c)" @click="toggle(c.id)" :aria-pressed="has(c.id)"
+                                                class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition"
+                                                :class="has(c.id) ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400'">
+                                            <svg x-show="has(c.id)" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                            <span x-text="c.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="text-xs text-ink-700/50 mt-1">Tick the main category and every sub-category this piece belongs to — browsing and category-based Meta catalog ads both use them.</p>
                 </div>
                 <script>
-                    window.__catChildren = @json($categories->groupBy('parent_id')->map(fn($g) => $g->pluck('id'))->all());
+                    // Picking a primary category ticks it and its sub-categories.
                     function primaryCatChanged(id) {
-                        if (!id) return;
-                        const ids = [parseInt(id, 10), ...((window.__catChildren[id] || []))];
-                        ids.forEach(cid => {
-                            const cb = document.querySelector(`input[name='category_ids[]'][value='${cid}']`);
-                            if (cb) cb.checked = true;
-                        });
+                        if (id) window.dispatchEvent(new CustomEvent('primary-category', { detail: id }));
                     }
                 </script>
                 <div>
@@ -440,6 +510,11 @@
             <div class="card p-6">
                 <h2 class="font-semibold">Product page points</h2>
                 <p class="text-xs text-ink-700/60 mb-3">The “why buy from us” list beside the buy button. Leave it inheriting unless this piece needs different promises.</p>
+                <div class="mb-4">
+                    <label class="label" for="warranty">Warranty badge</label>
+                    <input id="warranty" name="warranty" value="{{ old('warranty', $product->warranty) }}" maxlength="60" class="input" placeholder="e.g. 1-Year Warranty">
+                    <p class="text-xs text-ink-700/50 mt-1">Shown as a green shield badge beside the price. Leave empty for none.</p>
+                </div>
                 @include('admin.partials.pdp-points-editor', [
                     'points' => old('pdp_points_custom') !== null ? (old('pdp_points_custom') ? old('pdp_points') : null) : $product->pdp_points,
                     'inherited' => \App\Support\Storefront\PdpPoints::inheritedFor($product->exists ? $product : null),
@@ -555,7 +630,7 @@
                 </div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured))> Featured on homepage</label>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_bestseller" value="1" @checked(old('is_bestseller', $product->is_bestseller))> Mark as best seller</label>
-                <button class="btn-primary w-full">{{ $product->exists ? 'Save changes' : 'Create product' }}</button>
+                <button class="btn-primary w-full" data-main-save>{{ $product->exists ? 'Save changes' : 'Create product' }}</button>
             </div>
 
             <!-- Pre-order -->
@@ -678,6 +753,40 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    {{-- Floating save (owner, 2026-11-27): the form is long and the real
+         button sits at the end of the right column. This one submits the same
+         form (so admin-ajax saves it in the background as before), shows a dot
+         once anything is edited, and steps aside while the in-page button is
+         on screen. --}}
+    <div x-data="{
+            dirty: false,
+            inView: false,
+            init() {
+                const form = document.getElementById('product-form');
+                if (!form) return;
+                const mark = (e) => { if (e.target.form === form || form.contains(e.target)) this.dirty = true; };
+                document.addEventListener('input', mark);
+                document.addEventListener('change', mark);
+                form.addEventListener('submit', () => { this.dirty = false; });
+                const real = document.querySelector('[data-main-save]');
+                if (real && 'IntersectionObserver' in window) {
+                    new IntersectionObserver(([e]) => { this.inView = e.isIntersecting; }).observe(real);
+                }
+            },
+         }"
+         x-show="!inView" x-transition.opacity
+         class="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40">
+        <button type="submit" form="product-form"
+                class="inline-flex items-center gap-2.5 rounded-full bg-ink-900 text-white pl-4 pr-5 py-3 text-sm font-semibold shadow-2xl ring-1 ring-black/10 hover:bg-ink-800 hover:-translate-y-0.5 transition">
+            <span class="relative grid place-items-center w-5 h-5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg>
+                <span x-show="dirty" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-gold-400 ring-2 ring-ink-900"></span>
+            </span>
+            <span>{{ $product->exists ? 'Save changes' : 'Create product' }}</span>
+            <span x-show="dirty" class="hidden sm:inline text-xs font-normal text-white/60">· unsaved</span>
+        </button>
     </div>
 </form>
 

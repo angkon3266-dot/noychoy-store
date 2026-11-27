@@ -624,6 +624,14 @@ function BuyBox({ product, purchase, offerTiers, pdpOffers, myOffers, pdpPoints,
                 {purchase.offerPercent > 0 && (
                     <span className="badge bg-success-100 text-success-700">Bundle price · save {money(purchase.savings)}</span>
                 )}
+                {/* Warranty (owner, 2026-11-27): at the price, where the buyer
+                    weighs cost against risk — the spot marketplaces use. */}
+                {product.warranty && (
+                    <span className="sm:ml-auto self-center inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 py-1.5 pl-2 pr-3 text-[12px] font-semibold tracking-[0.01em] text-success-700">
+                        <Icon name="shieldCheck" className="w-4 h-4 shrink-0" strokeWidth={1.8} />
+                        {product.warranty}
+                    </span>
+                )}
             </div>
 
             {/* The reward ladder on the price — one line, not a panel. */}

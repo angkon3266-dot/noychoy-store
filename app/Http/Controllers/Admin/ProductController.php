@@ -1213,6 +1213,7 @@ class ProductController extends Controller
             'status' => ['required', 'in:draft,published'],
             'tags' => ['nullable', 'string', 'max:255'],
             'colors' => ['nullable', 'string', 'max:255'],
+            'warranty' => ['nullable', 'string', 'max:60'],
             'custom_label' => ['nullable', 'string', 'max:60'],
             'custom_value' => ['nullable', 'string', 'max:255'],
             'custom_show' => ['nullable', 'boolean'],

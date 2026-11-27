@@ -59,6 +59,8 @@ class ProductPageData
                 'name' => $product->name,
                 'url' => route('product.show', $product),
                 'short_description' => $product->short_description,
+                // "1-Year Warranty" — a badge beside the price; null = none.
+                'warranty' => filled($product->warranty) ? trim($product->warranty) : null,
                 'description' => $product->description,
                 // The listed price — the ViewContent pixel's value, matching
                 // the server event and the catalogue feed's sale price.
