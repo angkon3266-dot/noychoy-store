@@ -52,6 +52,8 @@ class ProductCardData
             // down and asks the page for fresh prices when it runs out.
             'offer_ends' => $quote['offer']?->endsAtUnix(),
             'preorder' => $p->isPreorder(),
+            // "1-Year Warranty" — the same badge as beside the product page price.
+            'warranty' => filled($p->warranty) ? trim($p->warranty) : null,
             'available' => $p->isAvailable(),
             'has_variants' => (bool) $p->has_variants,
             'rating' => $p->average_rating ? (float) $p->average_rating : null,

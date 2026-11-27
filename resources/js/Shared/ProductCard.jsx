@@ -125,7 +125,15 @@ export default function ProductCard({ product: p }) {
                     ) : p.on_sale ? (
                         <span className="rounded-full bg-gold-500 px-2.5 py-1 text-[11px] font-semibold text-ink-900">−{p.discount_percent}%</span>
                     ) : <span />}
-                    {soldOut && <span className="rounded-full bg-ink-900/85 px-2.5 py-1 text-[10.5px] font-medium tracking-[0.06em] uppercase text-white">Sold out</span>}
+                    {soldOut ? (
+                        <span className="rounded-full bg-ink-900/85 px-2.5 py-1 text-[10.5px] font-medium tracking-[0.06em] uppercase text-white">Sold out</span>
+                    ) : p.warranty ? (
+                        // The warranty, seen from the grid (owner, 2026-11-27).
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white/90 py-1 pl-1.5 pr-2.5 text-[10.5px] font-semibold text-success-700 shadow-sm backdrop-blur">
+                            <Icon name="shieldCheck" className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                            {p.warranty}
+                        </span>
+                    ) : null}
                 </div>
 
                 {/* Desktop: actions rise over the photo on hover / keyboard focus. */}

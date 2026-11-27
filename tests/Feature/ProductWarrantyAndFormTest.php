@@ -48,6 +48,15 @@ class ProductWarrantyAndFormTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('product.warranty', null));
     }
 
+    public function test_product_cards_carry_the_warranty_so_the_grid_can_show_it(): void
+    {
+        \App\Models\Setting::put('theme', ['homepage_template' => 'couture']);
+        $this->product(['warranty' => '1-Year Warranty']);
+
+        $this->get('/')->assertInertia(fn (Assert $page) => $page
+            ->where('newArrivals.cards.0.warranty', '1-Year Warranty'));
+    }
+
     public function test_a_product_without_a_warranty_sends_none(): void
     {
         $this->get(route('product.show', $this->product()))
