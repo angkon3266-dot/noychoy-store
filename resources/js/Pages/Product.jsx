@@ -37,12 +37,13 @@ export default function Product(props) {
     const { gift } = useCart();
     const ladder = useLadderQuote(props, gift);
 
-    // Customer reviews start OPEN (owner, 2026-10-24 — they had been folded
-    // since 2026-09-17), right under the story row. The state still lives up
-    // here: the buy-box star link, "Be the first to review" and any #reviews
-    // URL all (re)open it, and "Be the first to review" also unfolds the
-    // write-a-review form, since writing is what that link offers.
-    const [reviewsOpen, setReviewsOpen] = useState(true);
+    // Customer reviews start FOLDED, after the care notes (owner, 2026-11-27;
+    // they had been open under the story row since 2026-10-24, and folded
+    // before that since 2026-09-17). The state lives up here so the buy-box
+    // star link, "Be the first to review" and any #reviews URL all (re)open
+    // it; "Be the first to review" also unfolds the write-a-review form,
+    // since writing is what that link offers.
+    const [reviewsOpen, setReviewsOpen] = useState(false);
     const [writeOpen, setWriteOpen] = useState(false);
     const openReviews = useCallback((write = false) => {
         setReviewsOpen(true);
@@ -68,15 +69,16 @@ export default function Product(props) {
                 </div>
             </div>
 
-            {/* Order (owner, 2026-10-24): the story row (the product video),
-                customer reviews — open — then the description and care notes
-                folded, then more to look at. "Frequently bought together" now
-                lives in the bag (MiniCart's "Pairs beautifully with"). */}
+            {/* Order (owner, 2026-11-27): the story row (the product video),
+                the description, details and care notes, then customer reviews
+                — folded like the description and care — then more to look at.
+                "Frequently bought together" lives in the bag (MiniCart's
+                "Pairs beautifully with"). */}
             <StorySections sections={product.sections} name={product.name} />
-            <Reviews {...props} reviewsOpen={reviewsOpen} setReviewsOpen={setReviewsOpen} writeOpen={writeOpen} setWriteOpen={setWriteOpen} />
             <Description text={product.description} />
             <Details specs={product.specs} />
             <Care text={props.care} />
+            <Reviews {...props} reviewsOpen={reviewsOpen} setReviewsOpen={setReviewsOpen} writeOpen={writeOpen} setWriteOpen={setWriteOpen} />
             <CardStrip title="You may also like" products={props.related} cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-5" />
             <CardStrip title="Recently viewed" products={props.recentlyViewed} cols="grid-cols-2 md:grid-cols-4" />
             <StickyBar {...props} purchase={purchase} />
@@ -1231,8 +1233,8 @@ function Care({ text }) {
 }
 
 function Reviews({ product, reviews, storeReviews = [], ui, flash, reviewsOpen: open, setReviewsOpen: setOpen, writeOpen, setWriteOpen }) {
-    // Open by default (owner, 2026-10-24); the open state lives in Product so
-    // the buy-box star link and "Be the first to review" can reopen it.
+    // Folded by default (owner, 2026-11-27); the open state lives in Product so
+    // the buy-box star link and "Be the first to review" can open it.
     const [rating, setRating] = useState(0);
     const [hover, setHover] = useState(0);
     const { props } = usePage();
@@ -1249,7 +1251,7 @@ function Reviews({ product, reviews, storeReviews = [], ui, flash, reviewsOpen: 
     };
 
     return (
-        <section className="mt-16 border-t border-ink-900/[0.08] pt-10" id="reviews">
+        <section className="mt-10 border-t border-ink-900/[0.08] pt-8 scroll-mt-28" id="reviews">
             <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 text-left">
                 <h2 className="display text-3xl sm:text-4xl flex flex-wrap items-center gap-x-4 gap-y-1">
                     Customer reviews
