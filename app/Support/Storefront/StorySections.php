@@ -31,17 +31,34 @@ use Illuminate\Support\Collection;
 class StorySections
 {
     /**
-     * What the product page shows: only the story row that plays the
-     * product's video, and nothing when no row does (owner, 2026-10-24:
-     * "keep only one row with videos, if videos not available don't add
-     * this"). The other rows were deleted from every product by the
-     * 2026_10_24 migration, and this keeps later edits to the same shape.
+     * What the product page shows, in the builder's order:
+     *
+     *  - the row that plays the product's own video (one at most);
+     *  - every row given its own picture or video ("This image / video"),
+     *    and every text-only row ("Nothing") — the owner chose those on
+     *    purpose (owner, 2026-11-27: a GRA warranty-card row was not showing);
+     *  - but never an `auto` row that would only repeat a gallery photo
+     *    (owner, 2026-10-24: "keep only one row with videos, if videos not
+     *    available don't add this" — those rows were the auto-written copy
+     *    the 2026_10_24 migration removed).
      */
     public static function for(Product $product): array
     {
-        $row = collect(static::resolve($product))->first(fn ($s) => ($s['media']['type'] ?? null) === 'video');
+        $sections = ContentTemplate::cleanSections($product->content_sections ?? []);
+        $videoShown = false;
 
-        return $row ? [$row] : [];
+        return collect(static::resolve($product))
+            ->filter(function ($row, $i) use ($sections, &$videoShown) {
+                if (($sections[$i]['media'] ?? 'auto') !== 'auto') {
+                    return $row['media'] !== null || $row['heading'] !== '' || $row['body'] !== '';
+                }
+                if (! $videoShown && ($row['media']['type'] ?? null) === 'video') {
+                    return $videoShown = true;
+                }
+
+                return false;
+            })
+            ->values()->all();
     }
 
     /** Every saved row with its media resolved, in order (the admin and the clean-up read this). */

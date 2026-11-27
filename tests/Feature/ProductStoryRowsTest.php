@@ -311,6 +311,42 @@ class ProductStoryRowsTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('product.sections', []));
     }
 
+    // ── 27 Nov 2026: rows with their own picture show too ───────────────────
+
+    public function test_a_row_with_its_own_picture_shows_after_the_video_row(): void
+    {
+        $product = $this->product([
+            ['media' => 'auto', 'image' => '', 'heading' => 'Lucky Clover', 'body' => 'Video row.', 'layout' => 'left'],
+            ['media' => 'auto', 'image' => '', 'heading' => 'Repeats a photo', 'body' => 'Hidden.', 'layout' => 'right'],
+            ['media' => 'image', 'image' => 'https://noychoy.test/storage/sections/gra.webp', 'heading' => 'GRA Warranty Card', 'body' => 'Card.', 'layout' => 'right'],
+            ['media' => 'none', 'image' => '', 'heading' => 'Words only', 'body' => 'Text row.', 'layout' => 'left'],
+        ], videos: ['product-videos/clip.mp4']);
+
+        $this->get(route('product.show', $product))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('product.sections', 3)
+                ->where('product.sections.0.media.type', 'video')
+                ->where('product.sections.1.heading', 'GRA Warranty Card')
+                ->where('product.sections.1.layout', 'right')
+                ->where('product.sections.1.media.type', 'image')
+                ->where('product.sections.1.media.src', 'https://noychoy.test/storage/sections/gra.webp')
+                ->where('product.sections.2.heading', 'Words only')
+                ->where('product.sections.2.media', null));
+    }
+
+    public function test_a_row_with_its_own_picture_shows_even_without_a_product_video(): void
+    {
+        $product = $this->product([
+            ['media' => 'auto', 'image' => '', 'heading' => 'No video here', 'body' => '', 'layout' => 'left'],
+            ['media' => 'image', 'image' => 'https://noychoy.test/storage/sections/gra.webp', 'heading' => 'GRA Warranty Card', 'body' => '', 'layout' => 'right'],
+        ]);
+
+        $this->get(route('product.show', $product))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('product.sections', 1)
+                ->where('product.sections.0.heading', 'GRA Warranty Card'));
+    }
+
     private function trim(): object
     {
         return require database_path('migrations/2026_10_24_120000_keep_only_the_video_story_row.php');
