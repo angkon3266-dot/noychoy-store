@@ -24,7 +24,9 @@ class HomePageData
         ?Collection $recentlyViewed = null,
         ?Collection $pickedForYou = null,
         ?\App\Models\Product $featuredLead = null,
+        ?Collection $spotlight = null,
     ): array {
+        $spotlight ??= collect();
         $recentlyViewed ??= collect();
         $pickedForYou ??= collect();
         $giftProfile = \App\Support\GiftProfile::current();
@@ -176,6 +178,7 @@ class HomePageData
                     : [],
             ],
             'heroTrust' => collect(home_content('hero_trust') ?? [])->filter(fn ($t) => filled($t))->take(3)->values(),
+            'spotlight' => self::spotlight($spotlight),
             'membershipBand' => ['show' => (bool) home_content('show_membership')],
             // The wheel's own state rides in chrome.spin; this is only the switch.
             'spinBand' => ['show' => (bool) (home_content('show_spin_wheel') ?? true)],
@@ -281,6 +284,48 @@ class HomePageData
     }
 
     /** Same slide-building contract as the couture/meridian Blade templates. */
+    /**
+     * The collection spotlight: a dark band with a looping video (or a
+     * picture), a headline with one italic phrase, spec figures, a button
+     * and the collection's products. Hidden when switched off, or with
+     * neither something to play nor something to buy.
+     */
+    protected static function spotlight(Collection $products): array
+    {
+        $video = filled(home_content('spotlight_video')) ? video_meta(home_content('spotlight_video')) : null;
+        $video = ($video['type'] ?? null) === 'file' ? ['src' => $video['src']] : null;
+        $image = theme_asset(home_content('spotlight_image')) ?: $products->first()?->thumbnail;
+        $title = (string) (home_content('spotlight_title') ?: 'Brilliance, forever.');
+        $highlight = (string) home_content('spotlight_highlight');
+        // The heading is escaped first, then the highlight wrapped in <em> —
+        // never raw owner HTML.
+        $headingHtml = e($title);
+        if ($highlight !== '' && str_contains($title, $highlight)) {
+            $headingHtml = Str::replaceFirst(e($highlight), '<em>'.e($highlight).'</em>', $headingHtml);
+        }
+        $from = $products->map(fn ($p) => (float) $p->price)->filter(fn ($p) => $p > 0)->min();
+
+        return [
+            'show' => (bool) home_content('show_spotlight') && ($video || $products->isNotEmpty()),
+            'eyebrow' => home_content('spotlight_eyebrow'),
+            'headingHtml' => $headingHtml,
+            'title' => $title,
+            'text' => home_content('spotlight_text'),
+            'ctaText' => home_content('spotlight_cta_text') ?: 'Shop the edit',
+            'ctaLink' => home_content('spotlight_cta_link') ?: route('shop'),
+            'fromLabel' => $from ? trim((home_content('spotlight_from_label') ?: 'From').' '.money($from)) : null,
+            'video' => $video,
+            'sound' => (bool) (home_content('spotlight_sound') ?? true),
+            'image' => $image,
+            'image900' => $image ? image_variant($image, 900) : null,
+            'stats' => collect(home_content('spotlight_stats') ?? [])
+                ->filter(fn ($s) => filled($s['value'] ?? null))->take(4)->values()
+                ->map(fn ($s) => ['value' => $s['value'], 'label' => $s['label'] ?? null]),
+            'railTitle' => home_content('spotlight_rail_title') ?: 'Shop the edit',
+            'cards' => ProductCardData::collection($products->take(24)),
+        ];
+    }
+
     protected static function heroSlides(Collection $featured): array
     {
         $slides = collect(home_content('hero_slides') ?? [])

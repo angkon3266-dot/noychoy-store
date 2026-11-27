@@ -20,10 +20,10 @@ import { SpinBand } from '../Shared/SpinWheel';
 // App\Support\HomeLayout): built-in sections by key, the owner's custom
 // sections as "block:<id>". Every section has an on/off switch and its words,
 // links and products are editable there; copy falls back to sensible defaults.
-const DEFAULT_ORDER = ['ribbon', 'categories', 'picked', 'occasions', 'deals', 'spin_wheel', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
+const DEFAULT_ORDER = ['ribbon', 'spotlight', 'categories', 'picked', 'occasions', 'deals', 'spin_wheel', 'membership', 'best', 'recent', 'gift_finder', 'featured', 'gifting_steps', 'reviews', 'promise', 'new'];
 
 export default function Home(props) {
-    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, spinBand, reviewsSection, template } = props;
+    const { hero, featureStrip, occasions, deals, bestSellers, giftFinder, categoriesSection, featured, reviews, promise, newArrivals, blocks = [], heroTrust, pickedForYou, recentlyViewed, order, membershipBand, spinBand, reviewsSection, template, spotlight } = props;
     // Editorial (2026-10-28) restyles these sections; the rest are shared.
     const ed = template === 'editorial';
 
@@ -31,6 +31,7 @@ export default function Home(props) {
     // real signal; every other section hides when switched off or empty.
     const sections = {
         ribbon: () => (ed ? <EdRibbon strip={featureStrip} /> : <Ribbon strip={featureStrip} trust={heroTrust} />),
+        spotlight: () => <Spotlight spot={spotlight} />,
         categories: () => (ed ? <EdCategories section={categoriesSection} /> : <Categories section={categoriesSection} />),
         picked: () => <CardSection section={pickedForYou} rail />,
         occasions: () => (ed ? <EdOccasions section={occasions} /> : <Occasions section={occasions} />),
@@ -343,6 +344,175 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                         </div>
                     </div>
                 </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Collection spotlight: a dark, cinematic campaign band ──────────────── */
+// Written out in full so Tailwind sees every class it needs.
+const STAT_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-2 sm:grid-cols-4' };
+// Hairlines between the figures: four sit 2×2 on a phone and in one row
+// from small screens up; fewer always share one row.
+const statCell = (k, n) => (n < 4
+    ? (k > 0 ? 'pl-4 border-l border-white/10' : '')
+    : [
+        k % 2 ? 'pl-4 border-l border-white/10' : '',
+        k === 2 ? 'sm:pl-4 sm:border-l sm:border-white/10' : '',
+        k >= 2 ? 'border-t border-white/10 sm:border-t-0' : '',
+    ].join(' '));
+
+// One collection presented like a launch (2026-11-27, the Moissanite Edit): a
+// looping film beside a large serif headline with one italic phrase in
+// champagne, the collection's figures, and a button carrying its lowest price;
+// the pieces themselves follow as a row on the page ground.
+//
+// The film is only fetched once the band is near the screen, and never on a
+// connection asking to save data — the poster stands in, as on the hero.
+function Spotlight({ spot }) {
+    const band = useRef(null);
+    const film = useRef(null);
+    const [near, setNear] = useState(false);
+    const [allowed, setAllowed] = useState(true);
+    const [soundOn, setSoundOn] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+        const c = navigator.connection;
+        if ((c && (c.saveData || /(^|[^4-9])(slow-2g|2g)$/.test(c.effectiveType || '')))
+            || window.matchMedia('(prefers-reduced-data: reduce)').matches) {
+            setAllowed(false);
+            return undefined;
+        }
+        const el = band.current;
+        if (!el || typeof IntersectionObserver === 'undefined') { setNear(true); return undefined; }
+        const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: '400px 0px' });
+        io.observe(el);
+        return () => io.disconnect();
+    }, []);
+
+    // Sound follows the button; leaving the band mutes it again.
+    useEffect(() => {
+        const v = film.current;
+        if (!v) return undefined;
+        v.muted = !soundOn;
+        if (soundOn) v.play?.().catch(() => {});
+        if (!soundOn || typeof IntersectionObserver === 'undefined') return undefined;
+        const io = new IntersectionObserver(([e]) => { if (!e.isIntersecting) setSoundOn(false); }, { threshold: 0.15 });
+        io.observe(v);
+        return () => io.disconnect();
+    }, [soundOn]);
+
+    if (!spot?.show) return null;
+    const playing = spot.video && near && allowed;
+    const stats = spot.stats || [];
+
+    return (
+        <section ref={band} className="pt-14 sm:pt-20 lg:pt-24" aria-label={spot.title}>
+            <div className={shell}>
+                <div className="relative isolate overflow-hidden rounded-[28px] lg:rounded-[40px] bg-[#0c0b0a] text-white">
+                    {/* Light, the way a stone throws it: a soft bloom behind the
+                        copy and a hairline of champagne along the top edge. */}
+                    <div aria-hidden="true" className="pointer-events-none absolute -left-40 -top-48 h-[620px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(233,220,196,0.16),transparent)]" />
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#e9dcc4]/50 to-transparent" />
+
+                    <div className="grid lg:grid-cols-12">
+                        {/* The film */}
+                        <div className="relative lg:order-2 lg:col-span-7 aspect-[4/5] sm:aspect-[16/11] lg:aspect-auto lg:min-h-[680px] overflow-hidden">
+                            {(spot.image900 || spot.image) && (
+                                <img
+                                    src={spot.image900 || spot.image}
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                />
+                            )}
+                            {playing && (
+                                <video
+                                    ref={film}
+                                    src={spot.video.src}
+                                    poster={spot.image900 || spot.image || undefined}
+                                    autoPlay
+                                    muted
+                                    loop
+                                    playsInline
+                                    preload="auto"
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                />
+                            )}
+                            {/* Fade the film into the dark: up on a phone, left on a desktop. */}
+                            <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0c0b0a] via-[#0c0b0a]/10 to-transparent lg:bg-gradient-to-r lg:from-[#0c0b0a] lg:via-[#0c0b0a]/5 lg:to-transparent" />
+                            <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_70%_40%,transparent_55%,rgba(12,11,10,0.55))]" />
+
+                            {playing && spot.sound && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSoundOn(!soundOn)}
+                                    aria-pressed={soundOn}
+                                    aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
+                                    className="absolute right-4 top-4 lg:right-7 lg:top-7 grid h-11 w-11 place-items-center rounded-full glass-dark text-white transition-colors hover:bg-white hover:text-ink-900"
+                                >
+                                    <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                                        <path d="M11 5L6 9H3v6h3l5 4V5z" />
+                                        {soundOn ? <path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" /> : <path d="M16 9l5 6M21 9l-5 6" />}
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* The words */}
+                        <div className="relative lg:order-1 lg:col-span-5 flex flex-col justify-center px-6 pb-10 -mt-24 sm:-mt-28 sm:px-10 sm:pb-12 lg:mt-0 lg:py-20 lg:pl-16 lg:pr-4 xl:pl-20">
+                            {spot.eyebrow && (
+                                <p className="eyebrow flex items-center gap-3 !text-[#e9dcc4]/80">
+                                    <span className="h-px w-8 bg-[#e9dcc4]/50" aria-hidden="true" />
+                                    {spot.eyebrow}
+                                </p>
+                            )}
+                            <h2
+                                className="display mt-5 lg:mt-7 !text-white text-[2.9rem] leading-[1.02] sm:text-6xl lg:text-[4.4rem] xl:text-[5.1rem] [&_em]:bg-gradient-to-r [&_em]:from-[#f6eedd] [&_em]:via-[#e3cfa6] [&_em]:to-[#b89a68] [&_em]:bg-clip-text [&_em]:text-transparent [&_em]:pr-1"
+                                dangerouslySetInnerHTML={{ __html: spot.headingHtml }}
+                            />
+                            {spot.text && <p className="mt-5 lg:mt-7 max-w-md text-[15px] lg:text-base leading-relaxed text-white/65">{spot.text}</p>}
+
+                            {stats.length > 0 && (
+                                <dl className={`mt-8 lg:mt-10 grid border-y border-white/10 ${STAT_COLS[stats.length] || STAT_COLS[4]}`}>
+                                    {stats.map((s, k) => (
+                                        <div key={k} className={`py-4 lg:py-5 ${statCell(k, stats.length)}`}>
+                                            <dt className="sr-only">{s.label}</dt>
+                                            <dd>
+                                                <span className="block font-display text-[1.9rem] lg:text-[2.15rem] leading-none text-white">{s.value}</span>
+                                                {s.label && <span className="mt-2 block text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">{s.label}</span>}
+                                            </dd>
+                                        </div>
+                                    ))}
+                                </dl>
+                            )}
+
+                            <div className="mt-8 lg:mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
+                                <SmartLink href={spot.ctaLink} className="lux-btn-light">
+                                    {spot.ctaText}
+                                    <Arrow />
+                                </SmartLink>
+                                {spot.fromLabel && <span className="text-[13px] tracking-[0.06em] text-white/55">{spot.fromLabel}</span>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {spot.cards?.length > 0 && (
+                    <div className="mt-10 lg:mt-14">
+                        <div className="mb-6 lg:mb-8 flex items-end justify-between gap-6">
+                            <h3 className="display text-[1.75rem] sm:text-4xl">{spot.railTitle}</h3>
+                            <ViewAll href={spot.ctaLink}>View all</ViewAll>
+                        </div>
+                        <Carousel>
+                            {spot.cards.map((p) => (
+                                <div key={p.id} className="snap-start shrink-0 w-[46%] sm:w-[31%] lg:w-[23.4%]"><ProductCard product={p} /></div>
+                            ))}
+                        </Carousel>
+                    </div>
+                )}
             </div>
         </section>
     );

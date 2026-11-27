@@ -56,6 +56,10 @@ class HomeController extends Controller
                 'featured' => $this->sectionProductIds('featured', fn ($n) => Product::published()->featured()->latest()->take($n)->pluck('id')->all()),
                 'new' => $this->sectionProductIds('new', fn ($n) => Product::published()->latest()->take($n)->pluck('id')->all()),
                 'best' => $this->sectionProductIds('best', fn ($n) => $this->bestSellerIds($n)),
+                // The collection spotlight's own row; "auto" there is newest first.
+                'spotlight' => home_content('show_spotlight')
+                    ? $this->sectionProductIds('spotlight', fn ($n) => Product::published()->latest()->take($n)->pluck('id')->all())
+                    : [],
                 'featured_lead' => home_content('featured_lead_mode') === 'product'
                     ? ((int) home_content('featured_lead_product_id') ?: null) : null,
                 'sections' => $sectionBlocks,
@@ -73,7 +77,7 @@ class HomeController extends Controller
 
         // One query hydrates every product used anywhere on the page.
         $with = ['images', 'approvedReviews', 'category'];
-        $allIds = collect([$plan['featured'], $plan['new'], $plan['best'], [$plan['featured_lead'] ?? null], $recentIds, $pickedIds])
+        $allIds = collect([$plan['featured'], $plan['new'], $plan['best'], $plan['spotlight'] ?? [], [$plan['featured_lead'] ?? null], $recentIds, $pickedIds])
             ->flatten()
             ->merge(collect($plan['sections'])->pluck('product_ids')->flatten())
             ->filter()->unique()->values();
@@ -86,6 +90,7 @@ class HomeController extends Controller
         $bestSellers = $pick($plan['best']);
         $recentlyViewed = $pick($recentIds);
         $pickedForYou = $pick($pickedIds);
+        $spotlight = $pick($plan['spotlight'] ?? []);
 
         // Category scroller — admin-chosen categories in order, else auto (top parents).
         $scrollerIds = collect(home_content('category_scroller_ids') ?? [])->map(fn ($i) => (int) $i)->filter();
@@ -136,7 +141,7 @@ class HomeController extends Controller
         // the old Blade homepage instead.
         if (\App\Support\HomePage::isReact($key)) {
             $data = \App\Support\Storefront\HomePageData::make(
-                $featured, $newArrivals, $bestSellers, $categories, $sections, $recentlyViewed, $pickedForYou, $featuredLead,
+                $featured, $newArrivals, $bestSellers, $categories, $sections, $recentlyViewed, $pickedForYou, $featuredLead, $spotlight,
             );
 
             // First hero slide is the LCP element on almost every home visit.

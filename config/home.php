@@ -195,6 +195,35 @@ return [
         'best_category_id' => null,
         'best_product_ids' => [],
 
+        // Collection spotlight (2026-11-27): a dark, cinematic band — a
+        // looping video beside a headline, a row of spec figures and a
+        // button — with the collection's own products underneath. Off until
+        // the owner switches it on; it also hides with neither a video nor
+        // products to show.
+        'show_spotlight' => false,
+        'spotlight_eyebrow' => 'New · The Moissanite Edit',
+        'spotlight_title' => 'Brilliance, forever.',
+        'spotlight_highlight' => 'forever.',
+        'spotlight_text' => 'Lab-grown moissanite, D colour and VVS1 clear, hand-set in 925 sterling silver — more fire than a diamond, and it never goes dull. Every piece arrives with its GRA certificate.',
+        'spotlight_cta_text' => 'Shop the edit',
+        'spotlight_cta_link' => null,           // defaults to the shop
+        'spotlight_from_label' => 'From',       // "From ৳1,890", from the lowest price shown
+        'spotlight_video' => null,              // storage path or URL of an MP4
+        'spotlight_image' => null,              // poster / picture when there is no video
+        'spotlight_sound' => true,              // show a sound button on the video
+        'spotlight_stats' => [
+            ['value' => 'D', 'label' => 'Colour grade'],
+            ['value' => 'VVS1', 'label' => 'Clarity'],
+            ['value' => 'GRA', 'label' => 'Certified'],
+            ['value' => '925', 'label' => 'Silver'],
+        ],
+        'spotlight_rail_title' => 'Shop the edit',
+        'spotlight_source' => 'collection',
+        'spotlight_limit' => '8',
+        'spotlight_collection_id' => null,
+        'spotlight_category_id' => null,
+        'spotlight_product_ids' => [],
+
         'new_arrivals_eyebrow' => 'Just in',
         'new_arrivals_link_label' => "See what's new",
         'new_arrivals_link' => null,            // defaults to the shop, newest first
@@ -239,6 +268,7 @@ return [
     // listed: it always opens the page.
     'sections' => [
         'ribbon' => ['label' => 'Reassurance ticker', 'toggle' => 'show_feature_strip', 'hint' => 'The slow-moving strip of trust points under the hero.'],
+        'spotlight' => ['label' => 'Collection spotlight', 'toggle' => 'show_spotlight', 'hint' => 'A dark, cinematic band: a looping video, a big headline, spec figures and a button, with the collection’s products under it.'],
         'categories' => ['label' => 'Categories', 'toggle' => 'show_categories', 'hint' => 'Tall picture tiles, one per category.'],
         'picked' => ['label' => 'Picked for you', 'toggle' => 'show_picked_for_you', 'hint' => 'Each visitor sees their own picks. Hides itself until there is enough to show.'],
         'occasions' => ['label' => 'Shop by occasion', 'toggle' => 'show_occasions', 'hint' => 'A list of occasions; on a computer, hovering one shows its photo.'],

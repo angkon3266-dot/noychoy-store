@@ -160,6 +160,11 @@ class AppearanceController extends Controller
             'home.*' => ['nullable', 'string', 'max:500'],
             'hero_image' => ['nullable', 'image', 'max:4096'],
             'promise_image' => ['nullable', 'image', 'max:4096'],
+            'spotlight_image' => ['nullable', 'image', 'max:4096'],
+            'spotlight_video_file' => ['nullable', 'file', 'mimes:mp4,webm,mov,m4v', 'max:51200'],
+            'spotlight_stats' => ['nullable', 'array', 'max:8'],
+            'spotlight_stats.*.value' => ['nullable', 'string', 'max:16'],
+            'spotlight_stats.*.label' => ['nullable', 'string', 'max:40'],
 
             // Storefront homepage builder
             'feature_strip' => ['nullable', 'array'],
@@ -553,7 +558,7 @@ class AppearanceController extends Controller
         }
 
         // Only known choices for the builder's pick-one settings.
-        foreach (['featured', 'best', 'new'] as $p) {
+        foreach (['featured', 'best', 'new', 'spotlight'] as $p) {
             if (! in_array($home[$p.'_source'] ?? 'auto', ['auto', 'products', 'collection', 'category'], true)) {
                 $home[$p.'_source'] = 'auto';
             }
@@ -580,11 +585,35 @@ class AppearanceController extends Controller
                 ->filter(fn ($r) => $r['title'] !== '')->take(4)->values()->all();
         }
         foreach (array_keys((array) $request->input('home_products_present', [])) as $p) {
-            if (in_array($p, ['featured', 'best', 'new'], true)) {
+            if (in_array($p, ['featured', 'best', 'new', 'spotlight'], true)) {
                 $home[$p.'_product_ids'] = collect($request->input('home_products.'.$p, []))
                     ->map(fn ($id) => (int) $id)->filter()->unique()->take(24)->values()->all();
             }
         }
+        // Collection spotlight: its figures, its poster picture and its video.
+        if ($request->has('spotlight_stats_present')) {
+            $home['spotlight_stats'] = collect($request->input('spotlight_stats', []))
+                ->map(fn ($r) => ['value' => trim((string) ($r['value'] ?? '')), 'label' => trim((string) ($r['label'] ?? ''))])
+                ->filter(fn ($r) => $r['value'] !== '')->take(4)->values()->all();
+        }
+        $spotPick = trim((string) $request->input('spotlight_image_url', ''));
+        if ($request->hasFile('spotlight_image')) {
+            if (! empty($home['spotlight_image']) && ! str_starts_with($home['spotlight_image'], 'http')) {
+                $delete($home['spotlight_image']);
+            }
+            $home['spotlight_image'] = $dryRun ? null : $optimizer->storeWebp($request->file('spotlight_image'), 'branding', 1600, 85);
+        } elseif ($spotPick !== '') {
+            $home['spotlight_image'] = public_url_to_path($spotPick) ?: $fetch($spotPick, 'branding', 1600, 85);
+        } elseif ($request->boolean('spotlight_image_cleared')) {
+            $home['spotlight_image'] = null;
+        }
+        if ($request->hasFile('spotlight_video_file') && ! $dryRun) {
+            if (! empty($home['spotlight_video']) && ! str_starts_with($home['spotlight_video'], 'http')) {
+                $delete($home['spotlight_video']);
+            }
+            $home['spotlight_video'] = $request->file('spotlight_video_file')->store('hero-videos', 'public');
+        }
+
         if ($request->has('reviews_ids_present')) {
             $home['reviews_ids'] = collect($request->input('reviews_ids', []))
                 ->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();

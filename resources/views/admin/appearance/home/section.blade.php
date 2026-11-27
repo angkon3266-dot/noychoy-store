@@ -239,6 +239,41 @@
             </div>
             @break
 
+        @case('spotlight')
+            <p class="text-xs text-ink-700/60">One collection, presented like a campaign: a looping video beside a big headline, a row of figures and a button, with the collection’s products underneath. The part of the heading you put in “Words in italics” is set in italic.</p>
+            @include('admin.appearance.home._texts', ['fields' => [
+                'spotlight_eyebrow' => 'Small label', 'spotlight_title' => 'Heading', 'spotlight_highlight' => 'Words in italics (part of the heading)',
+                'spotlight_text' => 'Text under the heading', 'spotlight_cta_text' => 'Button text', 'spotlight_cta_link' => 'Button goes to',
+                'spotlight_from_label' => 'Price lead-in (“From ৳1,890”)', 'spotlight_rail_title' => 'Heading over the products',
+            ]])
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Video (MP4)</label>
+                    <input type="file" name="spotlight_video_file" accept="video/mp4,video/webm,video/quicktime" class="block w-full text-sm">
+                    <input name="home[spotlight_video]" value="{{ $home['spotlight_video'] ?? '' }}" class="input mt-2 text-xs" placeholder="…or a stored path / video URL">
+                    <p class="text-[11px] text-ink-700/50 mt-1">Plays muted and looped. Landscape (16:9) fills the frame best. Clear the box to show the picture instead.</p>
+                    <input type="hidden" name="home[spotlight_sound]" value="0">
+                    <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" name="home[spotlight_sound]" value="1" @checked($home['spotlight_sound'] ?? true)> Show a sound button</label>
+                </div>
+                <x-media-field name="spotlight_image" :value="theme_asset($home['spotlight_image'] ?? null) ?: ''" folder="branding"
+                    label="Picture" help="The video’s first frame, and what phones on slow connections see. Leave empty to use the first product’s photo." />
+            </div>
+            @php $spotStats = collect($home['spotlight_stats'] ?? config('home.defaults.spotlight_stats', []))->values(); @endphp
+            <div x-data="{ rows: @js($spotStats->all()) }">
+                <input type="hidden" name="spotlight_stats_present" value="1">
+                <label class="label">Figures (up to 4)</label>
+                <template x-for="(r, i) in rows" :key="i">
+                    <div class="flex gap-2 mb-2">
+                        <input :name="`spotlight_stats[${i}][value]`" x-model="r.value" class="input w-32" maxlength="16" placeholder="VVS1">
+                        <input :name="`spotlight_stats[${i}][label]`" x-model="r.label" class="input flex-1" maxlength="40" placeholder="Clarity">
+                        <button type="button" @click="rows.splice(i,1)" class="text-red-500 px-2 text-xl leading-none">&times;</button>
+                    </div>
+                </template>
+                <button type="button" x-show="rows.length < 4" @click="rows.push({value:'',label:''})" class="btn-outline text-xs py-1">+ Add a figure</button>
+            </div>
+            @include('admin.appearance.home._product-source', ['p' => 'spotlight', 'autoLabel' => 'Automatic (newest first)'])
+            @break
+
         @case('new')
             @include('admin.appearance.home._texts', ['fields' => [
                 'new_arrivals_eyebrow' => 'Small label', 'new_arrivals_title' => 'Heading',
