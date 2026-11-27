@@ -149,8 +149,10 @@ class CategoryController extends Controller
         $data['is_active'] = $request->boolean('is_active');
         $data['is_preorder'] = $request->boolean('is_preorder');
         $data['position'] = $data['position'] ?? 0;
-        $data['google_category'] = $data['google_category'] ?: null;
-        $data['parent_id'] = $data['parent_id'] ?: null;
+        // The quick-add form on the list page has no google_category field, and
+        // validated() leaves absent keys out — so never index these directly.
+        $data['google_category'] = ($data['google_category'] ?? null) ?: null;
+        $data['parent_id'] = ($data['parent_id'] ?? null) ?: null;
         unset($data['image']); // handled by caller
 
         // Only the full form carries the editor; anything else leaves the list alone.
