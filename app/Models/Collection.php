@@ -19,6 +19,8 @@ class Collection extends Model
     protected $fillable = [
         'name', 'slug', 'description', 'image', 'type', 'match', 'rules', 'sort',
         'position', 'is_active', 'show_in_menu', 'meta_title', 'meta_description',
+        // The Meta product set this collection is mirrored to (MetaProductSetSync).
+        'meta_sync', 'meta_product_set_id', 'meta_set_hash', 'meta_set_count', 'meta_synced_at', 'meta_sync_error',
     ];
 
     protected $casts = [
@@ -26,6 +28,9 @@ class Collection extends Model
         'is_active' => 'boolean',
         'show_in_menu' => 'boolean',
         'position' => 'integer',
+        'meta_sync' => 'boolean',
+        'meta_set_count' => 'integer',
+        'meta_synced_at' => 'datetime',
     ];
 
     protected static function booted(): void

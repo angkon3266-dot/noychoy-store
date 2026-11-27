@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Meta\SyncCollectionToMeta;
 use App\Models\Category;
 use App\Models\Collection;
 use App\Models\Product;
@@ -39,6 +40,7 @@ class CollectionController extends Controller
             'match' => 'all',
             'sort' => 'new',
             'is_active' => true,
+            'meta_sync' => true,
             'rules' => [],
         ]));
     }
@@ -65,6 +67,7 @@ class CollectionController extends Controller
     {
         $collection = Collection::create($this->validateData($request));
         $this->syncPinned($collection, $request);
+        SyncCollectionToMeta::dispatchAfterResponse($collection->id);
 
         return redirect()->route('admin.collections.index')->with('success', 'Collection created.');
     }
@@ -73,6 +76,7 @@ class CollectionController extends Controller
     {
         $collection->update($this->validateData($request, $collection));
         $this->syncPinned($collection, $request);
+        SyncCollectionToMeta::dispatchAfterResponse($collection->id);
 
         return redirect()->route('admin.collections.index')->with('success', 'Collection updated.');
     }
@@ -111,7 +115,11 @@ class CollectionController extends Controller
 
     public function destroy(Collection $collection)
     {
+        $setId = $collection->meta_product_set_id;
         $collection->delete();
+        if ($setId) {
+            SyncCollectionToMeta::dispatchAfterResponse(null, $setId);
+        }
 
         return redirect()->route('admin.collections.index')->with('success', 'Collection deleted.');
     }
@@ -136,6 +144,7 @@ class CollectionController extends Controller
             'position' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
             'show_in_menu' => ['nullable', 'boolean'],
+            'meta_sync' => ['nullable', 'boolean'],
             'meta_title' => ['nullable', 'string', 'max:160'],
             'meta_description' => ['nullable', 'string', 'max:320'],
             'rules' => ['nullable', 'array'],
@@ -149,6 +158,7 @@ class CollectionController extends Controller
 
         $data['is_active'] = $request->boolean('is_active');
         $data['show_in_menu'] = $request->boolean('show_in_menu');
+        $data['meta_sync'] = $request->boolean('meta_sync');
         $data['position'] = $data['position'] ?? 0;
         $data['sort'] = $data['sort'] ?? 'new' ?: 'new';
 

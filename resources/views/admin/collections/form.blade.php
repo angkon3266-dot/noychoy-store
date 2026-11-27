@@ -151,6 +151,29 @@
             </div>
         </div>
 
+        <div class="card p-6 space-y-3">
+            <h2 class="font-semibold">Meta ads</h2>
+            <label class="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="meta_sync" value="1" class="mt-0.5" @checked(old('meta_sync', $collection->meta_sync ?? true))>
+                <span>Make it a product set in Meta, so carousel and catalogue ads can use it</span>
+            </label>
+            @if($collection->exists)
+                @if($collection->meta_sync_error)
+                    <p class="text-xs text-red-700">Meta refused the last update: {{ $collection->meta_sync_error }}</p>
+                @elseif($collection->meta_product_set_id)
+                    <p class="text-xs text-ink-700/60">
+                        In Meta as “{{ $collection->name }}” · {{ $collection->meta_set_count }} {{ \Illuminate\Support\Str::plural('item', (int) $collection->meta_set_count) }}
+                        · updated {{ $collection->meta_synced_at?->diffForHumans() }}
+                    </p>
+                @elseif($collection->meta_sync && $collection->is_active)
+                    <p class="text-xs text-ink-700/60">Not in Meta yet. It goes up a moment after you save, once it has products.</p>
+                @else
+                    <p class="text-xs text-ink-700/60">Not in Meta.</p>
+                @endif
+            @endif
+            <p class="text-xs text-ink-700/50">The store refreshes it every hour. Turning it off, deactivating or deleting the collection removes the set from Meta.</p>
+        </div>
+
         <div class="card p-6 space-y-4">
             <h2 class="font-semibold">SEO</h2>
             <div><label class="label">Meta title</label><input name="meta_title" value="{{ old('meta_title', $collection->meta_title) }}" class="input"></div>

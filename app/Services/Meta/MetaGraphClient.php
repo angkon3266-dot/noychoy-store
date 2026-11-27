@@ -41,7 +41,7 @@ class MetaGraphClient
     }
 
     /**
-     * Perform a Graph request. $method is GET|POST. Returns the decoded body.
+     * Perform a Graph request. $method is GET|POST|DELETE. Returns the decoded body.
      *
      * @throws MetaApiException
      */
@@ -59,9 +59,12 @@ class MetaGraphClient
         try {
             $http = Http::timeout(30)->acceptJson();
 
-            $response = strtoupper($method) === 'GET'
-                ? $http->get($url, $params)
-                : $http->asForm()->post($url, $params);
+            $response = match (strtoupper($method)) {
+                'GET' => $http->get($url, $params),
+                // Graph reads a DELETE's parameters from the query string.
+                'DELETE' => $http->delete($url.'?'.http_build_query($params)),
+                default => $http->asForm()->post($url, $params),
+            };
         } catch (ConnectionException $e) {
             $this->debugRecord($method, $path, $url, $params, null, $started, $e);
             throw new MetaApiException(

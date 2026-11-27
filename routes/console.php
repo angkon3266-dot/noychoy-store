@@ -37,6 +37,10 @@ Schedule::command('queue:work '.env('QUEUE_CONNECTION', 'database')
 // Hourly: re-queue any product stuck in a failed sync state.
 Schedule::job(new RetryFailedMetaSyncs)->hourly()->name('meta-retry-failed')->withoutOverlapping();
 
+// Hourly: mirror collections into the catalogue as product sets for ads. A
+// smart collection's products move without the collection being saved.
+Schedule::command('meta:sync-collections')->hourlyAt(40)->name('meta-collection-sets')->withoutOverlapping();
+
 // Daily: verify the whole catalog is in sync and re-queue anything stale.
 Schedule::job(new VerifyCatalogSync)->dailyAt('03:30')->name('meta-verify-catalog')->withoutOverlapping();
 
