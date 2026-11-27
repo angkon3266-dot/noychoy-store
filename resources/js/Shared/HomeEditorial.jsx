@@ -4,6 +4,8 @@ import Carousel from './Carousel';
 import SmartLink from './SmartLink';
 import { IconOrGlyph, Star } from './Icons';
 import { Arrow, Heading, ViewAll, shell } from './HomeKit';
+import AutoVideo, { SpeakerGlyph } from './AutoVideo';
+import { setSoundWanted, useSoundPref } from './videoSound';
 
 // The "Editorial" homepage design (owner, 2026-10-28: "a more advanced, more
 // editorial homepage template"). Same payload, same builder and same section
@@ -21,6 +23,7 @@ export function EdHero({ hero, trust = [], giftFinder }) {
     const [i, setI] = useState(0);
     const [paused, setPaused] = useState(false);
     const [soundOn, setSoundOn] = useState(false);
+    const pref = useSoundPref();
     const [mounted, setMounted] = useState(() => new Set(slides.length > 1 ? [0, 1] : [0]));
     const frames = useRef({});
     const touchX = useRef(null);
@@ -38,8 +41,9 @@ export function EdHero({ hero, trust = [], giftFinder }) {
         setSoundOn(false);
     }, [i, slides.length]);
 
-    // Same sound control as Couture: videos start muted, the button turns the
-    // current one up, and changing slide mutes everything again.
+    // Same sound control as Couture: an uploaded clip follows the site-wide
+    // rules (videoSound.js); a YouTube/Vimeo slide starts muted, the button
+    // turns it up, and changing slide mutes it again.
     useEffect(() => {
         Object.entries(frames.current).forEach(([k, frame]) => {
             if (!frame?.contentWindow) return;
@@ -72,7 +76,7 @@ export function EdHero({ hero, trust = [], giftFinder }) {
                 return (
                     <div key={k} className={cls} aria-hidden={!active}>
                         {s.type === 'video' && s.video?.type === 'file' ? (
-                            <video src={s.video.src} autoPlay muted={!(soundOn && active)} loop playsInline className="w-full h-full object-cover" />
+                            <AutoVideo enabled={active} sound={!!s.sound} src={s.video.src} loop playsInline className="w-full h-full object-cover" />
                         ) : s.type === 'video' ? (
                             <div className="absolute inset-0 overflow-hidden [container-type:size]">
                                 <iframe ref={(el) => { frames.current[k] = el; }} src={s.video.embedUrl} title={s.alt || 'Video'} tabIndex={-1}
@@ -126,14 +130,16 @@ export function EdHero({ hero, trust = [], giftFinder }) {
                             ))}
                         </div>
                     )}
-                    {current.type === 'video' && current.sound && (
-                        <button type="button" onClick={() => setSoundOn(!soundOn)} aria-pressed={soundOn} aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
-                            className="grid place-items-center w-10 h-10 rounded-full glass-dark hover:bg-white hover:text-ink-900 transition-colors">
-                            <svg aria-hidden="true" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                <path d="M11 5L6 9H3v6h3l5 4V5z" />{soundOn ? <path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" /> : <path d="M16 9l5 6M21 9l-5 6" />}
-                            </svg>
-                        </button>
-                    )}
+                    {current.type === 'video' && current.sound && (() => {
+                        const file = current.video?.type === 'file';
+                        const audible = file ? pref.wanted && pref.unlocked : soundOn;
+                        return (
+                            <button type="button" onClick={() => (file ? setSoundWanted(!audible) : setSoundOn(!soundOn))} aria-pressed={audible} aria-label={audible ? 'Turn sound off' : 'Turn sound on'}
+                                className="grid place-items-center w-10 h-10 rounded-full glass-dark hover:bg-white hover:text-ink-900 transition-colors">
+                                <SpeakerGlyph on={audible} />
+                            </button>
+                        );
+                    })()}
                     {current.link && (
                         <SmartLink href={current.link} className="shrink-0 inline-flex items-center gap-2 text-[11px] tracking-[0.24em] uppercase text-white/85 hover:text-white">
                             <span className="lux-link lux-link-on">Shop the look</span> <Arrow className="w-3.5 h-3.5" />

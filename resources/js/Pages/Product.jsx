@@ -10,6 +10,8 @@ import SizeFinder from '../Shared/SizeFinder';
 import { useCart } from '../Shared/CartContext';
 import { csrf, fetchJson, money, newEventId } from '../Shared/format';
 import { ordinal, rewardLabel, rewardPhrase, t } from '../Shared/i18n';
+import AutoVideo, { SpeakerGlyph } from '../Shared/AutoVideo';
+import { setSoundWanted, useAutoVideo, useSoundPref } from '../Shared/videoSound';
 
 // The React product page — a superset of the Blade "showcase" template:
 // swipeable gallery + zoom + videos, conversion buy box (variants, qty tiers,
@@ -455,7 +457,9 @@ function Gallery({ product, img, setImg, variantId }) {
                                     s.embed ? (
                                         <iframe src={`${s.embed}?autoplay=1`} title={`Video ${i - images.length + 1}`} className="absolute inset-0 h-full w-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
                                     ) : (
-                                        <video src={s.src} controls autoPlay playsInline className="absolute inset-0 h-full w-full object-contain bg-black" />
+                                        // The shopper started it: its own controls own the sound;
+                                        // it only pauses once swiped or scrolled away.
+                                        <AutoVideo managesSound={false} autoplay={false} src={s.src} controls autoPlay playsInline className="absolute inset-0 h-full w-full object-contain bg-black" />
                                     )
                                 ) : (
                                     <button type="button" onClick={() => setPlaying(i)} aria-label={`Play video ${i - images.length + 1}`} className="absolute inset-0 grid place-items-center">
@@ -1090,69 +1094,44 @@ function storyAutoplay() {
 }
 
 /**
- * The product's own clip, muted and looped, playing only while it is on
- * screen. The file (median ~4 MB) is not touched until the row is near the
- * viewport, and then only its metadata, so the box can take the clip's shape
- * before anyone sees it. On Save-Data or 2G it waits for a tap instead.
+ * The product's own clip, looped, playing only while it is on screen, with
+ * sound by the site-wide rules (videoSound.js: audible from the visitor's
+ * first tap, or at once where the browser allows; paused when scrolled away).
+ * The file (median ~4 MB) is not touched until the row is near the viewport,
+ * and then only its metadata, so the box can take the clip's shape before
+ * anyone sees it. On Save-Data or 2G it waits for a tap instead.
  */
 function StoryVideo({ media, alt }) {
     const box = useRef(null);
-    const video = useRef(null);
-    const inView = useRef(false);
-    const userPaused = useRef(false);
-    const wantPlay = useRef(false);
     const [auto] = useState(storyAutoplay);
+    const [tapped, setTapped] = useState(false);   // Save-Data: started by hand
     const [src, setSrc] = useState(null);
     const [ratio, setRatio] = useState(1);
     const [shown, setShown] = useState(false);     // first frame decoded — fade the clip over the poster
     const [playing, setPlaying] = useState(false);
-
-    const play = useCallback(() => { video.current?.play().catch(() => {}); }, []);
+    const { ref: video, setUserPaused } = useAutoVideo({ autoplay: auto || tapped, sound: true });
+    const { wanted, unlocked } = useSoundPref();
+    const audible = wanted && unlocked;
 
     useEffect(() => {
         const el = box.current;
-        if (!el) return undefined;
-        if (!('IntersectionObserver' in window)) {
-            inView.current = true;
-            if (auto) setSrc(media.src);
-            return undefined;
-        }
+        if (!el || !auto) return undefined;
+        if (!('IntersectionObserver' in window)) { setSrc(media.src); return undefined; }
         const near = new IntersectionObserver(([e]) => {
             if (!e.isIntersecting) return;
             setSrc(media.src);
             near.disconnect();
         }, { rootMargin: '600px 0px' });
-        // On the ratio, not isIntersecting: a slow scroll out crosses 0.35
-        // while still intersecting, and would never pause.
-        const seen = new IntersectionObserver(([e]) => {
-            inView.current = e.isIntersecting && e.intersectionRatio >= 0.35;
-            if (!inView.current) video.current?.pause();
-            else if (auto && !userPaused.current) play();
-        }, { threshold: [0, 0.35] });
-        if (auto) near.observe(el);
-        seen.observe(el);
-        return () => { near.disconnect(); seen.disconnect(); };
-    }, [media.src, auto, play]);
-
-    // A source that arrives after the row came into view (or after a tap on
-    // Save-Data) starts playing as soon as it is attached.
-    useEffect(() => {
-        if (src && (wantPlay.current || (auto && inView.current && !userPaused.current))) play();
-    }, [src, auto, play]);
+        near.observe(el);
+        return () => near.disconnect();
+    }, [media.src, auto]);
 
     const toggle = () => {
-        const v = video.current;
-        if (!v) return;
         if (!src) {
-            wantPlay.current = true;
-            userPaused.current = false;
+            setTapped(true);
             setSrc(media.src);
-        } else if (v.paused) {
-            userPaused.current = false;
-            play();
         } else {
-            userPaused.current = true;
-            v.pause();
+            setUserPaused(playing);
         }
     };
 
@@ -1168,12 +1147,20 @@ function StoryVideo({ media, alt }) {
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
                 className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${shown ? 'opacity-100' : 'opacity-0'}`} />
-            <button type="button" onClick={toggle} aria-label={playing ? 'Pause video' : 'Play video'}
-                className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full border border-white/50 bg-ink-900/70 text-white backdrop-blur-sm transition hover:bg-ink-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-                {playing
-                    ? <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>
-                    : <PlayGlyph className="w-4 h-4" />}
-            </button>
+            <div className="absolute bottom-3 right-3 flex gap-2">
+                {src && (
+                    <button type="button" onClick={() => setSoundWanted(!audible)} aria-pressed={audible} aria-label={audible ? 'Turn sound off' : 'Turn sound on'}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-white/50 bg-ink-900/70 text-white backdrop-blur-sm transition hover:bg-ink-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                        <SpeakerGlyph on={audible} className="w-4 h-4" />
+                    </button>
+                )}
+                <button type="button" onClick={toggle} aria-label={playing ? 'Pause video' : 'Play video'}
+                    className="grid h-10 w-10 place-items-center rounded-full border border-white/50 bg-ink-900/70 text-white backdrop-blur-sm transition hover:bg-ink-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                    {playing
+                        ? <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>
+                        : <PlayGlyph className="w-4 h-4" />}
+                </button>
+            </div>
         </div>
     );
 }

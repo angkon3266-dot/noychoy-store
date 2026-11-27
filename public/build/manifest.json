@@ -13,6 +13,14 @@
       "_vendor-CbkBc-rd.js"
     ]
   },
+  "_AutoVideo-CN-gbt-z.js": {
+    "file": "assets/AutoVideo-CN-gbt-z.js",
+    "name": "AutoVideo",
+    "imports": [
+      "_rolldown-runtime-Bh1tDfsg.js",
+      "_vendor-CbkBc-rd.js"
+    ]
+  },
   "_Layout-CB8LWZXA.js": {
     "file": "assets/Layout-CB8LWZXA.js",
     "name": "Layout",
@@ -205,7 +213,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-N2rRqMUo.css",
+    "file": "assets/app-DK8cXEm3.css",
     "name": "app",
     "names": [
       "app.css"
@@ -443,13 +451,14 @@
     ]
   },
   "resources/js/Pages/Home.jsx": {
-    "file": "assets/Home-TslXP56K.js",
+    "file": "assets/Home-CMYTxrTU.js",
     "name": "Home",
     "src": "resources/js/Pages/Home.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-Bh1tDfsg.js",
       "_vendor-CbkBc-rd.js",
+      "_AutoVideo-CN-gbt-z.js",
       "_Layout-CB8LWZXA.js",
       "_ProductCard-Ce02nEw7.js"
     ]
@@ -465,13 +474,14 @@
     ]
   },
   "resources/js/Pages/Product.jsx": {
-    "file": "assets/Product-VS9IEUyC.js",
+    "file": "assets/Product-5xcclHEO.js",
     "name": "Product",
     "src": "resources/js/Pages/Product.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-Bh1tDfsg.js",
       "_vendor-CbkBc-rd.js",
+      "_AutoVideo-CN-gbt-z.js",
       "_Layout-CB8LWZXA.js",
       "_ProductCard-Ce02nEw7.js"
     ]
@@ -527,7 +537,7 @@
     "isEntry": true
   },
   "resources/js/inertia.jsx": {
-    "file": "assets/inertia-VNYGrRkI.js",
+    "file": "assets/inertia-OJEpUeKJ.js",
     "name": "inertia",
     "src": "resources/js/inertia.jsx",
     "isEntry": true,

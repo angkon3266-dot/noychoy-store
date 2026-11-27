@@ -11,6 +11,8 @@ import useCountdown from '../Shared/useCountdown';
 import Icon, { IconOrGlyph, Star } from '../Shared/Icons';
 import { t } from '../Shared/i18n';
 import { SpinBand } from '../Shared/SpinWheel';
+import AutoVideo, { SpeakerGlyph } from '../Shared/AutoVideo';
+import { setSoundWanted, useSoundPref } from '../Shared/videoSound';
 
 // The homepage — editorial, conversion-first and gift-led (redesigned
 // 2026-10-24).
@@ -122,9 +124,12 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
     const current = slides[i] || {};
     const showFinder = giftFinder?.show && giftFinder.budgets?.length;
 
-    // Sound: video slides start muted (browsers only autoplay silent video);
-    // the speaker button turns the current one up. Moving to another slide
-    // mutes everything again.
+    // Sound. An uploaded clip follows the site-wide rules (videoSound.js): on
+    // by default, audible from the visitor's first tap (or straight away
+    // where the browser allows), paused when scrolled away. A YouTube/Vimeo
+    // slide keeps its own switch: it starts muted, the speaker button turns
+    // it up, and moving to another slide mutes it again.
+    const pref = useSoundPref();
     const [soundOn, setSoundOn] = useState(false);
     const frames = useRef({});
     useEffect(() => { setSoundOn(false); }, [i]);
@@ -260,7 +265,7 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                                         />
                                     )}
                                     {(!s.image || clipReady) && (
-                                        <video src={s.video.src} poster={s.image || undefined} autoPlay muted={!(soundOn && active)} loop playsInline preload={s.image ? 'metadata' : 'auto'} className="relative w-full h-full object-cover" />
+                                        <AutoVideo enabled={active} sound={!!s.sound} src={s.video.src} poster={s.image || undefined} loop playsInline preload={s.image ? 'metadata' : 'auto'} className="relative w-full h-full object-cover" />
                                     )}
                                 </>
                             ) : s.type === 'video' ? (
@@ -315,20 +320,21 @@ function Hero({ hero, hasReviews = false, trust = [], giftFinder }) {
                                 </SmartLink>
                             ) : <span />}
                             <div className="pointer-events-auto flex items-center gap-2">
-                                {current.type === 'video' && current.sound && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSoundOn(!soundOn)}
-                                        aria-pressed={soundOn}
-                                        aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
-                                        className="grid place-items-center w-11 h-11 rounded-full glass-dark text-white hover:bg-white hover:text-ink-900 transition-colors"
-                                    >
-                                        <svg aria-hidden="true" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                            <path d="M11 5L6 9H3v6h3l5 4V5z" />
-                                            {soundOn ? <path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" /> : <path d="M16 9l5 6M21 9l-5 6" />}
-                                        </svg>
-                                    </button>
-                                )}
+                                {current.type === 'video' && current.sound && (() => {
+                                    const file = current.video?.type === 'file';
+                                    const audible = file ? pref.wanted && pref.unlocked : soundOn;
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => (file ? setSoundWanted(!audible) : setSoundOn(!soundOn))}
+                                            aria-pressed={audible}
+                                            aria-label={audible ? 'Turn sound off' : 'Turn sound on'}
+                                            className="grid place-items-center w-11 h-11 rounded-full glass-dark text-white hover:bg-white hover:text-ink-900 transition-colors"
+                                        >
+                                            <SpeakerGlyph on={audible} />
+                                        </button>
+                                    );
+                                })()}
                             {many && (
                                 <>
                                     <span className="hidden sm:inline text-white/90 text-[12px] tabular-nums tracking-[0.12em] mr-1">{String(i + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span>
@@ -371,10 +377,10 @@ const statCell = (k, n) => (n < 4
 // connection asking to save data — the poster stands in, as on the hero.
 function Spotlight({ spot }) {
     const band = useRef(null);
-    const film = useRef(null);
     const [near, setNear] = useState(false);
     const [allowed, setAllowed] = useState(true);
-    const [soundOn, setSoundOn] = useState(false);
+    const pref = useSoundPref();
+    const audible = pref.wanted && pref.unlocked;
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -390,18 +396,6 @@ function Spotlight({ spot }) {
         io.observe(el);
         return () => io.disconnect();
     }, []);
-
-    // Sound follows the button; leaving the band mutes it again.
-    useEffect(() => {
-        const v = film.current;
-        if (!v) return undefined;
-        v.muted = !soundOn;
-        if (soundOn) v.play?.().catch(() => {});
-        if (!soundOn || typeof IntersectionObserver === 'undefined') return undefined;
-        const io = new IntersectionObserver(([e]) => { if (!e.isIntersecting) setSoundOn(false); }, { threshold: 0.15 });
-        io.observe(v);
-        return () => io.disconnect();
-    }, [soundOn]);
 
     if (!spot?.show) return null;
     const playing = spot.video && near && allowed;
@@ -429,12 +423,13 @@ function Spotlight({ spot }) {
                                 />
                             )}
                             {playing && (
-                                <video
-                                    ref={film}
+                                // Sound, play and pause follow videoSound.js:
+                                // it plays (with sound where allowed) while on
+                                // screen and pauses once scrolled away.
+                                <AutoVideo
+                                    sound={!!spot.sound}
                                     src={spot.video.src}
                                     poster={spot.image900 || spot.image || undefined}
-                                    autoPlay
-                                    muted
                                     loop
                                     playsInline
                                     preload="auto"
@@ -448,15 +443,12 @@ function Spotlight({ spot }) {
                             {playing && spot.sound && (
                                 <button
                                     type="button"
-                                    onClick={() => setSoundOn(!soundOn)}
-                                    aria-pressed={soundOn}
-                                    aria-label={soundOn ? 'Turn sound off' : 'Turn sound on'}
+                                    onClick={() => setSoundWanted(!audible)}
+                                    aria-pressed={audible}
+                                    aria-label={audible ? 'Turn sound off' : 'Turn sound on'}
                                     className="absolute right-4 top-4 lg:right-7 lg:top-7 grid h-11 w-11 place-items-center rounded-full glass-dark text-white transition-colors hover:bg-white hover:text-ink-900"
                                 >
-                                    <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                                        <path d="M11 5L6 9H3v6h3l5 4V5z" />
-                                        {soundOn ? <path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" /> : <path d="M16 9l5 6M21 9l-5 6" />}
-                                    </svg>
+                                    <SpeakerGlyph on={audible} />
                                 </button>
                             )}
                         </div>
