@@ -187,4 +187,18 @@ class CollectionTest extends TestCase
 
         $this->assertSame(['Live gift'], $this->svc()->query($c)->pluck('name')->all());
     }
+
+    public function test_the_edit_form_prints_rule_fields_so_a_saved_category_rule_reloads_as_category(): void
+    {
+        // The field options used to be drawn by x-for after x-model had set the
+        // select, so every saved rule reloaded showing "Tag" — and re-saving the
+        // page turned "Category is 18" into "Tag is 18" (owner, 2026-11-27).
+        $c = $this->smart([['field' => 'category', 'operator' => 'is', 'value' => '18']]);
+
+        $html = $this->actingAs($this->admin())->get(route('admin.collections.edit', $c))->assertOk()->getContent();
+
+        $this->assertStringContainsString("<option value=\"category\" :selected=\"r.field === 'category'\">Category</option>", $html);
+        $this->assertStringContainsString(':selected="op === r.operator"', $html);
+        $this->assertStringNotContainsString('x-for="(f, key) in fields"', $html);
+    }
 }

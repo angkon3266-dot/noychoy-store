@@ -62,15 +62,20 @@
 
                 <template x-for="(r, i) in rules" :key="i">
                     <div class="flex flex-wrap gap-2 mb-2 items-start">
+                        {{-- Options drawn by x-for arrive after x-model has set the
+                             select's value, so the browser fell back to the first
+                             option: a saved Category rule showed (and re-saved) as
+                             Tag. Field options are printed by the server instead,
+                             and every option says itself whether it is chosen. --}}
                         <select :name="`rules[${i}][field]`" x-model="r.field" @change="onFieldChange(r)" class="input py-1.5 w-44">
-                            <template x-for="(f, key) in fields" :key="key">
-                                <option :value="key" x-text="f.label"></option>
-                            </template>
+                            @foreach($fields as $key => $f)
+                                <option value="{{ $key }}" :selected="r.field === @js($key)">{{ $f['label'] }}</option>
+                            @endforeach
                         </select>
 
                         <select :name="`rules[${i}][operator]`" x-model="r.operator" @change="preview()" class="input py-1.5 w-52">
                             <template x-for="op in (fields[r.field]?.operators || [])" :key="op">
-                                <option :value="op" x-text="operatorLabels[op]"></option>
+                                <option :value="op" x-text="operatorLabels[op]" :selected="op === r.operator"></option>
                             </template>
                         </select>
 
