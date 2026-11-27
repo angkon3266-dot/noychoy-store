@@ -6,6 +6,8 @@
     @param array      $inherited  what shows when this record has no list of its own
     @param string     $scope      'store' | 'override'
     @param string     $inheritsFrom  human label for where the inherited list comes from
+    @param int|null   $copyFromProduct  product form only: show "Copy from another
+                      product" (the value is the product being edited, 0 when new)
 --}}
 @php
     $scope ??= 'override';
@@ -21,7 +23,15 @@
         ...@js($state),
         start() { if (!this.rows.length) this.rows = JSON.parse(JSON.stringify(this.inherited)); },
         move(i, d) { const j = i + d; if (j < 0 || j >= this.rows.length) return; [this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]]; },
-     }">
+        copied: '',
+        takeCopy(detail) {
+            if (detail.kind !== 'pdp_points') return;
+            const add = detail.data.map(r => ({ icon: r.icon || 'check', title: r.title, text: r.text || '' }));
+            this.rows = (detail.mode === 'append' ? this.rows.concat(add) : add).slice(0, this.max);
+            this.custom = true;
+            this.copied = 'Copied from ' + detail.name + '. Save the product to keep it.';
+        },
+     }" @copy-from-product="takeCopy($event.detail)">
     <datalist id="pdp-point-icons">
         @foreach(\App\Support\StorefrontIcons::names() as $iconName)
             <option value="{{ $iconName }}"></option>
@@ -64,10 +74,15 @@
                 <button type="button" x-show="rows.length" @click="rows = JSON.parse(JSON.stringify(inherited))" class="text-xs text-gold-700 underline">Reset to the inherited list</button>
             @endif
         </div>
+        <p x-show="copied" x-text="copied" class="text-xs text-success-700"></p>
         <p class="text-xs text-ink-700/50">
             Up to {{ \App\Support\Storefront\PdpPoints::MAX }} points. Shown as “<strong>title</strong> — text” with the icon in front.
             Icons: {{ implode(', ', \App\Support\StorefrontIcons::suggested()) }}, tag, cash, trackBox…
             @if($scope === 'override') Untick “Use its own list” to go back to inheriting. @endif
         </p>
     </div>
+
+    @isset($copyFromProduct)
+        @include('admin.partials.copy-from-product', ['kind' => 'pdp_points', 'noun' => 'page points', 'exceptId' => $copyFromProduct])
+    @endisset
 </div>

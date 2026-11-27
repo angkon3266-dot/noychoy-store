@@ -71,6 +71,10 @@ Route::middleware('admin')->group(function () {
     // The owner's ring and bangle size charts, read by "Find my size".
     Route::get('products/size-chart', [\App\Http\Controllers\Admin\SizeChartController::class, 'edit'])->name('products.size-chart');
     Route::post('products/size-chart', [\App\Http\Controllers\Admin\SizeChartController::class, 'update'])->name('products.size-chart.update');
+    // Copy custom fields / page points from another product (edit form).
+    Route::get('products/copy-search', [ProductController::class, 'copySearch'])
+        ->middleware('throttle:120,1')->name('products.copy-search');
+    Route::get('products/{product}/copyable', [ProductController::class, 'copyable'])->name('products.copyable');
     Route::get('products/{product}/export', [ProductController::class, 'exportOne'])->name('products.export-one');
     Route::post('products', [ProductController::class, 'store'])->name('products.store');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');

@@ -444,6 +444,7 @@
                     'points' => old('pdp_points_custom') !== null ? (old('pdp_points_custom') ? old('pdp_points') : null) : $product->pdp_points,
                     'inherited' => \App\Support\Storefront\PdpPoints::inheritedFor($product->exists ? $product : null),
                     'inheritsFrom' => 'its category, or the store-wide list if the category has none',
+                    'copyFromProduct' => $product->id ?? 0,
                 ])
             </div>
 
@@ -510,23 +511,34 @@
                     <input name="colors" value="{{ old('colors', implode(', ', $product->color_list ?? [])) }}" class="input" placeholder="Gold, Rose Gold, Silver">
                     <p class="text-xs text-ink-700/50 mt-1">Comma-separated. Shown as a colour filter on the shop &amp; category pages.</p>
                 </div>
-                <div class="border-t border-ink-100 pt-4" x-data="{ rows: @js(array_values(old('custom_fields', $product->custom_fields ?? []))) }">
+                {{-- Every custom field is one reorderable list. The old single
+                     "primary" field (custom_label/value/show) loads as the first
+                     row and is folded into custom_fields when the product saves. --}}
+                <div class="border-t border-ink-100 pt-4"
+                     x-data="{
+                        rows: @js(array_values(old('custom_fields', $product->customFieldList()))),
+                        move(i, d) { const j = i + d; if (j < 0 || j >= this.rows.length) return; [this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]]; },
+                        copied: '',
+                        takeCopy(detail) {
+                            if (detail.kind !== 'custom_fields') return;
+                            const add = detail.data.map(r => ({ label: r.label, value: r.value, show: !!r.show }));
+                            this.rows = detail.mode === 'append' ? this.rows.concat(add) : add;
+                            this.copied = 'Copied from ' + detail.name + '. Save the product to keep it.';
+                        },
+                     }"
+                     @copy-from-product="takeCopy($event.detail)">
                     <label class="label">Custom fields (any purpose)</label>
 
-                    {{-- Primary custom field (kept for back-compat) --}}
-                    <div class="grid grid-cols-2 gap-2">
-                        <input name="custom_label" value="{{ old('custom_label', $product->custom_label) }}" class="input" placeholder="Label (e.g. Material)">
-                        <input name="custom_value" value="{{ old('custom_value', $product->custom_value) }}" class="input" placeholder="Value (e.g. 22k Gold)">
-                    </div>
-                    <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" name="custom_show" value="1" @checked(old('custom_show', $product->custom_show))> Show on product page</label>
-
-                    {{-- Additional custom fields (unlimited) --}}
                     <template x-for="(row, i) in rows" :key="i">
                         <div class="mt-3 rounded-md border border-ink-100 p-3">
-                            <div class="grid grid-cols-2 gap-2">
-                                <input :name="`custom_fields[${i}][label]`" x-model="row.label" class="input" placeholder="Label">
-                                <div class="flex gap-2">
-                                    <input :name="`custom_fields[${i}][value]`" x-model="row.value" class="input flex-1" placeholder="Value">
+                            <div class="flex gap-2 items-start">
+                                <div class="grid grid-cols-2 gap-2 flex-1 min-w-0">
+                                    <input :name="`custom_fields[${i}][label]`" x-model="row.label" class="input" placeholder="Label (e.g. Material)">
+                                    <input :name="`custom_fields[${i}][value]`" x-model="row.value" class="input" placeholder="Value (e.g. 22k Gold)">
+                                </div>
+                                <div class="flex shrink-0 pt-1.5">
+                                    <button type="button" @click="move(i, -1)" :disabled="i === 0" class="px-1.5 text-ink-700/50 hover:text-ink-900 disabled:opacity-25" title="Move up">▲</button>
+                                    <button type="button" @click="move(i, 1)" :disabled="i === rows.length - 1" class="px-1.5 text-ink-700/50 hover:text-ink-900 disabled:opacity-25" title="Move down">▼</button>
                                     <button type="button" @click="rows.splice(i, 1)" class="text-red-500 px-2 text-xl leading-none" title="Remove">&times;</button>
                                 </div>
                             </div>
@@ -536,8 +548,10 @@
                         </div>
                     </template>
 
-                    <button type="button" @click="rows.push({label:'', value:'', show:false})" class="btn-outline mt-3 text-sm">+ Add another custom field</button>
-                    <p class="text-xs text-ink-700/50 mt-2">Use for anything (material, purity, weight…). Shown fields appear on the product page; all are filterable in the admin list.</p>
+                    <button type="button" @click="rows.push({label:'', value:'', show:false})" class="btn-outline mt-3 text-sm">+ Add a custom field</button>
+                    @include('admin.partials.copy-from-product', ['kind' => 'custom_fields', 'noun' => 'custom fields', 'exceptId' => $product->id])
+                    <p x-show="copied" x-text="copied" class="text-xs text-success-700 mt-2"></p>
+                    <p class="text-xs text-ink-700/50 mt-2">Use for anything (material, purity, weight…). Shown fields appear on the product page in this order (▲▼ to move); all are filterable in the admin list.</p>
                 </div>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured))> Featured on homepage</label>
                 <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_bestseller" value="1" @checked(old('is_bestseller', $product->is_bestseller))> Mark as best seller</label>

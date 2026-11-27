@@ -403,6 +403,58 @@ class ProductController extends Controller
         ]);
     }
 
+    /**
+     * The "Copy from another product" picker on the edit form: products of any
+     * status, by name, SKU or serial, leaving out the one being edited.
+     */
+    public function copySearch(Request $request)
+    {
+        $q = trim((string) $request->query('q'));
+        if ($q === '' || (mb_strlen($q) < 2 && ! ctype_digit($q))) {
+            return response()->json(['results' => []]);
+        }
+
+        $products = Product::query()
+            ->with('primaryImage')
+            ->when($request->integer('except'), fn ($w, $id) => $w->whereKeyNot($id))
+            ->where(function ($w) use ($q) {
+                $w->where('name', 'like', '%'.$q.'%')->orWhere('sku', 'like', '%'.$q.'%');
+                if (ctype_digit($q)) {
+                    $w->orWhere('serial', (int) $q);
+                }
+            })
+            ->orderByRaw('CASE WHEN name LIKE ? THEN 0 ELSE 1 END', [$q.'%'])
+            ->orderBy('name')
+            ->limit(12)
+            ->get();
+
+        return response()->json([
+            'results' => $products->map(fn (Product $p) => [
+                'id' => $p->id,
+                'serial' => $p->serial,
+                'name' => $p->name,
+                'status' => $p->status,
+                'thumbnail' => $p->thumbnail,
+                'copyable_url' => route('admin.products.copyable', $p),
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * What the edit form can copy from a product: its custom fields (in their
+     * saved order) and the product page points it shows — its own list, or the
+     * one it inherits from its category or the store.
+     */
+    public function copyable(Product $product)
+    {
+        return response()->json([
+            'name' => $product->name,
+            'custom_fields' => $product->customFieldList(),
+            'pdp_points' => PdpPoints::for($product)['items'],
+            'pdp_points_own' => PdpPoints::clean($product->pdp_points) !== [],
+        ]);
+    }
+
     public function update(Request $request, Product $product)
     {
         // Snapshot for back-in-stock + price-drop push triggers.
@@ -1216,6 +1268,16 @@ class ProductController extends Controller
             ])
             ->filter(fn ($f) => $f['label'] !== '' && $f['value'] !== '')
             ->values()->all();
+
+        // The form edits every custom field as one reorderable list, the old
+        // single "primary" field included (it is loaded as the first row). So
+        // once the list is saved, the legacy columns are emptied — otherwise
+        // customFieldList() would show that field twice, and always first.
+        if (! $request->has('custom_label')) {
+            $validated['custom_label'] = null;
+            $validated['custom_value'] = null;
+            $validated['custom_show'] = false;
+        }
 
         // ── Product type: simple vs variable ────────────────────────────────
         $isVariable = ($request->input('product_type') === 'variable');
