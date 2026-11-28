@@ -101,6 +101,32 @@ class SpinWheelTest extends TestCase
             ->where('spin.result.applied', true));
     }
 
+    public function test_a_prize_lasts_twenty_minutes_and_says_when_it_ends(): void
+    {
+        // Owner, 2026-11-28: "After spinning, show times to user so they are
+        // aware for how long the offer stands (make it 20 mins)".
+        $this->wheel();
+        $this->inCart(2000);
+
+        $res = $this->postJson('/checkout/spin')->assertJson(['ok' => true]);
+
+        $coupon = Coupon::firstOrFail();
+        $this->assertEqualsWithDelta(now()->addMinutes(20)->timestamp, $coupon->expires_at->timestamp, 2);
+        $this->assertSame($coupon->expires_at->timestamp, $res->json('result.expiresAt'));
+
+        // Twenty-one minutes on: the prize is gone, and the bag pays full price.
+        $this->travel(21)->minutes();
+        $this->app->forgetInstance(CartService::class);
+        $this->assertSame(0.0, app(CartService::class)->couponDiscount());
+        $this->get('/checkout')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('spin.result.live', false)
+            ->where('spin.result.expiresAt', null)
+            ->where('spin.result.note', 'This prize has expired.'));
+
+        // …but the spin still holds the wheel for the owner's hours.
+        $this->postJson('/checkout/spin')->assertJson(['ok' => false, 'message' => 'You have already spun the wheel.']);
+    }
+
     public function test_one_spin_per_shopper(): void
     {
         $this->wheel();
@@ -369,6 +395,86 @@ class SpinWheelTest extends TestCase
         $this->assertSame(300.0, $cart->couponDiscount());
     }
 
+    public function test_a_gift_is_not_discounted_twice_under_a_percentage_offer(): void
+    {
+        // Review 2026-11-28: the 20% offer took ৳100 off the ৳500 gift, then
+        // the gift coupon took the full ৳500 — the extra ৳100 came off the
+        // ring. A ৳1,000 ring and a free ৳500 gift under 20% off is ৳800.
+        \App\Models\Offer::create([
+            'title' => '20% off everything', 'type' => 'order_percent', 'applies_to' => 'all',
+            'percent' => 20, 'is_active' => true,
+        ]);
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 500]);
+        $this->giftWheel($gift);
+        $this->inCart(1000);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => ['applied' => true]]);
+
+        $this->app->forgetInstance(CartService::class);
+        $cart = app(CartService::class);
+        $this->assertSame(1500.0, $cart->subtotal());
+        $this->assertSame(200.0, $cart->promoDiscount());
+        $this->assertSame(500.0, $cart->couponDiscount());
+        $this->assertSame(800.0, round($cart->subtotal() - $cart->discount(), 2));
+
+        $this->post('/checkout', $this->checkoutData())->assertRedirect();
+        $this->assertSame(800.0, (float) Order::firstOrFail()->subtotal - (float) Order::firstOrFail()->discount);
+    }
+
+    public function test_a_gift_waiting_for_its_minimum_still_gets_the_offer(): void
+    {
+        // The coupon does not apply yet (the bag is under the prize's ৳2,000
+        // minimum), so the gift is not held out of the offer for nothing.
+        \App\Models\Offer::create([
+            'title' => '20% off everything', 'type' => 'order_percent', 'applies_to' => 'all',
+            'percent' => 20, 'is_active' => true,
+        ]);
+        $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 500]);
+        $this->wheel([
+            ['label' => 'Free gift', 'type' => 'free_gift', 'product_id' => $gift->id, 'weight' => 1, 'min_order' => 2000],
+            ['label' => 'Try again', 'type' => 'none', 'weight' => 0],
+        ]);
+        $this->inCart(1000);
+
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true, 'result' => ['applied' => false]]);
+
+        $this->app->forgetInstance(CartService::class);
+        $cart = app(CartService::class);
+        $this->assertSame(0.0, $cart->couponDiscount());
+        $this->assertSame(300.0, $cart->promoDiscount());
+    }
+
+    public function test_a_prize_that_ran_out_before_place_order_sends_her_back_instead_of_charging_more(): void
+    {
+        // Review 2026-11-28: the checkout showed ৳1,800 + delivery with the
+        // 10% prize; it expired while she typed, and the order was written at
+        // ৳2,000 + delivery without a word.
+        $this->wheel();
+        $this->inCart(2000);
+        $this->postJson('/checkout/spin')->assertJson(['ok' => true]);
+        $this->app->forgetInstance(CartService::class);
+        $delivery = app(CartService::class)->shipping(true);
+        $shown = 1800 + $delivery;
+
+        Coupon::query()->update(['expires_at' => now()->subMinute()]);
+
+        $this->post('/checkout', $this->checkoutData(['shown_total' => $shown]))
+            ->assertRedirect('/cart')
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'Your total is now '.money(2000 + $delivery)));
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_a_total_lower_than_shown_still_goes_through(): void
+    {
+        // The page priced before it knew her number; anything that lowers the
+        // total by the time she orders is hers to keep.
+        $this->inCart(2000);
+
+        $this->post('/checkout', $this->checkoutData(['shown_total' => 2500]))->assertRedirect();
+        $this->assertSame(1, Order::count());
+        $this->assertSame(2000.0 + app(CartService::class)->shipping(true), (float) Order::first()->total);
+    }
+
     public function test_a_sold_out_gift_is_never_won(): void
     {
         $gift = $this->product(['name' => 'Pouch', 'slug' => 'pouch', 'price' => 300, 'stock_quantity' => 0]);
@@ -417,7 +523,7 @@ class SpinWheelTest extends TestCase
             ->assertOk()->assertSee('Spin & win wheel');
 
         $this->actingAs($this->admin())->post(route('admin.offers.spin-wheel'), [
-            'enabled' => 1, 'once_per_phone' => 1, 'title' => 'Ghurao, jeto!', 'valid_hours' => 48, 'min_cart' => 0,
+            'enabled' => 1, 'once_per_phone' => 1, 'title' => 'Ghurao, jeto!', 'valid_hours' => 48, 'valid_minutes' => 30, 'min_cart' => 0,
             'segments' => [
                 ['label' => '', 'type' => 'percent', 'value' => 15, 'weight' => 5, 'color' => '#112233', 'min_order' => 1200],
                 ['label' => 'Oops', 'type' => 'none', 'value' => '', 'weight' => 5, 'color' => '#abcdef'],
@@ -429,6 +535,7 @@ class SpinWheelTest extends TestCase
         $this->assertTrue($wheel->enabled());
         $this->assertSame('Ghurao, jeto!', $wheel->title());
         $this->assertSame(48, $wheel->validHours());
+        $this->assertSame(30, $wheel->validMinutes());
         // A ৳ slice with no amount is dropped; a blank label is written for her.
         $this->assertCount(2, $wheel->segments());
         $this->assertSame('15% OFF', $wheel->segments()[0]['label']);

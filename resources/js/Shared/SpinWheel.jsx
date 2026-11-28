@@ -164,6 +164,64 @@ function Confetti() {
     );
 }
 
+// ── How long the prize stands (owner, 2026-11-28: "make it 20 mins") ──────
+
+const secondsLeft = (endsAt) => Math.max(0, Math.round((endsAt || 0) - Date.now() / 1000));
+
+// Whichever timer sees the prize run out first asks the server once — the
+// prize leaves the bag there, and the totals on screen must follow it.
+let reloadedFor = null;
+
+/** Seconds until the prize ends, ticking; null when it has no end. */
+function useTimeLeft(endsAt) {
+    const [left, setLeft] = useState(() => (endsAt ? secondsLeft(endsAt) : null));
+
+    useEffect(() => {
+        if (!endsAt) { setLeft(null); return undefined; }
+        setLeft(secondsLeft(endsAt));
+        const t = setInterval(() => setLeft(secondsLeft(endsAt)), 1000);
+        return () => clearInterval(t);
+    }, [endsAt]);
+
+    useEffect(() => {
+        if (left !== 0 || reloadedFor === endsAt) return undefined;
+        reloadedFor = endsAt;
+        // A breath after zero, so the server's clock agrees it has ended.
+        // DONE_EVENT: the checkout drops its own copy of the totals on it.
+        const t = setTimeout(() => router.reload({
+            only: RELOAD_ONLY,
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => window.dispatchEvent(new Event(DONE_EVENT)),
+        }), 1500);
+        return () => clearTimeout(t);
+    }, [left, endsAt]);
+
+    return left;
+}
+
+/** 19:42 — or 1:05:00 for a prize that lasts hours. */
+const clock = (s) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = String(s % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+};
+
+/** "Offer ends in 19:42", for as long as the prize can still be spent. */
+export function PrizeTimer({ result, className = '' }) {
+    const left = useTimeLeft(result?.won && result.live ? result.expiresAt : null);
+    if (left === null) return null;
+    const urgent = left <= 120;
+
+    return (
+        <p className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${urgent ? 'bg-danger-600 text-white' : 'bg-gold-400/15 text-gold-200 ring-1 ring-gold-400/40'} ${className}`} role="timer" aria-live="off">
+            <Icon name="clock" className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+            {left > 0 ? <>Offer ends in {clock(left)}</> : 'Offer ended'}
+        </p>
+    );
+}
+
 /** One line on what she won and where it stands. */
 function prizeLine(r) {
     if (!r.won) return 'Thanks for playing — the offers on your order still apply.';
@@ -359,6 +417,7 @@ export function SpinHost() {
                                 </div>
                             )}
                             <p className="mt-2 text-xs text-white/70">{prizeLine(result)}</p>
+                            <PrizeTimer result={result} className="mt-3" />
                             <button type="button" onClick={() => setOpen(false)} className="mt-4 w-full rounded-full bg-white py-3 text-base font-semibold text-ink-900 hover:bg-mist-100">
                                 {component === 'Checkout' ? 'Continue to checkout' : 'Continue shopping'}
                             </button>
@@ -403,6 +462,7 @@ export function SpinCard({ spin: own, band = false }) {
                             {r.gift && !r.applied && r.gift.url && (
                                 <a href={r.gift.url} className="mt-2 inline-flex text-xs font-semibold text-gold-300 underline">See your gift</a>
                             )}
+                            <div><PrizeTimer result={r} className="mt-2" /></div>
                         </>
                     ) : (
                         <>
@@ -464,6 +524,7 @@ export function SpinPrize({ className = '' }) {
     const r = spin?.result;
     const [open, setOpen] = useState(false);
     const box = useRef(null);
+    const left = useTimeLeft(r?.won && r.live ? r.expiresAt : null);
 
     useEffect(() => {
         if (!open) return undefined;
@@ -474,11 +535,13 @@ export function SpinPrize({ className = '' }) {
         return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', esc); };
     }, [open]);
 
-    if (!r?.won || !r.live) return null;
+    // Gone the moment it runs out; the reload that follows confirms it.
+    if (!r?.won || !r.live || left === 0) return null;
 
     // "5% OFF" → "5%", "৳200 off" → "৳200"; anything else is a gift.
     const short = (String(r.label || '').match(/(\d+(?:\.\d+)?\s?%|৳\s?[\d,]+)/) || [])[1]?.replace(/\s/g, '') || null;
-    const status = r.applied ? 'applied to your bag ✓' : 'yours';
+    const ends = left ? `ends in ${clock(left)}` : null;
+    const status = [r.applied ? 'applied to your bag ✓' : 'yours', ends].filter(Boolean).join(', ');
 
     return (
         <div ref={box} className={`relative ${className}`}>
@@ -496,6 +559,12 @@ export function SpinPrize({ className = '' }) {
                         {short || <Icon name="gift" className="w-3 h-3" strokeWidth={2.2} />}
                     </span>
                 )}
+                {/* Time left, under the button: inside the stack's gap. */}
+                {!open && left !== null && (
+                    <span aria-hidden="true" className={`absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full px-1.5 text-[10px] font-bold leading-4 tabular-nums shadow ring-2 ring-white ${left <= 120 ? 'bg-danger-600 text-white' : 'bg-ink-900 text-gold-200'}`}>
+                        {clock(left)}
+                    </span>
+                )}
             </button>
 
             {open && (
@@ -510,6 +579,7 @@ export function SpinPrize({ className = '' }) {
                     <span className="text-[13px] leading-tight">
                         <span className="block font-semibold text-gold-300">{r.label}</span>
                         <span className="block text-[11px] text-white/65">{r.applied ? 'Applied to your bag ✓' : 'Won on the wheel · yours'}</span>
+                        {ends && <span className="block text-[11px] font-semibold tabular-nums text-gold-200">Offer {ends}</span>}
                     </span>
                     <button
                         type="button"

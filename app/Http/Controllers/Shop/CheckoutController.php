@@ -126,8 +126,8 @@ class CheckoutController extends Controller
                 // Client-side shipping math inputs (same rules the server applies).
                 'sub' => (float) ($this->cart->subtotal() - $discount),
                 'rawSubtotal' => (float) $this->cart->subtotal(),
-                'shipInside' => (int) Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
-                'shipOutside' => (int) Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
+                'shipInside' => (float) Setting::get('shipping_inside', config('store.shipping.inside_dhaka')),
+                'shipOutside' => (float) Setting::get('shipping_outside', config('store.shipping.outside_dhaka')),
                 'freeThreshold' => free_shipping_threshold(),
             ],
             'prefill' => [
@@ -220,6 +220,8 @@ class CheckoutController extends Controller
             'anniversary_day' => ['nullable', 'integer', 'between:1,31'],
             'anniversary_month' => ['nullable', 'integer', 'between:1,12'],
             'use_wallet' => ['nullable', 'boolean'],
+            // The total the summary showed (PlaceOrder refuses a higher one).
+            'shown_total' => ['nullable', 'numeric', 'min:0'],
         ], [
             'phone.regex' => 'Please enter a valid Bangladeshi mobile number (e.g. 01XXXXXXXXX).',
         ]);

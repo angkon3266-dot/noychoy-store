@@ -170,6 +170,24 @@ class PlaceOrder
                 }
             }
 
+            // The web checkout sends the total its summary showed (before
+            // wallet credit, which is reserved below). Only a HIGHER total is
+            // refused: a spin prize, coupon or offer that ran out between the
+            // page and the button used to drop away silently, and the order was
+            // written at a figure she never saw — on cash on delivery that is
+            // the rider's argument at the door (review, 2026-11-28). A lower
+            // one is let through: the page priced before it knew her number,
+            // and a coupon waiting for that number is hers to keep.
+            if (isset($data['shown_total'])) {
+                $wouldBe = round(max(0, $subtotal - $discount + $shipping), 2);
+                if ($wouldBe - round((float) $data['shown_total'], 2) >= 0.01) {
+                    throw new CheckoutException(
+                        'Your total is now '.money($wouldBe).', not the '.money((float) $data['shown_total']).' shown at '
+                        .'checkout — a discount on it has ended. Please check your bag and order again.'
+                    );
+                }
+            }
+
             // Wallet credit on the number she typed (WalletService): products
             // only, after every other discount — never the delivery charge —
             // and counted inside $discount, because it is store credit. Only

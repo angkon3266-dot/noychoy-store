@@ -254,6 +254,10 @@ class CartService
         return $this->memo('discountable_items', function () {
             $items = $this->withCategories($this->items());
             $free = app(\App\Support\GiftLadder::class)->freeUnitsByLine($this);
+            // The wheel's free gift is held out the same way (spinGiftHold()).
+            if ($hold = $this->spinGiftHold()) {
+                $free[$hold['key']] = ($free[$hold['key']] ?? 0) + 1;
+            }
             if ($free === []) {
                 return $items;
             }
@@ -267,6 +271,69 @@ class CartService
                 ->filter(fn ($i) => $i['qty'] > 0)
                 ->values();
         });
+    }
+
+    /**
+     * The spin wheel's free gift: one unit of the piece, held out of every
+     * percentage stage, for the gift coupon alone to zero.
+     *
+     * The gift is a fixed coupon worth the piece's price, scoped to that
+     * piece. Left in the discountable lines, the offers, quantity tiers and
+     * member rates each took their percentage of it first, and the coupon
+     * then still took its full price — the overflow coming off her other
+     * pieces. A ৳1,000 ring and a ৳500 gift under a 20% offer cost ৳700, not
+     * ৳800 (review, 2026-11-28). The reward ladder's own gift has always been
+     * held out like this (GiftLadder::freeUnitsByLine()).
+     *
+     * Decided from the coupon row and the bag alone — never from the coupon's
+     * validity, which is priced from these very lines. cascade() then checks
+     * the gift coupon really applied, and prices again without the hold if it
+     * did not (say the bag is under its minimum), so the gift is never held
+     * out of the offers for nothing.
+     *
+     * @return array{key:string, coupon_id:int}|false
+     */
+    protected function spinGiftHold(): array|false
+    {
+        return $this->memo('spin_gift_hold', function () {
+            $coupon = $this->storedCoupon();
+
+            if (! $coupon || $coupon->source !== \App\Support\SpinWheel::SOURCE || $coupon->applies_to !== 'products'
+                || isset($this->suppressedCoupons[$coupon->id]) || ! $coupon->is_active
+                || $coupon->expires_at?->isPast()
+                || ($coupon->usage_limit !== null && $coupon->used_count >= $coupon->usage_limit)) {
+                return false;
+            }
+
+            $giftId = (int) (($coupon->product_ids ?? [])[0] ?? 0);
+            $ladderFree = app(\App\Support\GiftLadder::class)->freeUnitsByLine($this);
+
+            foreach ($this->items() as $item) {
+                if ((int) $item['product_id'] === $giftId && (int) $item['qty'] - ($ladderFree[$item['key']] ?? 0) >= 1) {
+                    return ['key' => $item['key'], 'coupon_id' => (int) $coupon->id];
+                }
+            }
+
+            return false;
+        });
+    }
+
+    /**
+     * The gift unit this wheel coupon zeroes, as a one-unit line — what the
+     * coupon is scoped to and priced from while the unit is held out of the
+     * discountable lines. Null for any other coupon.
+     */
+    public function heldSpinGift(Coupon $coupon): ?Collection
+    {
+        $hold = $this->spinGiftHold();
+
+        if (! $hold || $hold['coupon_id'] !== (int) $coupon->id) {
+            return null;
+        }
+
+        $line = $this->withCategories($this->items())->firstWhere('key', $hold['key']);
+
+        return $line ? collect([array_merge($line, ['qty' => 1])]) : null;
     }
 
     /**
@@ -500,7 +567,27 @@ class CartService
      */
     protected function cascade(): array
     {
-        return $this->memo('cascade', function () {
+        if (isset($this->memo['cascade'])) {
+            return $this->memo['cascade'];
+        }
+
+        $result = $this->computeCascade();
+
+        // The wheel's gift unit was held out of the offers for its coupon; if
+        // that coupon did not apply after all, price again with it back in.
+        $hold = $this->spinGiftHold();
+        if ($hold && (int) ($result['coupon_model']?->id ?? 0) !== $hold['coupon_id']) {
+            $this->memo = ['spin_gift_hold' => false];
+            $result = $this->computeCascade();
+        }
+
+        return $this->memo['cascade'] = $result;
+    }
+
+    /** One pass of the cascade — see cascade(). */
+    protected function computeCascade(): array
+    {
+        return (function () {
             $remaining = $this->subtotal();
 
             // Take an amount off the remaining base, never more than is left.
@@ -550,7 +637,7 @@ class CartService
                 'base_before_coupon' => round($baseBeforeCoupon, 2),
                 'total' => round($gift + $offer + $promo + $member + $customer + $coupon + $points, 2),
             ];
-        });
+        })();
     }
 
     // ── Reward ladder (Admin → Offers) ─────────────────────────────────────

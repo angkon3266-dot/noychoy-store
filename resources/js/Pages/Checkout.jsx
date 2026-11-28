@@ -232,7 +232,10 @@ export default function Checkout({ items, summary, prefill, loyalty, registerPct
         e.preventDefault();
         // Only credit she was shown: a number changed since its card appeared
         // places the order without it rather than at a total nobody saw.
-        form.transform((data) => ({ ...data, use_wallet: walletUse > 0 }));
+        // shown_total: what the summary said before wallet credit. The server
+        // refuses to write the order at more than that — a spin prize or an
+        // offer that ran out while she typed sends her back to look first.
+        form.transform((data) => ({ ...data, use_wallet: walletUse > 0, shown_total: Math.round(total * 100) / 100 }));
         form.post(urls.store, {
             // Hold scroll only when we stay on this page; a placed order
             // redirects to the confirmation, which must open at the top.

@@ -91,10 +91,33 @@ class SpinWheel
         return (string) (Setting::get('spin_wheel_subtitle') ?: 'One free spin — whatever you win comes off this order.');
     }
 
-    /** How long a prize lasts, and how long one spin holds the wheel. */
+    /**
+     * How long one spin holds the wheel: no second spin for this many hours.
+     *
+     * Until 2026-11-28 this was also how long the prize lasted. The owner
+     * asked for prizes that last 20 minutes with the time left on show, so
+     * the two are apart now — the setting keeps its old key, and the prize
+     * has its own (validMinutes()).
+     */
     public function validHours(): int
     {
         return max(1, min(720, (int) Setting::get('spin_wheel_valid_hours', 24)));
+    }
+
+    /**
+     * How long a prize lasts once won (owner, 2026-11-28: "make it 20 mins").
+     * The result card, the cart and checkout cards and the floating prize
+     * count it down, so she knows how long the offer stands.
+     */
+    public function validMinutes(): int
+    {
+        return max(5, min(43200, (int) Setting::get('spin_wheel_valid_minutes', 20)));
+    }
+
+    /** Minutes one spin holds the wheel — never shorter than its prize lasts. */
+    protected function holdMinutes(): int
+    {
+        return max($this->validHours() * 60, $this->validMinutes());
     }
 
     /** The order value (after offers) the wheel waits for, and the prize needs. */
@@ -301,7 +324,7 @@ class SpinWheel
         ];
 
         session([self::SESSION_KEY => $spin]);
-        Cookie::queue(self::COOKIE, json_encode($spin), $this->validHours() * 60);
+        Cookie::queue(self::COOKIE, json_encode($spin), $this->holdMinutes());
 
         return ['ok' => true, 'index' => $index, 'result' => $this->present($spin, $cart)];
     }
@@ -410,7 +433,7 @@ class SpinWheel
                 'usage_limit' => 1,
                 'per_customer_limit' => 1,
                 'is_exclusive' => false,
-                'expires_at' => Carbon::now()->addHours($this->validHours()),
+                'expires_at' => Carbon::now()->addMinutes($this->validMinutes()),
                 'is_active' => true,
             ]);
         }
@@ -427,7 +450,7 @@ class SpinWheel
             'usage_limit' => 1,
             'per_customer_limit' => 1,
             'is_exclusive' => false,
-            'expires_at' => Carbon::now()->addHours($this->validHours()),
+            'expires_at' => Carbon::now()->addMinutes($this->validMinutes()),
             'is_active' => true,
         ]);
     }
@@ -462,7 +485,7 @@ class SpinWheel
             return null;
         }
 
-        if ((int) $spin['at'] + $this->validHours() * 3600 < now()->timestamp) {
+        if ((int) $spin['at'] + $this->holdMinutes() * 60 < now()->timestamp) {
             session()->forget(self::SESSION_KEY);
 
             return null;
@@ -542,6 +565,8 @@ class SpinWheel
             // Still spendable (not used, not expired): the storefront keeps a
             // small reminder of it above the chat buttons while this is true.
             'live' => $live,
+            // When the prize stops being spendable (unix), for the countdown.
+            'expiresAt' => $live ? $coupon->expires_at?->timestamp : null,
             'note' => $note,
             'min' => $min > 0 ? money($min) : null,
             'gift' => $gift ? ['name' => $gift->name, 'url' => route('product.show', $gift), 'image' => $gift->thumbnail] : null,

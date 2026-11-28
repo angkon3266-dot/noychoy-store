@@ -50,6 +50,7 @@ class OfferController extends Controller
                 'title' => app(\App\Support\SpinWheel::class)->title(),
                 'subtitle' => app(\App\Support\SpinWheel::class)->subtitle(),
                 'valid_hours' => app(\App\Support\SpinWheel::class)->validHours(),
+                'valid_minutes' => app(\App\Support\SpinWheel::class)->validMinutes(),
                 'min_cart' => app(\App\Support\SpinWheel::class)->minCart(),
                 'once_per_phone' => \App\Support\SpinWheel::oncePerPhone(),
                 'popup' => (bool) \App\Models\Setting::get('spin_wheel_popup', true),
@@ -168,6 +169,7 @@ class OfferController extends Controller
             'title' => ['nullable', 'string', 'max:60'],
             'subtitle' => ['nullable', 'string', 'max:160'],
             'valid_hours' => ['required', 'integer', 'min:1', 'max:720'],
+            'valid_minutes' => ['nullable', 'integer', 'min:5', 'max:43200'],
             'min_cart' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
             'segments' => ['nullable', 'array', 'max:'.\App\Support\SpinWheel::MAX_SEGMENTS],
             'segments.*.label' => ['nullable', 'string', 'max:24'],
@@ -199,6 +201,7 @@ class OfferController extends Controller
         \App\Models\Setting::put('spin_wheel_title', $data['title'] ?? null);
         \App\Models\Setting::put('spin_wheel_subtitle', $data['subtitle'] ?? null);
         \App\Models\Setting::put('spin_wheel_valid_hours', (int) $data['valid_hours']);
+        \App\Models\Setting::put('spin_wheel_valid_minutes', (int) ($data['valid_minutes'] ?? 20));
         \App\Models\Setting::put('spin_wheel_min_cart', (float) ($data['min_cart'] ?? 0));
         \App\Models\Setting::put('spin_wheel_once_per_phone', $request->boolean('once_per_phone'));
         \App\Models\Setting::put('spin_wheel_popup', $request->boolean('popup'));

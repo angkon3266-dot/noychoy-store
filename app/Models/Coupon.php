@@ -77,8 +77,11 @@ class Coupon extends Model
             // order, and a gift-only order would be the gift for the price of
             // delivery.
             // Two of the gift piece itself counts: one paid, one free.
+            // The gift unit itself is held out of the discountable lines while
+            // its coupon is on the cart (CartService::spinGiftHold()), so it is
+            // added back here.
             if ($this->source === \App\Support\SpinWheel::SOURCE && $this->applies_to === 'products'
-                && (int) $cart->discountableItems()->sum('qty') < 2) {
+                && (int) $cart->discountableItems()->sum('qty') + ($cart->heldSpinGift($this) ? 1 : 0) < 2) {
                 return false;
             }
 
@@ -281,6 +284,12 @@ class Coupon extends Model
      */
     public function eligibleItems(CartService $cart)
     {
+        // The wheel's gift coupon is priced from the one unit held out for it,
+        // which no percentage stage has touched.
+        if ($this->source === \App\Support\SpinWheel::SOURCE && ($held = $cart->heldSpinGift($this))) {
+            return $held->filter(fn ($item) => $this->itemEligible($item));
+        }
+
         return $cart->discountableItems()->filter(fn ($item) => $this->itemEligible($item));
     }
 

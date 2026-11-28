@@ -163,7 +163,12 @@
                 <input name="subtitle" maxlength="160" value="{{ old('subtitle', $spinWheel['subtitle']) }}" class="input">
             </div>
             <div>
-                <label class="label">Prize valid for (hours)</label>
+                <label class="label">Prize lasts (minutes)</label>
+                <input name="valid_minutes" type="number" min="5" max="43200" value="{{ old('valid_minutes', $spinWheel['valid_minutes']) }}" class="input" required>
+                <p class="text-xs text-ink-700/50 mt-1">Counted down to the shopper after she spins.</p>
+            </div>
+            <div>
+                <label class="label">One spin per shopper every (hours)</label>
                 <input name="valid_hours" type="number" min="1" max="720" value="{{ old('valid_hours', $spinWheel['valid_hours']) }}" class="input" required>
             </div>
             <div>
