@@ -153,17 +153,47 @@ class RedisHealth
                     : $r->auth($cfg['password']);
             }
             $r->ping();
+            $blocksWrites = static::quietSnapshots($r);
             $persistence = $r->info('persistence');
             $r->close();
         } catch (\Throwable $e) {
             return 'no answer: '.$e->getMessage();
         }
 
-        if (($persistence['rdb_last_bgsave_status'] ?? 'ok') === 'err') {
+        if ($blocksWrites && ($persistence['rdb_last_bgsave_status'] ?? 'ok') === 'err') {
             return 'its last snapshot save failed, so it refuses writes (MISCONF)';
         }
 
         return null;
+    }
+
+    /**
+     * Turn off Redis's snapshots to disk, and its habit of refusing every
+     * write when one fails. This store only keeps a cache and sessions in
+     * Redis, which need no copy on disk, and that refusal is what took the
+     * site down on 2026-11-27. Hostnin's advice (2026-11-28) was `save ""`.
+     * Runtime settings reset when Redis restarts, so every check reapplies
+     * them; when they are already off it costs one CONFIG GET.
+     *
+     * @return bool whether a failed snapshot would still block writes
+     */
+    public static function quietSnapshots(\Redis $r): bool
+    {
+        try {
+            $save = $r->config('GET', 'save');
+            if (($save['save'] ?? '') !== '') {
+                $r->config('SET', 'save', '');
+            }
+            $stop = $r->config('GET', 'stop-writes-on-bgsave-error');
+            if (($stop['stop-writes-on-bgsave-error'] ?? 'yes') !== 'no') {
+                $r->config('SET', 'stop-writes-on-bgsave-error', 'no');
+            }
+
+            return ($r->config('GET', 'stop-writes-on-bgsave-error')['stop-writes-on-bgsave-error'] ?? 'yes') !== 'no';
+        } catch (\Throwable) {
+            // CONFIG can be disabled by the host; then the old rule stands.
+            return true;
+        }
     }
 
     protected static function recovered(): void
