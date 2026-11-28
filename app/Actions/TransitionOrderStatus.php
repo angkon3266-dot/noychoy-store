@@ -35,6 +35,33 @@ class TransitionOrderStatus
      */
     public function handle(Order $order, string $status, ?string $note = null, string $by = 'System'): bool
     {
+        $changed = \Illuminate\Support\Facades\DB::transaction(function () use ($order, $status, $note, $by) {
+            // Decide from the row as it is NOW, not as the caller loaded it.
+            // The courier paths hold an order across a Steadfast call of up to
+            // 30 s; if the webhook cancelled (and restocked) it meanwhile, the
+            // stale copy still read "shipped, not restocked" and restocked it a
+            // second time — or paid a delivery's points twice. The row lock
+            // makes the second caller wait, then see the first one's work.
+            $locked = Order::whereKey($order->getKey())->lockForUpdate()->first();
+            if ($locked) {
+                $order->setRawAttributes($locked->getAttributes(), true);
+            }
+
+            return $this->transition($order, $status, $note, $by);
+        });
+
+        // Outside the lock: a push is an HTTP call, never something to hold
+        // an order row for.
+        if ($changed) {
+            $this->push($order->fresh(), $status);
+        }
+
+        return $changed;
+    }
+
+    /** handle()'s work, on a freshly locked order. */
+    protected function transition(Order $order, string $status, ?string $note, string $by): bool
+    {
         $from = $order->status;
 
         $order->update(['status' => $status]);
@@ -100,8 +127,6 @@ class TransitionOrderStatus
             app(\App\Services\WalletService::class)->refundForOrder($order);
         }
 
-        $this->push($order->fresh(), $status);
-
         return true;
     }
 
@@ -123,6 +148,13 @@ class TransitionOrderStatus
     public function applyCourierStatus(Order $order, ?string $rawCourierStatus, string $by = 'Courier'): bool
     {
         $target = Order::statusForCourierStatus($rawCourierStatus);
+
+        // Re-read first: a webhook may have applied this same verdict while
+        // the caller was waiting on Steadfast — then there is nothing to do,
+        // not even a history line.
+        if ($target !== null && $order->exists) {
+            $order->setRawAttributes(Order::whereKey($order->getKey())->first()?->getAttributes() ?? $order->getAttributes(), true);
+        }
 
         if ($target === null || $order->status === $target) {
             return false;
