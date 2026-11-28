@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { fetchJson } from './format';
 import Icon from './Icons';
@@ -58,15 +58,22 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
     const n = segments.length;
     const seg = 360 / n;
     const R = 100;
+    // Gradient ids of this wheel alone. The same wheel is drawn in several
+    // places (the dialog, the floating button, the header's menu entry), and
+    // with shared ids Chrome took the gradients from the first copy, which on
+    // a phone is the hidden desktop menu: the gold rim and hub came out empty.
+    const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+    const rim = `sw-rim-${uid}`;
+    const hub = `sw-hub-${uid}`;
 
     return (
         <svg viewBox="-115 -118 230 233" width={size} height={size} className="block max-w-full h-auto" aria-hidden="true">
             <defs>
-                <radialGradient id="sw-rim" cx="50%" cy="50%" r="50%">
+                <radialGradient id={rim} cx="50%" cy="50%" r="50%">
                     <stop offset="80%" stopColor="#E9C46A" />
                     <stop offset="100%" stopColor="#8A6A1F" />
                 </radialGradient>
-                <radialGradient id="sw-hub" cx="40%" cy="35%" r="70%">
+                <radialGradient id={hub} cx="40%" cy="35%" r="70%">
                     <stop offset="0%" stopColor="#FFF4D0" />
                     <stop offset="60%" stopColor="#D6A93F" />
                     <stop offset="100%" stopColor="#7A5A16" />
@@ -74,7 +81,7 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
             </defs>
 
             {/* Rim with marquee bulbs — still, so the slices carry the motion. */}
-            <circle r="112" fill="url(#sw-rim)" />
+            <circle r="112" fill={`url(#${rim})`} />
             <circle r="104" fill="#111827" />
             {Array.from({ length: BULBS }, (_, i) => {
                 const [x, y] = pt(108, (360 / BULBS) * i);
@@ -91,6 +98,13 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
                     const mid = a0 + seg / 2;
                     const label = s.label || '';
                     const fs = label.length > 14 ? 6.5 : label.length > 9 ? 8 : 9.5;
+                    // Text runs along the radius. On the right half it reads
+                    // from the hub outward; on the left half that would be
+                    // upside down, so it reads from the rim inward instead.
+                    const flip = mid > 180;
+                    const turn = flip ? 90 : -90;
+                    const lx = s.min ? (flip ? 3.5 : -3.5) : 0;
+                    const mx = flip ? -6 : 6;
                     return (
                         <g key={i}>
                             <path d={`M0 0 L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`} fill={s.color} stroke="#E9C46A" strokeWidth="0.8" />
@@ -102,13 +116,13 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
                                     {/* The prize, and under it (beside it, as
                                         the text runs outward) the order value
                                         it needs. */}
-                                    <text x={s.min ? -3.5 : 0} y="-60" transform={`rotate(-90 ${s.min ? -3.5 : 0} -60)`} textAnchor="middle" dominantBaseline="central"
+                                    <text x={lx} y="-60" transform={`rotate(${turn} ${lx} -60)`} textAnchor="middle" dominantBaseline="central"
                                           fill={inkFor(s.color)} fontSize={fs} fontWeight="700" letterSpacing="0.3"
                                           style={{ fontFamily: 'inherit' }}>
                                         {label}
                                     </text>
                                     {s.min && (
-                                        <text x="6" y="-60" transform="rotate(-90 6 -60)" textAnchor="middle" dominantBaseline="central"
+                                        <text x={mx} y="-60" transform={`rotate(${turn} ${mx} -60)`} textAnchor="middle" dominantBaseline="central"
                                               fill={inkFor(s.color)} fillOpacity="0.85" fontSize="6" fontWeight="600"
                                               style={{ fontFamily: 'inherit' }}>
                                             {s.min}
@@ -121,7 +135,7 @@ export function Wheel({ segments, rotation = 0, duration = 0, size = 300, pointe
                 })}
             </g>
 
-            <circle r="17" fill="url(#sw-hub)" stroke="#7A5A16" strokeWidth="1" />
+            <circle r="17" fill={`url(#${hub})`} stroke="#7A5A16" strokeWidth="1" />
 
             {/* The pointer, at twelve o'clock. */}
             {pointer && <path d="M0 -92 L-9 -117 L9 -117 Z" fill="#DC2626" stroke="#FFF7D6" strokeWidth="1.5" strokeLinejoin="round" />}
