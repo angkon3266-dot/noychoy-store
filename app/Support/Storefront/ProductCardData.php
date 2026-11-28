@@ -23,7 +23,9 @@ class ProductCardData
         // price, so they add up rather than compound.
         $memberPct = 0.0;
         if (is_member()) {
-            $memberPct = (member_pricing()->enabled() ? member_pricing()->percentForProduct($p) : 0)
+            // availableTo(): not once she has used it on as many orders as the
+            // window allows — the cart stops it then, so the card does too.
+            $memberPct = (member_pricing()->availableTo(auth('customer')->user()) ? member_pricing()->percentForProduct($p) : 0)
                 + (float) (offer_pricing()->memberOfferFor($p)?->percent ?? 0);
         }
 

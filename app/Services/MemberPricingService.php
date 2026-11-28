@@ -87,47 +87,82 @@ class MemberPricingService
         ];
     }
 
-    /** Effective % for a cart line — no DB hit (uses stored product/category id). */
-    public function percentForLine(int $productId, ?int $categoryId): float
+    /**
+     * The member % for a piece — the one rule the cards, the cart and the
+     * checkout all use (2026-11-28).
+     *
+     * A product override wins. Otherwise every category the piece is filed
+     * under counts, primary or extra, and the best override among them
+     * applies; an override of 0 is a real "no member price here". Pieces with
+     * no override get the base %.
+     *
+     * Until now the two halves disagreed: the cart read only the primary
+     * category snapshotted when the piece was added, so a piece filed under
+     * an overridden second category showed "10% off for members" on its card
+     * and was charged at the base rate; and the card skipped a 0 override the
+     * cart honoured, so a category excluded from member pricing still showed
+     * a member price.
+     *
+     * @param  array<int, int|null>  $categoryIds
+     */
+    public function percentFor(int $productId, array $categoryIds): float
     {
         $o = $this->overrides();
         if (isset($o['products'][$productId])) {
             return $this->clamp((float) $o['products'][$productId]);
         }
-        if ($categoryId && isset($o['categories'][$categoryId])) {
-            return $this->clamp((float) $o['categories'][$categoryId]);
+
+        $hits = [];
+        foreach (array_unique(array_filter(array_map('intval', $categoryIds))) as $cid) {
+            if (isset($o['categories'][$cid])) {
+                $hits[] = (float) $o['categories'][$cid];
+            }
         }
 
-        return $this->basePercent();
+        return $hits ? $this->clamp(max($hits)) : $this->basePercent();
+    }
+
+    /**
+     * Effective % for a cart line. Pass the line's `category_ids` (every
+     * category, stamped by CartService) — a lone primary id still works.
+     *
+     * @param  array<int, int|null>|int|null  $categories
+     */
+    public function percentForLine(int $productId, array|int|null $categories): float
+    {
+        return $this->percentFor($productId, (array) $categories);
     }
 
     /** Effective % for a product page/card (checks all of the product's categories). */
     public function percentForProduct(Product $product): float
     {
-        $o = $this->overrides();
-        $pid = (int) $product->id;
-        if (isset($o['products'][$pid])) {
-            return $this->clamp((float) $o['products'][$pid]);
-        }
+        $cats = [(int) $product->category_id];
 
         // Only touch the categories relation when category overrides actually exist.
         if ($this->hasCategoryOverrides()) {
-            $cats = $product->relationLoaded('categories')
+            $cats = array_merge($cats, $product->relationLoaded('categories')
                 ? $product->categories->pluck('id')->all()
-                : $product->categories()->pluck('categories.id')->all();
-            $cats[] = (int) $product->category_id;
-            $best = 0.0;
-            foreach (array_filter($cats) as $cid) {
-                if (isset($o['categories'][$cid])) {
-                    $best = max($best, (float) $o['categories'][$cid]);
-                }
-            }
-            if ($best > 0) {
-                return $this->clamp($best);
-            }
+                : $product->categories()->pluck('categories.id')->all());
         }
 
-        return $this->basePercent();
+        return $this->percentFor((int) $product->id, $cats);
+    }
+
+    /**
+     * Does this member still get the member price? The cart stops it once she
+     * has used it on `register_offer_max_uses` orders in the window; the
+     * cards now stop showing it at the same moment, rather than promising a
+     * price the cart will not charge.
+     */
+    public function availableTo(?\App\Models\Customer $customer): bool
+    {
+        if (! $customer || ! $this->enabled()) {
+            return false;
+        }
+
+        $usage = $this->usageStatus($customer);
+
+        return ! $usage['capped'] || ($usage['remaining'] ?? 0) > 0;
     }
 
     public function memberPrice(Product $product, ?float $price = null): float

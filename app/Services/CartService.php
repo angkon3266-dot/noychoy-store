@@ -344,13 +344,17 @@ class CartService
      * A line's own `category_id` is only the primary, snapshotted when it was
      * added. Once offer prices were printed on products (19 Sep 2026), a piece
      * filed under a second category would have listed at "20% off" and been
-     * charged in full. Only looked up while an offer is scoped to categories.
+     * charged in full. Only looked up while something prices by category: an
+     * offer, a member-discount override (MemberPricingService::percentFor)
+     * or a live coupon scoped to categories (Coupon::itemEligible) — the last
+     * two read only the primary until 2026-11-28, so a card and the cart
+     * could quote one piece two ways.
      */
     protected function withCategories(Collection $items): Collection
     {
         $this->offerCache ??= Offer::active()->get();
 
-        if ($items->isEmpty() || ! $this->offerCache->contains('applies_to', 'categories')) {
+        if ($items->isEmpty() || ! $this->pricesByCategory()) {
             return $items;
         }
 
@@ -367,6 +371,15 @@ class CartService
 
             return $i;
         });
+    }
+
+    /** Is anything live that prices a line by its categories? */
+    protected function pricesByCategory(): bool
+    {
+        return $this->memo('prices_by_category', fn () => $this->offerCache->contains('applies_to', 'categories')
+            // Guests too: the checkout tells them what registering would save.
+            || app(MemberPricingService::class)->hasCategoryOverrides()
+            || Coupon::byCategoryLive());
     }
 
     // ── Quantity / bundle offers ────────────────────────────────────────────
@@ -714,7 +727,7 @@ class CartService
             // apply. Paid units only — a free gift unit earns no member percent.
             $total = 0.0;
             foreach ($this->discountableItems() as $item) {
-                $pct = $pricing->percentForLine((int) $item['product_id'], $item['category_id'] ?? null);
+                $pct = $pricing->percentForLine((int) $item['product_id'], $item['category_ids'] ?? $item['category_id'] ?? null);
                 if ($pct > 0) {
                     $total += $item['price'] * $item['qty'] * $pct / 100;
                 }

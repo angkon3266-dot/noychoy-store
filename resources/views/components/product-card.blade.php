@@ -9,7 +9,7 @@
     $quote = offer_pricing()->quote($product);
     // Member pricing: logged-in customers see the discounted price.
     $memberPct = is_member()
-        ? (member_pricing()->enabled() ? member_pricing()->percentForProduct($product) : 0) + (float) (offer_pricing()->memberOfferFor($product)?->percent ?? 0)
+        ? (member_pricing()->availableTo(auth('customer')->user()) ? member_pricing()->percentForProduct($product) : 0) + (float) (offer_pricing()->memberOfferFor($product)?->percent ?? 0)
         : 0;
     $memberPrice = $memberPct > 0
         ? \App\Support\OfferPricing::less((float) $product->price, $quote['offer'] ? $quote['percent'] + $memberPct : $memberPct)

@@ -7,6 +7,27 @@ use Illuminate\Database\Eloquent\Model;
 
 class Coupon extends Model
 {
+    /** Cache key for byCategoryLive(); dropped whenever any coupon changes. */
+    public const BY_CATEGORY_KEY = 'coupons.by-category-live';
+
+    protected static function booted(): void
+    {
+        $forget = fn () => \Illuminate\Support\Facades\Cache::forget(self::BY_CATEGORY_KEY);
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
+    /**
+     * Is any active coupon scoped to categories? The cart then stamps every
+     * category on its lines (CartService::withCategories). Cached, because it
+     * is asked on every pricing and the answer changes only when a coupon does.
+     */
+    public static function byCategoryLive(): bool
+    {
+        return (bool) \Illuminate\Support\Facades\Cache::rememberForever(self::BY_CATEGORY_KEY,
+            fn () => static::where('applies_to', 'categories')->where('is_active', true)->exists() ? 1 : 0);
+    }
+
     /** Who an auto-applying coupon is for. */
     public const AUDIENCES = [
         'all' => 'Every order',
@@ -306,7 +327,13 @@ class Coupon extends Model
 
         return match ($this->applies_to) {
             'products' => in_array((int) $item['product_id'], array_map('intval', $this->product_ids ?? []), true),
-            'categories' => in_array((int) ($item['category_id'] ?? 0), array_map('intval', $this->category_ids ?? []), true),
+            // Every category the piece is filed under, as offers and the card
+            // read it (CartService::withCategories); the primary alone missed
+            // pieces whose page sits under a second category.
+            'categories' => (bool) array_intersect(
+                array_map('intval', $item['category_ids'] ?? [$item['category_id'] ?? 0]),
+                array_map('intval', $this->category_ids ?? []),
+            ),
             default => true, // 'all'
         };
     }

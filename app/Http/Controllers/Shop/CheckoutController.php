@@ -90,8 +90,9 @@ class CheckoutController extends Controller
         if (! $customer) {
             $pricing = app(MemberPricingService::class);
             if ($pricing->enabled()) {
-                foreach ($this->cart->items() as $line) {
-                    $pct = $pricing->percentForLine((int) $line['product_id'], $line['category_id'] ?? null);
+                // The lines the cart prices (gift units out, every category in).
+                foreach ($this->cart->discountableItems() as $line) {
+                    $pct = $pricing->percentForLine((int) $line['product_id'], $line['category_ids'] ?? $line['category_id'] ?? null);
                     if ($pct > 0) {
                         $regSaving += $line['price'] * $line['qty'] * $pct / 100;
                     }
