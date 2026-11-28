@@ -49,7 +49,9 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = $this->filtered($request)
-            ->with('primaryImage', 'category', 'categories');
+            // images: every row's quick-edit panel lists them (two queries a
+            // row without this — 220+ on "show all").
+            ->with('primaryImage', 'category', 'categories', 'images');
 
         // Sort: newest (default), product ID (serial), name, price, stock.
         $products = match ($request->query('sort')) {

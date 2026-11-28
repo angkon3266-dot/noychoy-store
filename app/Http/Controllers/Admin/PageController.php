@@ -44,6 +44,18 @@ class PageController extends Controller
             'pages.refund.body' => ['nullable', 'string'],
             'pages.contact.title' => ['nullable', 'string', 'max:150'],
             'pages.contact.intro' => ['nullable', 'string', 'max:500'],
+        ], [], [
+            // What the error banner calls each box: "The Our story opening line
+            // must not be greater than 400 characters", not "pages.about.lede".
+            'pages.about.title' => 'Our story title',
+            'pages.about.eyebrow' => 'Our story eyebrow',
+            'pages.about.headline' => 'Our story headline',
+            'pages.about.lede' => 'Our story opening line',
+            'pages.privacy.title' => 'Privacy title',
+            'pages.terms.title' => 'Terms title',
+            'pages.refund.title' => 'Refund title',
+            'pages.contact.title' => 'Contact title',
+            'pages.contact.intro' => 'Contact intro',
         ]);
 
         $pages = $data['pages'];

@@ -2,6 +2,10 @@
 @section('title', $page->exists ? 'Edit landing page' : 'New landing page')
 @section('heading', $page->exists ? 'Edit landing page' : 'New landing page')
 
+@section('flash')
+    @include('admin.partials.form-errors')
+@endsection
+
 @section('content')
 <form action="{{ $page->exists ? route('admin.landing.update', $page) : route('admin.landing.store') }}"
       method="POST" enctype="multipart/form-data" class="space-y-6"

@@ -894,4 +894,15 @@ class CustomerCourierTiersTest extends TestCase
         $this->assertStringContainsString('Nusrat Jahan', $tierCsv);
         $this->assertStringNotContainsString('Rafi Ahmed', $tierCsv);
     }
+
+    public function test_a_batch_run_with_one_slow_lookup_still_ends_inside_its_timeout_and_retry_after(): void
+    {
+        // The budget is checked before a lookup starts, so the worst run is
+        // the budget plus one lookup at BDCourier's full timeout.
+        $job = new CheckCustomersCourier('x', []);
+        $worst = $job->budgetSeconds + BdCourierService::TIMEOUT_SECONDS;
+
+        $this->assertLessThan($job->timeout, $worst + 5);
+        $this->assertLessThan((int) config('queue.connections.database.retry_after'), $job->timeout);
+    }
 }

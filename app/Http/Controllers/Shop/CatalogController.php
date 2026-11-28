@@ -394,7 +394,8 @@ class CatalogController extends Controller
             $recentIds = collect(session('recently_viewed', []))->reject(fn ($id) => $id === $product->id)->take(4);
             if ($recentIds->isNotEmpty()) {
                 $recentlyViewed = Product::published()->whereIn('id', $recentIds)
-                    ->with('images', 'approvedReviews')->get()
+                    // category: the card asks isPreorder(), which reads it.
+                    ->with('images', 'approvedReviews', 'category')->get()
                     ->sortBy(fn ($p) => $recentIds->search($p->id))->values();
             }
         }

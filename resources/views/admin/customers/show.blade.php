@@ -2,6 +2,10 @@
 @section('title', $customer->name)
 @section('heading', 'Customer · '.$customer->name)
 
+@section('flash')
+    @include('admin.partials.form-errors')
+@endsection
+
 @section('content')
 <div class="flex flex-wrap items-center justify-between gap-3">
     <a href="{{ route('admin.customers.index') }}" class="text-sm text-gold-700 hover:underline">← All customers</a>

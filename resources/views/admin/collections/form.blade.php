@@ -36,7 +36,7 @@
             </div>
             <div>
                 <label class="label">Cover image</label>
-                <x-media-field name="image" :value="$collection->image" folder="collections" />
+                <x-media-field name="image" :value="theme_asset($collection->image)" folder="collections" />
             </div>
         </div>
 

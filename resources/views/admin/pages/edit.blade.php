@@ -2,6 +2,10 @@
 @section('title', 'Pages')
 @section('heading', 'Content Pages')
 
+@section('flash')
+    @include('admin.partials.form-errors')
+@endsection
+
 @section('content')
 <div class="max-w-3xl space-y-5">
     <div class="flex items-center justify-between">

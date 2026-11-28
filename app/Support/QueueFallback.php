@@ -56,6 +56,9 @@ class QueueFallback
 
     private const LOCK = 'queue:web-drain';
 
+    /** Held for the whole of one drain, released when it ends. */
+    private const RUNNING_LOCK = 'queue:web-drain:running';
+
     private const SCHEDULE_LOCK = 'scheduler:web-run';
 
     private const BUDGET_SECONDS = 45;
@@ -128,6 +131,26 @@ class QueueFallback
                 return;
             }
 
+            // The minute lock above throttles; it does not stop a drain that
+            // is still running from overlapping the next one. A job is only
+            // checked against the deadline between jobs and nothing enforces
+            // its $timeout here (no pcntl in the web SAPI), so one long job
+            // can outlive the minute — and once it has been reserved for
+            // longer than retry_after, the next drain would reserve it a
+            // second time (a segment SMS texted twice, a courier batch
+            // "attempted too many times"). This one is held until the drain
+            // actually ends.
+            $running = Cache::lock(self::RUNNING_LOCK, self::BUDGET_SECONDS + 150);
+            if (! $running->get()) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::error('Queue fallback drain failed', ['error' => $e->getMessage()]);
+
+            return;
+        }
+
+        try {
             ignore_user_abort(true);
             @set_time_limit(self::BUDGET_SECONDS + 150);
 
@@ -143,6 +166,8 @@ class QueueFallback
             }
         } catch (\Throwable $e) {
             Log::error('Queue fallback drain failed', ['error' => $e->getMessage()]);
+        } finally {
+            $running->release();
         }
     }
 

@@ -96,4 +96,34 @@ class CheckoutAvailabilityTest extends TestCase
         $this->assertSame(1, Customer::count());
         $this->assertSame($c->id, (int) Order::first()->customer_id);
     }
+
+    public function test_reorder_skips_a_piece_whose_size_was_deleted_instead_of_adding_it_without_one(): void
+    {
+        $c = Customer::create(['name' => 'Real', 'phone' => '01711111112', 'password' => bcrypt('x')]);
+        $sized = $this->product(['has_variants' => true]);
+        $v = ProductVariant::create([
+            'product_id' => $sized->id, 'sku' => 'V9', 'attributes' => ['Size' => '7'],
+            'price' => 1000, 'stock_quantity' => 5, 'is_active' => true,
+        ]);
+        $plain = $this->product();
+
+        $order = Order::create([
+            'order_number' => '50001', 'customer_id' => $c->id, 'customer_name' => 'Real',
+            'customer_phone' => '01711111112', 'shipping_address' => '1 Rd', 'district' => 'Dhaka',
+            'subtotal' => 2000, 'shipping_cost' => 0, 'discount' => 0, 'total' => 2000,
+            'payment_method' => 'cod', 'payment_status' => 'unpaid', 'status' => 'delivered', 'source' => 'web',
+        ]);
+        $order->items()->create(['product_id' => $sized->id, 'variant_id' => $v->id, 'name' => $sized->name, 'price' => 1000, 'quantity' => 1, 'subtotal' => 1000]);
+        $order->items()->create(['product_id' => $plain->id, 'name' => $plain->name, 'price' => 1000, 'quantity' => 1, 'subtotal' => 1000]);
+
+        $v->delete();
+
+        $this->actingAs($c, 'customer')
+            ->post(route('account.reorder', '50001'))
+            ->assertRedirect(route('cart'))
+            ->assertSessionHas('success', 'Added 1 item(s) to your cart. 1 item(s) are no longer available.');
+
+        $lines = collect(app(CartService::class)->items());
+        $this->assertSame([$plain->id], $lines->pluck('product_id')->all());
+    }
 }

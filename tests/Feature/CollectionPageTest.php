@@ -133,6 +133,25 @@ class CollectionPageTest extends TestCase
         $this->get('/collection/eid-gifts')->assertOk();
     }
 
+    public function test_removing_a_collection_cover_clears_it_and_keeping_it_keeps_it(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public')->put('collections/eid.webp', 'x');
+        $c = Collection::create(['name' => 'Eid', 'slug' => 'eid', 'type' => 'manual', 'match' => 'all', 'image' => 'collections/eid.webp']);
+        $base = ['name' => 'Eid', 'type' => 'manual', 'match' => 'all', 'is_active' => '1'];
+
+        // The form shows the saved cover as its public URL; saving untouched
+        // posts that URL back and must keep the same stored path.
+        $this->actingAs($this->admin())->get(route('admin.collections.edit', $c))
+            ->assertOk()->assertSee("mediaField('".str_replace('/', '\/', theme_asset('collections/eid.webp'))."'", false);
+        $this->put(route('admin.collections.update', $c), $base + ['image_url' => theme_asset('collections/eid.webp')])
+            ->assertRedirect();
+        $this->assertSame('collections/eid.webp', $c->fresh()->image);
+
+        $this->put(route('admin.collections.update', $c), $base + ['image_url' => '', 'image_cleared' => '1'])
+            ->assertRedirect();
+        $this->assertNull($c->fresh()->image);
+    }
+
     public function test_malformed_rules_are_dropped_at_save_not_at_query_time(): void
     {
         $this->actingAs($this->admin())->post('/admin/collections', [

@@ -83,6 +83,31 @@ class QueueStallTest extends TestCase
         $this->assertSame(1, $this->waiting());
     }
 
+    public function test_a_drain_still_running_is_not_overlapped_by_the_next_minutes_drain(): void
+    {
+        // The minute lock has expired, but the previous drain is still in a
+        // long job: a second drain would re-reserve it after retry_after.
+        $held = Cache::lock('queue:web-drain:running', 60);
+        $this->assertTrue($held->get());
+        $this->queueProbe();
+
+        app(QueueFallback::class)->afterResponse();
+        $this->assertSame(1, $this->waiting());
+
+        $held->release();
+        Cache::forget('queue:web-drain');
+        app(QueueFallback::class)->afterResponse();
+        $this->assertSame(0, $this->waiting());
+    }
+
+    public function test_the_running_lock_is_let_go_when_a_drain_ends(): void
+    {
+        $this->queueProbe();
+        app(QueueFallback::class)->afterResponse();
+
+        $this->assertTrue(Cache::lock('queue:web-drain:running', 1)->get());
+    }
+
     public function test_a_stale_heartbeat_counts_as_a_missing_cron(): void
     {
         Cache::put(QueueFallback::HEARTBEAT, now()->subMinutes(10)->getTimestamp());

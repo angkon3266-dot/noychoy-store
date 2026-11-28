@@ -73,11 +73,20 @@ class CheckCustomersCourier implements ShouldQueue
      */
     public int $tries = 1;
 
-    /** Budget plus one slow lookup (20 s) plus slack, and under retry_after. */
-    public int $timeout = 80;
+    /**
+     * Budget plus one slow lookup plus slack, and under retry_after (90).
+     *
+     * The budget is only checked before a lookup starts, so the worst run is
+     * budget + BdCourierService::TIMEOUT_SECONDS (60 since 20 Sep). These were
+     * sized for 20-second lookups (40 + 80) and not re-sized when that went
+     * to 60, so a slow answer late in a run overran both the timeout and
+     * retry_after — "CheckCustomersCourier has been attempted too many
+     * times" in production on 27 Oct, with that lookup's credit spent.
+     */
+    public int $timeout = 85;
 
     /** Seconds one run may spend before handing the rest to a fresh job. */
-    public int $budgetSeconds = 40;
+    public int $budgetSeconds = 15;
 
     /** @param  array<int, int>  $customerIds  still to look up, in order */
     public function __construct(public string $batchId, public array $customerIds) {}

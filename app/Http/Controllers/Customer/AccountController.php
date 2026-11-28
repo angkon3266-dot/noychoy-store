@@ -546,7 +546,17 @@ class AccountController extends Controller
                 $skipped++;
                 continue;
             }
-            $variant = $item->variant_id ? ProductVariant::find($item->variant_id) : null;
+            // The size she bought must still exist, belong to this piece and be
+            // on sale. A deleted variant used to come back as the bare product
+            // with no size at all — and checkout only re-checks lines that
+            // carry a variant, so that order went through without one.
+            $variant = $item->variant_id
+                ? ProductVariant::where('product_id', $product->id)->where('is_active', true)->find($item->variant_id)
+                : null;
+            if (($item->variant_id && ! $variant) || (! $variant && $product->has_variants)) {
+                $skipped++;
+                continue;
+            }
             $cart->add($product, $variant, max(1, (int) $item->quantity));
             $added++;
         }

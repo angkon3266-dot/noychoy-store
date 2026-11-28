@@ -89,7 +89,11 @@ class SmsService
             // Any "%" killed a broadcast; "&", "+" and "#" are the same hazard.
             // A form body is parsed once, so the text arrives verbatim. This is
             // also what KhudeBarta's own WordPress plugin does.
-            $response = Http::timeout(config('sms.timeout', 20))->asForm()->post($endpoint, $params);
+            // connectTimeout: a gateway that is down (not slow) never answers
+            // the connect at all, and every SMS then held the one queue worker
+            // for Laravel's default 10 s — new orders' confirmations queued up
+            // behind them and ran hours late (Oct 2026 outage).
+            $response = Http::connectTimeout(5)->timeout(config('sms.timeout', 20))->asForm()->post($endpoint, $params);
 
             $this->lastResponse = $response->json() ?? ['raw' => $response->body()];
             // Surface the endpoint + HTTP code (no secrets) to aid diagnosis.

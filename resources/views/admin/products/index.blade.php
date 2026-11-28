@@ -261,7 +261,7 @@
                             <div><label class="label">Transport / packaging (৳)</label><input name="transport_cost" type="number" step="0.01" value="{{ $product->transport_cost }}" class="input" placeholder="Per unit"></div>
                             <div class="lg:col-span-4"><label class="label">Meta description <span class="text-ink-700/40 font-normal">(SEO)</span></label><textarea name="meta_description" rows="2" class="input" placeholder="Short summary shown in Google results">{{ $product->meta_description }}</textarea></div>
                             <div class="lg:col-span-2" x-data="{ picks: [] }">
-                                <label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images()->count() }} now)</span></label>
+                                <label class="label">Add images <span class="text-ink-700/40 font-normal">({{ $product->images->count() }} now)</span></label>
                                 <input type="file" name="images[]" accept="image/*" multiple class="input text-sm">
                                 <button type="button" @click="$store.mediaLib.openWith(u => { if(!picks.includes(u)) picks.push(u) }, 'products')" class="btn-outline text-xs py-1 mt-1">+ From library</button>
                                 <div class="flex flex-wrap gap-1 mt-1" x-show="picks.length" x-cloak>

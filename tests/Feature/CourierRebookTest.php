@@ -789,4 +789,26 @@ class CourierRebookTest extends TestCase
             ->assertSee('This order is marked DELIVERED', false)
             ->assertSee('is NOT cancelled at Steadfast by this', false);
     }
+
+    public function test_a_long_item_list_is_cut_to_steadfasts_255_character_limit(): void
+    {
+        // Order 10282 (2026-11-03) was refused twice: "The item description
+        // may not be greater than 255 characters."
+        $order = $this->order(['order_number' => '40077']);
+        foreach (range(1, 6) as $n) {
+            $order->items()->create([
+                'name' => "Moissanite Halo Tennis Bracelet in Sterling Silver, style {$n}",
+                'price' => 100, 'quantity' => 2, 'subtotal' => 200,
+            ]);
+        }
+
+        $description = app(SteadfastService::class)->payloadFor($order->fresh())['item_description'];
+
+        $this->assertLessThanOrEqual(255, mb_strlen($description));
+        $this->assertStringStartsWith('Ring x1, Moissanite Halo', $description);
+        $this->assertStringEndsWith('+13 pcs', $description);
+
+        $short = app(SteadfastService::class)->payloadFor($this->order(['order_number' => '40078']))['item_description'];
+        $this->assertSame('Ring x1', $short);
+    }
 }

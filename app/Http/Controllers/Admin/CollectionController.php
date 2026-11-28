@@ -172,6 +172,11 @@ class CollectionController extends Controller
 
         if ($path = resolve_media($request, 'image', 'collections')) {
             $data['image'] = $path;
+        } elseif ($request->boolean('image_cleared')) {
+            // The media field's Remove. Never read here before, so a removed
+            // cover came back on save. The file is left on disk: it may be a
+            // library pick that something else still shows.
+            $data['image'] = null;
         }
 
         return $data;

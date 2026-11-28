@@ -2,6 +2,10 @@
 @section('title', 'Customers')
 @section('heading', 'Customers')
 
+@section('flash')
+    @include('admin.partials.form-errors')
+@endsection
+
 @section('content')
 @php
     $nextBatch = min($courier['batchSize'], $courier['unchecked']);

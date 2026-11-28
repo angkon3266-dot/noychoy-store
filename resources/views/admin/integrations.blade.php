@@ -2,6 +2,10 @@
 @section('title', 'Integrations')
 @section('heading', 'Integrations')
 
+@section('flash')
+    @include('admin.partials.form-errors')
+@endsection
+
 @section('content')
 <div class="max-w-4xl space-y-6">
     <a href="{{ route('admin.system-config.index') }}" class="text-sm text-gold-700 hover:underline">← System Configuration</a>

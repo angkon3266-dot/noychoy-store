@@ -155,4 +155,18 @@ class StoryPageTest extends TestCase
         $this->get('/about')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('eyebrow', store_name()));
     }
+
+    public function test_a_refused_pages_save_says_why_instead_of_showing_nothing(): void
+    {
+        $admin = \App\Models\User::firstOrCreate(
+            ['email' => 'pages-owner@test.local'],
+            ['name' => 'Owner', 'password' => bcrypt('x'), 'role' => 'admin'],
+        );
+
+        $this->actingAs($admin)->from(route('admin.pages'))
+            ->post(route('admin.pages.update'), ['pages' => ['about' => ['lede' => str_repeat('a', 401)]]])
+            ->assertRedirect(route('admin.pages'));
+
+        $this->get(route('admin.pages'))->assertOk()->assertSee('Not saved')->assertSee('Our story opening line')->assertSee('400 characters');
+    }
 }

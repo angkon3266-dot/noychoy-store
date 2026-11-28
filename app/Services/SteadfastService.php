@@ -220,8 +220,29 @@ class SteadfastService
                 ->implode(', '),
             'cod_amount' => (float) ($order->payment_status === 'paid' ? 0 : $order->total),
             'note' => $order->notes ?? '',
-            'item_description' => $order->items->map(fn ($i) => "{$i->name} x{$i->quantity}")->implode(', '),
+            'item_description' => $this->itemDescription($order),
         ];
+    }
+
+    /**
+     * "Ring x1, Necklace x2" — cut to fit Steadfast's 255-character limit.
+     *
+     * Steadfast answers a longer description with a 400 and books nothing, so
+     * an order of four or five long-named products could not be sent at all
+     * (order 10282, 2026-11-03, refused twice). The label only needs enough
+     * for the rider and the packer; the full list is on the order page.
+     */
+    protected function itemDescription(Order $order): string
+    {
+        $full = $order->items->map(fn ($i) => "{$i->name} x{$i->quantity}")->implode(', ');
+
+        if (mb_strlen($full) <= 255) {
+            return $full;
+        }
+
+        $more = ' +'.$order->items->sum('quantity').' pcs';
+
+        return rtrim(mb_substr($full, 0, 255 - mb_strlen($more) - 1), ' ,').'…'.$more;
     }
 
     /**
