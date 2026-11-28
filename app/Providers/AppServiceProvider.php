@@ -37,6 +37,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // First, before anything reads the cache or a session: if the host's
+        // Redis is down or refusing writes, run both on the database instead
+        // of failing every page (outages 2026-10-15 and 2026-11-27).
+        \App\Support\RedisHealth::apply();
+
         $this->app->singleton(CartService::class);
 
         // Gift-ladder collections resolve once per request, not once per
@@ -147,6 +152,12 @@ class AppServiceProvider extends ServiceProvider
 
         // Apply DB-stored System Configuration as runtime overrides (fails safe).
         app(ConfigApplier::class)->apply();
+
+        // The admin's "Cache driver" setting (system_configs cache.default)
+        // was just applied over .env. If it put the cache back on a Redis
+        // that is down, move it off again. The verdict is the one register()
+        // stored a moment ago, so this costs a file read.
+        \App\Support\RedisHealth::apply();
 
         // Settings are held in memory for the life of the process. A web request
         // ends in milliseconds, but a queue worker lives for up to a minute and

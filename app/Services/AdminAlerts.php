@@ -423,6 +423,28 @@ class AdminAlerts
                 }
             }
 
+            // (r) The host's Redis down: the site stays up on the database
+            // (RedisHealth), but slower and with everyone signed out, until
+            // Redis is restarted.
+            $redis = \App\Support\RedisHealth::state();
+            if (! $redis['healthy']) {
+                $out[] = $this->alert(
+                    $this->dailyKey('integration.redis.down'), 'money', 'urgent',
+                    'Redis is down — the site is running on the database',
+                    'The shop is still open, a little slower. Restart Redis in cPanel → LiteSpeed Redis Cache Manager; the site moves back by itself. Reason: '.($redis['reason'] ?? 'unknown').'.',
+                    null, $redis['down_since'] ? Carbon::createFromTimestamp($redis['down_since']) : now(),
+                );
+            } elseif (($redis['last_outage']['to'] ?? 0) >= now()->subDay()->getTimestamp()) {
+                $o = $redis['last_outage'];
+                $tz = config('store.timezone') ?: config('app.timezone');
+                $out[] = $this->alert(
+                    'integration.redis.recovered.'.$o['to'], 'money', 'info',
+                    'Redis was down '.Carbon::createFromTimestamp($o['from'])->tz($tz)->format('j M H:i').'–'.Carbon::createFromTimestamp($o['to'])->tz($tz)->format('H:i').'; the shop stayed open',
+                    'The site ran on the database meanwhile and moved back by itself. If this keeps happening, show Hostnin the time. Reason: '.($o['reason'] ?? 'unknown').'.',
+                    null, Carbon::createFromTimestamp($o['to']),
+                );
+            }
+
             // (b) Parcels that were never actually booked with the courier.
             $unbooked = \App\Models\Order::whereIn('status', ['processing', 'booked'])
                 ->whereDoesntHave('shipment')
