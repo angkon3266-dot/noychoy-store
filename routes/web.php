@@ -300,3 +300,7 @@ Route::get('/collection/{collection:slug}', [CatalogController::class, 'collecti
 Route::get('/category/{category:slug}', [CatalogController::class, 'category'])->name('category.show');
 // withTrashed: an archived product's old links redirect to the shop, not a 404.
 Route::get('/product/{product:slug}', [CatalogController::class, 'show'])->withTrashed()->name('product.show');
+// The "Choose" pop-up's options and prices (QuickPickData): a piece with sizes
+// goes in the bag from a card or the bag's pairs row without opening its page.
+Route::get('/product/{product:slug}/options', [CatalogController::class, 'options'])
+    ->middleware('throttle:120,1')->name('product.options');

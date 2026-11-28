@@ -5,6 +5,7 @@ import { useCart } from './CartContext';
 import { money, newEventId } from './format';
 import { rewardLabel, t } from './i18n';
 import OfferCountdown from './OfferCountdown';
+import { openQuickPick } from './QuickPick';
 
 // Storefront product card — data shape comes from ProductCardData::make().
 export default function ProductCard({ product: p }) {
@@ -58,12 +59,14 @@ export default function ProductCard({ product: p }) {
         if (soldOut) {
             return <button type="button" disabled className={`${btn} w-full ${onImage ? 'bg-white/80 text-ink-500' : 'border border-ink-900/10 text-ink-400'} cursor-not-allowed`}>Sold out</button>;
         }
+        // A piece with options opens the "Choose" pop-up over the page
+        // (QuickPick) rather than sending her off to the product page.
         if (p.has_variants) {
             return (
-                <Link href={p.url} className={`${btn} w-full ${onImage ? solid : outline}`}>
+                <button type="button" onClick={() => openQuickPick(p)} aria-haspopup="dialog" className={`${btn} w-full ${onImage ? solid : outline}`}>
                     Select options
                     <Icon name="chevronRight" className="w-3.5 h-3.5" strokeWidth={2} />
-                </Link>
+                </button>
             );
         }
         return (

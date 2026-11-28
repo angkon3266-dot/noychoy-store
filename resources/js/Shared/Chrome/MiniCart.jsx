@@ -9,6 +9,7 @@ import Icon from '../Icons';
 import { trapTab } from '../focusTrap';
 import { t } from '../i18n';
 import OfferCountdown from '../OfferCountdown';
+import { openQuickPick } from '../QuickPick';
 
 // Mini-cart slide-over — same /cart/mini data contract as the Alpine drawer.
 export default function MiniCart() {
@@ -145,7 +146,7 @@ export default function MiniCart() {
 // "Pairs beautifully with" — the frequently-bought-together picks, moved off
 // the product page into the bag (owner, 2026-10-24). A swipeable row of small
 // cards; a simple piece goes straight into the bag with one tap, a piece with
-// options opens its page.
+// options opens the "Choose" pop-up over the bag (QuickPick, Nov 2026).
 function PairsRow({ pairs, onNavigate }) {
     const { add } = useCart();
     const [adding, setAdding] = useState(null);
@@ -174,7 +175,7 @@ function PairsRow({ pairs, onNavigate }) {
                                 {p.thumb && <img src={p.thumb450 || p.thumb} alt="" loading="lazy" className="w-full h-full object-cover transition duration-700 hover:scale-105" />}
                             </SmartLink>
                             {p.has_variants ? (
-                                <SmartLink href={p.url} onClick={onNavigate} className="absolute bottom-2 right-2 h-8 px-3 rounded-full bg-white/90 backdrop-blur text-[11px] font-medium text-ink-900 grid place-items-center shadow-sm">Choose</SmartLink>
+                                <button type="button" onClick={() => openQuickPick(p)} aria-haspopup="dialog" aria-label={`Choose options for ${p.name}`} className="absolute bottom-2 right-2 h-8 px-3 rounded-full bg-white/90 backdrop-blur text-[11px] font-medium text-ink-900 grid place-items-center shadow-sm">Choose</button>
                             ) : (
                                 <button
                                     type="button"

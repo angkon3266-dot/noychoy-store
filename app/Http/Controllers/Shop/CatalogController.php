@@ -430,6 +430,22 @@ class CatalogController extends Controller
     }
 
     /**
+     * The "Choose" pop-up: a piece's options, each variant's listed price and
+     * stock, as JSON (QuickPickData). Not a product view — no view count, no
+     * ViewContent, no recently-viewed entry — only what adding it needs. Never
+     * cached: a member sees her own price here.
+     */
+    public function options(Product $product)
+    {
+        abort_unless($product->status === 'published', 404);
+
+        return response()->json(\App\Support\Storefront\QuickPickData::make($product))
+            ->header('Cache-Control', 'no-store, private')
+            ->header('X-LiteSpeed-Cache-Control', 'no-cache')
+            ->header('X-Robots-Tag', 'noindex');
+    }
+
+    /**
      * Identifiable fields for CAPI user_data, taken from the logged-in customer
      * when present. Hashing happens inside MetaTrackingService; guests just yield
      * an empty array (IP / user-agent / fbp still provide match quality).

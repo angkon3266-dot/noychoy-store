@@ -66,6 +66,8 @@ class ProductCardData
             ] : null,
             'add_url' => route('cart.add', $p),
             'buynow_url' => route('cart.buynow', $p),
+            // The "Choose" pop-up's data, for a piece with options (QuickPick).
+            'options_url' => $p->has_variants ? route('product.options', $p) : null,
         ];
     }
 

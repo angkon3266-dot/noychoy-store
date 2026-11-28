@@ -4,6 +4,7 @@ import Carousel from './Carousel';
 import SmartLink from './SmartLink';
 import useCountdown from './useCountdown';
 import { useCart } from './CartContext';
+import { openQuickPick } from './QuickPick';
 import { IconOrGlyph } from './Icons';
 
 // Renders the admin section-builder blocks — the React port of
@@ -288,12 +289,12 @@ function BuyBoxBlock({ block }) {
                             item's id and numeric price from the page data; an
                             item without an id gets no track rather than a
                             Pixel event for "prod-undefined".
-                            A product with options gets a link to its page
+                            A product with options opens the "Choose" pop-up
                             instead, as ProductCard does: the cart refuses it
                             until an option is chosen, and the button fired a
                             Pixel AddToCart for that refused add all the same. */}
                         {p.has_variants ? (
-                            <SmartLink href={p.url} className="btn-primary w-full mt-4">Select options</SmartLink>
+                            <button type="button" onClick={() => openQuickPick(p)} aria-haspopup="dialog" className="btn-primary w-full mt-4">Select options</button>
                         ) : (
                             <button
                                 type="button"

@@ -536,12 +536,13 @@ class HomePageData
                     // listed price: the live offer off, the regular one struck.
                     'id' => $p->id,
                     'price' => ($quote = offer_pricing()->quote($p))['price'],
-                    // A product with options cannot be added from here: the
-                    // cart refuses it until one is chosen, so the block links
-                    // to the product page instead — as ProductCard does —
-                    // rather than firing a Pixel AddToCart for an add that
-                    // never happened.
+                    // A product with options cannot be added in one tap: the
+                    // cart refuses it until one is chosen, so the block opens
+                    // the "Choose" pop-up instead (QuickPickData) — as
+                    // ProductCard does — rather than firing a Pixel AddToCart
+                    // for an add that never happened.
                     'has_variants' => (bool) $p->has_variants,
+                    'options_url' => $p->has_variants ? route('product.options', $p) : null,
                     'name' => $p->name,
                     'url' => route('product.show', $p),
                     'thumb' => $p->thumbnail,

@@ -11,6 +11,7 @@ import FloatingStack from './FloatingStack';
 import BottomNav from './BottomNav';
 import PushPrompt from './PushPrompt';
 import { SpinHost } from '../SpinWheel';
+import { QuickPickHost } from '../QuickPick';
 import { initReveal } from '../reveal';
 
 // Persistent layout: assigned via `Page.layout = (page) => <Layout>{page}</Layout>`
@@ -103,6 +104,7 @@ function Chrome({ children, minimalFooter }) {
             <FloatingStack />
             <BottomNav />
             <SpinHost />
+            <QuickPickHost />
 
             {/* Toast */}
             <div
